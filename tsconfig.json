@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "NodeNext",
+    "moduleResolution": "nodenext",
+    "ignoreDeprecations": "6.0",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "isolatedModules": true
+  },
+  "include": ["**/**.ts"],
+  "exclude": ["node_modules", "dist", "**/dist"]
+}

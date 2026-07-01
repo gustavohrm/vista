@@ -1,0 +1,22 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+catalog:
+  "@tauri-apps/api": ^2.0.0
+  "@tailwindcss/vite": ^4.3.0
+  "@vitest/coverage-v8": 4.1.9
+  jsdom: ^29.1.1
+  oxfmt: ^0.57.0
+  oxlint: ^1.72.0
+  tailwindcss: ^4.3.0
+  typescript: ^6.0.3
+  vite: ^8.1.0
+  vitest: ^4.1.9
+
+blockExoticSubdeps: true
+trustPolicy: no-downgrade
+trustPolicyIgnoreAfter: 10080
+allowBuilds:
+  "@parcel/watcher": true
+  esbuild: true

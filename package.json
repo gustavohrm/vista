@@ -1,0 +1,28 @@
+{
+  "name": "vista",
+  "version": "0.0.1",
+  "private": true,
+  "author": "coden.agency",
+  "type": "module",
+  "scripts": {
+    "cloc": "cloc --exclude-dir=node_modules,dist,coverage,test-results,.git --exclude-ext=md,yaml,json",
+    "build": "pnpm -r --if-present build",
+    "format:check": "oxfmt --check",
+    "format:fix": "oxfmt",
+    "lint:check": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "status:npm": "pnpm -r --if-present status:npm",
+    "status:pack": "pnpm -r --if-present status:pack",
+    "test": "pnpm -r --if-present test",
+    "test:coverage": "pnpm -r --if-present test:coverage",
+    "test:watch": "pnpm -r --if-present test:watch",
+    "typecheck": "pnpm -r --if-present typecheck"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "catalog:",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
