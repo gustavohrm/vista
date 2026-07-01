@@ -11,8 +11,6 @@
     "format:fix": "oxfmt",
     "lint:check": "oxlint",
     "lint:fix": "oxlint --fix",
-    "status:npm": "pnpm -r --if-present status:npm",
-    "status:pack": "pnpm -r --if-present status:pack",
     "test": "pnpm -r --if-present test",
     "test:coverage": "pnpm -r --if-present test:coverage",
     "test:watch": "pnpm -r --if-present test:watch",

@@ -3,6 +3,13 @@ packages:
   - "packages/*"
 
 catalog:
+  "@codenhub/components": ^0.0.1
+  "@codenhub/error": ^0.0.1
+  "@codenhub/kbd": ^0.0.1
+  "@codenhub/router": ^0.0.1
+  "@codenhub/ui-kit": ^0.0.1
+  "@codenhub/validation": ^0.0.1
+  "@codenhub/vite-plugin-icons": ^0.0.1
   "@tauri-apps/api": ^2.0.0
   "@tailwindcss/vite": ^4.3.0
   "@vitest/coverage-v8": 4.1.9

@@ -1,0 +1,29 @@
+{
+  "name": "@vista/web",
+  "version": "0.0.1",
+  "private": true,
+  "author": "coden.agency",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "deploy": "wrangler deploy",
+    "format:check": "oxfmt --check",
+    "format:fix": "oxfmt",
+    "lint:check": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vista/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "wrangler": "^3.107.0"
+  }
+}

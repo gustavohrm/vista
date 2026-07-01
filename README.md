@@ -1,5 +1,8 @@
 # Vista
 
+Vista is a multi-platform application designed for managing notes and personal data, optimized for building and navigating your own "second-brain". It blends the best features of Notion, Obsidian, and VS Code into a lightweight app that operates directly on local folders.
+
+The app opens a folder on the user's computer and interprets files in rich, context-aware visualizations. Markdown files open in a fluid rich-text editor; CSV files render as interactive, searchable, filterable, and sortable tables. Vista also includes backlinks for connecting notes, folder-level fuzzy search, and versatile export formats (exporting tables to `.csv`, `.xlsx`, `.json`, or `.yaml`, and text files to `.txt`, `.markdown`, or `.docx`).
 
 ## Commands
 
@@ -23,7 +26,7 @@ pnpm format:check packages/error
 pnpm lint:fix packages/error/src
 ```
 
-When working on one package, run package scripts with `--filter` from the repository root. Use the directory name under `packages/` as the filter value:
+When working on one package, run package scripts with `--filter` from the repository root. Use the directory name under `packages/` or `apps/` as the filter value:
 
 ```sh
 pnpm --filter=error build
