@@ -4,10 +4,13 @@
   "htmlWhitespaceSensitivity": "ignore",
   "ignorePatterns": [
     "dist/**",
+    "target/**",
+    "**/target/**",
+    "**/src-tauri/gen/**",
     "coverage/**",
     "**/coverage/**",
     "test-results/**",
-    "**/test-results/**",
+    "**/test-results/**"
   ],
   "printWidth": 120,
   "semi": true,

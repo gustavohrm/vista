@@ -3,23 +3,21 @@ packages:
   - "packages/*"
 
 catalog:
-  "@codenhub/components": ^0.0.1
-  "@codenhub/error": ^0.0.1
-  "@codenhub/kbd": ^0.0.1
-  "@codenhub/router": ^0.0.1
-  "@codenhub/ui-kit": ^0.0.1
-  "@codenhub/validation": ^0.0.1
-  "@codenhub/vite-plugin-icons": ^0.0.1
-  "@tauri-apps/api": ^2.0.0
-  "@tailwindcss/vite": ^4.3.0
-  "@vitest/coverage-v8": 4.1.9
-  jsdom: ^29.1.1
+  "@tauri-apps/cli": 2.11.4
+  "@tailwindcss/vite": 4.3.3
+  "@types/react": 19.2.18
+  "@types/react-dom": 19.2.4
+  "@vitejs/plugin-react": 6.0.5
+  "@vitest/coverage-v8": 4.1.10
   oxfmt: ^0.57.0
   oxlint: ^1.72.0
-  tailwindcss: ^4.3.0
+  react: 19.2.8
+  react-dom: 19.2.8
+  tailwindcss: 4.3.3
   typescript: ^6.0.3
   vite: ^8.1.0
-  vitest: ^4.1.9
+  vitest: 4.1.10
+  wrangler: 4.123.0
 
 blockExoticSubdeps: true
 trustPolicy: no-downgrade
@@ -27,3 +25,7 @@ trustPolicyIgnoreAfter: 10080
 allowBuilds:
   "@parcel/watcher": true
   esbuild: true
+  workerd: true
+minimumReleaseAgeExclude:
+  - miniflare@5.20260811.1-alpha
+  - wrangler@4.123.0

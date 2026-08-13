@@ -28,16 +28,13 @@ Format and lint scripts can run repo-wide or against a root-relative path:
 
 ```sh
 pnpm format:check
-pnpm format:check packages/error
-pnpm lint:fix packages/error/src
+pnpm format:check packages/app
+pnpm lint:fix packages/app/src
 ```
 
-When checking or running scripts for one package, use `pnpm --filter=<package-dir> <script>` from the repository root, where `<package-dir>` is the directory name under `packages/` or `apps/`. For example, use `pnpm --filter=error typecheck` or `pnpm --filter=error test`. Do not change into a package directory to run package scripts.
+When checking or running scripts for one package, use `pnpm --filter=<package-name> <script>` from the repository root. For example, use `pnpm --filter=@vista/app test` or `pnpm --filter=@vista/web build`. Do not change into a package directory to run package scripts.
 
 Use package-filtered commands when a full workspace check is unnecessary, but full workspace checks are preferred before final delivery when practical.
-
-> [!WARNING]
-> Running `pnpm test` repo-wide may hang/fail to exit because of Playwright worker timeout issues in the `styles` package. Prefer package-filtered test execution (e.g. `pnpm --filter=<pkg> test`) or target specific packages.
 
 ## Change rules
 
@@ -49,13 +46,3 @@ Use package-filtered commands when a full workspace check is unnecessary, but fu
 - Keep package README files aligned with `package.json` `exports`.
 - Do not add dependencies unless simple in-house code is worse.
 - Do not commit secrets, build artifacts, or unrelated changes.
-
-## Public packages
-
-For `private: false` packages under `packages/*`:
-
-- Follow `docs/specs/packages-lifecycle.md`.
-- Keep `README.md` compliant with `docs/specs/packages-readme.md`.
-- Document breaking changes in README and relevant `docs/` files.
-- Keep public exports explicit and documented.
-- Add or update JSDoc/TSDoc for every public symbol exposed through package `exports`; source docs and README reference material must describe the same consumer-facing behavior.

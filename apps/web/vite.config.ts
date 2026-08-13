@@ -1,13 +1,12 @@
-import { defineConfig, mergeConfig } from "vite";
-import path from "path";
-import baseConfig from "../../packages/core/vite.config";
+import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
 
-export default mergeConfig(
-  baseConfig,
-  defineConfig({
-    root: path.resolve(__dirname, "../../packages/core"),
-    build: {
-      outDir: path.resolve(__dirname, "./dist"),
-    },
-  })
-);
+export default defineConfig({
+  root: "src",
+  build: {
+    outDir: "../dist",
+    emptyOutDir: true,
+  },
+  plugins: [react(), tailwindcss()],
+});

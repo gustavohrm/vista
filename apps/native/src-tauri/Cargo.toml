@@ -1,0 +1,16 @@
+[package]
+name = "vista-native"
+version = "0.0.1"
+description = "Native host for Vista"
+authors = ["Gustavo Motta"]
+edition = "2024"
+
+[lib]
+name = "vista_native_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+tauri = { version = "2.11.5", features = [] }

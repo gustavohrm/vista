@@ -1,0 +1,10 @@
+@import "tailwindcss";
+@source "../../../packages/app/src";
+
+html {
+  background: #020617;
+}
+
+body {
+  margin: 0;
+}

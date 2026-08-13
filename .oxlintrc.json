@@ -2,10 +2,13 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "ignorePatterns": [
     "dist/**",
+    "target/**",
+    "**/target/**",
+    "**/src-tauri/gen/**",
     "coverage/**",
     "**/coverage/**",
     "test-results/**",
-    "**/test-results/**",
+    "**/test-results/**"
   ],
   "env": {
     "browser": true,

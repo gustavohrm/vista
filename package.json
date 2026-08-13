@@ -5,8 +5,12 @@
   "author": "coden.agency",
   "type": "module",
   "scripts": {
-    "cloc": "cloc --exclude-dir=node_modules,dist,coverage,test-results,.git --exclude-ext=md,yaml,json",
-    "build": "pnpm -r --if-present build",
+    "build": "pnpm build:web && pnpm build:native",
+    "build:native": "pnpm --filter=@vista/native build",
+    "build:web": "pnpm --filter=@vista/web build",
+    "deploy:web": "pnpm --filter=@vista/web deploy",
+    "dev:native": "pnpm --filter=@vista/native dev:native",
+    "dev:web": "pnpm --filter=@vista/web dev",
     "format:check": "oxfmt --check",
     "format:fix": "oxfmt",
     "lint:check": "oxlint",
@@ -14,13 +18,11 @@
     "test": "pnpm -r --if-present test",
     "test:coverage": "pnpm -r --if-present test:coverage",
     "test:watch": "pnpm -r --if-present test:watch",
-    "typecheck": "pnpm -r --if-present typecheck"
+    "typecheck": "pnpm -r --if-present typecheck",
+    "verify": "pnpm format:check && pnpm lint:check && pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "catalog:",
     "oxfmt": "catalog:",
-    "oxlint": "catalog:",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
+    "oxlint": "catalog:"
   }
 }

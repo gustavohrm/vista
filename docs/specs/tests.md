@@ -1,7 +1,7 @@
 # Testing specification
 
-**Status:** IMPLEMENTED
-**Last updated:** 2026-06-28
+**Status:** APPROVED
+**Last updated:** 2026-08-13
 
 This document outlines the testing strategy, architecture, and standards for this repository. It defines test categories, tooling, configuration requirements, and code coverage targets.
 
@@ -13,7 +13,7 @@ This document outlines the testing strategy, architecture, and standards for thi
 
 ## Test Categorization
 
-Tests in this repository are divided into three distinct categories based on their scope and isolation level.
+Tests in this repository use the following categories as needed, based on scope and isolation level.
 
 ### 1. Unit Tests
 
@@ -25,13 +25,13 @@ Unit tests verify the correctness of small, isolated blocks of code (such as ind
 - **Conventions**:
   - Mock external dependencies (network APIs, local storage, databases, file system, timers, and browser-specific globals).
   - Do not cross-import test utilities across distant packages unless exposed via explicit shared test packages.
-  - Run automatically during local development and on every pull request.
+  - SHOULD run on every pull request once continuous integration is configured.
 
 ### 2. Integration Tests
 
 Integration tests verify that multiple modules or packages interact correctly, including boundaries such as database adapters, network middleware, or cache layers.
 
-- **Location**: Housed in a `tests/integration/` directory inside the package or application root (e.g., `packages/store/tests/integration/`).
+- **Location**: Housed in a `tests/integration/` directory inside the package or application root (e.g., `packages/app/tests/integration/`).
 - **Tooling**: [Vitest](https://vitest.dev/).
 - **Conventions**:
   - Do not use a repository-root global `tests/` directory by default. Keep tests colocated within the package/app scope.
@@ -81,9 +81,9 @@ pnpm test:coverage
 Prefer using package-filtered commands when testing a single package or to avoid workspace timeouts:
 
 ```sh
-pnpm --filter=<package-dir> test
-pnpm --filter=<package-dir> test:watch
-pnpm --filter=<package-dir> test:coverage
+pnpm --filter=<package-name> test
+pnpm --filter=<package-name> test:watch
+pnpm --filter=<package-name> test:coverage
 ```
 
-_(Replace `<package-dir>` with the package name or folder name under `packages/` or `apps/`, e.g., `pnpm --filter=error test`)_
+_(Replace `<package-name>` with a workspace package name, e.g., `pnpm --filter=@vista/app test`.)_

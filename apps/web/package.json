@@ -7,23 +7,27 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "preview": "vite preview",
     "deploy": "wrangler deploy",
     "format:check": "oxfmt --check",
     "format:fix": "oxfmt",
     "lint:check": "oxlint",
     "lint:fix": "oxlint --fix",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest watch",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@vista/core": "workspace:*"
+    "@vista/app": "workspace:*",
+    "react": "catalog:",
+    "react-dom": "catalog:"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "catalog:",
+    "@tailwindcss/vite": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "wrangler": "^3.107.0"
+    "wrangler": "catalog:"
   }
 }
