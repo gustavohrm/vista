@@ -1,13 +1,13 @@
-import { renderToStaticMarkup } from "react-dom/server";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { App } from "./app";
 
 describe("App", () => {
-  it("renders Vista for the provided platform", () => {
-    const markup = renderToStaticMarkup(<App adapter={{ platform: "web" }} />);
+  it.each(["web", "native"] as const)("renders Vista for the %s host", (platform) => {
+    render(<App adapter={{ platform }} />);
 
-    expect(markup).toContain("Vista");
-    expect(markup).toContain('data-platform="web"');
+    expect(screen.getByRole("heading", { name: "Vista", level: 1 })).toBeVisible();
+    expect(screen.getByRole("main")).toHaveAttribute("data-platform", platform);
   });
 });

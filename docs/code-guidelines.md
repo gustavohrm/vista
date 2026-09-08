@@ -1,7 +1,7 @@
 # Coding guidelines
 
 **Status:** IMPLEMENTED
-**Last updated:** 2026-07-01
+**Last updated:** 2026-09-08
 
 This document outlines patterns, conventions and guidelines to follow when working on this codebase.
 
@@ -105,3 +105,13 @@ Oxlint validates JSDoc structure and tag quality where supported, but current Ox
 - Code MUST pass `pnpm typecheck` for changed packages or the full workspace when practical.
 - Formatting is owned by Oxfmt. Do not manually fight formatter output.
 - Lint rules are enforceable project policy. Change the rule or document an exception instead of ignoring it broadly.
+
+## Git workflow
+
+- Work on a feature branch, normally named `codex/<description>` for agent changes. All changes, including new files, must reach `main` through a pull request.
+- Before committing, stage all intended changes and explicitly ignore only files that do not belong in the repository. Hooks reject non-ignored untracked files and unstaged changes, including partially staged files. They never stage or stash files automatically.
+- The pre-commit hook rejects commits on `main` or detached HEAD, then checks formatting and linting across the repository.
+- The pre-push hook rejects updates or deletions targeting remote `main`, regardless of the local branch name. It requires a clean working tree and checks that every non-deletion update points to the checked-out commit, so verification covers the code being pushed. Push other commits from their own checkout.
+- Pre-push runs `pnpm verify` and the browser smoke test. Rust formatting, Clippy, Rust tests, and the native release build are enforced by Windows CI.
+- GitHub branch protection requires a pull request and successful `Web and shared app` and `Windows native` checks against an up-to-date branch. It applies to administrators, prohibits force pushes/deletion, and requires no reviewer approvals so the owner can merge their own PR after checks pass.
+- Hooks are installed per checkout with `pnpm hooks:install` and automatically during a normal local `pnpm install`. GitHub checks remain authoritative because local hooks can be bypassed. Documentation accuracy, architecture, public API documentation, and other semantic guidelines still require PR review.

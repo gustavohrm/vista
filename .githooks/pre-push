@@ -1,0 +1,4 @@
+#!/bin/sh
+cd "$(git rev-parse --show-toplevel)" || exit 1
+node scripts/check-git-state.mjs pre-push || exit 1
+pnpm verify && pnpm test:e2e

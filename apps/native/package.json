@@ -14,11 +14,14 @@
     "dev:ios": "tauri ios dev",
     "dev:native": "tauri dev",
     "format:check": "oxfmt --check",
+    "format:rust:check": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check",
     "format:fix": "oxfmt",
     "lint:check": "oxlint",
+    "lint:rust:check": "cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings",
     "lint:fix": "oxlint --fix",
     "preview": "vite preview",
     "tauri": "tauri",
+    "test:rust": "cargo test --locked --manifest-path src-tauri/Cargo.toml",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -15,8 +15,12 @@
     "format:fix": "oxfmt",
     "lint:check": "oxlint",
     "lint:fix": "oxlint --fix",
-    "test": "pnpm -r --if-present test",
+    "hooks:install": "node scripts/install-hooks.mjs",
+    "prepare": "node scripts/install-hooks.mjs",
+    "test": "pnpm test:hooks && pnpm -r --if-present test",
+    "test:hooks": "node --test scripts/git-hooks.test.mjs",
     "test:coverage": "pnpm -r --if-present test:coverage",
+    "test:e2e": "pnpm --filter=@vista/web test:e2e",
     "test:watch": "pnpm -r --if-present test:watch",
     "typecheck": "pnpm -r --if-present typecheck",
     "verify": "pnpm format:check && pnpm lint:check && pnpm typecheck && pnpm test && pnpm build"
@@ -24,5 +28,10 @@
   "devDependencies": {
     "oxfmt": "catalog:",
     "oxlint": "catalog:"
-  }
+  },
+  "engines": {
+    "node": ">=24.14.1 <25",
+    "pnpm": "11.7.0"
+  },
+  "packageManager": "pnpm@11.7.0"
 }
