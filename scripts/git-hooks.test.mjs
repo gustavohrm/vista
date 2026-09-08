@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
@@ -145,19 +154,12 @@ test("pre-push rejects a commit other than the checked-out commit", (context) =>
   assertRejected(repo.git("push", "origin", "main:other"), /checked-out commit/);
 });
 
-test("pre-push accepts the checked-out feature commit and runs verification", (context) => {
-  const repo = createRepository(context);
-  repo.run("checkout", "-b", "feature");
-  repo.run("push", "origin", "feature");
-  assert.equal(readFileSync(repo.log, "utf8"), "verify\ntest:e2e\n");
-});
-
-test("pre-push propagates failed verification", (context) => {
+test("pre-push accepts the checked-out feature commit without running quality checks", (context) => {
   const repo = createRepository(context);
   repo.run("checkout", "-b", "feature");
   repo.env.VISTA_CHECK_EXIT = "1";
-  assert.notEqual(repo.git("push", "origin", "feature").status, 0);
-  assert.equal(readFileSync(repo.log, "utf8"), "verify\n");
+  repo.run("push", "origin", "feature");
+  assert.equal(existsSync(repo.log), false);
 });
 
 test("pre-push blocks staged but uncommitted changes", (context) => {

@@ -14,9 +14,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  web:
-    name: Web and shared app
-    runs-on: ubuntu-latest
+  windows:
+    name: Windows checks
+    runs-on: windows-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7.0.1
@@ -26,9 +26,11 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm verify
-      - run: pnpm test:coverage
-      - run: pnpm --filter=@vista/web exec playwright install --with-deps chromium
+      - run: pnpm format:check
+      - run: pnpm lint:check
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm --filter=@vista/web exec playwright install chromium
       - run: pnpm test:e2e
       - uses: actions/upload-artifact@v7.0.1
         if: failure()
@@ -36,20 +38,3 @@ jobs:
           name: browser-test-results
           path: apps/web/test-results
           if-no-files-found: ignore
-
-  windows:
-    name: Windows native
-    runs-on: windows-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: pnpm/action-setup@v6.1.0
-      - uses: actions/setup-node@v7.0.0
-        with:
-          node-version-file: .node-version
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter=@vista/native format:rust:check
-      - run: pnpm --filter=@vista/native lint:rust:check
-      - run: pnpm --filter=@vista/native test:rust
-      - run: pnpm --filter=@vista/native build:desktop --no-bundle

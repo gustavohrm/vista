@@ -44,7 +44,7 @@ function checkPush() {
       );
     }
     if (!/^0+$/.test(localOid) && localOid !== head) {
-      throw new Error("Push only the checked-out commit so local checks cover the code being pushed.");
+      throw new Error("Push only the checked-out commit; push other commits from their own checkout.");
     }
   }
   if (readGit(["status", "--porcelain=v1", "--untracked-files=all", "--ignore-submodules=none"])) {

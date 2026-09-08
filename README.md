@@ -88,15 +88,15 @@ pnpm --filter=@vista/native lint:rust:check
 pnpm --filter=@vista/native test:rust
 ```
 
-The browser smoke test uses a fresh build and local Wrangler, including direct navigation and reload. GitHub CI runs frontend checks and the browser smoke test on Linux, plus Rust checks and a Windows release executable build. Native bundles, mobile device validation, signing, and store distribution are separate release concerns.
+The browser smoke test uses a fresh build and local Wrangler, including direct navigation and reload. GitHub CI has one `Windows checks` job for formatting, linting, TypeScript, hook/unit tests, and the Chromium smoke test. It does not compile or launch Tauri. Run Rust checks and `pnpm --filter=@vista/native build:desktop --no-bundle` manually when changing Tauri/Rust configuration or implementing native adapters. Native bundles, mobile device validation, signing, and store distribution are separate release concerns.
 
 For a deployment dry run or local Cloudflare preview, see the [web host commands](apps/web/README.md). Local `.env`, `.dev.vars`, Wrangler state, and generated output are ignored. Only explicitly public client configuration belongs in `VITE_*` variables; those values are included in browser bundles.
 
 ## Contributions
 
-Use a feature branch and open a PR for every change to `main`. A normal local `pnpm install` installs the repository's Git hooks; run `pnpm hooks:install` if lifecycle scripts were disabled. Pre-commit checks formatting and linting and requires all non-ignored changes to be staged. Pre-push requires a clean tree, blocks pushes to `main`, and runs `pnpm verify` plus `pnpm test:e2e`. Install Playwright's Chromium before your first push.
+Use a feature branch and open a PR for every change to `main`. A normal local `pnpm install` installs the repository's Git hooks; run `pnpm hooks:install` if lifecycle scripts were disabled. Pre-commit checks formatting and linting and requires all non-ignored changes to be staged. Pre-push requires a clean tree, blocks pushes to `main`, and accepts only updates pointing to the checked-out commit. It runs no quality checks; CI runs checks and tests automatically on the PR.
 
-GitHub requires both CI jobs before a PR can merge, including for administrators. No additional reviewer is required for this personal project. Hooks never auto-stage untracked files, stash work, or include ignored secrets/build output. See the [Git workflow rules](docs/code-guidelines.md#git-workflow) for details.
+GitHub requires the `Windows checks` job before a PR can merge, including for administrators. No additional reviewer is required for this personal project. Hooks never auto-stage untracked files, stash work, or include ignored secrets/build output. See the [Git workflow rules](docs/code-guidelines.md#git-workflow) for details.
 
 ## Documentation
 
