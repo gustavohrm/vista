@@ -1,3 +1,5 @@
+import { NotebookPen } from "lucide-react";
+
 import type { AppAdapter } from "./ports";
 
 interface AppProps {
@@ -17,6 +19,7 @@ export function App({ adapter }: AppProps) {
       data-platform={adapter.platform}
     >
       <div className="max-w-xl text-center">
+        <NotebookPen aria-hidden="true" className="mx-auto mb-6 size-8 text-cyan-400" />
         <p className="mb-3 text-xs font-semibold tracking-[0.3em] text-cyan-400 uppercase">Local-first workspace</p>
         <h1 className="text-5xl font-semibold tracking-tight">Vista</h1>
         <p className="mt-4 text-balance text-slate-400">Notes, files, and structured data in one focused workspace.</p>
