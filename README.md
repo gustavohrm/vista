@@ -6,7 +6,7 @@ Planned capabilities include rich Markdown editing, structured CSV views, backli
 
 ## Setup
 
-Use Node **24.14.1** (also recorded in `.node-version`) and pnpm **11.7.0** (pinned in `package.json`). Install pnpm with `npm install --global pnpm@11.7.0` if it is not already available. Then, from the repository root:
+Use Node **24.14.1** (also recorded in `.nvmrc`) and pnpm **11.7.0** (pinned in `package.json`). Install pnpm with `npm install --global pnpm@11.7.0` if it is not already available. Then, from the repository root:
 
 ```sh
 pnpm install --frozen-lockfile
@@ -94,13 +94,13 @@ For a deployment dry run or local Cloudflare preview, see the [web host commands
 
 ## Contributions
 
-Use a feature branch and open a PR for every change to `main`. A normal local `pnpm install` installs the repository's Git hooks; run `pnpm hooks:install` if lifecycle scripts were disabled. Pre-commit checks formatting and linting and requires all non-ignored changes to be staged. Pre-push requires a clean tree, blocks pushes to `main`, and accepts only updates pointing to the checked-out commit. It runs no quality checks; CI runs checks and tests automatically on the PR.
+Use a feature branch and open a PR for every change to `main`. A normal local `pnpm install` installs the repository's Git hooks; run `pnpm hooks:install` if lifecycle scripts were disabled. Pre-commit checks formatting and linting and requires all non-ignored changes to be staged. A `commit-msg` hook enforces Conventional Commits format. Pre-push requires a clean tree, blocks pushes to `main`, and accepts only updates pointing to the checked-out commit. It runs no quality checks; CI runs checks and tests automatically on the PR.
 
-GitHub requires the `Windows checks` job before a PR can merge, including for administrators. No additional reviewer is required for this personal project. Hooks never auto-stage untracked files, stash work, or include ignored secrets/build output. See the [Git workflow rules](docs/code-guidelines.md#git-workflow) for details.
+GitHub requires the `Windows checks` job before a PR can merge, including for administrators. No additional reviewer is required for this personal project. Hooks never auto-stage untracked files, stash work, or include ignored secrets/build output. See [CONTRIBUTING.md](CONTRIBUTING.md) for details on branches, commits, and pull requests.
 
 ## Documentation
 
-This repository is docs-first: durable decisions live in `docs/` and code should follow approved documentation. Package-specific documentation lives in `packages/<name>/docs/` or `apps/<name>/docs/`.
+This repository is docs-first: durable decisions live in `docs/` and code should follow approved documentation.
 
 Read these before changing behavior, public APIs, or project conventions:
 

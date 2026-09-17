@@ -59,6 +59,6 @@ Use `docs/` for durable project knowledge:
 - Feature specs.
 - Source-of-truth decisions.
 
-Do not use `docs/` for temporary notes, TODO lists, or information better expressed in code comments. Also do not use root `docs/` for package-specific documentation; those should be in `packages/<name>/docs/` or `apps/<name>/docs/`, because each package should own its own rules and documentation.
+Do not use `docs/` for temporary notes, TODO lists, or information better expressed in code comments.
 
 Plans and similar temporary documents MAY live in `docs/plans/`. This directory is git-ignored and should stay that way because these documents are short-lived planning aids, not long-term project documentation.

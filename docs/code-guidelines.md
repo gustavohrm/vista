@@ -55,11 +55,11 @@ Exceptions: framework callbacks, test helpers, tiny local functions, and APIs wh
 - Use type-only imports when importing only types.
 - Validate `unknown` at boundaries before use.
 - Keep casts close to the boundary and make them narrow.
-- Do not export types or values that are not part of the package API.
+- Do not export types or values that are not part of the package or module API.
 
 ## Modules and imports
 
-- Prefer named exports for reusable library code.
+- Prefer named exports for shared application code and modules.
 - Use barrel files only as package or folder entrypoints.
 - Avoid deep imports across package internals unless the subpath is part of `exports`.
 - Keep dependency direction clear: shared code must not import app-specific code.
@@ -88,15 +88,15 @@ For comprehensive details on test categorization (Unit, Integration, E2E), confi
 
 - Comments explain WHY, not WHAT or HOW.
 - Remove and avoid redundant comments, decorations and outdated docs.
-- Public package APIs MUST have JSDoc/TSDoc in source, even when the README also documents them.
+- Public workspace and contract APIs MUST have JSDoc/TSDoc in source, even when the package README also documents them.
 
-Every symbol exposed through `package.json` `exports` is public API. Public API includes exported functions, classes, methods, interfaces, type aliases, constants, config objects, plugin factories, CSS/token surfaces represented in TypeScript, and other consumer-facing values.
+In this application workspace, symbols exposed through `package.json` `exports` (such as in `@vista/app`) form the shared contracts and components consumed across platform hosts. Public workspace API includes exported components, capability contracts, interfaces, type aliases, constants, and host adapter types.
 
-Public API JSDoc/TSDoc MUST describe consumer-facing purpose, important inputs or properties, return values or side effects, and observable error or failure behavior. It MUST NOT restate the type signature in prose or document private implementation details.
+Contract and component JSDoc/TSDoc MUST describe purpose, important parameters or properties, return values or side effects, and observable error or failure behavior. It MUST NOT restate the type signature in prose or document private implementation details.
 
-When changing package `exports`, public symbols, public behavior, or observable failure behavior, update source JSDoc/TSDoc and the package README/reference material in the same change.
+When changing workspace `exports`, shared symbols, capability contracts, or observable failure behavior, update source JSDoc/TSDoc and the package or app README in the same change.
 
-Oxlint validates JSDoc structure and tag quality where supported, but current Oxlint rules do not fully detect missing docs for package public exports. Code authors and reviewers MUST enforce public API JSDoc/TSDoc coverage during implementation and review until a dedicated lint rule or custom plugin exists.
+Oxlint validates JSDoc structure and tag quality where supported, but current Oxlint rules do not fully detect missing docs for workspace public exports. Code authors and reviewers MUST enforce public API JSDoc/TSDoc coverage during implementation and review until a dedicated lint rule or custom plugin exists.
 
 ## Formatting, linting, and type checking
 
@@ -105,13 +105,3 @@ Oxlint validates JSDoc structure and tag quality where supported, but current Ox
 - Code MUST pass `pnpm typecheck` for changed packages or the full workspace when practical.
 - Formatting is owned by Oxfmt. Do not manually fight formatter output.
 - Lint rules are enforceable project policy. Change the rule or document an exception instead of ignoring it broadly.
-
-## Git workflow
-
-- Work on a feature branch, normally named `codex/<description>` for agent changes. All changes, including new files, must reach `main` through a pull request.
-- Before committing, stage all intended changes and explicitly ignore only files that do not belong in the repository. Hooks reject non-ignored untracked files and unstaged changes, including partially staged files. They never stage or stash files automatically.
-- The pre-commit hook rejects commits on `main` or detached HEAD, then checks formatting and linting across the repository.
-- The pre-push hook rejects updates or deletions targeting remote `main`, regardless of the local branch name. It requires a clean working tree and checks that every non-deletion update points to the checked-out commit. Push other commits from their own checkout.
-- Pre-push enforces only Git state rules. One Windows CI job runs formatting, linting, TypeScript checks, hook/unit tests, and the Chromium smoke test. Run Rust formatting, Clippy, Rust tests, and a native executable build manually when changing Tauri/Rust configuration or implementing native adapters; native compilation is outside CI for now.
-- GitHub branch protection requires a pull request and a successful `Windows checks` job against an up-to-date branch. It applies to administrators, prohibits force pushes/deletion, and requires no reviewer approvals so the owner can merge their own PR after checks pass.
-- Hooks are installed per checkout with `pnpm hooks:install` and automatically during a normal local `pnpm install`. GitHub checks remain authoritative because local hooks can be bypassed. Documentation accuracy, architecture, public API documentation, and other semantic guidelines still require PR review.

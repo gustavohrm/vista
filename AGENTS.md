@@ -1,5 +1,7 @@
 # Agent instructions
 
+Vista is a user-facing application for managing notes and personal data directly on local folders (web and native desktop/mobile). Its target audience is normal end users, not external developers. It uses a pnpm monorepo workspace to organize shared application UI (`packages/app`) and platform hosts (`apps/web`, `apps/native`), but it is not a library or package-publishing repository.
+
 This repository is docs-first. Before making non-trivial changes, read and follow the relevant source-of-truth documents in `docs/`, especially `docs/code-guidelines.md` and `docs/docs-guidelines.md`.
 
 ## Priority
@@ -40,9 +42,9 @@ Use package-filtered commands when a full workspace check is unnecessary, but fu
 
 - Prefer small, targeted changes.
 - Do not refactor outside the requested scope.
-- Update docs in the same change when behavior, public APIs, package exports, conventions, or lifecycle rules change.
+- Update docs in the same change when behavior, architecture contracts, workspace exports, conventions, or platform rules change.
 - Follow `docs/code-guidelines.md` for code style, architecture, TypeScript, testing, and source documentation requirements.
 - Follow `docs/docs-guidelines.md` when creating, updating, interpreting, or making exceptions to durable documentation.
-- Keep package README files aligned with `package.json` `exports`.
+- Keep package and app README files aligned with their responsibilities and `package.json` `exports`.
 - Do not add dependencies unless simple in-house code is worse.
 - Do not commit secrets, build artifacts, or unrelated changes.

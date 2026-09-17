@@ -12,7 +12,7 @@ if (!process.env.CI && existsSync(".git")) {
       `Existing core.hooksPath is ${current}. Reconcile it with .githooks before installing Vista hooks.`,
     );
   }
-  for (const hook of ["pre-commit", "pre-push"]) {
+  for (const hook of ["pre-commit", "pre-push", "commit-msg"]) {
     chmodSync(`.githooks/${hook}`, 0o755);
   }
   const installed = spawnSync("git", ["config", "--local", "core.hooksPath", ".githooks"], { encoding: "utf8" });
