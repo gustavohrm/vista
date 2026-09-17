@@ -42,7 +42,7 @@ Integration tests verify that multiple modules or packages interact correctly, i
 
 E2E tests verify full user journeys, page transitions, rendering, and visual regression across real browser environments.
 
-- **Location**: Housed in `tests/e2e/` or `tests/browser/` directories within the target application or specialized styling packages.
+- **Location**: Housed in `tests/e2e/` or `tests/browser/` directories within the target application host (such as `apps/web/tests/e2e/`).
 - **Tooling**: [Playwright](https://playwright.dev/).
 - **Conventions**:
   - Add visual regression tests when a component has an agreed visual design. The current shell uses a browser startup smoke test, including a computed-style check, rather than maintaining snapshots of placeholder UI.

@@ -58,12 +58,12 @@ function createRepository(context) {
   for (const script of ["check-git-state.mjs", "install-hooks.mjs"]) {
     copyFileSync(join(repositoryRoot, "scripts", script), join(cwd, "scripts", script));
   }
-  for (const hook of ["pre-commit", "pre-push"]) {
+  for (const hook of ["pre-commit", "pre-push", "commit-msg"]) {
     copyFileSync(join(repositoryRoot, ".githooks", hook), join(cwd, ".githooks", hook));
     chmodSync(join(cwd, ".githooks", hook), 0o755);
   }
   run("add", ".");
-  run("commit", "-m", "initial");
+  run("commit", "-m", "chore: initial");
   run("init", "--bare", join(directory, "remote.git"));
   run("remote", "add", "origin", join(directory, "remote.git"));
   run("push", "origin", "main");
@@ -116,7 +116,7 @@ test("pre-commit accepts fully staged additions and excludes ignored secrets", (
   writeFileSync(join(repo.cwd, "new file.txt"), "included\n");
   writeFileSync(join(repo.cwd, ".env"), "local fixture\n");
   repo.run("add", ".");
-  repo.run("commit", "-m", "allowed");
+  repo.run("commit", "-m", "feat: allowed");
   assert.equal(readFileSync(repo.log, "utf8"), "format:check\nlint:check\n");
   assert.equal(repo.run("ls-files", ".env"), "");
 });
@@ -125,13 +125,13 @@ test("pre-commit propagates failed quality checks", (context) => {
   const repo = createRepository(context);
   repo.run("checkout", "-b", "feature");
   repo.env.VISTA_CHECK_EXIT = "1";
-  assert.notEqual(repo.git("commit", "--allow-empty", "-m", "blocked").status, 0);
+  assert.notEqual(repo.git("commit", "--allow-empty", "-m", "feat: blocked").status, 0);
 });
 
 test("pre-push blocks a feature branch mapped to remote main", (context) => {
   const repo = createRepository(context);
   repo.run("checkout", "-b", "feature");
-  repo.run("commit", "--allow-empty", "-m", "feature");
+  repo.run("commit", "--allow-empty", "-m", "feat: feature");
   assertRejected(repo.git("push", "origin", "HEAD:main"), /pull request/);
 });
 
@@ -150,7 +150,7 @@ test("pre-push blocks a dirty checkout", (context) => {
 test("pre-push rejects a commit other than the checked-out commit", (context) => {
   const repo = createRepository(context);
   repo.run("checkout", "-b", "feature");
-  repo.run("commit", "--allow-empty", "-m", "feature");
+  repo.run("commit", "--allow-empty", "-m", "feat: feature");
   assertRejected(repo.git("push", "origin", "main:other"), /checked-out commit/);
 });
 
@@ -168,4 +168,51 @@ test("pre-push blocks staged but uncommitted changes", (context) => {
   writeFileSync(join(repo.cwd, "file.txt"), "staged\n");
   repo.run("add", "file.txt");
   assertRejected(repo.git("push", "origin", "feature"), /clean working tree/);
+});
+
+test("commit-msg blocks non-conventional commit messages", (context) => {
+  const repo = createRepository(context);
+  repo.run("checkout", "-b", "feature");
+  assertRejected(repo.git("commit", "--allow-empty", "-m", "invalid subject"), /start with a type and a colon/);
+});
+
+test("commit-msg blocks subjects starting with a capital letter", (context) => {
+  const repo = createRepository(context);
+  repo.run("checkout", "-b", "feature");
+  assertRejected(repo.git("commit", "--allow-empty", "-m", "feat: Add feature"), /starts with a capital/);
+});
+
+test("commit-msg blocks subjects ending with a period", (context) => {
+  const repo = createRepository(context);
+  repo.run("checkout", "-b", "feature");
+  assertRejected(repo.git("commit", "--allow-empty", "-m", "feat: add feature."), /ends with a period/);
+});
+
+test("commit-msg blocks subjects exceeding 72 characters", (context) => {
+  const repo = createRepository(context);
+  repo.run("checkout", "-b", "feature");
+  const longSubject = `feat: ${"a".repeat(70)}`;
+  assertRejected(repo.git("commit", "--allow-empty", "-m", longSubject), /over the 72 limit/);
+});
+
+test("commit-msg blocks empty messages", (context) => {
+  const repo = createRepository(context);
+  repo.run("checkout", "-b", "feature");
+  assertRejected(repo.git("commit", "--allow-empty", "-m", ""), /commit message is empty/);
+});
+
+test("commit-msg accepts valid Conventional Commits with and without scope, including breaking changes", (context) => {
+  const repo = createRepository(context);
+  repo.run("checkout", "-b", "feature");
+  repo.run("commit", "--allow-empty", "-m", "feat(app): add note editor");
+  repo.run("commit", "--allow-empty", "-m", "fix(web)!: handle permission revocation");
+  repo.run("commit", "--allow-empty", "-m", "docs: update contributing guide");
+});
+
+test("commit-msg allows merge, revert, and autosquash subjects", (context) => {
+  const repo = createRepository(context);
+  repo.run("checkout", "-b", "feature");
+  repo.run("commit", "--allow-empty", "-m", "Merge branch 'main' into feature");
+  repo.run("commit", "--allow-empty", "-m", 'Revert "feat: something"');
+  repo.run("commit", "--allow-empty", "-m", "fixup! feat: something");
 });
