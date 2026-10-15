@@ -200,6 +200,22 @@ test("pre-push accepts tag pushes regardless of name", (context) => {
   assert.match(repo.run("ls-remote", "--tags", "origin"), /refs\/tags\/v0\.1\.0/);
 });
 
+test("pre-push accepts an annotated tag of the checked-out commit", (context) => {
+  const repo = createRepository(context);
+  repo.run("checkout", "-b", "feat/notes-search");
+  repo.run("tag", "-a", "v1.0.0", "-m", "v1.0.0");
+  repo.run("push", "origin", "v1.0.0");
+  assert.match(repo.run("ls-remote", "--tags", "origin"), /refs\/tags\/v1\.0\.0/);
+});
+
+test("pre-push rejects an annotated tag of a commit other than the checked-out commit", (context) => {
+  const repo = createRepository(context);
+  repo.run("tag", "-a", "v1.0.0", "-m", "v1.0.0");
+  repo.run("checkout", "-b", "feat/notes-search");
+  repo.run("commit", "--allow-empty", "-m", "feat: feature");
+  assertRejected(repo.git("push", "origin", "v1.0.0"), /checked-out commit/);
+});
+
 test("pre-push accepts deleting a misnamed remote branch", (context) => {
   const repo = createRepository(context);
   repo.run("checkout", "-b", "feat/notes-search");
