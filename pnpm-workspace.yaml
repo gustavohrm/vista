@@ -3,21 +3,33 @@ packages:
   - "packages/*"
 
 catalog:
+  "@codenhub/icons": 0.2.1
+  "@codenhub/styles": 0.6.0
+  "@codenhub/theme": 0.1.2
+  "@codenhub/toaster": 0.2.0
+  "@milkdown/core": 7.22.1
+  "@milkdown/plugin-history": 7.22.1
+  "@milkdown/plugin-listener": 7.22.1
+  "@milkdown/preset-commonmark": 7.22.1
+  "@milkdown/preset-gfm": 7.22.1
   "@playwright/test": 1.63.0
+  "@tauri-apps/cli": 2.11.4
+  "@tauri-apps/plugin-dialog": 2.7.3
+  "@tauri-apps/plugin-fs": 2.5.2
+  "@tailwindcss/vite": 4.3.3
   "@testing-library/dom": 10.4.1
   "@testing-library/jest-dom": 7.0.1
   "@testing-library/react": 16.3.3
   "@testing-library/user-event": 14.6.7
-  "@tauri-apps/cli": 2.11.4
-  "@tailwindcss/vite": 4.3.3
+  "@types/papaparse": 5.5.2
   "@types/react": 19.2.18
   "@types/react-dom": 19.2.4
   "@vitejs/plugin-react": 6.0.5
   "@vitest/coverage-v8": 4.1.10
-  oxfmt: ^0.57.0
   jsdom: 29.1.1
-  lucide-react: 1.42.0
+  oxfmt: ^0.57.0
   oxlint: ^1.72.0
+  papaparse: 5.7.0
   react: 19.2.8
   react-dom: 19.2.8
   tailwindcss: 4.3.3
@@ -36,4 +48,5 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - miniflare@5.20260811.1-alpha
   - wrangler@4.123.0
-  - lucide-react@1.42.0
+  - "@codenhub/icons@0.2.1"
+  - "@codenhub/theme@0.1.2"

@@ -44,11 +44,11 @@ pnpm --filter=@vista/native dev:ios
 pnpm --filter=@vista/native build:ios
 ```
 
-Mobile folder access and platform permissions must be designed and tested with the first workspace feature. Desktop paths and browser folder handles are not a cross-platform storage contract. App-store distribution, signing and automatic updates belong to beta preparation.
+Mobile folder access is not supported yet. `@tauri-apps/plugin-dialog` has no folder picker on Android or iOS, so opening, remembering, and restoring folders is desktop-only until mobile folder access and platform permissions are designed and tested. Desktop paths and browser folder handles are not a cross-platform storage contract. App-store distribution, signing and automatic updates belong to beta preparation.
 
 ## Host boundary and security
 
-Tauri integrations belong in this host. Install `@tauri-apps/api` and individual plugins when a concrete capability needs them; the current shell needs neither. Grant permissions only for implemented capabilities. The default capability currently grants Tauri core operations to the main window and no filesystem access.
+Tauri integrations belong in this host. The workspace capability uses `@tauri-apps/plugin-dialog` for folder selection and `@tauri-apps/plugin-fs` for file access. `tauri-plugin-persisted-scope` keeps the folder scope granted by the picker across restarts, so the last folder can be reopened. Grant permissions only for implemented capabilities. The default capability (`src-tauri/capabilities/default.json`) grants Tauri core operations, dialog, and the filesystem operations the workspace uses (read directory, read and write text files, exists, mkdir, remove, and rename) to the main window.
 
 The production content security policy allows bundled scripts and styles, inline styles, local/data images, and Tauri IPC. The development policy additionally allows Vite's inline React bootstrap and WebSocket hot reload. Expand policies only alongside the feature that requires the new source; keep development exceptions out of production.
 

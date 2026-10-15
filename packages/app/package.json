@@ -18,7 +18,16 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "lucide-react": "catalog:",
+    "@codenhub/icons": "catalog:",
+    "@codenhub/styles": "catalog:",
+    "@codenhub/theme": "catalog:",
+    "@codenhub/toaster": "catalog:",
+    "@milkdown/core": "catalog:",
+    "@milkdown/plugin-history": "catalog:",
+    "@milkdown/plugin-listener": "catalog:",
+    "@milkdown/preset-commonmark": "catalog:",
+    "@milkdown/preset-gfm": "catalog:",
+    "papaparse": "catalog:",
     "react": "catalog:"
   },
   "devDependencies": {
@@ -26,6 +35,7 @@
     "@testing-library/jest-dom": "catalog:",
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",
+    "@types/papaparse": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitest/coverage-v8": "catalog:",

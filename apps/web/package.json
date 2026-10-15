@@ -24,6 +24,7 @@
     "react-dom": "catalog:"
   },
   "devDependencies": {
+    "@codenhub/icons": "catalog:",
     "@playwright/test": "catalog:",
     "@tailwindcss/vite": "catalog:",
     "@types/react": "catalog:",
