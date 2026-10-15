@@ -1,10 +1,136 @@
-@import "tailwindcss";
+@import "@codenhub/styles/tw";
+@import "@codenhub/icons";
+@import "@codenhub/toaster/styles";
 @source ".";
 
-html {
-  background: #020617;
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-default, "Segoe UI", system-ui, sans-serif);
 }
 
-body {
-  margin: 0;
+/* GFM task list items in the Markdown WYSIWYG editor. Hand-written CSS because the checkbox is
+   centered on the first line box and the checked style targets a nested content element, which
+   Tailwind arbitrary variants would make unreadable. The `.checkbox` class owns the control's look. */
+.markdown-editor .ProseMirror li[data-item-type="task"] {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  /* Cancels the list's pl-6 so the checkbox sits in the bullet gutter and the text stays aligned. */
+  margin-left: -1.5rem;
+  list-style: none;
+}
+
+/* A 1lh-tall flex row centers the 1rem checkbox on the first line of text. */
+.markdown-editor .ProseMirror li[data-item-type="task"] > .task-list-item-control {
+  display: flex;
+  flex: none;
+  align-items: center;
+  width: 1rem;
+  height: 1lh;
+}
+
+.markdown-editor .ProseMirror li[data-item-type="task"] > .task-list-item-content {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+/* Paragraphs inside a task item sit on the same line as its checkbox, so they drop the list's
+   paragraph spacing, matching `li > p` for plain items. */
+.markdown-editor .ProseMirror li[data-item-type="task"] > .task-list-item-content > p {
+  margin-bottom: 0;
+}
+
+.markdown-editor .ProseMirror li[data-item-type="task"][data-checked="true"] > .task-list-item-content {
+  color: var(--color-text-secondary);
+  text-decoration: line-through;
+}
+
+/* Rich-text elements that Milkdown renders, so markup cannot carry package classes. `/tw/native`
+   is not imported here: its bare-element mappings are global and would restyle the whole app. */
+.markdown-editor .ProseMirror {
+  @apply text-text mx-auto max-w-3xl leading-relaxed outline-none;
+}
+
+.markdown-editor .ProseMirror a {
+  @apply text-text-strong underline;
+}
+
+.markdown-editor .ProseMirror h1 {
+  @apply text-title text-text-strong border-border mb-4 border-b pb-2;
+}
+
+/* No package step sits between `text-title` (text-3xl) and `text-title-sm` (text-xl), so h2 keeps
+   its own size. */
+.markdown-editor .ProseMirror h2 {
+  @apply text-text-strong mt-6 mb-3 text-2xl font-semibold;
+}
+
+.markdown-editor .ProseMirror h3 {
+  @apply text-title-sm text-text-strong mt-4 mb-2;
+}
+
+.markdown-editor .ProseMirror p {
+  @apply mb-4;
+}
+
+.markdown-editor .ProseMirror ul {
+  @apply mb-4 list-disc pl-6;
+}
+
+.markdown-editor .ProseMirror ol {
+  @apply mb-4 list-decimal pl-6;
+}
+
+.markdown-editor .ProseMirror li {
+  @apply mb-1;
+}
+
+/* A paragraph inside a list item sits on the item's own line, so it drops the paragraph gap. */
+.markdown-editor .ProseMirror li > p {
+  @apply mb-0;
+}
+
+.markdown-editor .ProseMirror blockquote {
+  @apply quote;
+
+  margin-block: 1rem;
+}
+
+.markdown-editor .ProseMirror code {
+  @apply code;
+}
+
+.markdown-editor .ProseMirror pre {
+  @apply pre mb-4;
+}
+
+.markdown-editor .ProseMirror pre code {
+  @apply bg-transparent p-0;
+}
+
+.markdown-editor .ProseMirror table {
+  @apply data-table mb-4;
+}
+
+/* Body cells hold an input that carries its own padding, so the grid cell adds none; the table's
+   cell padding would double it and make every row as tall as a document table row. */
+.csv-table .data-table tbody td {
+  padding: 0;
+}
+
+/* End-aligned variant of the design system's bottom tooltip, for controls near the right edge of
+   a header. The package only centers a bottom bubble, which would overflow the edge, and a side
+   bubble would cover the neighbouring buttons while it lingers. It sets the same positioning
+   custom properties the package's own `data-tooltip-position` rules set. Unlayered, so it wins
+   over the package's layered rules. */
+.tooltip.tooltip-end[data-tooltip-position="bottom"] {
+  --tooltip-left: auto;
+  --tooltip-right: 0;
+  --tooltip-transform: translate(0, 100%);
+  --tooltip-origin: top right;
 }

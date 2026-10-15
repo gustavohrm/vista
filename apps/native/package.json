@@ -25,11 +25,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@tauri-apps/plugin-dialog": "catalog:",
+    "@tauri-apps/plugin-fs": "catalog:",
     "@vista/app": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:"
   },
   "devDependencies": {
+    "@codenhub/icons": "catalog:",
     "@tailwindcss/vite": "catalog:",
     "@tauri-apps/cli": "catalog:",
     "@types/react": "catalog:",
