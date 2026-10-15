@@ -8,14 +8,12 @@ scope: Index of the project documentation.
 
 `docs/` holds durable project knowledge. [Contributing](../CONTRIBUTING.md) contains the contributor workflow; [agent instructions](../AGENTS.md) contain agent behavior guidance. [Documentation guidelines](guidelines/documentation.md) define how these documents are written, what their status means, and how they change.
 
-Start with [Architecture](architecture.md).
-
 ## Overview
 
-| Document                        | Contains                                                                                        |
-| ------------------------------- | ----------------------------------------------------------------------------------------------- |
-| [Architecture](architecture.md) | Shared app code versus platform hosts, platform adapters, and the hosting decision. Start here. |
-| [Roadmap](roadmap.md)           | Planned, possible, and ruled-out work, each cited to the document that states it.               |
+| Document                        | Contains                                                                            |
+| ------------------------------- | ----------------------------------------------------------------------------------- |
+| [Architecture](architecture.md) | Shared app code versus platform hosts, platform adapters, and the hosting decision. |
+| [Roadmap](roadmap.md)           | Planned, possible, and ruled-out work, each cited to the document that states it.   |
 
 ## Repository references
 
@@ -26,10 +24,10 @@ Start with [Architecture](architecture.md).
 
 ## Guidelines
 
-| Document                                     | Contains                                                                                       |
-| -------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| [Code](guidelines/code.md)                   | Naming, structure, TypeScript, async and error handling, testing, and tooling.                 |
-| [Documentation](guidelines/documentation.md) | Required header, status and authority, recording decisions, exceptions, and what belongs here. |
+| Document                                     | Contains                                                                                            |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| [Code](guidelines/code.md)                   | Naming, structure, TypeScript, async and error handling, testing, and tooling.                      |
+| [Documentation](guidelines/documentation.md) | Required header, status and authority, recording decisions, exceptions, document roles, and layout. |
 
 ## Specifications
 

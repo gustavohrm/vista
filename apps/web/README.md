@@ -4,7 +4,7 @@ Browser host and Cloudflare Workers deployment for the shared Vista app. Browser
 
 ## Local development
 
-Run commands from the repository root after following the root README's toolchain setup:
+Run commands from the repository root, with the toolchain the root README pins installed:
 
 ```sh
 pnpm dev:web

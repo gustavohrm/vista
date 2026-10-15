@@ -2,110 +2,28 @@
 
 Vista is an early-stage, multi-platform workspace for managing notes and personal data. Its goal is a lightweight middle ground between Notion, Obsidian, and VS Code that operates directly on local folders.
 
-Planned capabilities include rich Markdown editing, structured CSV views, backlinks, folder search, and data export. Current implementation provides shared React, web, and Tauri foundations with a folder file tree, Markdown and CSV editing, and file management.
+The current implementation opens a local folder as a workspace, shows its file tree, edits Markdown and CSV files, and creates, renames, and deletes files, on the web and in a Tauri desktop host. Backlinks, folder search, and data export are planned. Desktop Chrome and Edge, and Windows, are the verified targets; the mobile builds are prepared but unverified.
 
-## Setup
+## Repository
 
-Use Node **24.14.1** (also recorded in `.nvmrc`) and pnpm **11.7.0** (pinned in `package.json`). Install pnpm with `npm install --global pnpm@11.7.0` if it is not already available. Then, from the repository root:
+A pnpm workspace of one shared application package and the platform hosts that run it:
 
-```sh
-pnpm install --frozen-lockfile
-pnpm dev:web
-```
+- `packages/app`: shared React product code and the platform capability contracts the hosts implement.
+- `apps/web`: browser host, with folder access through browser APIs, a Vite build, and a Cloudflare Workers scaffold whose publication is deferred.
+- `apps/native`: Tauri host for desktop, Android, and iOS, with Rust in `apps/native/src-tauri`.
+- `docs/`: architecture, guidelines, specifications, and repository references.
 
-For Windows development, install Rust through rustup, Microsoft C++ Build Tools, and WebView2. The root `rust-toolchain.toml` pins Rust **1.95.0**. See the [native host setup](apps/native/README.md) for Windows details and Android/iOS initialization. The immediate verification targets are desktop Chrome/Edge and Windows; mobile remains prepared but unverified.
+## Tooling
 
-The web MVP will work on user-selected existing folders through supported browser APIs. Browser-private storage is not a substitute for folder access. See the [architecture](docs/architecture.md) for the approved adapter boundaries and platform constraints.
-
-## Commands
-
-Use pnpm from the repository root. Run workspace-wide commands with no package filter:
-
-```sh
-pnpm build
-pnpm format:check
-pnpm format:fix
-pnpm lint:check
-pnpm lint:fix
-pnpm test
-pnpm test:e2e
-pnpm typecheck
-pnpm verify
-```
-
-Development and platform commands:
-
-```sh
-pnpm dev:web
-pnpm dev:native
-pnpm build:web
-pnpm build:native # Native frontend only
-pnpm --filter=@vista/native build:desktop
-pnpm --filter=@vista/native build:android
-pnpm --filter=@vista/native build:ios
-```
-
-## Architecture
-
-- `packages/app`: shared React product code and platform capability contracts.
-- `apps/web`: browser adapters, Vite host, and local Cloudflare Worker scaffold. Production hosting is approved; publishing is deferred until the app is ready.
-- `apps/native`: Tauri adapters and one native host for desktop, Android, and iOS.
-
-See `docs/architecture.md` for dependency boundaries.
-
-Format and lint scripts accept an optional root-relative path:
-
-```sh
-pnpm format:check
-pnpm format:check packages/app
-pnpm lint:fix packages/app/src
-```
-
-When working on one package, run package scripts with `--filter` from the repository root. Use the package's `package.json` name as the filter value:
-
-```sh
-pnpm --filter=@vista/app test
-pnpm --filter=@vista/web build
-pnpm --filter=@vista/native typecheck
-```
-
-Before merging behavior changes, run at least:
-
-```sh
-pnpm format:check
-pnpm lint:check
-pnpm typecheck
-pnpm test
-```
-
-`pnpm verify` runs formatting, linting, TypeScript, unit tests, and both frontend builds. Browser and Rust checks are separate:
-
-```sh
-pnpm --filter=@vista/web exec playwright install chromium
-pnpm test:e2e
-pnpm --filter=@vista/native format:rust:check
-pnpm --filter=@vista/native lint:rust:check
-pnpm --filter=@vista/native test:rust
-```
-
-The browser smoke test uses a fresh build and local Wrangler, including direct navigation and reload. GitHub CI has a `Web` job (Ubuntu) for formatting, linting, TypeScript, hook/unit tests, builds, and the Chromium smoke test, and a `Rust` job (Windows) for Rust formatting, Clippy, and Rust tests; see [CI](docs/ci.md). CI does not bundle or launch Tauri. Run `pnpm --filter=@vista/native build:desktop --no-bundle` manually when changing Tauri/Rust configuration or implementing native adapters. Native bundles, mobile device validation, signing, and store distribution are separate release concerns.
-
-For a deployment dry run or local Cloudflare preview, see the [web host commands](apps/web/README.md). Local `.env`, `.dev.vars`, Wrangler state, and generated output are ignored. Only explicitly public client configuration belongs in `VITE_*` variables; those values are included in browser bundles.
-
-## Contributions
-
-Use a feature branch and open a PR for every change to `main`. A normal local `pnpm install` installs the repository's Git hooks; run `pnpm hooks:install` if lifecycle scripts were disabled. Pre-commit checks formatting and linting and requires all non-ignored changes to be staged. A `commit-msg` hook enforces Conventional Commits format. Pre-push requires a clean tree, blocks pushes to `main`, and accepts only updates pointing to the checked-out commit. It also requires `<type>/<slug>` branch names and runs no quality checks; CI runs checks and tests automatically on the PR.
-
-GitHub requires the `Web` and `Rust` checks before a PR can merge, including for administrators. No additional reviewer is required for this personal project. Hooks never auto-stage untracked files, stash work, or include ignored secrets/build output. See [CONTRIBUTING.md](CONTRIBUTING.md) for details on branches, commits, and pull requests.
+Every check is a root pnpm script run from the repository root, and `pnpm verify` runs the full gate: formatting, linting, type checking, tests, builds, and the Rust checks. The toolchain versions are declared in `.nvmrc`, `package.json`, and `rust-toolchain.toml`. [Tooling](docs/tooling.md) documents the scripts, the verification order, and the git hooks.
 
 ## Documentation
 
-This repository is docs-first: durable decisions live in `docs/` and code should follow approved documentation.
-
-The [documentation index](docs/README.md) lists every document. Read these before changing behavior, public APIs, or project conventions:
-
-- `docs/guidelines/documentation.md`: documentation structure, status model, and exception rules.
-- `docs/guidelines/code.md`: coding conventions and enforceable quality rules.
+- [Contributing](CONTRIBUTING.md): setup, contributor workflow, validation, branches, commits, and pull requests.
+- [Agent instructions](AGENTS.md): agent behavior, judgment, and context discipline.
+- [Security](SECURITY.md): how to report a vulnerability and which surfaces matter most.
+- [Repository documentation](docs/README.md): the map of architecture, guidelines, specifications, and repository references.
+- Each app and package `README.md`: that workspace's responsibilities, commands, and boundaries.
 
 ## License
 

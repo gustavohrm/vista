@@ -4,7 +4,7 @@ Tauri host for the shared Vista app. Windows is the verified development target;
 
 ## Setup
 
-Run every command below from the repository root. Install the pinned Node and pnpm versions described in the root README, then run `pnpm install --frozen-lockfile`.
+Run every command below from the repository root. The root README says where the pinned Node and pnpm versions are declared. Install them, then run `pnpm install --frozen-lockfile`.
 
 Install [Tauri's platform prerequisites](https://v2.tauri.app/start/prerequisites/) and Rust through rustup. The root `rust-toolchain.toml` selects the Rust version and includes rustfmt and Clippy. On Windows, install Microsoft C++ Build Tools with the Desktop development with C++ workload and WebView2.
 

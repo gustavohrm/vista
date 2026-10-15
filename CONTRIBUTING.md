@@ -25,7 +25,7 @@ Use `pnpm dev:native` for the Tauri host. `pnpm install` also points git at `.gi
 ## Changes
 
 - Keep each change within its requested scope and preserve unrelated work.
-- Read the applicable guidelines and specifications in `docs/` before a non-trivial change. [Code guidelines](docs/guidelines/code.md) and [documentation guidelines](docs/guidelines/documentation.md) govern how code and documents are written. APPROVED or IMPLEMENTED documents govern the change. Existing code may lag those contracts; conflicts and exceptions are resolved under the documentation guidelines.
+- Applicable coding standards, specifications, and APPROVED or IMPLEMENTED documentation govern the change. Existing code may lag those contracts; conflicts and exceptions are resolved under the documentation guidelines.
 - Update affected documentation in the same change when behavior, architecture, workspace exports, conventions, or platform rules change. Each contract has one owning document; references point to that owner rather than repeat its requirements.
 - Do not commit secrets, build artifacts, or unrelated changes.
 
@@ -151,7 +151,7 @@ Before delivering a change, run the whole gate:
 pnpm verify
 ```
 
-Report any step that was skipped or failed. [Tooling](docs/tooling.md) lists the commands `pnpm verify` runs and the narrower ones.
+Report any step that was skipped or failed. [Tooling](docs/tooling.md) documents what `pnpm verify` runs and the narrower commands.
 
 ## Pull requests
 

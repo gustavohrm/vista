@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-10-14
+last_updated: 2026-10-15
 scope: Boundaries between shared app code, platform hosts, and workspace packages.
 ---
 
@@ -31,7 +31,7 @@ The immediate development targets are the web app in current desktop Chrome and 
 
 Android and iOS remain planned targets of the same Tauri host. Their project initialization and toolchain prerequisites are documented by the native host; mobile builds and folder-access semantics require validation on those platforms before support is claimed. A shared web UI does not imply identical filesystem access across platforms.
 
-See the [File System Access API documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/showDirectoryPicker) for browser constraints. Detailed workspace semantics and document handling are specified in [Workspaces](specs/workspaces.md).
+The [File System Access API documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/showDirectoryPicker) covers the browser constraints. [Workspaces](specs/workspaces.md) specifies the detailed workspace semantics and document handling.
 
 ## Shared presentation
 
