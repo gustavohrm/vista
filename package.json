@@ -11,11 +11,12 @@
     "deploy:web": "pnpm --filter=@vista/web deploy",
     "dev:native": "pnpm --filter=@vista/native dev:native",
     "dev:web": "pnpm --filter=@vista/web dev",
-    "format:check": "oxfmt --check",
-    "format:fix": "oxfmt",
-    "lint:check": "oxlint",
-    "lint:fix": "oxlint --fix",
+    "format:check": "oxfmt --check && prettier --check --log-level warn \"**/*.md\"",
+    "format:fix": "oxfmt && prettier --write --log-level warn \"**/*.md\" && pnpm --filter=@vista/native format:rust:fix",
     "hooks:install": "node scripts/install-hooks.mjs",
+    "labels": "node scripts/sync-labels.mjs",
+    "lint:check": "oxlint --deny-warnings",
+    "lint:fix": "oxlint --fix",
     "prepare": "node scripts/install-hooks.mjs",
     "test": "pnpm test:hooks && pnpm -r --if-present test",
     "test:hooks": "node --test scripts/git-hooks.test.mjs",
@@ -23,11 +24,14 @@
     "test:e2e": "pnpm --filter=@vista/web test:e2e",
     "test:watch": "pnpm -r --if-present test:watch",
     "typecheck": "pnpm -r --if-present typecheck",
-    "verify": "pnpm format:check && pnpm lint:check && pnpm typecheck && pnpm test && pnpm build"
+    "verify": "pnpm verify:web && pnpm verify:rust",
+    "verify:rust": "pnpm --filter=@vista/native format:rust:check && pnpm --filter=@vista/native lint:rust:check && pnpm --filter=@vista/native test:rust",
+    "verify:web": "pnpm format:check && pnpm lint:check && pnpm typecheck && pnpm test && pnpm build:web && pnpm build:native"
   },
   "devDependencies": {
     "oxfmt": "catalog:",
-    "oxlint": "catalog:"
+    "oxlint": "catalog:",
+    "prettier": "catalog:"
   },
   "engines": {
     "node": ">=24.14.1 <25",

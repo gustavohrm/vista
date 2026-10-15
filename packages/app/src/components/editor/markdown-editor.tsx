@@ -136,6 +136,8 @@ export function MarkdownEditor({ content, onChange }: MarkdownEditorProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  // The editor is seeded once, on mount, so the effect below reads the content from the first render.
+  const initialContentRef = useRef(content);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -146,7 +148,7 @@ export function MarkdownEditor({ content, onChange }: MarkdownEditorProps) {
     const editor = Editor.make()
       .config((ctx) => {
         ctx.set(rootCtx, root);
-        ctx.set(defaultValueCtx, content);
+        ctx.set(defaultValueCtx, initialContentRef.current);
         ctx.set(editorViewOptionsCtx, { attributes: { "aria-label": "Markdown Editor" } });
         // Appended, not passed as `nodeViews` in editorViewOptionsCtx: core spreads that option
         // over its own node views, so it would replace them.

@@ -1,6 +1,11 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
+// The commit types, as in `.githooks/commit-msg`. Keep the two lists the same;
+// the test suite checks that they match.
+const COMMIT_TYPES = ["build", "chore", "ci", "docs", "feat", "fix", "perf", "refactor", "revert", "style", "test"];
+const BRANCH_NAME = new RegExp(`^(${COMMIT_TYPES.join("|")})/[a-z0-9]+([.-][a-z0-9]+)*$`);
+
 function readGit(args) {
   const result = spawnSync("git", args, { encoding: "utf8" });
   if (result.error || result.status !== 0) {
@@ -45,6 +50,17 @@ function checkPush() {
     }
     if (!/^0+$/.test(localOid) && localOid !== head) {
       throw new Error("Push only the checked-out commit; push other commits from their own checkout.");
+    }
+    // A deletion removes a name, which is how a misnamed branch gets cleaned up, so it passes.
+    // Tags carry no branch name to check.
+    if (!/^0+$/.test(localOid) && remoteRef.startsWith("refs/heads/")) {
+      const branch = remoteRef.slice("refs/heads/".length);
+      if (!BRANCH_NAME.test(branch)) {
+        throw new Error(
+          `Branch name "${branch}" does not match <type>/<slug>, for example feat/notes-search. ` +
+            `Types: ${COMMIT_TYPES.join(", ")}. Rename the branch with git branch -m, then push again.`,
+        );
+      }
     }
   }
   if (readGit(["status", "--porcelain=v1", "--untracked-files=all", "--ignore-submodules=none"])) {

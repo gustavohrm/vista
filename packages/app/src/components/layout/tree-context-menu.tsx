@@ -116,6 +116,7 @@ export function TreeContextMenu({
       {canRenameOrDelete && (
         <>
           {canCreateChildren && (
+            // oxlint-disable-next-line jsx-a11y/control-has-associated-label, jsx-a11y/prefer-tag-over-role -- a styled divider with no label, not a control; `divider` styles a div, and a native hr would bring browser styling the class does not reset
             <div role="separator" className="divider my-1 [--divider-color:var(--intent-border)]" />
           )}
           <button

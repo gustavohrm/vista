@@ -1,7 +1,10 @@
-# Application architecture
+---
+status: IMPLEMENTED
+last_updated: 2026-10-14
+scope: Boundaries between shared app code, platform hosts, and workspace packages.
+---
 
-**Status:** IMPLEMENTED
-**Last updated:** 2026-10-14
+# Application architecture
 
 Vista separates shared product code from platform hosts:
 
@@ -28,7 +31,7 @@ The immediate development targets are the web app in current desktop Chrome and 
 
 Android and iOS remain planned targets of the same Tauri host. Their project initialization and toolchain prerequisites are documented by the native host; mobile builds and folder-access semantics require validation on those platforms before support is claimed. A shared web UI does not imply identical filesystem access across platforms.
 
-See the [File System Access API documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/showDirectoryPicker) for browser constraints. Detailed workspace semantics and document handling are specified in [Workspaces](./workspaces.md).
+See the [File System Access API documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/showDirectoryPicker) for browser constraints. Detailed workspace semantics and document handling are specified in [Workspaces](specs/workspaces.md).
 
 ## Shared presentation
 

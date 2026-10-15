@@ -11,6 +11,12 @@
 # Bypass with `git commit --no-verify` when a commit has to land unfixed.
 set -eu
 
+# A closed stderr, as when the caller pipes git through `head`, would kill this
+# hook with SIGPIPE mid-message, and git for Windows lets a commit through a hook
+# killed that way. Ignoring the signal turns a failed write into an ordinary
+# error, so the hook's own verdict is what sets its exit status.
+trap "" PIPE
+
 message_file=$1
 
 # Generated messages that no one composed: a merge, an autosquash marker, or the
@@ -27,6 +33,7 @@ case "$subject" in
   "Merge "* | "Revert "* | "fixup!"* | "squash!"* | "amend!"*) exit 0 ;;
 esac
 
+# The commit types, as in `scripts/check-git-state.mjs`. Keep the two lists the same.
 TYPES='build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test'
 SUBJECT_LIMIT=72
 

@@ -30,6 +30,7 @@ catalog:
   oxfmt: ^0.57.0
   oxlint: ^1.72.0
   papaparse: 5.7.0
+  prettier: ^3.9.9
   react: 19.2.8
   react-dom: 19.2.8
   tailwindcss: 4.3.3
