@@ -62,7 +62,7 @@ Rust tests cover the native host in `apps/native/src-tauri`.
 
 The web host's Playwright smoke test builds the frontend and serves it with local Wrangler. It verifies shared-app startup, styles, direct navigation, reload, and JavaScript errors through the deployment runtime. Chromium covers the initial desktop Chrome/Edge web target. The test starts its own server and fails on a port collision rather than silently using another app.
 
-CI in `.github/workflows/ci.yml` has two jobs. The `Web` job runs on `ubuntu-latest` and executes format, lint, typecheck, `pnpm test` (which includes the Git-hook tests), `pnpm build:web`, `pnpm build:native`, and then `pnpm test:e2e` with Chromium. The browser suite runs after the build and does not rebuild the frontend. The `Rust` job runs on `windows-latest` and executes Rust formatting, Rust linting, and `test:rust` (see [Rust Tests](#4-rust-tests)).
+CI in `.github/workflows/ci.yml` has two jobs. The `Web` job runs on `ubuntu-latest` and executes format, lint, typecheck, `pnpm test` (which includes the Git-hook tests), `pnpm build:web`, `pnpm build:native`, and then `pnpm test:e2e` with Chromium. The browser suite runs after the build and does not rebuild the frontend. The `Rust` job runs on `windows-latest` and executes Rust formatting, Rust linting, and `test:rust`, covered in [Rust Tests](#4-rust-tests).
 
 Native executable builds are not run in CI. Build the native app manually when changing Tauri configuration or implementing native adapters.
 

@@ -6,11 +6,11 @@ scope: Code conventions for naming, structure, TypeScript, React and UI, Rust, t
 
 # Coding guidelines
 
-This document outlines patterns, conventions and guidelines to follow when working on this codebase.
+This document outlines the patterns, conventions, and guidelines that apply to this codebase.
 
 ## Naming conventions
 
-- Files & Folders: kebab-case (`user-service.ts`, `api-routes/`). Rust files and modules are snake_case; see [Rust](#rust).
+- Files & Folders: kebab-case (`user-service.ts`, `api-routes/`). Rust files and modules are snake_case, as [Rust](#rust) describes.
 - Variables & Functions: camelCase (`getUserById`, `isValid`)
 - Classes & Types: PascalCase (`UserService`, `ApiResponse`)
 - Constants & Enums: UPPER_SNAKE_CASE (`MAX_RETRY_ATTEMPTS`)
@@ -81,10 +81,10 @@ How failures are classified and shown to people is specified in [Errors](../spec
 
 ## React and UI
 
-- Shared UI in `packages/app` MUST NOT import Tauri, File System Access, or other host APIs. It consumes capabilities through the contracts in `packages/app/src/ports.ts`, and each host implements them. See [Architecture](../architecture.md#platform-adapters).
-- Never use `alert`, `confirm`, or `prompt`. Show transient messages and confirmations through `useToast()` from `packages/app/src/components/feedback/toast.tsx`, which keeps them consistent with the rest of the app. See [Toasts and confirmations](../architecture.md#toasts-and-confirmations).
+- Shared UI in `packages/app` MUST NOT import Tauri, File System Access, or other host APIs. It consumes capabilities through the contracts in `packages/app/src/ports.ts`, and each host implements them. [Architecture](../architecture.md#platform-adapters) describes the adapter model.
+- Never use `alert`, `confirm`, or `prompt`. Show transient messages and confirmations through `useToast()` from `packages/app/src/components/feedback/toast.tsx`, which keeps them consistent with the rest of the app. [Toasts and confirmations](../architecture.md#toasts-and-confirmations) describes the toast and confirmation behavior.
 - A gesture that must stay smooth, such as dragging, SHOULD update the DOM through a ref during the gesture and commit to state on release, rather than re-rendering on every frame.
-- Use the `@codenhub/styles` component classes when one fits, and Tailwind utilities for layout only. Follow [Shared presentation](../architecture.md#shared-presentation) for the full styling contract.
+- Use the `@codenhub/styles` component classes when one fits, and Tailwind utilities for layout only. [Shared presentation](../architecture.md#shared-presentation) defines the full styling contract.
 - Icons are rendered by the build-time `@codenhub/icons` rewrite, which only matches literal class names. The `ic-*` class MUST appear as a literal string in `className`; never compute it at runtime.
 
 ## Rust
@@ -95,7 +95,7 @@ Rust code lives in `apps/native/src-tauri`, the Tauri host for Vista.
 - Keep logic that does not need Tauri types out of Tauri-facing entrypoints, so it can be unit-tested without a window.
 - Avoid `unwrap()` outside tests. Use `?` to propagate errors, or `expect()` with a message that names the invariant being relied on.
 
-Formatting and linting are owned by `rustfmt` and `clippy`; see [Formatting, linting, and type checking](#formatting-linting-and-type-checking).
+Formatting and linting are owned by `rustfmt` and `clippy`, as [Formatting, linting, and type checking](#formatting-linting-and-type-checking) describes.
 
 ## Testing
 

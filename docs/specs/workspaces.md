@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-10-14
+last_updated: 2026-10-15
 scope: Local folder workspaces, file tree representation, document view modes, and persistence across hosts.
 ---
 
@@ -13,7 +13,7 @@ This specification covers how Vista manages local folder workspaces, file tree r
 Vista is an Obsidian-, Notion-, and VS Code-inspired personal workspace application that operates directly on user-selected local folders:
 
 - **Local-first, direct disk access**: No proprietary database, shadow sync sandbox, or browser-isolated storage is used as a surrogate for user files.
-- **Explicit saving**: Changes are saved only when the user explicitly triggers save (via `Ctrl+S`, `Cmd+S`, or the icon-only Save button in the document header). There is no automatic, background saving in v1. Navigating away from unsaved changes asks the user first (see [Unsaved changes](#unsaved-changes)), so edits are never discarded silently.
+- **Explicit saving**: Changes are saved only when the user explicitly triggers save (via `Ctrl+S`, `Cmd+S`, or the icon-only Save button in the document header). There is no automatic, background saving in v1. Navigating away from unsaved changes asks the user first, as [Unsaved changes](#unsaved-changes) describes, so edits are never discarded silently.
 - **Dual-view paradigm**: Every supported file can be inspected and edited as raw text or rendered in an enriched presentation.
 
 ## Workspace lifecycle
@@ -21,7 +21,7 @@ Vista is an Obsidian-, Notion-, and VS Code-inspired personal workspace applicat
 In v1, Vista operates on **one active open folder** at a time:
 
 - Users open a directory using the platform's native file picker (`window.showDirectoryPicker` on web; `@tauri-apps/plugin-dialog` on native).
-- Opening a directory yields a `Workspace` entity (`id`, `name`, `rootPath`, and an optional `accessMode` distinguishing direct disk access from a more limited fallback — see [Platform-specific implementations](#platform-specific-implementations)).
+- Opening a directory yields a `Workspace` entity (`id`, `name`, `rootPath`, and an optional `accessMode` distinguishing direct disk access from a more limited fallback, which [Platform-specific implementations](#platform-specific-implementations) details).
 - The directory tree is scanned and mapped into hierarchical `WorkspaceNode` models (`file` and `directory` nodes). Directories start collapsed, and empty folders show no children.
 - While only one folder is active at a time in v1, the capability contract and state models are designed with opaque identifiers and collection structures to prevent painting future multi-root workspace support into a corner.
 
@@ -50,7 +50,7 @@ Future versions will expand to `.json`, `.yaml`, canvas representations, and emb
 
 ### Markdown WYSIWYG editing
 
-The Enriched view for `.md`/`.markdown` files (`packages/app/src/components/editor/markdown-editor.tsx`) is a WYSIWYG editor built on [Milkdown](https://milkdown.dev/), using its CommonMark and GFM presets (headings, emphasis, lists, links, code blocks, blockquotes, tables, task lists, strikethrough) with a minimal custom theme styled directly against `@codenhub/styles` tokens rather than Milkdown's bundled Nord theme. Editing in this view mutates the same `FileDocument` buffer as every other view (see below); switching to a different file remounts the editor rather than live-syncing content into the existing document, since the editor owns its document once mounted. Task list items render as real design-system checkboxes that toggle the item's checked state when clicked.
+The Enriched view for `.md`/`.markdown` files (`packages/app/src/components/editor/markdown-editor.tsx`) is a WYSIWYG editor built on [Milkdown](https://milkdown.dev/), using its CommonMark and GFM presets (headings, emphasis, lists, links, code blocks, blockquotes, tables, task lists, strikethrough) with a minimal custom theme styled directly against `@codenhub/styles` tokens rather than Milkdown's bundled Nord theme. Editing in this view mutates the same `FileDocument` buffer as every other view ([Document buffer and dirty state](#document-buffer-and-dirty-state) describes it); switching to a different file remounts the editor rather than live-syncing content into the existing document, since the editor owns its document once mounted. Task list items render as real design-system checkboxes that toggle the item's checked state when clicked.
 
 **Known limitation**: no WYSIWYG Markdown editor guarantees byte-for-byte round-trip on arbitrary existing Markdown. Parsing and re-serializing content the user never touched can still normalize source-level formatting that doesn't affect meaning, such as list bullet markers (`-`/`+` normalizing to `*`). This is intentional normalization, not data loss, and the accepted cases are enumerated and asserted in `packages/app/src/components/editor/markdown-round-trip.test.ts` rather than left undocumented.
 
@@ -93,15 +93,15 @@ export interface WorkspaceCapability {
 export type RestoreFolderResult = { status: "restored"; workspace: Workspace } | { status: "needs-permission"; name: string } | { status: "unavailable"; name: string } | { status: "none" };
 ```
 
-`restoreFolder({ interactive: true })` MUST only be called from a user gesture such as a click handler. With `interactive: false` the host never prompts. See [Reopening the last folder](#reopening-the-last-folder).
+`restoreFolder({ interactive: true })` MUST only be called from a user gesture such as a click handler. With `interactive: false` the host never prompts. [Reopening the last folder](#reopening-the-last-folder) describes each host's behavior.
 
 ### Platform-specific implementations
 
 1. **Web (`apps/web`)**:
    - **Primary direct-disk mode**: Uses the File System Access API (`window.showDirectoryPicker({ mode: "read" })`) in Chromium-based browsers (Chrome, Edge, Opera) for live in-place read access to local folders. Requesting read-only access up front keeps folder-open to a single native picker interaction. Write access is requested lazily, the first time a file is saved (`FileSystemDirectoryHandle.requestPermission({ mode: "readwrite" })`), so the second, easy-to-miss permission prompt fires in direct response to the user's own Save action instead of immediately after the folder picker. Every subsequent read or write re-checks the handle's current permission (`queryPermission`) and re-requests it if it was revoked, rather than assuming a previously granted handle stays valid for the life of the session.
-   - **Universal directory fallback**: In browsers that do not support the File System Access API (such as Firefox and Safari) or restricted environments (such as non-secure origins or cross-origin iframes), automatically falls back to `<input type="file" webkitdirectory />`. This allows any browser to select local folders and explore/edit their file tree in-memory with file export capabilities. A workspace opened this way reports `accessMode: "fallback"` on its `Workspace` entity (see [Workspace lifecycle](#workspace-lifecycle)); the application surfaces a one-time notice that saves will download a file instead of writing in place.
+   - **Universal directory fallback**: In browsers that do not support the File System Access API (such as Firefox and Safari) or restricted environments (such as non-secure origins or cross-origin iframes), automatically falls back to `<input type="file" webkitdirectory />`. This allows any browser to select local folders and explore/edit their file tree in-memory with file export capabilities. A workspace opened this way reports `accessMode: "fallback"` on its `Workspace` entity (as [Workspace lifecycle](#workspace-lifecycle) describes); the application surfaces a one-time notice that saves will download a file instead of writing in place.
    - **Performance filtering**: Automatically excludes heavy dependency and version-control folders (`.git`, `node_modules`, `.DS_Store`, etc.) from tree traversal to maintain instantaneous loading.
-   - **Remembered folder**: the directory handle is stored in IndexedDB (database `vista`, store `workspace`, key `lastFolder`). Fallback-mode folders are never stored (see [Reopening the last folder](#reopening-the-last-folder)).
+   - **Remembered folder**: the directory handle is stored in IndexedDB (database `vista`, store `workspace`, key `lastFolder`). Fallback-mode folders are never stored, as [Reopening the last folder](#reopening-the-last-folder) describes.
 2. **Native (`apps/native`)**:
    - Uses Tauri's dialog plugin (`@tauri-apps/plugin-dialog`) for native directory selection.
    - Uses Tauri's filesystem plugin (`@tauri-apps/plugin-fs`) for directory enumeration and file I/O, filtering heavy folders identically.
@@ -122,7 +122,7 @@ Users create, rename/move, and delete files and folders from a right-click conte
 - **Active document handling**: renaming the open file updates its path and name in place, without re-reading the file from disk (the bytes did not change). Deleting the open file, or a directory that contains it, clears the editor and shows a toast explaining why.
 - **Tree refresh**: every create, move, or delete is followed by a full `readTree` re-scan rather than a local, incremental tree edit — the only tree-construction logic lives in each platform adapter (per [Platform adapters](../architecture.md#platform-adapters)), so the shared UI does not duplicate it.
 - **Platform-specific move semantics**: the File System Access API has no native move or rename, so the web host implements `move` as a recursive copy followed by a delete of the source. This is **not atomic**: on a failure partway through, the source is left in place (never deleted before the copy fully succeeds) and the error propagates to the user rather than silently losing data. The native host uses `@tauri-apps/plugin-fs`'s `rename`, which is atomic; because `rename` silently replaces an existing destination rather than failing, the native adapter explicitly checks for a destination collision first to honor the same "throws on collision" contract as the web host.
-- **Fallback mode**: on the web host's non-FSA fallback (see [Platform-specific implementations](#platform-specific-implementations)), file management operates entirely on the in-memory tree and file map — there is no real disk backing to mutate, consistent with how `writeFile` already behaves in that mode.
+- **Fallback mode**: on the web host's non-FSA fallback (as [Platform-specific implementations](#platform-specific-implementations) describes), file management operates entirely on the in-memory tree and file map — there is no real disk backing to mutate, consistent with how `writeFile` already behaves in that mode.
 
 ## Theming and presentation
 

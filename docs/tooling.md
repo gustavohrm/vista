@@ -51,6 +51,8 @@ The versions are declared once and read by both local runs and CI:
 | `pnpm hooks:install` | Points `core.hooksPath` at `.githooks`, the step `prepare` runs   |
 | `pnpm prepare`       | Installs the git hooks, run automatically by `pnpm install`       |
 
+`lint:check` and `lint:fix` accept a root-relative path, such as `pnpm lint:fix packages/app/src`, to narrow oxlint to it.
+
 The Rust scripts live in `apps/native/package.json`: `format:rust:check`, `lint:rust:check`, and `test:rust`. `verify:rust` reaches them with `pnpm --filter=@vista/native`. Each passes `--manifest-path src-tauri/Cargo.toml`, so nothing needs to run from inside `apps/native/src-tauri`. They also pass `--locked` where cargo resolves dependencies, the Rust counterpart to `pnpm install --frozen-lockfile`: a `Cargo.lock` that disagrees with `Cargo.toml` fails rather than being rewritten.
 
 There is no `pnpm format` script. When a name matches no pnpm script, pnpm runs the executable of that name from `PATH` instead, and on Windows `format` is the system disk formatter. The explicit `format:check` and `format:fix` names avoid that.
@@ -108,7 +110,7 @@ Three hooks live in `.githooks/`. The `prepare` script runs `scripts/install-hoo
 
 `commit-msg` checks the subject line only: a known type, an optional scope, an imperative lowercase subject, no trailing period, and 72 characters at most. No hook can tell whether a message describes the commit honestly, so that half stays with review. Merges, reverts, and `fixup!`, `squash!`, and `amend!` subjects pass unchecked, because git composed them.
 
-`pre-push` reads the destination ref rather than the current branch, so it holds for a push from `main`, for an explicit refspec targeting it, and for a deletion. It checks the branch name because the name is often not a choice anyone made: an agent harness can create a branch before the agent has read a file. Deleting a remote branch passes whatever it is called, and tags are not checked.
+`pre-push` reads the destination ref rather than the current branch, so it holds for a push from `main`, for an explicit refspec targeting it, and for a deletion. It checks the branch name because the name is often not a choice anyone made: an agent harness can create a branch before anyone has chosen its name. Deleting a remote branch passes whatever it is called, and tags are not checked.
 
 The checks that are not shell live in `scripts/check-git-state.mjs`, which `pre-commit` and `pre-push` call. The hook tests in `scripts/git-hooks.test.mjs` run as part of `pnpm test`.
 
