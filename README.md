@@ -2,7 +2,7 @@
 
 Vista is an early-stage, multi-platform workspace for managing notes and personal data. Its goal is a lightweight middle ground between Notion, Obsidian, and VS Code that operates directly on local folders.
 
-Planned capabilities include rich Markdown editing, structured CSV views, backlinks, folder search, and data export. Current implementation provides shared React, web, and Tauri foundations; product features are not implemented yet.
+Planned capabilities include rich Markdown editing, structured CSV views, backlinks, folder search, and data export. Current implementation provides shared React, web, and Tauri foundations with a folder file tree, Markdown and CSV editing, and file management.
 
 ## Setup
 
@@ -15,7 +15,7 @@ pnpm dev:web
 
 For Windows development, install Rust through rustup, Microsoft C++ Build Tools, and WebView2. The root `rust-toolchain.toml` pins Rust **1.95.0**. See the [native host setup](apps/native/README.md) for Windows details and Android/iOS initialization. The immediate verification targets are desktop Chrome/Edge and Windows; mobile remains prepared but unverified.
 
-The web MVP will work on user-selected existing folders through supported browser APIs. Browser-private storage is not a substitute for folder access. See the [architecture](docs/specs/architecture.md) for the approved adapter boundaries and platform constraints.
+The web MVP will work on user-selected existing folders through supported browser APIs. Browser-private storage is not a substitute for folder access. See the [architecture](docs/architecture.md) for the approved adapter boundaries and platform constraints.
 
 ## Commands
 
@@ -51,7 +51,7 @@ pnpm --filter=@vista/native build:ios
 - `apps/web`: browser adapters, Vite host, and local Cloudflare Worker scaffold. Production hosting is approved; publishing is deferred until the app is ready.
 - `apps/native`: Tauri adapters and one native host for desktop, Android, and iOS.
 
-See `docs/specs/architecture.md` for dependency boundaries.
+See `docs/architecture.md` for dependency boundaries.
 
 Format and lint scripts accept an optional root-relative path:
 
@@ -88,24 +88,24 @@ pnpm --filter=@vista/native lint:rust:check
 pnpm --filter=@vista/native test:rust
 ```
 
-The browser smoke test uses a fresh build and local Wrangler, including direct navigation and reload. GitHub CI has one `Windows checks` job for formatting, linting, TypeScript, hook/unit tests, and the Chromium smoke test. It does not compile or launch Tauri. Run Rust checks and `pnpm --filter=@vista/native build:desktop --no-bundle` manually when changing Tauri/Rust configuration or implementing native adapters. Native bundles, mobile device validation, signing, and store distribution are separate release concerns.
+The browser smoke test uses a fresh build and local Wrangler, including direct navigation and reload. GitHub CI has a `Web` job (Ubuntu) for formatting, linting, TypeScript, hook/unit tests, builds, and the Chromium smoke test, and a `Rust` job (Windows) for Rust formatting, Clippy, and Rust tests; see [CI](docs/ci.md). CI does not bundle or launch Tauri. Run `pnpm --filter=@vista/native build:desktop --no-bundle` manually when changing Tauri/Rust configuration or implementing native adapters. Native bundles, mobile device validation, signing, and store distribution are separate release concerns.
 
 For a deployment dry run or local Cloudflare preview, see the [web host commands](apps/web/README.md). Local `.env`, `.dev.vars`, Wrangler state, and generated output are ignored. Only explicitly public client configuration belongs in `VITE_*` variables; those values are included in browser bundles.
 
 ## Contributions
 
-Use a feature branch and open a PR for every change to `main`. A normal local `pnpm install` installs the repository's Git hooks; run `pnpm hooks:install` if lifecycle scripts were disabled. Pre-commit checks formatting and linting and requires all non-ignored changes to be staged. A `commit-msg` hook enforces Conventional Commits format. Pre-push requires a clean tree, blocks pushes to `main`, and accepts only updates pointing to the checked-out commit. It runs no quality checks; CI runs checks and tests automatically on the PR.
+Use a feature branch and open a PR for every change to `main`. A normal local `pnpm install` installs the repository's Git hooks; run `pnpm hooks:install` if lifecycle scripts were disabled. Pre-commit checks formatting and linting and requires all non-ignored changes to be staged. A `commit-msg` hook enforces Conventional Commits format. Pre-push requires a clean tree, blocks pushes to `main`, and accepts only updates pointing to the checked-out commit. It also requires `<type>/<slug>` branch names and runs no quality checks; CI runs checks and tests automatically on the PR.
 
-GitHub requires the `Windows checks` job before a PR can merge, including for administrators. No additional reviewer is required for this personal project. Hooks never auto-stage untracked files, stash work, or include ignored secrets/build output. See [CONTRIBUTING.md](CONTRIBUTING.md) for details on branches, commits, and pull requests.
+GitHub requires the `Web` and `Rust` checks before a PR can merge, including for administrators. No additional reviewer is required for this personal project. Hooks never auto-stage untracked files, stash work, or include ignored secrets/build output. See [CONTRIBUTING.md](CONTRIBUTING.md) for details on branches, commits, and pull requests.
 
 ## Documentation
 
 This repository is docs-first: durable decisions live in `docs/` and code should follow approved documentation.
 
-Read these before changing behavior, public APIs, or project conventions:
+The [documentation index](docs/README.md) lists every document. Read these before changing behavior, public APIs, or project conventions:
 
-- `docs/docs-guidelines.md`: documentation structure, status model, and exception rules.
-- `docs/code-guidelines.md`: coding conventions and enforceable quality rules.
+- `docs/guidelines/documentation.md`: documentation structure, status model, and exception rules.
+- `docs/guidelines/code.md`: coding conventions and enforceable quality rules.
 
 ## License
 

@@ -7,10 +7,12 @@
     "target/**",
     "**/target/**",
     "**/src-tauri/gen/**",
+    "**/.wrangler/**",
     "coverage/**",
     "**/coverage/**",
     "test-results/**",
-    "**/test-results/**"
+    "**/test-results/**",
+    "**/*.md"
   ],
   "printWidth": 120,
   "semi": true,

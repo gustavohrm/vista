@@ -20,19 +20,23 @@ test-results
 **/test-results
 playwright-report
 .wrangler
+*.tsbuildinfo
 
 # Local configuration and credentials
 .env
 .env.*
 !.env.example
+*.local
 .dev.vars
 .dev.vars.*
 !.dev.vars.example
 
 # AI agents
+.agents
 .antigravity
 .claude
 .codex
 .cursor
 .gemini
+.opencode
 docs/plans

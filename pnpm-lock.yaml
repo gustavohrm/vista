@@ -87,6 +87,9 @@ catalogs:
     papaparse:
       specifier: 5.7.0
       version: 5.7.0
+    prettier:
+      specifier: ^3.9.9
+      version: 3.9.10
     react:
       specifier: 19.2.8
       version: 19.2.8
@@ -119,6 +122,9 @@ importers:
       oxlint:
         specifier: 'catalog:'
         version: 1.78.0
+      prettier:
+        specifier: 'catalog:'
+        version: 3.9.10
 
   apps/native:
     dependencies:
@@ -2092,6 +2098,11 @@ packages:
     resolution: {integrity: sha512-u82N74LFzG8ca+dD8puPnplTXoGH4fTPpVGuIbt36G3qvNlkvfD0lEAZSxaly3KX8TS/L1A1gsCEmvKmBcVbkQ==}
     engines: {node: ^10 || ^12 || >=14}
 
+  prettier@3.9.10:
+    resolution: {integrity: sha512-skGHTH1Yb9QvaTC4hWnRTzEYtCpApF0UMBPz+t/0ZPzP8ihefo/btKd+QA7pUE0fEwA1SbS/NmhyEcstdXOIdA==}
+    engines: {node: '>=14'}
+    hasBin: true
+
   pretty-format@27.5.1:
     resolution: {integrity: sha512-Qb1gy5OrP5+zDf2Bvnzdl3jsTf1qXVMazbvCoKhtKqVs4/YK4ozX4gKQJJVyNe+cajNPn0KoC0MC3FUmaHWEmQ==}
     engines: {node: ^10.13.0 || ^12.13.0 || ^14.15.0 || >=15.0.0}
@@ -4061,6 +4072,8 @@ snapshots:
       nanoid: 3.3.18
       picocolors: 1.1.1
       source-map-js: 1.2.1
+
+  prettier@3.9.10: {}
 
   pretty-format@27.5.1:
     dependencies:

@@ -59,6 +59,7 @@ export function UnsavedChangesDialog({ fileName, onChoose }: UnsavedChangesDialo
   };
 
   return (
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- the click only dismisses on the backdrop; keyboard users cancel with Escape (`onCancel`) and the dialog's buttons
     <dialog
       ref={dialogRef}
       aria-labelledby={titleId}

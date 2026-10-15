@@ -1,0 +1,53 @@
+name: Bug
+description: Vista does not behave the way it should.
+labels: ["type:bug", "status:needs-triage"]
+body:
+  - type: input
+    id: commit
+    attributes:
+      label: Commit
+      description: The commit you built, from `git rev-parse --short HEAD`.
+      placeholder: "1277a3e"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      description: Where you hit it.
+      options:
+        - Web — Chromium browser
+        - Desktop — Windows
+        - Desktop — macOS
+        - Desktop — Linux
+        - Mobile — Android
+        - Mobile — iOS
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: The shortest sequence that shows it, including the folder layout or file types involved if they matter.
+      placeholder: |
+        1. Open a workspace folder
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Workaround in place
+      description: What you did to keep going, and where, so it can be removed once this is fixed.

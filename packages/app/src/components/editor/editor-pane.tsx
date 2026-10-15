@@ -169,6 +169,7 @@ interface ViewModeToggleProps {
  */
 function ViewModeToggle({ viewMode, onViewModeChange }: ViewModeToggleProps) {
   return (
+    // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- the segmented control is styled by its `panel` class; a native fieldset would bring browser styling the class does not reset
     <div role="group" aria-label="Document view mode" className="panel p-xs flex flex-none items-center gap-0.5">
       <Tooltip text="Show raw text" position="bottom" align="end">
         {(bubbleId) => (

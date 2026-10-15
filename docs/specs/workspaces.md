@@ -1,7 +1,10 @@
-# Workspaces and document management
+---
+status: IMPLEMENTED
+last_updated: 2026-10-14
+scope: Local folder workspaces, file tree representation, document view modes, and persistence across hosts.
+---
 
-**Status:** IMPLEMENTED
-**Last updated:** 2026-10-14
+# Workspaces and document management
 
 This specification covers how Vista manages local folder workspaces, file tree representations, document view modes (`raw` vs `enriched`), and explicit persistence across platform hosts.
 
@@ -87,11 +90,7 @@ export interface WorkspaceCapability {
   remove(path: string): Promise<void>;
 }
 
-export type RestoreFolderResult =
-  | { status: "restored"; workspace: Workspace }
-  | { status: "needs-permission"; name: string }
-  | { status: "unavailable"; name: string }
-  | { status: "none" };
+export type RestoreFolderResult = { status: "restored"; workspace: Workspace } | { status: "needs-permission"; name: string } | { status: "unavailable"; name: string } | { status: "none" };
 ```
 
 `restoreFolder({ interactive: true })` MUST only be called from a user gesture such as a click handler. With `interactive: false` the host never prompts. See [Reopening the last folder](#reopening-the-last-folder).
@@ -121,7 +120,7 @@ Users create, rename/move, and delete files and folders from a right-click conte
 
 - **Validation**: candidate names are validated client-side before any disk operation, via `validateEntryName` (`packages/app/src/domain/path-validation.ts`). Rejected: empty or whitespace-padded names, the reserved names `.` and `..`, a trailing period, the characters `" * / : < > ? \ |` and ASCII control characters (disallowed universally rather than per-platform, since a name valid only on one OS could break when a workspace is later opened on another), and a case-insensitive collision with an existing sibling in the same directory.
 - **Active document handling**: renaming the open file updates its path and name in place, without re-reading the file from disk (the bytes did not change). Deleting the open file, or a directory that contains it, clears the editor and shows a toast explaining why.
-- **Tree refresh**: every create, move, or delete is followed by a full `readTree` re-scan rather than a local, incremental tree edit — the only tree-construction logic lives in each platform adapter (per [Platform adapters](./architecture.md#platform-adapters)), so the shared UI does not duplicate it.
+- **Tree refresh**: every create, move, or delete is followed by a full `readTree` re-scan rather than a local, incremental tree edit — the only tree-construction logic lives in each platform adapter (per [Platform adapters](../architecture.md#platform-adapters)), so the shared UI does not duplicate it.
 - **Platform-specific move semantics**: the File System Access API has no native move or rename, so the web host implements `move` as a recursive copy followed by a delete of the source. This is **not atomic**: on a failure partway through, the source is left in place (never deleted before the copy fully succeeds) and the error propagates to the user rather than silently losing data. The native host uses `@tauri-apps/plugin-fs`'s `rename`, which is atomic; because `rename` silently replaces an existing destination rather than failing, the native adapter explicitly checks for a destination collision first to honor the same "throws on collision" contract as the web host.
 - **Fallback mode**: on the web host's non-FSA fallback (see [Platform-specific implementations](#platform-specific-implementations)), file management operates entirely on the in-memory tree and file map — there is no real disk backing to mutate, consistent with how `writeFile` already behaves in that mode.
 
