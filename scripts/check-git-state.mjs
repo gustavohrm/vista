@@ -48,7 +48,8 @@ function checkPush() {
         "Direct updates or deletions of main are blocked. Push a feature branch and open a pull request.",
       );
     }
-    if (!/^0+$/.test(localOid) && localOid !== head) {
+    // An annotated tag's OID names the tag object, so compare the commit it points to.
+    if (!/^0+$/.test(localOid) && readGit(["rev-parse", `${localOid}^{commit}`]).trim() !== head) {
       throw new Error("Push only the checked-out commit; push other commits from their own checkout.");
     }
     // A deletion removes a name, which is how a misnamed branch gets cleaned up, so it passes.
