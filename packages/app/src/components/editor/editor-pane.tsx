@@ -5,6 +5,7 @@ import { Tooltip } from "../feedback/tooltip";
 import { CsvTableEditor } from "./csv-table-editor";
 import { MarkdownEditor } from "./markdown-editor";
 import { RawEditor } from "./raw-editor";
+import type { CursorInfo, RawEditorStateCache } from "./raw-editor";
 
 interface EditorPaneProps {
   platform: string;
@@ -12,11 +13,26 @@ interface EditorPaneProps {
   document: OpenDocument | null;
   onViewModeChange: (mode: ViewMode) => void;
   onContentChange: (newContent: string) => void;
+  /** Called with the active tab's key when its raw editor cursor or selection moves. */
+  onCursorChange: (key: string, cursor: CursorInfo) => void;
   onSave: () => void;
+  /** Raw editor state of each open tab, kept by the owner of the tabs. */
+  rawEditorStates: RawEditorStateCache;
+  /** App command shortcuts that the raw editor leaves to the commands layer. */
+  reservedShortcuts: readonly string[];
 }
 
 /** Hosts the document header, the view mode toggle, and the active document's editor. */
-export function EditorPane({ platform, document: doc, onViewModeChange, onContentChange, onSave }: EditorPaneProps) {
+export function EditorPane({
+  platform,
+  document: doc,
+  onViewModeChange,
+  onContentChange,
+  onCursorChange,
+  onSave,
+  rawEditorStates,
+  reservedShortcuts,
+}: EditorPaneProps) {
   if (!doc) {
     return <main role="main" data-platform={platform} className="bg-background text-text flex flex-1 flex-col" />;
   }
@@ -48,7 +64,13 @@ export function EditorPane({ platform, document: doc, onViewModeChange, onConten
       </header>
 
       <div className="flex-1 overflow-hidden">
-        <DocumentView document={doc} onContentChange={onContentChange} />
+        <DocumentView
+          document={doc}
+          onContentChange={onContentChange}
+          onCursorChange={onCursorChange}
+          rawEditorStates={rawEditorStates}
+          reservedShortcuts={reservedShortcuts}
+        />
       </div>
     </main>
   );
@@ -57,9 +79,18 @@ export function EditorPane({ platform, document: doc, onViewModeChange, onConten
 interface DocumentViewProps {
   document: OpenDocument;
   onContentChange: (newContent: string) => void;
+  onCursorChange: (key: string, cursor: CursorInfo) => void;
+  rawEditorStates: RawEditorStateCache;
+  reservedShortcuts: readonly string[];
 }
 
-function DocumentView({ document: doc, onContentChange }: DocumentViewProps) {
+function DocumentView({
+  document: doc,
+  onContentChange,
+  onCursorChange,
+  rawEditorStates,
+  reservedShortcuts,
+}: DocumentViewProps) {
   const enriched = doc.viewMode === "enriched" ? getViewer(doc.extension).enriched : undefined;
   switch (enriched) {
     case "markdown":
@@ -68,7 +99,17 @@ function DocumentView({ document: doc, onContentChange }: DocumentViewProps) {
     case "csv-table":
       return <CsvTableEditor content={doc.content} onChange={onContentChange} />;
     case undefined:
-      return <RawEditor content={doc.content} onChange={onContentChange} fileName={doc.name} />;
+      return (
+        <RawEditor
+          documentKey={doc.key}
+          content={doc.content}
+          fileName={doc.name}
+          onChange={onContentChange}
+          onCursorChange={(cursor) => onCursorChange(doc.key, cursor)}
+          stateCache={rawEditorStates}
+          reservedShortcuts={reservedShortcuts}
+        />
+      );
   }
 }
 

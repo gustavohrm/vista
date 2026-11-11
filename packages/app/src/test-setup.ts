@@ -15,4 +15,15 @@ if (typeof HTMLDialogElement !== "undefined" && typeof HTMLDialogElement.prototy
   };
 }
 
+// jsdom does no layout, so it leaves out Range's geometry methods. CodeMirror measures text ranges
+// after every update and throws without them; empty geometry is enough for it to keep working.
+if (typeof Range !== "undefined" && typeof Range.prototype.getClientRects !== "function") {
+  Range.prototype.getClientRects = function getClientRects() {
+    return Object.assign([], { item: () => null }) as unknown as DOMRectList;
+  };
+  Range.prototype.getBoundingClientRect = function getBoundingClientRect() {
+    return new DOMRect();
+  };
+}
+
 afterEach(cleanup);

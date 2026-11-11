@@ -1,3 +1,4 @@
+import { EditorView } from "@codemirror/view";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { StrictMode } from "react";
@@ -69,15 +70,39 @@ async function openFolderFromWelcome(user: UserEvent) {
  * Opens readme.md, switches it to raw mode, and types an edit so the document is dirty.
  *
  * @param user - The user-event instance driving the interaction.
- * @returns The raw editor textarea for readme.md.
+ * @returns The raw editor of readme.md.
  */
 async function makeReadmeDirty(user: UserEvent) {
   await openFolderFromWelcome(user);
   await user.click(screen.getByText("readme.md"));
   await user.click(await screen.findByRole("button", { name: "Raw" }));
-  const textarea = await screen.findByRole("textbox", { name: /Raw text content of readme\.md/i });
-  await user.type(textarea, "\nNew line");
-  return textarea;
+  const editor = await screen.findByRole("textbox", { name: /Raw text content of readme\.md/i });
+  await appendToRawEditor(user, editor, "\nNew line");
+  return editor;
+}
+
+/**
+ * Reads the text of a raw editor. CodeMirror edits a contenteditable element, which has no form value.
+ *
+ * @param editor - The raw editor's textbox element.
+ * @returns The editor's document text.
+ */
+function rawEditorText(editor: HTMLElement): string | undefined {
+  return EditorView.findFromDOM(editor)?.state.sliceDoc();
+}
+
+/**
+ * Types at the end of a raw editor's text. jsdom does no layout, so a click leaves the cursor at the
+ * start; the editor's own Ctrl+End binding moves it to the end first.
+ *
+ * @param user - The user-event instance driving the interaction.
+ * @param editor - The raw editor's textbox element.
+ * @param text - Text to type, in user-event keyboard syntax.
+ */
+async function appendToRawEditor(user: UserEvent, editor: HTMLElement, text: string) {
+  await user.click(editor);
+  await user.keyboard("{Control>}{End}{/Control}");
+  await user.keyboard(text);
 }
 
 function getTab(name: string): HTMLElement {
@@ -126,11 +151,11 @@ describe("App", () => {
     const rawBtn = screen.getByRole("button", { name: "Raw" });
     await user.click(rawBtn);
 
-    const textarea = screen.getByRole("textbox", { name: /Raw text content of readme\.md/i });
-    expect(textarea).toHaveValue(README_CONTENT);
+    const editor = screen.getByRole("textbox", { name: /Raw text content of readme\.md/i });
+    expect(rawEditorText(editor)).toBe(README_CONTENT);
 
     // Edit content to trigger dirty state
-    await user.type(textarea, "\nNew line");
+    await appendToRawEditor(user, editor, "\nNew line");
 
     // Save button should be enabled
     const saveBtn = screen.getByRole("button", { name: "Save file" });
@@ -243,8 +268,8 @@ describe("App", () => {
     await user.click(screen.getByText("readme.md"));
     await user.click(screen.getByRole("button", { name: "Raw" }));
 
-    const textarea = await screen.findByRole("textbox", { name: /Raw text content of readme\.md/i });
-    await user.type(textarea, "!");
+    const editor = await screen.findByRole("textbox", { name: /Raw text content of readme\.md/i });
+    await appendToRawEditor(user, editor, "!");
     await user.click(screen.getByRole("button", { name: "Save file" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Write access was denied.");
@@ -437,7 +462,9 @@ describe("App", () => {
 
       expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["readme.md", "data.csv"]);
       expect(getTab("data.csv")).toHaveAttribute("aria-selected", "true");
-      expect(await screen.findByRole("textbox", { name: /Raw text content of data\.csv/i })).toHaveValue(CSV_CONTENT);
+      expect(rawEditorText(await screen.findByRole("textbox", { name: /Raw text content of data\.csv/i }))).toBe(
+        CSV_CONTENT,
+      );
 
       await user.click(getTab("readme.md"));
 
@@ -456,7 +483,7 @@ describe("App", () => {
 
       await user.click(getTab("readme.md"));
 
-      expect(screen.getByRole("textbox", { name: /Raw text content of readme\.md/i })).toHaveValue(
+      expect(rawEditorText(screen.getByRole("textbox", { name: /Raw text content of readme\.md/i }))).toBe(
         EDITED_README_CONTENT,
       );
       expect(mockWorkspace.writeFile).not.toHaveBeenCalled();
@@ -578,6 +605,44 @@ describe("App", () => {
     });
   });
 
+  describe("raw editor", () => {
+    it("shows the cursor position in the status bar only while the raw editor is shown", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      await user.click(screen.getByText("readme.md"));
+      const statusBar = screen.getByRole("contentinfo", { name: "Status Bar" });
+      await screen.findByRole("heading", { name: "Hello Vista" });
+      expect(statusBar).not.toHaveTextContent("Ln");
+
+      await user.click(screen.getByRole("button", { name: "Raw" }));
+      await appendToRawEditor(
+        user,
+        await screen.findByRole("textbox", { name: /Raw text content of readme\.md/i }),
+        "!",
+      );
+      expect(statusBar).toHaveTextContent("Ln 2, Col 16");
+
+      await user.click(screen.getByRole("button", { name: "View" }));
+      expect(statusBar).not.toHaveTextContent("Ln");
+    });
+
+    it("starts a reopened file with a fresh editor state after its tab was closed", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await makeReadmeDirty(user);
+      await user.click(screen.getByRole("button", { name: "Close readme.md" }));
+      const dialog = await screen.findByRole("dialog", { name: "Save changes to readme.md?" });
+      await user.click(within(dialog).getByRole("button", { name: "Don't Save" }));
+      await waitFor(() => expect(screen.queryByRole("tab")).not.toBeInTheDocument());
+
+      await user.click(screen.getByText("readme.md"));
+      await user.click(await screen.findByRole("button", { name: "Raw" }));
+
+      expect(screen.getByRole("contentinfo", { name: "Status Bar" })).toHaveTextContent("Ln 1, Col 1");
+    });
+  });
+
   describe("unsaved changes", () => {
     it("keeps a dirty tab open when closing it is cancelled", async () => {
       const user = userEvent.setup();
@@ -589,7 +654,7 @@ describe("App", () => {
       await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
 
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-      expect(screen.getByRole("textbox", { name: /Raw text content of readme\.md/i })).toHaveValue(
+      expect(rawEditorText(screen.getByRole("textbox", { name: /Raw text content of readme\.md/i }))).toBe(
         EDITED_README_CONTENT,
       );
     });
@@ -635,7 +700,7 @@ describe("App", () => {
       await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
       expect(await screen.findByRole("alert")).toHaveTextContent("Write access was denied.");
-      expect(screen.getByRole("textbox", { name: /Raw text content of readme\.md/i })).toHaveValue(
+      expect(rawEditorText(screen.getByRole("textbox", { name: /Raw text content of readme\.md/i }))).toBe(
         EDITED_README_CONTENT,
       );
     });
@@ -664,10 +729,10 @@ describe("App", () => {
         ),
       });
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
-      const textarea = await makeReadmeDirty(user);
+      const editor = await makeReadmeDirty(user);
 
       await user.click(screen.getByRole("button", { name: "Save file" }));
-      await user.type(textarea, "!");
+      await appendToRawEditor(user, editor, "!");
       await act(async () => finishWrite());
 
       expect(mockWorkspace.writeFile).toHaveBeenCalledTimes(1);
@@ -687,7 +752,7 @@ describe("App", () => {
         ),
       });
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
-      const textarea = await makeReadmeDirty(user);
+      const editor = await makeReadmeDirty(user);
 
       await user.click(screen.getByRole("button", { name: "Close readme.md" }));
       await user.click(
@@ -695,13 +760,13 @@ describe("App", () => {
           name: "Save",
         }),
       );
-      await user.type(textarea, "!");
+      await appendToRawEditor(user, editor, "!");
       await act(async () => finishWrite());
 
       const dialog = await screen.findByRole("dialog", { name: "Save changes to readme.md?" });
       expect(getTab("readme.md")).toBeInTheDocument();
       await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
-      expect(screen.getByRole("textbox", { name: /Raw text content of readme\.md/i })).toHaveValue(
+      expect(rawEditorText(screen.getByRole("textbox", { name: /Raw text content of readme\.md/i }))).toBe(
         `${EDITED_README_CONTENT}!`,
       );
     });
@@ -744,7 +809,7 @@ describe("App", () => {
       await user.click(within(screen.getByRole("navigation", { name: "File Explorer" })).getByText("readme.md"));
 
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-      expect(screen.getByRole("textbox", { name: /Raw text content of readme\.md/i })).toHaveValue(
+      expect(rawEditorText(screen.getByRole("textbox", { name: /Raw text content of readme\.md/i }))).toBe(
         EDITED_README_CONTENT,
       );
     });
@@ -762,7 +827,7 @@ describe("App", () => {
       window.dispatchEvent(cleanEvent);
       expect(cleanEvent.defaultPrevented).toBe(false);
 
-      await user.type(screen.getByRole("textbox", { name: /Raw text content of readme\.md/i }), "!");
+      await appendToRawEditor(user, screen.getByRole("textbox", { name: /Raw text content of readme\.md/i }), "!");
 
       const dirtyEvent = new Event("beforeunload", { cancelable: true });
       window.dispatchEvent(dirtyEvent);

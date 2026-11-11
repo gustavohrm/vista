@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 
 import { useCommandShortcuts, type Command } from "./commands";
 import { EditorPane } from "./components/editor/editor-pane";
+import type { CursorInfo, RawEditorStateCache } from "./components/editor/raw-editor";
 import { ToastProvider, useToast } from "./components/feedback/toast";
 import { UnsavedChangesDialog, type UnsavedChangesChoice } from "./components/feedback/unsaved-changes-dialog";
 import { ActivityBar } from "./components/layout/activity-bar";
@@ -68,6 +69,10 @@ function AppShell({ adapter }: AppProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(isDesktopViewport);
   const [restorableFolderName, setRestorableFolderName] = useState<string | null>(null);
   const [unsavedRequest, setUnsavedRequest] = useState<UnsavedChangesRequest | null>(null);
+  // Tagged with its tab so a position from another tab is never shown.
+  const [cursor, setCursor] = useState<{ key: string; position: CursorInfo } | null>(null);
+  // Raw editor state of each open tab: selection, scroll position, and undo history.
+  const rawEditorStatesRef = useRef<RawEditorStateCache>(new Map());
   // Holds the startup restore so StrictMode's second effect run reuses it instead of restoring
   // twice. Restoring twice would matter because a second attempt can see the folder as forgotten.
   const startupRestoreRef = useRef<Promise<void> | null>(null);
@@ -79,6 +84,15 @@ function AppShell({ adapter }: AppProps) {
   workspaceRef.current = workspace;
 
   const activeDocument = getActiveDocument(documentsState);
+
+  useEffect(() => {
+    const openKeys = new Set(documentsState.documents.map((doc) => doc.key));
+    for (const key of rawEditorStatesRef.current.keys()) {
+      if (!openKeys.has(key)) {
+        rawEditorStatesRef.current.delete(key);
+      }
+    }
+  }, [documentsState.documents]);
   const activeDocumentKey = activeDocument?.key ?? null;
   const hasDirtyDocuments = documentsState.documents.some((doc) => doc.isDirty);
   const isPromptingForUnsavedChanges = unsavedRequest !== null;
@@ -492,6 +506,22 @@ function AppShell({ adapter }: AppProps) {
     [activeDocument, adapter.platform, closeActiveDocument, isPromptingForUnsavedChanges, saveActiveDocument],
   );
   useCommandShortcuts(commands);
+  const reservedShortcuts = useMemo(
+    () => commands.flatMap((command) => (command.shortcut ? [command.shortcut] : [])),
+    [commands],
+  );
+  const handleCursorChange = useCallback((key: string, position: CursorInfo) => {
+    setCursor((previous) =>
+      previous?.key === key &&
+      previous.position.line === position.line &&
+      previous.position.column === position.column &&
+      previous.position.selectionLength === position.selectionLength
+        ? previous
+        : { key, position },
+    );
+  }, []);
+  const isRawEditorShown = activeDocument !== null && activeDocument.viewMode === "raw";
+  const activeCursor = isRawEditorShown && cursor?.key === activeDocument.key ? cursor.position : null;
 
   return (
     <div
@@ -532,11 +562,14 @@ function AppShell({ adapter }: AppProps) {
             document={activeDocument}
             onViewModeChange={handleViewModeChange}
             onContentChange={handleContentChange}
+            onCursorChange={handleCursorChange}
+            rawEditorStates={rawEditorStatesRef.current}
+            reservedShortcuts={reservedShortcuts}
             onSave={() => void saveActiveDocument()}
           />
         </div>
       </div>
-      <StatusBar activeFile={activeDocument} />
+      <StatusBar activeFile={activeDocument} cursor={activeCursor} />
       {unsavedRequest && <UnsavedChangesDialog fileNames={unsavedRequest.fileNames} onChoose={handleUnsavedChoice} />}
     </div>
   );
