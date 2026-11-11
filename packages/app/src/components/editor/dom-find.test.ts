@@ -45,6 +45,12 @@ describe("createDomFindTarget", () => {
     expect(target.refresh()).toMatchObject({ total: 3, current: 2 });
   });
 
+  it("skips buttons and regions marked as not file text", () => {
+    const { target } = mount('<button>Add Row</button><p data-find-skip>Row</p><input value="Row" />');
+
+    expect(target.search(query("row"))).toMatchObject({ total: 1 });
+  });
+
   it("does not replace", () => {
     const { target } = mount("<p>text</p>");
     target.search(query("text"));

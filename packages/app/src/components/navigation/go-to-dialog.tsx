@@ -56,6 +56,11 @@ export function GoToDialog({ files, initialQuery, hasCurrentFile, onGo, onClose 
     };
   }, []);
 
+  useEffect(() => {
+    // Keyboard selection can move past the list's visible area; keep the picked file in view.
+    document.getElementById(`${listId}-${activeIndex}`)?.scrollIntoView?.({ block: "nearest" });
+  }, [activeIndex, listId]);
+
   const go = (match: FileMatch | undefined) => {
     if (isLineInCurrentFile) {
       if (hasCurrentFile && target.line !== undefined) {

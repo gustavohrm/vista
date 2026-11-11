@@ -90,6 +90,8 @@ function toSearchQuery(query: FindQuery, replace: string): SearchQuery {
     caseSensitive: query.caseSensitive,
     wholeWord: query.wholeWord,
     regexp: query.regexp,
+    // Without regex, `\n` and `\t` are matched as typed rather than as a line break or tab.
+    literal: !query.regexp,
     replace,
   });
 }
@@ -103,6 +105,7 @@ function setReplacement(view: EditorView, replace: string) {
         caseSensitive: current.caseSensitive,
         wholeWord: current.wholeWord,
         regexp: current.regexp,
+        literal: current.literal,
         replace,
       }),
     ),

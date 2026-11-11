@@ -60,4 +60,9 @@ describe("rankFiles", () => {
 
     expect(rankFiles(many, "file")).toHaveLength(GO_TO_RESULT_LIMIT);
   });
+
+  it("keeps match positions on the original path when lowercasing changes its length", () => {
+    // "İ".toLowerCase() is two UTF-16 units, which would shift every later position.
+    expect(rankFiles(["İ.md"], "d")).toEqual([{ path: "İ.md", positions: [3] }]);
+  });
 });

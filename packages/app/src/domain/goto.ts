@@ -41,7 +41,7 @@ export function parseGoToQuery(query: string): GoToTarget {
  * @returns The best matches, best first, at most `GO_TO_RESULT_LIMIT`.
  */
 export function rankFiles(paths: readonly string[], query: string): FileMatch[] {
-  const needle = query.replaceAll(" ", "").toLowerCase();
+  const needle = foldCase(query.replaceAll(" ", ""));
   if (needle === "") {
     return [...paths]
       .sort((a, b) => a.localeCompare(b))
@@ -62,11 +62,24 @@ export function rankFiles(paths: readonly string[], query: string): FileMatch[] 
   return scored.slice(0, GO_TO_RESULT_LIMIT).map(({ match }) => match);
 }
 
+/**
+ * Lowercases each UTF-16 unit on its own, keeping the length, so match positions in the folded text
+ * are positions in the original. `toLowerCase` on the whole string can change its length, as with "İ".
+ */
+function foldCase(text: string): string {
+  let folded = "";
+  for (let i = 0; i < text.length; i++) {
+    const lower = text[i].toLowerCase();
+    folded += lower.length === 1 ? lower : text[i];
+  }
+  return folded;
+}
+
 const WORD_SEPARATORS = new Set(["/", ".", "-", "_", " "]);
 
 /** Tries each place the query's first character occurs and keeps the best-scoring match. */
 function scorePath(path: string, needle: string): { score: number; positions: number[] } | null {
-  const haystack = path.toLowerCase();
+  const haystack = foldCase(path);
   const nameStart = path.lastIndexOf("/") + 1;
   let best: { score: number; positions: number[] } | null = null;
   for (let start = haystack.indexOf(needle[0]); start >= 0; start = haystack.indexOf(needle[0], start + 1)) {

@@ -705,6 +705,18 @@ describe("App", () => {
       expect(within(findBar).getByRole("status")).toHaveTextContent("No results");
     });
 
+    it("closes when the last tab closes, and stays closed for the next file", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openRawReadme(user);
+      await user.keyboard("{Control>}f{/Control}");
+
+      await user.click(screen.getByRole("button", { name: "Close readme.md" }));
+      await user.click(screen.getByText("data.csv"));
+
+      expect(screen.queryByLabelText("Find in file")).not.toBeInTheDocument();
+    });
+
     it("closes with Escape and returns focus to the editor", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);

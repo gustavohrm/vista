@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import type { EditorSettings } from "../../domain/settings";
 import { getViewer } from "../../domain/viewers";
@@ -70,6 +70,8 @@ export function EditorPane({
   const rawFindTargetRef = useRef<FindTarget>(null);
   const renderedViewRef = useRef<HTMLDivElement>(null);
   const renderedFindTarget = useMemo(() => createDomFindTarget(() => renderedViewRef.current), []);
+  // The Markdown editor renders its text after mounting; counting each render lets an open find bar search again.
+  const [markdownRenders, setMarkdownRenders] = useState(0);
   const enriched = doc?.viewMode === "enriched" ? getViewer(doc.extension).enriched : undefined;
   const isRawShown = enriched === undefined;
   const getFindTarget = useCallback(
@@ -125,7 +127,7 @@ export function EditorPane({
         {find && (
           <FindBar
             getTarget={getFindTarget}
-            targetKey={`${doc.key}:${isRawShown ? "raw" : "rendered"}`}
+            targetKey={`${doc.key}:${isRawShown ? "raw" : `rendered:${markdownRenders}`}`}
             content={doc.content}
             canReplace={isRawShown}
             mode={find.mode}
@@ -152,7 +154,12 @@ export function EditorPane({
           <div ref={renderedViewRef} className="h-full">
             {enriched === "markdown" ? (
               // The editor owns its document once mounted, so each tab gets its own instance.
-              <MarkdownEditor key={doc.key} content={doc.content} onChange={onContentChange} />
+              <MarkdownEditor
+                key={doc.key}
+                content={doc.content}
+                onChange={onContentChange}
+                onReady={() => setMarkdownRenders((count) => count + 1)}
+              />
             ) : (
               <CsvTableEditor content={doc.content} onChange={onContentChange} />
             )}

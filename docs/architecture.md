@@ -68,7 +68,7 @@ A Tauri mobile webview reports its real viewport dimensions, so this works throu
 
 User actions with a keyboard shortcut are `Command` objects (`packages/app/src/commands`): an id, a label, an optional shortcut, whether it is enabled, and what it runs. `AppShell` builds the list from its state, and `useCommandShortcuts` installs one window `keydown` listener that runs the matching command. A disabled command still swallows its shortcut, so `Ctrl+S` with nothing to save never opens the browser's own Save dialog. Shortcuts are written like `Mod+Shift+S`, where `Mod` matches Ctrl or Cmd. The raw editor hands every command shortcut to this listener instead of handling the key itself, so a command wins over a CodeMirror or vim binding on the same key. Components MUST NOT add their own global shortcut listeners; the planned menu bar, context menus, and command palette read the same command list, so an action and its shortcut are defined once.
 
-The commands are Save (`Mod+S`), Close Tab (`Mod+W` native, `Alt+W` web), Find (`Mod+F`), Replace (`Mod+H`), Go to File (`Mod+P`), and Go to Line (`Mod+G`). All of them are disabled while the unsaved-changes prompt is open. On macOS, `Cmd+H` is the system's Hide shortcut, so Replace there is reached from the find bar's disclosure button.
+The commands are Save (`Mod+S`), Close Tab (`Mod+W` native, `Alt+W` web), Find (`Mod+F`), Replace (`Mod+H`), Go to File (`Mod+P`), and Go to Line (`Mod+G`). All of them are disabled while the unsaved-changes prompt is open. On macOS, `Cmd+H` is the system's Hide shortcut; since `Mod` also matches Ctrl, `Ctrl+H` opens Replace there, as does the find bar's disclosure button.
 
 ### Find
 

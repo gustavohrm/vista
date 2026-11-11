@@ -1,8 +1,6 @@
 import Papa from "papaparse";
 import { useCallback, useMemo } from "react";
 
-import { lineSeparatorOf } from "../../domain/line-endings";
-
 interface CsvTableEditorProps {
   /** Raw CSV string content. */
   content: string;
@@ -17,19 +15,15 @@ interface CsvTableEditorProps {
  * @returns Tabular CSV editing interface.
  */
 export function CsvTableEditor({ content, onChange }: CsvTableEditorProps) {
-  const parsedData = useMemo(() => {
+  const { parsedData, newline } = useMemo(() => {
     const result = Papa.parse<string[]>(content, {
       skipEmptyLines: false,
     });
     const rows = result.data.filter((row) => Array.isArray(row));
-    if (rows.length === 0) {
-      return [[""]];
-    }
-    return rows;
+    // Papa writes CRLF by default. Writing back the record separator it detected, which ignores line
+    // breaks inside quoted cells, stops one cell edit from rewriting every line.
+    return { parsedData: rows.length === 0 ? [[""]] : rows, newline: result.meta.linebreak };
   }, [content]);
-
-  // Papa writes CRLF by default; keeping the file's own line breaks stops one cell edit from rewriting every line.
-  const newline = lineSeparatorOf(content);
 
   const maxColumns = useMemo(() => {
     return parsedData.reduce((max, row) => Math.max(max, row.length), 1);
@@ -75,7 +69,7 @@ export function CsvTableEditor({ content, onChange }: CsvTableEditorProps) {
 
   return (
     <div className="csv-table bg-background text-text flex h-full w-full flex-col">
-      <div className="border-border bg-foreground flex items-center gap-2 border-b px-4 py-2">
+      <div data-find-skip className="border-border bg-foreground flex items-center gap-2 border-b px-4 py-2">
         <span className="text-text-secondary text-xs font-medium">Table Actions:</span>
         <button type="button" onClick={handleAddRow} className="btn sm">
           <i className="ic-plus text-xs" aria-hidden="true" />
@@ -90,7 +84,7 @@ export function CsvTableEditor({ content, onChange }: CsvTableEditorProps) {
       <div className="flex-1 overflow-auto p-4">
         <div className="table-wrap">
           <table className="data-table ruled edged">
-            <thead>
+            <thead data-find-skip>
               <tr>
                 <th className="w-16 text-center select-none">#</th>
                 {columnLabels.map((col, idx) => (
@@ -103,7 +97,7 @@ export function CsvTableEditor({ content, onChange }: CsvTableEditorProps) {
             <tbody>
               {parsedData.map((row, rowIndex) => (
                 <tr key={rowIndex}>
-                  <td className="select-none">
+                  <td data-find-skip className="select-none">
                     <span className="block px-3 py-2 text-center font-mono">{rowIndex + 1}</span>
                   </td>
                   {Array.from({ length: maxColumns }, (_, colIndex) => (

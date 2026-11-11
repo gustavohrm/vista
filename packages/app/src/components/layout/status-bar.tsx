@@ -31,7 +31,7 @@ export function StatusBar({ activeFile, cursor, vimMode, onGoToLine }: StatusBar
       className="border-border bg-foreground text-text-secondary flex h-6 items-center justify-end border-t px-3 text-[11px] select-none"
     >
       {activeFile && (
-        <div className="flex min-w-0 items-center gap-4 overflow-hidden whitespace-nowrap">
+        <div className="flex min-w-0 [scrollbar-width:none] items-center gap-4 overflow-x-auto whitespace-nowrap">
           {vimMode && <span className="text-text font-medium">{vimMode.toUpperCase()}</span>}
           {cursor &&
             (onGoToLine ? (

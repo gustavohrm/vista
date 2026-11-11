@@ -94,6 +94,10 @@ function AppShell({ adapter }: AppProps) {
   workspaceRef.current = workspace;
 
   const activeDocument = getActiveDocument(documentsState);
+  // Closing the last tab closes the find bar, so opening a file later does not bring it back unasked.
+  if (activeDocument === null && find !== null) {
+    setFind(null);
+  }
 
   useEffect(() => {
     const openKeys = new Set(documentsState.documents.map((doc) => doc.key));

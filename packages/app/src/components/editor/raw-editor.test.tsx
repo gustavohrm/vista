@@ -260,6 +260,13 @@ describe("RawEditor find", () => {
     expect(props.onChange).toHaveBeenLastCalledWith("1 two 1 1");
   });
 
+  it("matches a backslash sequence as typed when regex is off", () => {
+    const { target } = renderWithFind("a\\nb\nc");
+
+    expect(target.search(query("\\n"))).toMatchObject({ total: 1 });
+    expect(getView().state.selection.main).toMatchObject({ from: 1, to: 3 });
+  });
+
   it("reports an invalid regular expression", () => {
     const { target } = renderWithFind("text");
 

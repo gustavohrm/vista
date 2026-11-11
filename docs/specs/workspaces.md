@@ -65,7 +65,7 @@ The raw view (`packages/app/src/components/editor/raw-editor.tsx`) is a [CodeMir
 
 ### Editor settings
 
-The gear button in the document header opens a popover with four switches: line numbers, word wrap, minimap, and vim mode. They apply to the raw editor at once and are remembered in the browser's `localStorage` under `vista.settings`, as `{ "version": 1, "editor": { "lineNumbers": true, "minimap": false, "vim": false, "wordWrap": true } }`. A stored value that is missing or of the wrong type falls back to its default, field by field, so one bad field does not reset the others. An unreadable or unwritable store leaves the defaults in effect for the session.
+The gear button in the document header opens a popover with four switches: line numbers, word wrap, minimap, and vim mode. They apply to the raw editor at once and are remembered in the browser's `localStorage` under `vista.settings`, as `{ "version": 1, "editor": { "lineNumbers": true, "minimap": false, "vim": false, "wordWrap": true } }`. A stored value that is missing or of the wrong type falls back to its default, field by field, so one bad field does not reset the others. When the store can't be read, the editor starts with the defaults. When it can't be written, a changed setting still applies for the rest of the session but is lost on reload.
 
 ### Find and replace
 

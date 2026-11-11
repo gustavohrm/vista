@@ -78,7 +78,13 @@ function isEqualQuery(a: FindQuery, b: FindQuery): boolean {
 
 function collectMatches(root: HTMLElement, pattern: RegExp): DomMatch[] {
   const matches: DomMatch[] = [];
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  // Controls and `data-find-skip` regions, such as the CSV table's buttons and headings, are not file text.
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+    acceptNode: (node) =>
+      node instanceof HTMLElement && (node instanceof HTMLButtonElement || node.hasAttribute("data-find-skip"))
+        ? NodeFilter.FILTER_REJECT
+        : NodeFilter.FILTER_ACCEPT,
+  });
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     if (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement) {
       if (findMatches(node.value, pattern).length > 0) {
