@@ -1,19 +1,22 @@
 import { getFileKind } from "../../domain/file-types";
 import type { FileDocument } from "../../ports";
+import type { CursorInfo } from "../editor/raw-editor";
 
 interface StatusBarProps {
   /** Currently active file document, if one is open. */
   activeFile?: FileDocument | null;
+  /** Cursor of the raw editor, or null when the active document isn't shown raw. */
+  cursor?: CursorInfo | null;
 }
 
 /**
- * Renders the bottom status bar with the active document's size and format. The bar stays empty
- * when no document is open.
+ * Renders the bottom status bar with the raw editor's cursor position, and the active document's
+ * size and format. The bar stays empty when no document is open.
  *
  * @param props - StatusBar properties.
  * @returns Status bar element.
  */
-export function StatusBar({ activeFile }: StatusBarProps) {
+export function StatusBar({ activeFile, cursor }: StatusBarProps) {
   return (
     <footer
       aria-label="Status Bar"
@@ -21,12 +24,18 @@ export function StatusBar({ activeFile }: StatusBarProps) {
     >
       {activeFile && (
         <div className="flex items-center gap-4">
+          {cursor && <span>{describeCursor(cursor)}</span>}
           <span>{describeSize(activeFile)}</span>
           <span>{describeFormat(activeFile.extension)}</span>
         </div>
       )}
     </footer>
   );
+}
+
+function describeCursor({ line, column, selectionLength }: CursorInfo): string {
+  const position = `Ln ${line}, Col ${column}`;
+  return selectionLength > 0 ? `${position} (${selectionLength} selected)` : position;
 }
 
 /**

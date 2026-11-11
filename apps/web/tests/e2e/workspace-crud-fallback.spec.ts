@@ -88,7 +88,7 @@ test.describe("workspace file management (fallback mode)", () => {
     await explorer.getByText("todo.md").click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await page.getByRole("tab", { name: /^notes\.md/ }).click();
-    await expect(editor).toHaveValue("Edited but not saved");
+    await expect(editor).toHaveText("Edited but not saved");
 
     await page.getByRole("button", { name: "Close notes.md" }).click();
     const unsavedDialog = page.getByRole("dialog");
@@ -96,7 +96,35 @@ test.describe("workspace file management (fallback mode)", () => {
     await unsavedDialog.getByRole("button", { name: "Cancel", exact: true }).click();
 
     await expect(unsavedDialog).toBeHidden();
-    await expect(editor).toHaveValue("Edited but not saved");
+    await expect(editor).toHaveText("Edited but not saved");
+  });
+
+  test("keeps the raw editor's cursor when switching tabs and back", async ({ page }) => {
+    await openFixtureVault(page);
+
+    const explorer = page.getByRole("navigation", { name: "File Explorer" });
+    await explorer.click({ button: "right", position: { x: 20, y: 300 } });
+    await page.getByRole("menuitem", { name: "New File" }).click();
+    await page.getByRole("textbox", { name: "Entry name" }).fill("todo.md");
+    await page.getByRole("textbox", { name: "Entry name" }).press("Enter");
+    await expect(explorer.getByText("todo.md")).toBeVisible();
+
+    await explorer.getByText("notes.md").click();
+    await page.getByRole("button", { name: "Raw", exact: true }).click();
+    const editor = page.getByRole("textbox", { name: "Raw text content of notes.md" });
+    await editor.fill("one two");
+    await editor.press("Home");
+    await editor.press("ArrowRight");
+    await editor.press("ArrowRight");
+    await editor.press("ArrowRight");
+
+    await explorer.getByText("todo.md").click();
+    await page.getByRole("tab", { name: /^notes\.md/ }).click();
+    await editor.focus();
+    await page.keyboard.type(",");
+
+    await expect(editor).toHaveText("one, two");
+    await expect(page.getByRole("contentinfo", { name: "Status Bar" })).toContainText("Ln 1, Col 5");
   });
 
   test("rejects creating a file with a name that already exists", async ({ page }) => {
