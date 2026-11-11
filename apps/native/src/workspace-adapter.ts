@@ -3,6 +3,7 @@ import {
   exists,
   mkdir,
   readDir,
+  readFile as readBinaryFile,
   readTextFile,
   remove as removeEntry,
   rename,
@@ -211,6 +212,13 @@ export function createNativeWorkspaceAdapter(): WorkspaceCapability {
       }
       const fullPath = joinPath(currentRootPath, path);
       return readTextFile(fullPath);
+    },
+
+    async readBinary(path: string): Promise<Uint8Array<ArrayBuffer>> {
+      if (!currentRootPath) {
+        throw new Error("No native workspace root folder selected");
+      }
+      return readBinaryFile(joinPath(currentRootPath, path));
     },
 
     async writeFile(path: string, content: string): Promise<void> {

@@ -103,6 +103,13 @@ export interface WorkspaceCapability {
    */
   readFile(path: string): Promise<string>;
   /**
+   * Reads a file's raw bytes, such as an image a Markdown document shows.
+   *
+   * @param path - Relative path of the file to read.
+   * @returns A promise resolving to the file's bytes.
+   */
+  readBinary(path: string): Promise<Uint8Array<ArrayBuffer>>;
+  /**
    * Writes the provided UTF-8 text content to the specified file on disk.
    *
    * @param path - Relative path of the file to write.

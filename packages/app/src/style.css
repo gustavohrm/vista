@@ -60,6 +60,19 @@ body,
   @apply text-text-strong underline;
 }
 
+.markdown-editor .ProseMirror .markdown-image img {
+  @apply inline-block h-auto max-w-full rounded-sm align-bottom;
+}
+
+.markdown-editor .ProseMirror .markdown-image.ProseMirror-selectednode img,
+.markdown-editor .ProseMirror .markdown-image.ProseMirror-selectednode .markdown-image-placeholder {
+  outline: 2px solid var(--focus-ring);
+}
+
+.markdown-editor .ProseMirror .markdown-image-placeholder {
+  @apply border-border bg-surface text-text-secondary inline-flex max-w-full items-center gap-1.5 rounded-sm border border-dashed px-2 py-1 align-bottom text-xs;
+}
+
 .markdown-editor .ProseMirror h1 {
   @apply text-title text-text-strong border-border mb-4 border-b pb-2;
 }

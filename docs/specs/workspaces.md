@@ -52,6 +52,8 @@ Future versions will expand to `.json`, `.yaml`, canvas representations, and emb
 
 The Enriched view for `.md`/`.markdown` files (`packages/app/src/components/editor/markdown-editor.tsx`) is a WYSIWYG editor built on [Milkdown](https://milkdown.dev/), using its CommonMark and GFM presets (headings, emphasis, lists, links, code blocks, blockquotes, tables, task lists, strikethrough) with a minimal custom theme styled directly against `@codenhub/styles` tokens rather than Milkdown's bundled Nord theme. Editing in this view mutates the same `FileDocument` buffer as every other view ([Document buffer and dirty state](#document-buffer-and-dirty-state) describes it); each tab gets its own editor instance, and switching tabs remounts it rather than live-syncing content into an existing document, since the editor owns its document once mounted. Task list items render as real design-system checkboxes that toggle the item's checked state when clicked.
 
+**Images.** An image's source resolves from the Markdown file's folder, or from the workspace root when it starts with `/`. Percent escapes such as `%20` are decoded, and a query or fragment is dropped. The file is read through the platform's `readBinary` capability and shown through a `blob:` URL, typed by its extension so SVG works; the URLs are revoked when the editor closes. The Markdown text is never rewritten. A path that climbs out of the workspace with `..`, a Windows drive path, and any scheme other than `http`, `https`, and `data:image/` are not loaded. Web images load in the browser, but the desktop app's content security policy blocks them. An image that is missing, unreadable, or blocked shows a placeholder with its alt text, or its path when it has none. Pasting or dropping images, an image viewer for image files, and a size limit are not built.
+
 **Known limitation**: no WYSIWYG Markdown editor guarantees byte-for-byte round-trip on arbitrary existing Markdown. Parsing and re-serializing content the user never touched can still normalize source-level formatting that doesn't affect meaning, such as list bullet markers (`-`/`+` normalizing to `*`). This is intentional normalization, not data loss, and the accepted cases are enumerated and asserted in `packages/app/src/components/editor/markdown-round-trip.test.ts` rather than left undocumented.
 
 ### Raw editor
@@ -65,7 +67,7 @@ The raw view (`packages/app/src/components/editor/raw-editor.tsx`) is a [CodeMir
 
 ### Editor settings
 
-The gear button in the document header opens a popover with four switches: line numbers, word wrap, minimap, and vim mode. They apply to the raw editor at once and are remembered in the browser's `localStorage` under `vista.settings`, as `{ "version": 1, "editor": { "lineNumbers": true, "minimap": false, "vim": false, "wordWrap": true } }`. A stored value that is missing or of the wrong type falls back to its default, field by field, so one bad field does not reset the others. When the store can't be read, the editor starts with the defaults. When it can't be written, a changed setting still applies for the rest of the session but is lost on reload.
+The gear button in the document header opens a popover with four switches: line numbers, word wrap, minimap, and vim mode. The View menu toggles the same four, and `Alt+Z` toggles word wrap. They apply to the raw editor at once and are remembered in the browser's `localStorage` under `vista.settings`, as `{ "version": 1, "editor": { "lineNumbers": true, "minimap": false, "vim": false, "wordWrap": true } }`. A stored value that is missing or of the wrong type falls back to its default, field by field, so one bad field does not reset the others. When the store can't be read, the editor starts with the defaults. When it can't be written, a changed setting still applies for the rest of the session but is lost on reload.
 
 ### Find and replace
 
@@ -82,12 +84,28 @@ The gear button in the document header opens a popover with four switches: line 
 
 With a file open, the status bar shows the cursor and vim mode (raw view only; see [Raw editor](#raw-editor)), then facts about the buffer: the line count, the size in bytes as UTF-8 (`B`, `KB`, or `MB`), the line ending (`CRLF` when the buffer contains any CRLF line break, `LF` otherwise), the format, and, for Markdown, the word count.
 
+### Menus
+
+A menu bar above the editor offers File, Edit, Selection, View, Go, and Help. Every item is a command (see [Commands and shortcuts](../architecture.md#commands-and-shortcuts)), so an item shows its shortcut and is greyed out when it can't run.
+
+- **File**: Open Folder, New File, New Folder (at the workspace root, opening the explorer), Save, Save All, Close Tab, Close All Tabs.
+- **Edit**: Undo, Redo, Cut, Copy, Paste, Find, Replace.
+- **Selection**: Select All, Select Line, Add Next Occurrence, Select All Occurrences, Add Cursor Above, Add Cursor Below. All but Select All need the raw view's multiple selections, so they are disabled in the rendered views.
+- **View**: Explorer, Raw Text, Word Wrap, Line Numbers, Minimap, Vim Mode, and the light or dark theme.
+- **Go**: Go to File, Go to Line, Next Tab, Previous Tab.
+- **Help**: Keyboard Shortcuts, a dialog listing every command with a key, and About Vista.
+
+The menu bar is one Tab stop: ArrowLeft and ArrowRight move between menus, Enter, Space, or ArrowDown opens one, the arrow keys move within it, and Escape closes it. Clicking a menu does not take focus from the editor first, and choosing an item returns focus to where it was before running it, so Edit and Selection items apply to the editor the user was in. Undo, Redo, Cut, Copy, Paste, Select All, and the Selection items show the keys the editors handle themselves; the app does not bind those keys, so they keep working in every text field. Paste from a menu reads the clipboard with the Clipboard API, which can ask for permission; when reading fails, a toast says to press `Ctrl+V` instead.
+
+Right-clicking opens a menu built the same way. The explorer's menu is described in [File and folder management](#file-and-folder-management), and the tab menu in [Tabs](#tabs). In the editors it offers Cut, Copy, Paste, Select All, and Find, plus Replace and Go to Line in the raw view. Shift+right-click keeps the browser's own menu, for spelling suggestions.
+
 ### Tabs
 
 Every opened file gets its own tab, and selecting a file that is already open switches to its tab instead of reloading it. There are no preview tabs: a tab stays until the user closes it. A new tab opens to the right of the active one. Closing the active tab shows its right neighbor, or its left neighbor when it was the last tab.
 
 - Each tab remembers its own view mode. Markdown opens in the rendered view; CSV and plain text open raw. Which views a format offers comes from the viewer registry in `packages/app/src/domain/viewers.ts`, so a later format with no raw form, such as PDF, hides the toggle.
 - A tab closes from its Close button, a middle click, or the Close Tab shortcut: `Ctrl+W` on native and `Alt+W` on the web, because browsers reserve `Ctrl+W` for closing their own tab. Arrow keys move between tabs.
+- Right-clicking a tab offers Close, Close Others, Close to the Right, Close Saved, Close All, and Copy Relative Path. Closing several tabs asks once about all their unsaved edits.
 - Renaming a file or folder updates every open tab inside it in place. Deleting closes every open tab inside it, with an info toast naming the file or counting them.
 - Tabs are keyed by workspace and path, so several workspace roots can later hold files at the same relative path.
 
@@ -120,6 +138,7 @@ export interface WorkspaceCapability {
   restoreFolder(options: { interactive: boolean }): Promise<RestoreFolderResult>;
   readTree(workspace: Workspace): Promise<WorkspaceNode[]>;
   readFile(path: string): Promise<string>;
+  readBinary(path: string): Promise<Uint8Array<ArrayBuffer>>;
   writeFile(path: string, content: string): Promise<void>;
   createFile(path: string): Promise<void>;
   createDirectory(path: string): Promise<void>;
@@ -129,6 +148,8 @@ export interface WorkspaceCapability {
 
 export type RestoreFolderResult = { status: "restored"; workspace: Workspace } | { status: "needs-permission"; name: string } | { status: "unavailable"; name: string } | { status: "none" };
 ```
+
+`readBinary` returns a file's bytes, for images shown in Markdown. The web host reads the file handle, or the picked file in fallback mode; the native host uses `readFile` from `@tauri-apps/plugin-fs`, allowed by the `fs:allow-read-file` permission.
 
 `restoreFolder({ interactive: true })` MUST only be called from a user gesture such as a click handler. With `interactive: false` the host never prompts. [Reopening the last folder](#reopening-the-last-folder) describes each host's behavior.
 
@@ -151,7 +172,7 @@ Workspace operations do not fail silently. A user-initiated cancellation of the 
 
 ## File and folder management
 
-Users create, rename/move, and delete files and folders from a right-click context menu on the sidebar file tree (right-clicking empty space targets the workspace root). Renaming is implemented as `move` within the same parent directory — there is no separate rename operation, matching VS Code's own model.
+Users create, rename/move, and delete files and folders from a right-click context menu on the sidebar file tree (right-clicking empty space targets the workspace root). The menu offers Open for a file, New File and New Folder for a folder or the root, Rename, Delete, and Copy Relative Path, plus Copy Path, the full path on disk, in the desktop app; the browser has no full path to copy. Renaming is implemented as `move` within the same parent directory — there is no separate rename operation, matching VS Code's own model.
 
 - **Delete confirmation**: choosing "Delete" opens a modal dialog titled `Delete "{name}"?` with **Cancel** and **Delete** buttons, and nothing is removed until Delete is confirmed. The message warns that a folder's contents are deleted with it. When an open tab inside the deleted entry has unsaved edits, the message also warns that those edits will be lost. The dialog is a native `<dialog>`, so Escape cancels it.
 

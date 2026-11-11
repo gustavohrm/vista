@@ -89,3 +89,44 @@ describe("MarkdownEditor", () => {
     expect(() => unmount()).not.toThrow();
   });
 });
+
+describe("MarkdownEditor images", () => {
+  const IMAGE_MARKDOWN = "![A cat](img/cat.png)";
+
+  it("shows an image from the loaded file and keeps the Markdown as written", async () => {
+    const createObjectURL = vi.fn(() => "blob:cat");
+    const revokeObjectURL = vi.fn();
+    // jsdom has no object URLs.
+    Object.assign(URL, { createObjectURL, revokeObjectURL });
+    const loadImage = vi.fn().mockResolvedValue(new Blob(["png"], { type: "image/png" }));
+    const onChange = vi.fn();
+    const { unmount } = render(<MarkdownEditor content={IMAGE_MARKDOWN} onChange={onChange} loadImage={loadImage} />);
+
+    const image = await screen.findByRole("img", { name: "A cat" });
+    await waitFor(() => expect(image).toHaveAttribute("src", "blob:cat"));
+    expect(loadImage).toHaveBeenCalledWith("img/cat.png");
+    expect(onChange).not.toHaveBeenCalled();
+
+    unmount();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:cat");
+    Reflect.deleteProperty(URL, "createObjectURL");
+    Reflect.deleteProperty(URL, "revokeObjectURL");
+  });
+
+  it("shows a web URL as it is", async () => {
+    const loadImage = vi.fn().mockResolvedValue("https://example.com/cat.png");
+    render(<MarkdownEditor content={IMAGE_MARKDOWN} onChange={vi.fn()} loadImage={loadImage} />);
+
+    const image = await screen.findByRole("img", { name: "A cat" });
+    await waitFor(() => expect(image).toHaveAttribute("src", "https://example.com/cat.png"));
+  });
+
+  it("shows a placeholder naming an image that cannot be loaded", async () => {
+    const loadImage = vi.fn().mockRejectedValue(new Error("File not found"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    render(<MarkdownEditor content={IMAGE_MARKDOWN} onChange={vi.fn()} loadImage={loadImage} />);
+
+    expect(await screen.findByRole("img", { name: "Image not shown: A cat" })).toHaveTextContent("A cat");
+    vi.restoreAllMocks();
+  });
+});

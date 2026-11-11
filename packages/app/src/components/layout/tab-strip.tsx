@@ -1,6 +1,7 @@
-import { useEffect, useRef, type KeyboardEvent, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 
 import type { OpenDocument } from "../../state/documents";
+import { Menu, MENU_SEPARATOR, type MenuEntry } from "../menu/menu";
 import { FileIcon } from "./file-icon";
 
 const MIDDLE_BUTTON = 1;
@@ -10,10 +11,24 @@ interface TabStripProps {
   activeKey: string | null;
   onActivate: (key: string) => void;
   onClose: (key: string) => void;
+  /** Closes several tabs at once, from the tab menu. The caller asks about unsaved changes. */
+  onCloseMany: (keys: string[]) => void;
+  onCopyRelativePath: (path: string) => void;
 }
 
-/** One tab per open document. Arrow keys move between tabs, and a middle click closes one. */
-export function TabStrip({ documents, activeKey, onActivate, onClose }: TabStripProps) {
+/**
+ * One tab per open document. Arrow keys move between tabs, a middle click closes one, and a right
+ * click opens a menu of close and copy actions.
+ */
+export function TabStrip({
+  documents,
+  activeKey,
+  onActivate,
+  onClose,
+  onCloseMany,
+  onCopyRelativePath,
+}: TabStripProps) {
+  const [menu, setMenu] = useState<{ key: string; x: number; y: number } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   // Set when a tab is closed from its focused Close button. Closing removes the focused element,
   // so focus follows the newly active tab once the close completes; a cancelled close keeps it.
@@ -72,10 +87,49 @@ export function TabStrip({ documents, activeKey, onActivate, onClose }: TabStrip
             onClose(doc.key);
           }}
           onKeyDown={handleKeyDown}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            setMenu({ key: doc.key, x: event.clientX, y: event.clientY });
+          }}
         />
       ))}
+      {menu && (
+        <Menu
+          label="Tab actions"
+          items={buildTabMenu(documents, menu.key, { onClose, onCloseMany, onCopyRelativePath })}
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+        />
+      )}
     </div>
   );
+}
+
+/** Lists the close actions for a tab, each disabled when it would close nothing, then Copy Relative Path. */
+function buildTabMenu(
+  documents: readonly OpenDocument[],
+  key: string,
+  actions: Pick<TabStripProps, "onClose" | "onCloseMany" | "onCopyRelativePath">,
+): MenuEntry[] {
+  const index = documents.findIndex((doc) => doc.key === key);
+  const target = documents[index];
+  if (!target) {
+    return [];
+  }
+  const keysOf = (docs: readonly OpenDocument[]) => docs.map((doc) => doc.key);
+  const others = keysOf(documents.filter((doc) => doc.key !== key));
+  const toTheRight = keysOf(documents.slice(index + 1));
+  const saved = keysOf(documents.filter((doc) => !doc.isDirty));
+  return [
+    { label: "Close", icon: "ic-x", onSelect: () => actions.onClose(key) },
+    { label: "Close Others", disabled: others.length === 0, onSelect: () => actions.onCloseMany(others) },
+    { label: "Close to the Right", disabled: toTheRight.length === 0, onSelect: () => actions.onCloseMany(toTheRight) },
+    { label: "Close Saved", disabled: saved.length === 0, onSelect: () => actions.onCloseMany(saved) },
+    { label: "Close All", onSelect: () => actions.onCloseMany(keysOf(documents)) },
+    MENU_SEPARATOR,
+    { label: "Copy Relative Path", icon: "ic-copy", onSelect: () => actions.onCopyRelativePath(target.path) },
+  ];
 }
 
 interface TabProps {
@@ -84,9 +138,10 @@ interface TabProps {
   onActivate: () => void;
   onClose: (event: MouseEvent) => void;
   onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
+  onContextMenu: (event: MouseEvent) => void;
 }
 
-function Tab({ document: doc, isActive, onActivate, onClose, onKeyDown }: TabProps) {
+function Tab({ document: doc, isActive, onActivate, onClose, onKeyDown, onContextMenu }: TabProps) {
   const handleAuxClick = (event: MouseEvent) => {
     if (event.button === MIDDLE_BUTTON) {
       event.preventDefault();
@@ -106,6 +161,7 @@ function Tab({ document: doc, isActive, onActivate, onClose, onKeyDown }: TabPro
     <div
       onAuxClick={handleAuxClick}
       onMouseDown={handleMouseDown}
+      onContextMenu={onContextMenu}
       className={`group border-border flex max-w-56 flex-none items-center border-r ${
         isActive ? "bg-background text-text-strong" : "text-text-secondary hover:bg-surface hover:text-text"
       }`}

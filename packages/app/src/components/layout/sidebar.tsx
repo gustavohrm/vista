@@ -1,11 +1,11 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { joinWorkspacePath } from "../../domain/path-validation";
 import { isDesktopViewport } from "../../domain/viewport";
 import type { Workspace, WorkspaceNode } from "../../ports";
 import { Tooltip } from "../feedback/tooltip";
+import { Menu, MENU_SEPARATOR, type MenuEntry } from "../menu/menu";
 import { FileIcon } from "./file-icon";
-import { TreeContextMenu } from "./tree-context-menu";
 import {
   TREE_CHEVRON_COLUMN_PX,
   TREE_INDENT_PX,
@@ -26,6 +26,13 @@ interface PendingNewEntry {
   /** Path of the parent directory the new entry will be created in, empty string for root. */
   parentPath: string;
   kind: "file" | "directory";
+}
+
+/** A request from outside the explorer, such as the File menu, to name a new entry at the workspace root. */
+export interface NewEntryRequest {
+  kind: "file" | "directory";
+  /** Bumped for each request, so asking twice for the same kind starts a new entry each time. */
+  serial: number;
 }
 
 interface SidebarProps {
@@ -64,6 +71,12 @@ interface SidebarProps {
   onRename: (fromPath: string, toPath: string) => void;
   /** Callback triggered immediately when "Delete" is chosen for an entry. The caller owns any confirmation. */
   onDelete: (path: string) => void;
+  /** Copies an entry's workspace-relative path. */
+  onCopyRelativePath: (path: string) => void;
+  /** Copies an entry's full path on disk. Omitted where there is none, such as in the browser. */
+  onCopyPath?: (path: string) => void;
+  /** Starts naming a new entry at the workspace root. */
+  newEntryRequest?: NewEntryRequest | null;
 }
 
 /** Icon classes for file and folder glyphs in the tree, matching the row text color. */
@@ -104,12 +117,21 @@ export function Sidebar({
   onCreateDirectory,
   onRename,
   onDelete,
+  onCopyRelativePath,
+  onCopyPath,
+  newEntryRequest,
 }: SidebarProps) {
   // Directories start collapsed, as in VS Code, Zed, and Obsidian; only expanded ones are tracked.
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set());
   const [contextMenu, setContextMenu] = useState<ContextMenuTarget | null>(null);
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [pendingNewEntry, setPendingNewEntry] = useState<PendingNewEntry | null>(null);
+
+  useEffect(() => {
+    if (newEntryRequest) {
+      setPendingNewEntry({ parentPath: "", kind: newEntryRequest.kind });
+    }
+  }, [newEntryRequest]);
 
   const handleSelectFile = (path: string) => {
     onSelectFile(path);
@@ -266,20 +288,68 @@ export function Sidebar({
       </nav>
 
       {contextMenu && (
-        <TreeContextMenu
+        <Menu
+          label="File actions"
+          items={buildTreeMenu(contextMenu, {
+            onOpen: handleSelectFile,
+            onNewFile: handleNewFile,
+            onNewFolder: handleNewFolder,
+            onRename: setRenamingPath,
+            onDelete,
+            onCopyRelativePath,
+            onCopyPath,
+          })}
           x={contextMenu.x}
           y={contextMenu.y}
-          canCreateChildren={contextMenu.kind === "directory"}
-          canRenameOrDelete={contextMenu.path !== ""}
-          onNewFile={() => handleNewFile(contextMenu.path)}
-          onNewFolder={() => handleNewFolder(contextMenu.path)}
-          onRename={() => setRenamingPath(contextMenu.path)}
-          onDelete={() => onDelete(contextMenu.path)}
           onClose={() => setContextMenu(null)}
         />
       )}
     </>
   );
+}
+
+interface TreeMenuActions {
+  onOpen: (path: string) => void;
+  onNewFile: (parentPath: string) => void;
+  onNewFolder: (parentPath: string) => void;
+  onRename: (path: string) => void;
+  onDelete: (path: string) => void;
+  onCopyRelativePath: (path: string) => void;
+  onCopyPath?: (path: string) => void;
+}
+
+/**
+ * Lists the actions for a tree entry: Open for a file, New File and New Folder for a folder or the
+ * workspace root, then Rename and Delete, then the copy actions. The root has no rename, delete,
+ * or relative path.
+ */
+function buildTreeMenu({ path, kind }: ContextMenuTarget, actions: TreeMenuActions): MenuEntry[] {
+  const isRoot = path === "";
+  const groups: MenuEntry[][] = [
+    kind === "file"
+      ? [{ label: "Open", icon: "ic-file", onSelect: () => actions.onOpen(path) }]
+      : [
+          { label: "New File", icon: "ic-file-plus", onSelect: () => actions.onNewFile(path) },
+          { label: "New Folder", icon: "ic-folder-plus", onSelect: () => actions.onNewFolder(path) },
+        ],
+    isRoot
+      ? []
+      : [
+          { label: "Rename", icon: "ic-pencil", onSelect: () => actions.onRename(path) },
+          { label: "Delete", icon: "ic-trash-2", destructive: true, onSelect: () => actions.onDelete(path) },
+        ],
+    [
+      ...(isRoot
+        ? []
+        : [{ label: "Copy Relative Path", icon: "ic-copy", onSelect: () => actions.onCopyRelativePath(path) }]),
+      ...(actions.onCopyPath
+        ? [{ label: "Copy Path", icon: "ic-clipboard", onSelect: () => actions.onCopyPath?.(path) }]
+        : []),
+    ],
+  ];
+  return groups
+    .filter((group) => group.length > 0)
+    .flatMap((group, index) => (index === 0 ? group : [MENU_SEPARATOR, ...group]));
 }
 
 interface ExplorerActionButtonProps {
