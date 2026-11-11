@@ -1,11 +1,25 @@
+import { useCallback, useMemo, useRef, useState } from "react";
+
+import type { EditorSettings } from "../../domain/settings";
 import { getViewer } from "../../domain/viewers";
 import type { FileDocument, ViewMode } from "../../ports";
 import type { OpenDocument } from "../../state/documents";
 import { Tooltip } from "../feedback/tooltip";
 import { CsvTableEditor } from "./csv-table-editor";
+import { createDomFindTarget } from "./dom-find";
+import { EditorSettingsMenu } from "./editor-settings-menu";
+import { FindBar, type FindMode } from "./find-bar";
+import type { FindTarget } from "./find-target";
 import { MarkdownEditor } from "./markdown-editor";
 import { RawEditor } from "./raw-editor";
-import type { CursorInfo, RawEditorStateCache } from "./raw-editor";
+import type { CursorInfo, EditorPosition, RawEditorStateCache } from "./raw-editor";
+
+/** An open find bar. */
+export interface FindRequest {
+  mode: FindMode;
+  /** Bumped each time find is requested, so the bar takes focus again. */
+  focusRequest: number;
+}
 
 interface EditorPaneProps {
   platform: string;
@@ -15,24 +29,56 @@ interface EditorPaneProps {
   onContentChange: (newContent: string) => void;
   /** Called with the active tab's key when its raw editor cursor or selection moves. */
   onCursorChange: (key: string, cursor: CursorInfo) => void;
+  /** Called with the active tab's key when vim's mode changes, and with null when vim goes off. */
+  onVimModeChange: (key: string, mode: string | null) => void;
   onSave: () => void;
   /** Raw editor state of each open tab, kept by the owner of the tabs. */
   rawEditorStates: RawEditorStateCache;
   /** App command shortcuts that the raw editor leaves to the commands layer. */
   reservedShortcuts: readonly string[];
+  editorSettings: EditorSettings;
+  onEditorSettingsChange: (changes: Partial<EditorSettings>) => void;
+  /** The open find bar, or null when it is closed. */
+  find: FindRequest | null;
+  /** Opens the find bar, from the header's find button. */
+  onFind: () => void;
+  onFindClose: () => void;
+  /** A position in the active document to move the raw editor's cursor to. */
+  pendingJump: EditorPosition | null;
+  onJumpApplied: () => void;
 }
 
-/** Hosts the document header, the view mode toggle, and the active document's editor. */
+/** Hosts the document header, the find bar, and the active document's editor. */
 export function EditorPane({
   platform,
   document: doc,
   onViewModeChange,
   onContentChange,
   onCursorChange,
+  onVimModeChange,
   onSave,
   rawEditorStates,
   reservedShortcuts,
+  editorSettings,
+  onEditorSettingsChange,
+  find,
+  onFind,
+  onFindClose,
+  pendingJump,
+  onJumpApplied,
 }: EditorPaneProps) {
+  const rawFindTargetRef = useRef<FindTarget>(null);
+  const renderedViewRef = useRef<HTMLDivElement>(null);
+  const renderedFindTarget = useMemo(() => createDomFindTarget(() => renderedViewRef.current), []);
+  // The Markdown editor renders its text after mounting; counting each render lets an open find bar search again.
+  const [markdownRenders, setMarkdownRenders] = useState(0);
+  const enriched = doc?.viewMode === "enriched" ? getViewer(doc.extension).enriched : undefined;
+  const isRawShown = enriched === undefined;
+  const getFindTarget = useCallback(
+    () => (isRawShown ? rawFindTargetRef.current : renderedFindTarget),
+    [isRawShown, renderedFindTarget],
+  );
+
   if (!doc) {
     return <main role="main" data-platform={platform} className="bg-background text-text flex flex-1 flex-col" />;
   }
@@ -44,8 +90,22 @@ export function EditorPane({
     <main role="main" data-platform={platform} className="bg-background text-text flex flex-1 flex-col overflow-hidden">
       <header className="border-border bg-background flex h-9 flex-none items-center justify-between gap-3 border-b px-3">
         <DocumentBreadcrumb file={doc} />
-        <div className="flex flex-none items-center gap-2">
+        <div className="flex flex-none items-center gap-1">
           {canToggleView && <ViewModeToggle viewMode={doc.viewMode} onViewModeChange={onViewModeChange} />}
+          <Tooltip text="Find (Ctrl+F)" position="bottom" align="end">
+            {(bubbleId) => (
+              <button
+                type="button"
+                onClick={onFind}
+                aria-label="Find"
+                aria-describedby={bubbleId}
+                className={find ? "btn soft icon sm" : "btn ghost icon sm"}
+              >
+                <i className="ic-search" aria-hidden="true" />
+              </button>
+            )}
+          </Tooltip>
+          <EditorSettingsMenu settings={editorSettings} onChange={onEditorSettingsChange} />
           <Tooltip text="Save (Ctrl+S)" position="bottom" align="end">
             {(bubbleId) => (
               <button
@@ -63,54 +123,51 @@ export function EditorPane({
         </div>
       </header>
 
-      <div className="flex-1 overflow-hidden">
-        <DocumentView
-          document={doc}
-          onContentChange={onContentChange}
-          onCursorChange={onCursorChange}
-          rawEditorStates={rawEditorStates}
-          reservedShortcuts={reservedShortcuts}
-        />
+      <div className="relative flex-1 overflow-hidden">
+        {find && (
+          <FindBar
+            getTarget={getFindTarget}
+            targetKey={`${doc.key}:${isRawShown ? "raw" : `rendered:${markdownRenders}`}`}
+            content={doc.content}
+            canReplace={isRawShown}
+            mode={find.mode}
+            focusRequest={find.focusRequest}
+            onClose={onFindClose}
+          />
+        )}
+        {isRawShown ? (
+          <RawEditor
+            ref={rawFindTargetRef}
+            documentKey={doc.key}
+            content={doc.content}
+            fileName={doc.name}
+            onChange={onContentChange}
+            onCursorChange={(cursor) => onCursorChange(doc.key, cursor)}
+            onVimModeChange={(mode) => onVimModeChange(doc.key, mode)}
+            stateCache={rawEditorStates}
+            options={editorSettings}
+            reservedShortcuts={reservedShortcuts}
+            pendingJump={pendingJump}
+            onJumpApplied={onJumpApplied}
+          />
+        ) : (
+          <div ref={renderedViewRef} className="h-full">
+            {enriched === "markdown" ? (
+              // The editor owns its document once mounted, so each tab gets its own instance.
+              <MarkdownEditor
+                key={doc.key}
+                content={doc.content}
+                onChange={onContentChange}
+                onReady={() => setMarkdownRenders((count) => count + 1)}
+              />
+            ) : (
+              <CsvTableEditor content={doc.content} onChange={onContentChange} />
+            )}
+          </div>
+        )}
       </div>
     </main>
   );
-}
-
-interface DocumentViewProps {
-  document: OpenDocument;
-  onContentChange: (newContent: string) => void;
-  onCursorChange: (key: string, cursor: CursorInfo) => void;
-  rawEditorStates: RawEditorStateCache;
-  reservedShortcuts: readonly string[];
-}
-
-function DocumentView({
-  document: doc,
-  onContentChange,
-  onCursorChange,
-  rawEditorStates,
-  reservedShortcuts,
-}: DocumentViewProps) {
-  const enriched = doc.viewMode === "enriched" ? getViewer(doc.extension).enriched : undefined;
-  switch (enriched) {
-    case "markdown":
-      // The editor owns its document once mounted, so each tab gets its own instance.
-      return <MarkdownEditor key={doc.key} content={doc.content} onChange={onContentChange} />;
-    case "csv-table":
-      return <CsvTableEditor content={doc.content} onChange={onContentChange} />;
-    case undefined:
-      return (
-        <RawEditor
-          documentKey={doc.key}
-          content={doc.content}
-          fileName={doc.name}
-          onChange={onContentChange}
-          onCursorChange={(cursor) => onCursorChange(doc.key, cursor)}
-          stateCache={rawEditorStates}
-          reservedShortcuts={reservedShortcuts}
-        />
-      );
-  }
 }
 
 interface DocumentBreadcrumbProps {

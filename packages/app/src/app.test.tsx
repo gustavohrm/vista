@@ -82,6 +82,19 @@ async function makeReadmeDirty(user: UserEvent) {
 }
 
 /**
+ * Opens readme.md in the raw view.
+ *
+ * @param user - The user-event instance driving the interaction.
+ * @returns The raw editor of readme.md.
+ */
+async function openRawReadme(user: UserEvent) {
+  await openFolderFromWelcome(user);
+  await user.click(screen.getByText("readme.md"));
+  await user.click(await screen.findByRole("button", { name: "Raw" }));
+  return screen.findByRole("textbox", { name: "Raw text content of readme.md" });
+}
+
+/**
  * Reads the text of a raw editor. CodeMirror edits a contenteditable element, which has no form value.
  *
  * @param editor - The raw editor's textbox element.
@@ -201,7 +214,8 @@ describe("App", () => {
     expect(saveBtn).toBeEnabled();
     await user.click(saveBtn);
 
-    expect(mockWorkspace.writeFile).toHaveBeenCalled();
+    // The file's LF line breaks survive the table's rewrite.
+    expect(mockWorkspace.writeFile).toHaveBeenCalledWith("data.csv", "Name,Age\nAlicia,30\nBob,25");
   });
 
   it("shows an error toast when opening a folder fails for a reason other than user cancellation", async () => {
@@ -640,6 +654,151 @@ describe("App", () => {
       await user.click(await screen.findByRole("button", { name: "Raw" }));
 
       expect(screen.getByRole("contentinfo", { name: "Status Bar" })).toHaveTextContent("Ln 1, Col 1");
+    });
+
+    it("describes the document's lines, size, line endings, and format in the status bar", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+
+      await user.click(screen.getByText("data.csv"));
+
+      const statusBar = screen.getByRole("contentinfo", { name: "Status Bar" });
+      for (const fact of ["3 lines", "24 B", "LF", "CSV"]) {
+        expect(within(statusBar).getByText(fact)).toBeInTheDocument();
+      }
+    });
+
+    it("applies a setting from the editor settings popover and remembers it", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openRawReadme(user);
+      expect(document.querySelector(".cm-lineNumbers")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Editor settings" }));
+      await user.click(screen.getByRole("switch", { name: "Line numbers" }));
+
+      expect(document.querySelector(".cm-lineNumbers")).not.toBeInTheDocument();
+      expect(JSON.parse(localStorage.getItem("vista.settings") ?? "null")).toMatchObject({
+        version: 1,
+        editor: { lineNumbers: false },
+      });
+    });
+  });
+
+  describe("find", () => {
+    it("finds and replaces text in the raw editor", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      const editor = await openRawReadme(user);
+
+      await user.keyboard("{Control>}f{/Control}");
+      await user.keyboard("notes");
+      const findBar = screen.getByLabelText("Find in file");
+      expect(within(findBar).getByRole("status")).toHaveTextContent("1 of 1");
+
+      await user.keyboard("{Control>}h{/Control}");
+      await user.type(within(findBar).getByRole("textbox", { name: "Replace" }), "docs");
+      await user.click(within(findBar).getByRole("button", { name: "Replace all" }));
+
+      expect(rawEditorText(editor)).toBe("# Hello Vista\nThis is docs.");
+      expect(within(findBar).getByRole("status")).toHaveTextContent("No results");
+    });
+
+    it("closes when the last tab closes, and stays closed for the next file", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openRawReadme(user);
+      await user.keyboard("{Control>}f{/Control}");
+
+      await user.click(screen.getByRole("button", { name: "Close readme.md" }));
+      await user.click(screen.getByText("data.csv"));
+
+      expect(screen.queryByLabelText("Find in file")).not.toBeInTheDocument();
+    });
+
+    it("closes with Escape and returns focus to the editor", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      const editor = await openRawReadme(user);
+
+      await user.keyboard("{Control>}f{/Control}");
+      await user.keyboard("{Escape}");
+
+      expect(screen.queryByLabelText("Find in file")).not.toBeInTheDocument();
+      expect(editor).toHaveFocus();
+    });
+
+    it("finds text in the rendered Markdown view, without replace", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      await user.click(screen.getByText("readme.md"));
+      await screen.findByRole("heading", { name: "Hello Vista" });
+
+      await user.keyboard("{Control>}h{/Control}");
+      await user.keyboard("notes");
+
+      const findBar = screen.getByLabelText("Find in file");
+      expect(within(findBar).getByRole("status")).toHaveTextContent("1 of 1");
+      expect(within(findBar).queryByRole("textbox", { name: "Replace" })).not.toBeInTheDocument();
+    });
+
+    it("finds text in CSV table cells", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      await user.click(screen.getByText("data.csv"));
+      await user.click(screen.getByRole("button", { name: "View" }));
+      await screen.findByDisplayValue("Alice");
+
+      await user.keyboard("{Control>}f{/Control}");
+      await user.keyboard("bob");
+
+      expect(screen.getByDisplayValue("Bob")).toHaveAttribute("data-find-match", "current");
+      expect(screen.getByDisplayValue("Alice")).not.toHaveAttribute("data-find-match");
+    });
+  });
+
+  describe("go to", () => {
+    it("opens a file at a line and column with Ctrl+P", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+
+      await user.keyboard("{Control>}p{/Control}");
+      await user.keyboard("readme:2:3");
+      expect(screen.getByRole("option", { name: "readme.md" })).toHaveAttribute("aria-selected", "true");
+      await user.keyboard("{Enter}");
+
+      const editor = await screen.findByRole("textbox", { name: "Raw text content of readme.md" });
+      expect(getTab("readme.md")).toHaveAttribute("aria-selected", "true");
+      await waitFor(() => expect(editor).toHaveFocus());
+      expect(screen.getByRole("contentinfo", { name: "Status Bar" })).toHaveTextContent("Ln 2, Col 3");
+    });
+
+    it("moves to a line in the current file with Ctrl+G", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openRawReadme(user);
+
+      await user.keyboard("{Control>}g{/Control}");
+      expect(screen.getByRole("combobox", { name: "Go to file, or :line:column" })).toHaveValue(":");
+      await user.keyboard("2{Enter}");
+
+      expect(screen.queryByRole("dialog", { name: "Go to file" })).not.toBeInTheDocument();
+      expect(screen.getByRole("contentinfo", { name: "Status Bar" })).toHaveTextContent("Ln 2, Col 1");
+    });
+
+    it("goes past the last line to the end of the file", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openRawReadme(user);
+
+      await user.keyboard("{Control>}g{/Control}");
+      await user.keyboard("99:99{Enter}");
+
+      expect(screen.getByRole("contentinfo", { name: "Status Bar" })).toHaveTextContent("Ln 2, Col 15");
     });
   });
 

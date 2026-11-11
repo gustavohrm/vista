@@ -10,6 +10,8 @@ interface MarkdownEditorProps {
   content: string;
   /** Callback fired with the serialized Markdown whenever the document changes. */
   onChange: (newContent: string) => void;
+  /** Called once the editor has rendered the document, which happens after mount. */
+  onReady?: () => void;
 }
 
 /*
@@ -132,10 +134,12 @@ function createTaskItemView(initialNode: ProseNode, view: ProseEditorView, getPo
  * @param props - MarkdownEditor properties.
  * @returns Editable rendered Markdown surface.
  */
-export function MarkdownEditor({ content, onChange }: MarkdownEditorProps) {
+export function MarkdownEditor({ content, onChange, onReady }: MarkdownEditorProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
   // The editor is seeded once, on mount, so the effect below reads the content from the first render.
   const initialContentRef = useRef(content);
 
@@ -163,9 +167,13 @@ export function MarkdownEditor({ content, onChange }: MarkdownEditorProps) {
       .use(history)
       .use(listener);
 
+    let isMounted = true;
     const createEditor = async () => {
       try {
         await editor.create();
+        if (isMounted) {
+          onReadyRef.current?.();
+        }
       } catch (error) {
         console.error("Failed to create Markdown editor", error);
       }
@@ -173,6 +181,7 @@ export function MarkdownEditor({ content, onChange }: MarkdownEditorProps) {
     void createEditor();
 
     return () => {
+      isMounted = false;
       const destroyEditor = async () => {
         try {
           await editor.destroy();

@@ -26,4 +26,8 @@ if (typeof Range !== "undefined" && typeof Range.prototype.getClientRects !== "f
   };
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  // Settings and the theme persist here; each test starts from the defaults.
+  localStorage.clear();
+});
