@@ -1,15 +1,24 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
+import { useCommandShortcuts, type Command } from "./commands";
 import { EditorPane } from "./components/editor/editor-pane";
 import { ToastProvider, useToast } from "./components/feedback/toast";
 import { UnsavedChangesDialog, type UnsavedChangesChoice } from "./components/feedback/unsaved-changes-dialog";
 import { ActivityBar } from "./components/layout/activity-bar";
 import { Sidebar } from "./components/layout/sidebar";
 import { StatusBar } from "./components/layout/status-bar";
-import { normalizeExtension } from "./domain/file-types";
+import { TabStrip } from "./components/layout/tab-strip";
 import { joinWorkspacePath } from "./domain/path-validation";
 import { isDesktopViewport } from "./domain/viewport";
-import type { AppAdapter, FileDocument, RestoreFolderResult, ViewMode, Workspace, WorkspaceNode } from "./ports";
+import type { AppAdapter, RestoreFolderResult, ViewMode, Workspace, WorkspaceNode } from "./ports";
+import {
+  documentKey,
+  documentsReducer,
+  findAffectedDocuments,
+  getActiveDocument,
+  INITIAL_DOCUMENTS_STATE,
+  type OpenDocument,
+} from "./state/documents";
 import { useTheme } from "./theme/theme-manager";
 
 interface AppProps {
@@ -19,8 +28,8 @@ interface AppProps {
 
 /** A pending request to resolve unsaved changes, held until the user answers the dialog. */
 interface UnsavedChangesRequest {
-  /** Name of the document the prompt is about. */
-  fileName: string;
+  /** Names of the documents the prompt is about. */
+  fileNames: string[];
   /** Settles the waiting operation with the user's decision. */
   resolve: (choice: UnsavedChangesChoice) => void;
 }
@@ -51,8 +60,7 @@ function AppShell({ adapter }: AppProps) {
   const toast = useToast();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [tree, setTree] = useState<WorkspaceNode[]>([]);
-  const [activeFile, setActiveFile] = useState<FileDocument | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("raw");
+  const [documentsState, dispatchDocuments] = useReducer(documentsReducer, INITIAL_DOCUMENTS_STATE);
   // Starts true when restore will run, so the explorer never flashes its "Open Folder" state.
   const [isLoading, setIsLoading] = useState(adapter.workspace.isSupported);
   // Defaults to open at `md` and above (a persistent column there) and closed below it (a
@@ -63,43 +71,73 @@ function AppShell({ adapter }: AppProps) {
   // Holds the startup restore so StrictMode's second effect run reuses it instead of restoring
   // twice. Restoring twice would matter because a second attempt can see the folder as forgotten.
   const startupRestoreRef = useRef<Promise<void> | null>(null);
+  // Async flows such as save-then-close read the buffers as they are when each step runs, not as
+  // they were when the flow started.
+  const documentsRef = useRef(documentsState);
+  documentsRef.current = documentsState;
 
-  const isActiveFileDirty = activeFile?.isDirty ?? false;
+  const activeDocument = getActiveDocument(documentsState);
+  const activeDocumentKey = activeDocument?.key ?? null;
+  const hasDirtyDocuments = documentsState.documents.some((doc) => doc.isDirty);
 
-  const saveActiveFile = useCallback(async (): Promise<boolean> => {
-    if (!activeFile) {
-      return false;
-    }
-    try {
-      await adapter.workspace.writeFile(activeFile.path, activeFile.content);
-      setActiveFile((prev) => (prev?.path === activeFile.path ? { ...prev, isDirty: false } : prev));
-      return true;
-    } catch (err) {
-      console.error("Failed to save file:", err);
-      const message = err instanceof Error ? err.message : `Failed to save ${activeFile.name}.`;
-      toast.show({ kind: "error", text: message });
-      return false;
-    }
-  }, [activeFile, adapter.workspace, toast]);
+  const saveDocument = useCallback(
+    async (key: string): Promise<boolean> => {
+      const doc = documentsRef.current.documents.find((candidate) => candidate.key === key);
+      if (!doc) {
+        return false;
+      }
+      try {
+        await adapter.workspace.writeFile(doc.path, doc.content);
+        dispatchDocuments({ type: "saved", key, content: doc.content });
+        return true;
+      } catch (err) {
+        console.error("Failed to save file:", err);
+        const message = err instanceof Error ? err.message : `Failed to save ${doc.name}.`;
+        toast.show({ kind: "error", text: message });
+        return false;
+      }
+    },
+    [adapter.workspace, toast],
+  );
 
   /**
-   * Asks the user what to do with unsaved edits before the active document is replaced or the
-   * workspace changes. Saving stays manual, so the only automatic write is the one the user chose.
+   * Asks the user what to do with unsaved edits before documents close or the workspace changes.
+   * Saving stays manual, so the only automatic write is the one the user chose.
    *
-   * @returns `true` if the caller may proceed, or `false` if the user cancelled or the save failed.
+   * @param keys - Documents about to be closed; clean ones are not mentioned.
+   * @returns `true` if the caller may proceed, or `false` if the user cancelled or a save failed.
    */
-  const confirmUnsavedChanges = useCallback(async (): Promise<boolean> => {
-    if (!activeFile?.isDirty) {
-      return true;
-    }
-    const choice = await new Promise<UnsavedChangesChoice>((resolve) => {
-      setUnsavedRequest({ fileName: activeFile.name, resolve });
-    });
-    if (choice === "save") {
-      return saveActiveFile();
-    }
-    return choice === "discard";
-  }, [activeFile, saveActiveFile]);
+  const confirmUnsavedChanges = useCallback(
+    async (keys: readonly string[]): Promise<boolean> => {
+      const dirtyDocuments = documentsRef.current.documents.filter((doc) => doc.isDirty && keys.includes(doc.key));
+      if (dirtyDocuments.length === 0) {
+        return true;
+      }
+      const choice = await new Promise<UnsavedChangesChoice>((resolve) => {
+        setUnsavedRequest({ fileNames: dirtyDocuments.map((doc) => doc.name), resolve });
+      });
+      if (choice === "save") {
+        const results = await Promise.all(dirtyDocuments.map((doc) => saveDocument(doc.key)));
+        return results.every(Boolean);
+      }
+      return choice === "discard";
+    },
+    [saveDocument],
+  );
+
+  const confirmUnsavedChangesInAllDocuments = useCallback(
+    () => confirmUnsavedChanges(documentsRef.current.documents.map((doc) => doc.key)),
+    [confirmUnsavedChanges],
+  );
+
+  const closeDocuments = useCallback(
+    async (keys: readonly string[]) => {
+      if (await confirmUnsavedChanges(keys)) {
+        dispatchDocuments({ type: "close", keys: [...keys] });
+      }
+    },
+    [confirmUnsavedChanges],
+  );
 
   const handleUnsavedChoice = useCallback(
     (choice: UnsavedChangesChoice) => {
@@ -113,9 +151,9 @@ function AppShell({ adapter }: AppProps) {
   );
 
   // Browsers only show their leave-page prompt while there is something to lose, so the listener
-  // is attached only while the active document has unsaved edits.
+  // is attached only while some document has unsaved edits.
   useEffect(() => {
-    if (!isActiveFileDirty) {
+    if (!hasDirtyDocuments) {
       return;
     }
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -123,7 +161,7 @@ function AppShell({ adapter }: AppProps) {
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [isActiveFileDirty]);
+  }, [hasDirtyDocuments]);
 
   /**
    * Makes a workspace the active root by reading its tree first, so a failed read leaves the
@@ -137,7 +175,7 @@ function AppShell({ adapter }: AppProps) {
       const nodes = await adapter.workspace.readTree(opened);
       setWorkspace(opened);
       setTree(nodes);
-      setActiveFile(null);
+      dispatchDocuments({ type: "close", keys: documentsRef.current.documents.map((doc) => doc.key) });
       setRestorableFolderName(null);
       if (opened.accessMode === "fallback") {
         toast.show({
@@ -154,7 +192,7 @@ function AppShell({ adapter }: AppProps) {
       toast.show({ kind: "error", text: "Local folder access is not supported in this browser or environment." });
       return;
     }
-    const canProceed = await confirmUnsavedChanges();
+    const canProceed = await confirmUnsavedChangesInAllDocuments();
     if (!canProceed) {
       return;
     }
@@ -172,7 +210,7 @@ function AppShell({ adapter }: AppProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [adapter.workspace, adoptWorkspace, confirmUnsavedChanges, toast]);
+  }, [adapter.workspace, adoptWorkspace, confirmUnsavedChangesInAllDocuments, toast]);
 
   /**
    * Acts on the outcome of a folder restore. A folder that needs permission is remembered so the
@@ -230,7 +268,7 @@ function AppShell({ adapter }: AppProps) {
   }, [adapter.workspace.isSupported, restoreLastFolder]);
 
   const handleReopenFolder = useCallback(async () => {
-    const canProceed = await confirmUnsavedChanges();
+    const canProceed = await confirmUnsavedChangesInAllDocuments();
     if (!canProceed) {
       return;
     }
@@ -242,53 +280,60 @@ function AppShell({ adapter }: AppProps) {
       const message = err instanceof Error ? err.message : "Failed to reopen the folder.";
       toast.show({ kind: "error", text: message });
     }
-  }, [adapter.workspace, applyRestoreResult, confirmUnsavedChanges, toast]);
+  }, [adapter.workspace, applyRestoreResult, confirmUnsavedChangesInAllDocuments, toast]);
 
   const handleSelectFile = useCallback(
     async (path: string) => {
-      // Re-selecting the open file must not reload it, which would discard unsaved edits.
-      if (activeFile?.path === path) {
+      if (!workspace) {
         return;
       }
-      const canProceed = await confirmUnsavedChanges();
-      if (!canProceed) {
+      const key = documentKey(workspace.id, path);
+      // Selecting an open file only switches to its tab; reloading it would discard unsaved edits.
+      if (documentsRef.current.documents.some((doc) => doc.key === key)) {
+        dispatchDocuments({ type: "activate", key });
         return;
       }
       try {
         const content = await adapter.workspace.readFile(path);
-        const name = path.split("/").pop() ?? path;
-        const extension = normalizeExtension(name);
-
-        setActiveFile({
-          path,
-          name,
-          extension,
-          content,
-          isDirty: false,
-        });
-        // Default markdown to enriched if opened, or keep raw
-        setViewMode(extension === "md" || extension === "markdown" ? "enriched" : "raw");
+        dispatchDocuments({ type: "open", workspaceId: workspace.id, path, content });
       } catch (err) {
         console.error("Failed to read file:", err);
         const message = err instanceof Error ? err.message : `Failed to open ${path}.`;
         toast.show({ kind: "error", text: message });
       }
     },
-    [activeFile?.path, adapter.workspace, confirmUnsavedChanges, toast],
+    [adapter.workspace, toast, workspace],
   );
 
-  const handleContentChange = useCallback((newContent: string) => {
-    setActiveFile((prev) => {
-      if (!prev) {
-        return null;
+  const handleContentChange = useCallback(
+    (content: string) => {
+      if (activeDocumentKey) {
+        dispatchDocuments({ type: "edit", key: activeDocumentKey, content });
       }
-      return {
-        ...prev,
-        content: newContent,
-        isDirty: true,
-      };
-    });
-  }, []);
+    },
+    [activeDocumentKey],
+  );
+
+  const handleViewModeChange = useCallback(
+    (viewMode: ViewMode) => {
+      if (activeDocumentKey) {
+        dispatchDocuments({ type: "setViewMode", key: activeDocumentKey, viewMode });
+      }
+    },
+    [activeDocumentKey],
+  );
+
+  const saveActiveDocument = useCallback(async () => {
+    if (activeDocumentKey) {
+      await saveDocument(activeDocumentKey);
+    }
+  }, [activeDocumentKey, saveDocument]);
+
+  const closeActiveDocument = useCallback(async () => {
+    if (activeDocumentKey) {
+      await closeDocuments([activeDocumentKey]);
+    }
+  }, [activeDocumentKey, closeDocuments]);
 
   const refreshTree = useCallback(async () => {
     if (!workspace) {
@@ -336,14 +381,9 @@ function AppShell({ adapter }: AppProps) {
     async (fromPath: string, toPath: string) => {
       try {
         await adapter.workspace.move(fromPath, toPath);
-        setActiveFile((prev) => {
-          if (!prev || (prev.path !== fromPath && !prev.path.startsWith(`${fromPath}/`))) {
-            return prev;
-          }
-          const newPath = prev.path === fromPath ? toPath : toPath + prev.path.slice(fromPath.length);
-          const name = newPath.split("/").pop() ?? newPath;
-          return { ...prev, path: newPath, name, extension: normalizeExtension(name) };
-        });
+        if (workspace) {
+          dispatchDocuments({ type: "move", workspaceId: workspace.id, fromPath, toPath });
+        }
         await refreshTree();
       } catch (err) {
         console.error("Failed to rename entry:", err);
@@ -351,7 +391,7 @@ function AppShell({ adapter }: AppProps) {
         toast.show({ kind: "error", text: message });
       }
     },
-    [adapter.workspace, refreshTree, toast],
+    [adapter.workspace, refreshTree, toast, workspace],
   );
 
   const handleDelete = useCallback(
@@ -372,9 +412,12 @@ function AppShell({ adapter }: AppProps) {
           return;
         }
         await adapter.workspace.remove(path);
-        if (activeFile && (activeFile.path === path || activeFile.path.startsWith(`${path}/`))) {
-          toast.show({ kind: "info", text: `"${activeFile.name}" was deleted.` });
-          setActiveFile(null);
+        const deletedDocuments = workspace
+          ? findAffectedDocuments(documentsRef.current, { workspaceId: workspace.id, path })
+          : [];
+        if (deletedDocuments.length > 0) {
+          toast.show({ kind: "info", text: describeDeletedDocuments(deletedDocuments) });
+          dispatchDocuments({ type: "close", keys: deletedDocuments.map((doc) => doc.key) });
         }
         await refreshTree();
       } catch (err) {
@@ -383,8 +426,30 @@ function AppShell({ adapter }: AppProps) {
         toast.show({ kind: "error", text: message });
       }
     },
-    [activeFile, adapter.workspace, refreshTree, toast, tree],
+    [adapter.workspace, refreshTree, toast, tree, workspace],
   );
+
+  const commands = useMemo<Command[]>(
+    () => [
+      {
+        id: "file.save",
+        label: "Save",
+        shortcut: "Mod+S",
+        isEnabled: activeDocument?.isDirty ?? false,
+        run: saveActiveDocument,
+      },
+      {
+        id: "tabs.close",
+        label: "Close Tab",
+        // Browsers reserve Ctrl+W for closing their own tab, so the web host uses Alt+W.
+        shortcut: adapter.platform === "native" ? "Mod+W" : "Alt+W",
+        isEnabled: activeDocument !== null,
+        run: closeActiveDocument,
+      },
+    ],
+    [activeDocument, adapter.platform, closeActiveDocument, saveActiveDocument],
+  );
+  useCommandShortcuts(commands);
 
   return (
     <div
@@ -400,7 +465,7 @@ function AppShell({ adapter }: AppProps) {
         <Sidebar
           workspace={workspace}
           tree={tree}
-          activePath={activeFile?.path}
+          activePath={activeDocument?.path}
           onSelectFile={handleSelectFile}
           onOpenFolder={handleOpenFolder}
           isLoading={isLoading}
@@ -414,20 +479,32 @@ function AppShell({ adapter }: AppProps) {
           onDelete={handleDelete}
         />
         <div className="flex flex-1 flex-col overflow-hidden">
+          <TabStrip
+            documents={documentsState.documents}
+            activeKey={documentsState.activeKey}
+            onActivate={(key) => dispatchDocuments({ type: "activate", key })}
+            onClose={(key) => void closeDocuments([key])}
+          />
           <EditorPane
             platform={adapter.platform}
-            file={activeFile}
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
+            document={activeDocument}
+            onViewModeChange={handleViewModeChange}
             onContentChange={handleContentChange}
-            onSave={saveActiveFile}
+            onSave={() => void saveActiveDocument()}
           />
         </div>
       </div>
-      <StatusBar activeFile={activeFile} />
-      {unsavedRequest && <UnsavedChangesDialog fileName={unsavedRequest.fileName} onChoose={handleUnsavedChoice} />}
+      <StatusBar activeFile={activeDocument} />
+      {unsavedRequest && <UnsavedChangesDialog fileNames={unsavedRequest.fileNames} onChoose={handleUnsavedChoice} />}
     </div>
   );
+}
+
+function describeDeletedDocuments(documents: readonly OpenDocument[]): string {
+  const [first] = documents;
+  return documents.length === 1 && first
+    ? `"${first.name}" was deleted.`
+    : `${documents.length} open files were deleted.`;
 }
 
 /**

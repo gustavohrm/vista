@@ -70,7 +70,7 @@ test.describe("workspace file management (fallback mode)", () => {
     await expect(explorer.getByText("notes.md")).toHaveCount(0);
   });
 
-  test("keeps the open file when switching files is cancelled at the unsaved-changes prompt", async ({ page }) => {
+  test("keeps unsaved edits across tabs and when closing the tab is cancelled", async ({ page }) => {
     await openFixtureVault(page);
 
     const explorer = page.getByRole("navigation", { name: "File Explorer" });
@@ -86,14 +86,17 @@ test.describe("workspace file management (fallback mode)", () => {
     await editor.fill("Edited but not saved");
 
     await explorer.getByText("todo.md").click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await page.getByRole("tab", { name: /^notes\.md/ }).click();
+    await expect(editor).toHaveValue("Edited but not saved");
 
+    await page.getByRole("button", { name: "Close notes.md" }).click();
     const unsavedDialog = page.getByRole("dialog");
     await expect(unsavedDialog).toContainText("Save changes to notes.md?");
     await unsavedDialog.getByRole("button", { name: "Cancel", exact: true }).click();
 
     await expect(unsavedDialog).toBeHidden();
     await expect(editor).toHaveValue("Edited but not saved");
-    await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toContainText("notes.md");
   });
 
   test("rejects creating a file with a name that already exists", async ({ page }) => {
