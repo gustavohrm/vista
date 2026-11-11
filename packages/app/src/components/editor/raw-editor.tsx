@@ -12,7 +12,7 @@ import {
 } from "@codemirror/view";
 import { showMinimap } from "@replit/codemirror-minimap";
 import { vim } from "@replit/codemirror-vim";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 import { matchesShortcut } from "../../commands/shortcuts";
 import { findTextChange } from "../../domain/text-change";
@@ -120,16 +120,14 @@ export function RawEditor(props: RawEditorProps) {
   const viewRef = useRef<EditorView | null>(null);
   const binding = useRef<EditorBinding>({ props, reportedTexts: [] }).current;
   binding.props = props;
-  const compartmentsRef = useRef<EditorCompartments | null>(null);
-  compartmentsRef.current ??= createCompartments();
 
   const { documentKey, content, fileName, stateCache } = props;
   const options = props.options ?? DEFAULT_RAW_EDITOR_OPTIONS;
 
-  useEffect(() => {
+  // A layout effect, so that on unmount the scroll position is saved while the editor is still in the DOM.
+  useLayoutEffect(() => {
     const host = hostRef.current;
-    const compartments = compartmentsRef.current;
-    if (!host || !compartments) {
+    if (!host) {
       return;
     }
     viewRef.current ??= new EditorView({ parent: host });
@@ -137,9 +135,8 @@ export function RawEditor(props: RawEditorProps) {
     const current = binding.props;
 
     const saved = stateCache.get(documentKey);
-    view.setState(saved?.state ?? createEditorState(current.content, compartments));
-    view.dispatch({ effects: reconfigure(compartments, binding) });
-    syncWithBuffer(view, current.content, saved?.scroll);
+    loadState(view, binding, saved?.state ?? createEditorState(current.content));
+    syncWithBuffer({ view, binding, content: current.content, scroll: saved?.scroll });
     binding.reportedTexts = [];
     current.onCursorChange?.(describeCursor(view.state));
 
@@ -148,7 +145,7 @@ export function RawEditor(props: RawEditorProps) {
     };
   }, [binding, documentKey, stateCache]);
 
-  // Declared after the effect above so that, on unmount, the tab's state is saved before the view goes away.
+  // A passive effect's cleanup runs after the layout effect's, so the tab's state is saved before the view goes away.
   useEffect(
     () => () => {
       viewRef.current?.destroy();
@@ -170,16 +167,12 @@ export function RawEditor(props: RawEditorProps) {
       return;
     }
     binding.reportedTexts = [];
-    syncWithBuffer(view, content);
+    syncWithBuffer({ view, binding, content });
   }, [binding, content]);
 
   const { lineNumbers: showLineNumbers, minimap, vim: isVimEnabled, wordWrap } = options;
   useEffect(() => {
-    const view = viewRef.current;
-    const compartments = compartmentsRef.current;
-    if (view && compartments) {
-      view.dispatch({ effects: reconfigure(compartments, binding) });
-    }
+    viewRef.current?.dispatch({ effects: reconfigure(binding) });
   }, [binding, fileName, showLineNumbers, minimap, isVimEnabled, wordWrap]);
 
   return <div ref={hostRef} className="bg-background h-full w-full overflow-hidden" />;
@@ -192,31 +185,31 @@ interface EditorBinding {
   reportedTexts: string[];
 }
 
-interface EditorCompartments {
+// Shared by every editor instance: a saved state can only be reconfigured through the compartments
+// it was created with, and it may be restored by a later instance after a remount.
+const compartments = {
   /** Callbacks bound to the mounted component, rebound when a saved state is restored. */
-  bindings: Compartment;
-  label: Compartment;
-  lineNumbers: Compartment;
-  minimap: Compartment;
-  vim: Compartment;
-  wordWrap: Compartment;
+  bindings: new Compartment(),
+  label: new Compartment(),
+  lineNumbers: new Compartment(),
+  minimap: new Compartment(),
+  vim: new Compartment(),
+  wordWrap: new Compartment(),
+};
+
+/**
+ * Keeps the file's line endings, so editing doesn't rewrite them. CodeMirror otherwise splits on any
+ * line break and joins with LF. A file with any CRLF is treated as CRLF.
+ */
+function lineSeparatorOf(content: string): string {
+  return content.includes("\r\n") ? "\r\n" : "\n";
 }
 
-function createCompartments(): EditorCompartments {
-  return {
-    bindings: new Compartment(),
-    label: new Compartment(),
-    lineNumbers: new Compartment(),
-    minimap: new Compartment(),
-    vim: new Compartment(),
-    wordWrap: new Compartment(),
-  };
-}
-
-function createEditorState(content: string, compartments: EditorCompartments): EditorState {
+function createEditorState(content: string): EditorState {
   return EditorState.create({
     doc: content,
     extensions: [
+      EditorState.lineSeparator.of(lineSeparatorOf(content)),
       // Bindings come first so reserved shortcuts are checked before vim's and CodeMirror's keymaps.
       compartments.bindings.of([]),
       compartments.vim.of([]),
@@ -240,7 +233,7 @@ function createEditorState(content: string, compartments: EditorCompartments): E
  * Builds the effects that apply the component's current props to the editor's compartments. A
  * restored state still holds the previous configuration, so this runs after every restore as well.
  */
-function reconfigure(compartments: EditorCompartments, binding: EditorBinding): StateEffect<unknown>[] {
+function reconfigure(binding: EditorBinding): StateEffect<unknown>[] {
   const props = binding.props;
   const options = props.options ?? DEFAULT_RAW_EDITOR_OPTIONS;
   return [
@@ -272,7 +265,7 @@ function createBindings(binding: EditorBinding): Extension {
     EditorView.updateListener.of((update) => {
       const isBufferSync = update.transactions.some((transaction) => transaction.annotation(bufferSync));
       if (update.docChanged && !isBufferSync) {
-        const text = update.state.doc.toString();
+        const text = update.state.sliceDoc();
         binding.reportedTexts.push(text);
         binding.props.onChange(text);
       }
@@ -283,19 +276,40 @@ function createBindings(binding: EditorBinding): Extension {
   ];
 }
 
+function loadState(view: EditorView, binding: EditorBinding, state: EditorState) {
+  view.setState(state);
+  view.dispatch({ effects: reconfigure(binding) });
+}
+
+interface BufferSync {
+  view: EditorView;
+  binding: EditorBinding;
+  content: string;
+  /** Scroll position to restore, mapped through the change. */
+  scroll?: StateEffect<unknown>;
+}
+
 /**
- * Brings the editor's text in line with the buffer without recording an undo step, and restores
- * the scroll position given, mapped through that change.
+ * Brings the editor's text in line with the buffer without recording an undo step. When the
+ * buffer's line endings changed, such as after a CSV table edit, the state is rebuilt instead,
+ * because a state's line separator is fixed.
  */
-function syncWithBuffer(view: EditorView, content: string, scroll?: StateEffect<unknown>) {
-  const change = findTextChange(view.state.doc.toString(), content);
+function syncWithBuffer({ view, binding, content, scroll }: BufferSync) {
+  if (view.state.lineBreak !== lineSeparatorOf(content)) {
+    loadState(view, binding, createEditorState(content));
+    return;
+  }
+  // CodeMirror counts a line break as one position, so offsets come from LF-joined text, and the
+  // inserted text goes back to the file's separator.
+  const lineBreak = view.state.lineBreak;
+  const change = findTextChange(view.state.doc.toString(), content.replaceAll(lineBreak, "\n"));
   if (!change) {
     if (scroll) {
       view.dispatch({ effects: scroll });
     }
     return;
   }
-  const changes = view.state.changes(change);
+  const changes = view.state.changes({ ...change, insert: change.insert.replaceAll("\n", lineBreak) });
   const mappedScroll = scroll?.map(changes);
   view.dispatch({
     changes,

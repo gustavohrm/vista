@@ -88,7 +88,7 @@ async function makeReadmeDirty(user: UserEvent) {
  * @returns The editor's document text.
  */
 function rawEditorText(editor: HTMLElement): string | undefined {
-  return EditorView.findFromDOM(editor)?.state.doc.toString();
+  return EditorView.findFromDOM(editor)?.state.sliceDoc();
 }
 
 /**

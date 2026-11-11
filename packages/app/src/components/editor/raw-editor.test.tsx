@@ -62,7 +62,7 @@ describe("RawEditor", () => {
     rerenderWith({ content: "abc" });
     rerenderWith({ content: "abcd" });
 
-    expect(view.state.doc.toString()).toBe("abcd");
+    expect(view.state.sliceDoc()).toBe("abcd");
     expect(props.onChange).toHaveBeenCalledTimes(2);
   });
 
@@ -73,7 +73,7 @@ describe("RawEditor", () => {
 
     rerenderWith({ content: "hello brave world" });
 
-    expect(view.state.doc.toString()).toBe("hello brave world");
+    expect(view.state.sliceDoc()).toBe("hello brave world");
     expect(view.state.selection.main.head).toBe(17);
     expect(props.onChange).not.toHaveBeenCalled();
   });
@@ -84,16 +84,16 @@ describe("RawEditor", () => {
     const { rerenderWith } = renderEditor({ stateCache });
     await user.click(getEditor());
     await user.keyboard("{Control>}{End}{/Control}!");
-    const editedContent = getView().state.doc.toString();
+    const editedContent = getView().state.sliceDoc();
 
     rerenderWith({ documentKey: "ws:b.txt", fileName: "b.txt", content: "other file" });
-    expect(getView("b.txt").state.doc.toString()).toBe("other file");
+    expect(getView("b.txt").state.sliceDoc()).toBe("other file");
     rerenderWith({ documentKey: "ws:a.txt", fileName: "a.txt", content: editedContent });
 
     expect(getView().state.selection.main.head).toBe(editedContent.length);
     await user.click(getEditor());
     await user.keyboard("{Control>}z{/Control}");
-    expect(getView().state.doc.toString()).toBe("first line\nsecond line");
+    expect(getView().state.sliceDoc()).toBe("first line\nsecond line");
   });
 
   it("restores a tab's state after the editor remounts", () => {
@@ -105,6 +105,51 @@ describe("RawEditor", () => {
     renderEditor({ stateCache });
 
     expect(getView().state.selection.main).toMatchObject({ anchor: 3, head: 7 });
+  });
+
+  it("reports edits made after a remount to the new instance's callback", async () => {
+    const user = userEvent.setup();
+    const stateCache: RawEditorStateCache = new Map();
+    const firstOnChange = vi.fn();
+    const { unmount } = renderEditor({ stateCache, onChange: firstOnChange });
+    unmount();
+
+    const { props } = renderEditor({ stateCache });
+    await user.click(getEditor());
+    await user.keyboard("{Control>}{End}{/Control}!");
+
+    expect(props.onChange).toHaveBeenLastCalledWith("first line\nsecond line!");
+    expect(firstOnChange).not.toHaveBeenCalled();
+  });
+
+  it("keeps CRLF line endings when editing", async () => {
+    const user = userEvent.setup();
+    const { props } = renderEditor({ content: "a\r\nb" });
+    expect(getView().state.doc.line(1).text).toBe("a");
+
+    await user.click(getEditor());
+    await user.keyboard("{Control>}{End}{/Control}!");
+
+    expect(props.onChange).toHaveBeenLastCalledWith("a\r\nb!");
+  });
+
+  it("follows the buffer when its line endings change elsewhere", () => {
+    const { props, rerenderWith } = renderEditor({ content: "a\nb" });
+
+    rerenderWith({ content: "a\r\nb\r\nc" });
+
+    expect(getView().state.doc.lines).toBe(3);
+    expect(getView().state.sliceDoc()).toBe("a\r\nb\r\nc");
+    expect(props.onChange).not.toHaveBeenCalled();
+  });
+
+  it("applies a buffer change after a CRLF line break at the right position", () => {
+    const { rerenderWith } = renderEditor({ content: "a\r\nb\r\nc" });
+
+    rerenderWith({ content: "a\r\nB\r\nc" });
+
+    expect(getView().state.doc.line(2).text).toBe("B");
+    expect(getView().state.sliceDoc()).toBe("a\r\nB\r\nc");
   });
 
   it("reports the cursor line, column, and selection length", () => {
