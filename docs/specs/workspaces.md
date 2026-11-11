@@ -42,7 +42,7 @@ The initial format targets in v1 are `.txt`, `.md`, and `.csv`:
 
 | Format | Raw View                   | Enriched View                                                                   |
 | :----- | :------------------------- | :------------------------------------------------------------------------------ |
-| `.txt` | Plain-text editor          | Plain-text viewer/editor                                                        |
+| `.txt` | Plain-text editor          | None; plain text has only the raw view                                          |
 | `.md`  | Plain-text Markdown editor | WYSIWYG editable rendering (Milkdown), styled against `@codenhub/styles` tokens |
 | `.csv` | Plain-text CSV editor      | Interactive data table with in-place cell editing                               |
 
@@ -77,7 +77,7 @@ Edits made in either the Raw view or the rendered view (such as editing a CSV ce
 
 ### Unsaved changes
 
-Unsaved edits are never discarded silently. Switching tabs or opening another file keeps every buffer as it is. Closing a tab with unsaved edits, or opening another folder while any tab has them, shows a modal titled "Save changes to {file}?" with **Save**, **Don't Save**, and **Cancel**. When several tabs have unsaved edits, one modal titled "Save changes to {n} files?" lists them and offers **Save All**. Cancel, Escape, and a backdrop click keep everything open with its edits intact, and the requested action does not happen. A failed save also stops the action and shows an error toast.
+Unsaved edits are never discarded silently. Switching tabs or opening another file keeps every buffer as it is. Closing a tab with unsaved edits, or opening another folder while any tab has them, shows a modal titled "Save changes to {file}?" with **Save**, **Don't Save**, and **Cancel**. When several tabs have unsaved edits, one modal titled "Save changes to {n} files?" lists them and offers **Save All**. The list shows paths, so two files with the same name stay distinguishable. Edits made after the user answers, such as typing while a save is in flight, are asked about again before the action continues. Cancel, Escape, and a backdrop click keep everything open with its edits intact, and the requested action does not happen. A failed save also stops the action and shows an error toast.
 
 Closing or reloading the browser tab while any tab has unsaved edits triggers the browser's own unload warning. Vista cannot customize that prompt's text.
 
@@ -125,7 +125,7 @@ Workspace operations do not fail silently. A user-initiated cancellation of the 
 
 Users create, rename/move, and delete files and folders from a right-click context menu on the sidebar file tree (right-clicking empty space targets the workspace root). Renaming is implemented as `move` within the same parent directory — there is no separate rename operation, matching VS Code's own model.
 
-- **Delete confirmation**: choosing "Delete" opens a modal dialog titled `Delete "{name}"?` with **Cancel** and **Delete** buttons, and nothing is removed until Delete is confirmed. The message warns that a folder's contents are deleted with it. The dialog is a native `<dialog>`, so Escape cancels it.
+- **Delete confirmation**: choosing "Delete" opens a modal dialog titled `Delete "{name}"?` with **Cancel** and **Delete** buttons, and nothing is removed until Delete is confirmed. The message warns that a folder's contents are deleted with it. When an open tab inside the deleted entry has unsaved edits, the message also warns that those edits will be lost. The dialog is a native `<dialog>`, so Escape cancels it.
 
 - **Validation**: candidate names are validated client-side before any disk operation, via `validateEntryName` (`packages/app/src/domain/path-validation.ts`). Rejected: empty or whitespace-padded names, the reserved names `.` and `..`, a trailing period, the characters `" * / : < > ? \ |` and ASCII control characters (disallowed universally rather than per-platform, since a name valid only on one OS could break when a workspace is later opened on another), and a case-insensitive collision with an existing sibling in the same directory.
 - **Active document handling**: renaming the open file updates its path and name in place, without re-reading the file from disk (the bytes did not change). Deleting the open file, or a directory that contains it, clears the editor and shows a toast explaining why.

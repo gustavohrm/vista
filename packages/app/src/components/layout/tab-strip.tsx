@@ -1,4 +1,4 @@
-import { useRef, type KeyboardEvent, type MouseEvent } from "react";
+import { useEffect, useRef, type KeyboardEvent, type MouseEvent } from "react";
 
 import type { OpenDocument } from "../../state/documents";
 import { FileIcon } from "./file-icon";
@@ -15,6 +15,24 @@ interface TabStripProps {
 /** One tab per open document. Arrow keys move between tabs, and a middle click closes one. */
 export function TabStrip({ documents, activeKey, onActivate, onClose }: TabStripProps) {
   const listRef = useRef<HTMLDivElement>(null);
+  // Set when a tab is closed from its focused Close button. Closing removes the focused element,
+  // so focus follows the newly active tab once the close completes; a cancelled close keeps it.
+  const keyboardClosedKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const closedKey = keyboardClosedKeyRef.current;
+    if (closedKey === null || documents.some((doc) => doc.key === closedKey)) {
+      return;
+    }
+    keyboardClosedKeyRef.current = null;
+    if (activeKey !== null) {
+      focusTab(activeKey);
+    }
+  });
+
+  const focusTab = (key: string) => {
+    listRef.current?.querySelector<HTMLElement>(`[data-tab-key="${CSS.escape(key)}"]`)?.focus();
+  };
 
   if (documents.length === 0) {
     return null;
@@ -32,7 +50,7 @@ export function TabStrip({ documents, activeKey, onActivate, onClose }: TabStrip
     }
     event.preventDefault();
     onActivate(next.key);
-    listRef.current?.querySelector<HTMLElement>(`[data-tab-key="${CSS.escape(next.key)}"]`)?.focus();
+    focusTab(next.key);
   };
 
   return (
@@ -48,7 +66,11 @@ export function TabStrip({ documents, activeKey, onActivate, onClose }: TabStrip
           document={doc}
           isActive={doc.key === activeKey}
           onActivate={() => onActivate(doc.key)}
-          onClose={() => onClose(doc.key)}
+          onClose={(event) => {
+            // A click with no pointer detail came from the keyboard (Enter or Space).
+            keyboardClosedKeyRef.current = event.detail === 0 ? doc.key : null;
+            onClose(doc.key);
+          }}
           onKeyDown={handleKeyDown}
         />
       ))}
@@ -60,7 +82,7 @@ interface TabProps {
   document: OpenDocument;
   isActive: boolean;
   onActivate: () => void;
-  onClose: () => void;
+  onClose: (event: MouseEvent) => void;
   onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
 }
 
@@ -68,7 +90,7 @@ function Tab({ document: doc, isActive, onActivate, onClose, onKeyDown }: TabPro
   const handleAuxClick = (event: MouseEvent) => {
     if (event.button === MIDDLE_BUTTON) {
       event.preventDefault();
-      onClose();
+      onClose(event);
     }
   };
 

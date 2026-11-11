@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -526,6 +526,19 @@ describe("App", () => {
       expect(getTab("readme.md")).toHaveFocus();
     });
 
+    it("moves focus to the next active tab after closing a tab from the keyboard", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      await user.click(screen.getByText("readme.md"));
+      await user.click(screen.getByText("data.csv"));
+      screen.getByRole("button", { name: "Close data.csv" }).focus();
+
+      await user.keyboard("{Enter}");
+
+      await waitFor(() => expect(getTab("readme.md")).toHaveFocus());
+    });
+
     it("closes every tab inside a deleted folder", async () => {
       const user = userEvent.setup();
       const nestedTree: WorkspaceNode[] = [
@@ -655,11 +668,71 @@ describe("App", () => {
 
       await user.click(screen.getByRole("button", { name: "Save file" }));
       await user.type(textarea, "!");
-      finishWrite();
+      await act(async () => finishWrite());
 
-      await waitFor(() => expect(mockWorkspace.writeFile).toHaveBeenCalledTimes(1));
+      expect(mockWorkspace.writeFile).toHaveBeenCalledTimes(1);
       expect(getTab("readme.md")).toHaveTextContent("(unsaved)");
       expect(screen.getByRole("button", { name: "Save file" })).toBeEnabled();
+    });
+
+    it("asks again when the tab was edited while its save-then-close was in flight", async () => {
+      const user = userEvent.setup();
+      let finishWrite: () => void = () => {};
+      const mockWorkspace = createMockWorkspaceCapability({
+        writeFile: vi.fn().mockImplementation(
+          () =>
+            new Promise<void>((resolve) => {
+              finishWrite = resolve;
+            }),
+        ),
+      });
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      const textarea = await makeReadmeDirty(user);
+
+      await user.click(screen.getByRole("button", { name: "Close readme.md" }));
+      await user.click(
+        within(await screen.findByRole("dialog", { name: "Save changes to readme.md?" })).getByRole("button", {
+          name: "Save",
+        }),
+      );
+      await user.type(textarea, "!");
+      await act(async () => finishWrite());
+
+      const dialog = await screen.findByRole("dialog", { name: "Save changes to readme.md?" });
+      expect(getTab("readme.md")).toBeInTheDocument();
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      expect(screen.getByRole("textbox", { name: /Raw text content of readme\.md/i })).toHaveValue(
+        `${EDITED_README_CONTENT}!`,
+      );
+    });
+
+    it("ignores Save and Close Tab shortcuts while a save prompt is open", async () => {
+      const user = userEvent.setup();
+      const mockWorkspace = createMockWorkspaceCapability();
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      await makeReadmeDirty(user);
+
+      await user.click(screen.getByRole("button", { name: "Close readme.md" }));
+      const dialog = await screen.findByRole("dialog", { name: "Save changes to readme.md?" });
+      await user.keyboard("{Control>}s{/Control}{Alt>}w{/Alt}");
+      await user.click(within(dialog).getByRole("button", { name: "Don't Save" }));
+
+      await waitFor(() => expect(screen.queryByRole("tab")).not.toBeInTheDocument());
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(mockWorkspace.writeFile).not.toHaveBeenCalled();
+    });
+
+    it("warns that unsaved edits will be lost when deleting an open file", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await makeReadmeDirty(user);
+
+      const explorer = screen.getByRole("navigation", { name: "File Explorer" });
+      fireEvent.contextMenu(within(explorer).getByText("readme.md"));
+      await user.click(screen.getByRole("menuitem", { name: "Delete" }));
+
+      const dialog = await screen.findByRole("dialog", { name: 'Delete "readme.md"?' });
+      expect(dialog).toHaveTextContent('Unsaved changes in "readme.md" will be lost.');
     });
 
     it("does not discard edits when the open file is selected again", async () => {

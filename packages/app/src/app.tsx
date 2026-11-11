@@ -75,10 +75,13 @@ function AppShell({ adapter }: AppProps) {
   // they were when the flow started.
   const documentsRef = useRef(documentsState);
   documentsRef.current = documentsState;
+  const workspaceRef = useRef(workspace);
+  workspaceRef.current = workspace;
 
   const activeDocument = getActiveDocument(documentsState);
   const activeDocumentKey = activeDocument?.key ?? null;
   const hasDirtyDocuments = documentsState.documents.some((doc) => doc.isDirty);
+  const isPromptingForUnsavedChanges = unsavedRequest !== null;
 
   const saveDocument = useCallback(
     async (key: string): Promise<boolean> => {
@@ -102,31 +105,54 @@ function AppShell({ adapter }: AppProps) {
 
   /**
    * Asks the user what to do with unsaved edits before documents close or the workspace changes.
-   * Saving stays manual, so the only automatic write is the one the user chose.
+   * Saving stays manual, so the only automatic write is the one the user chose. The prompt repeats
+   * for edits made after the user answered, such as typing while a save is in flight, so the
+   * caller never closes a buffer the user has not seen.
    *
    * @param keys - Documents about to be closed; clean ones are not mentioned.
-   * @returns `true` if the caller may proceed, or `false` if the user cancelled or a save failed.
+   * @param alreadyApproved - Buffer contents the user already saved or chose to discard.
+   * @returns The approved buffer contents, to pass back when closing later, or `null` if the user
+   *   cancelled or a save failed.
    */
   const confirmUnsavedChanges = useCallback(
-    async (keys: readonly string[]): Promise<boolean> => {
-      const dirtyDocuments = documentsRef.current.documents.filter((doc) => doc.isDirty && keys.includes(doc.key));
-      if (dirtyDocuments.length === 0) {
-        return true;
+    async function confirm(
+      keys: readonly string[],
+      alreadyApproved: ApprovedEdits = NO_APPROVED_EDITS,
+    ): Promise<ApprovedEdits | null> {
+      const pendingDocuments = documentsRef.current.documents.filter(
+        (doc) => doc.isDirty && keys.includes(doc.key) && alreadyApproved.get(doc.key) !== doc.content,
+      );
+      if (pendingDocuments.length === 0) {
+        return alreadyApproved;
       }
       const choice = await new Promise<UnsavedChangesChoice>((resolve) => {
-        setUnsavedRequest({ fileNames: dirtyDocuments.map((doc) => doc.name), resolve });
+        setUnsavedRequest({ fileNames: describeUnsavedDocuments(pendingDocuments), resolve });
       });
-      if (choice === "save") {
-        const results = await Promise.all(dirtyDocuments.map((doc) => saveDocument(doc.key)));
-        return results.every(Boolean);
+      if (choice === "cancel") {
+        return null;
       }
-      return choice === "discard";
+      if (choice === "save") {
+        const results = await Promise.all(pendingDocuments.map((doc) => saveDocument(doc.key)));
+        if (!results.every(Boolean)) {
+          return null;
+        }
+      }
+      const approved = new Map(alreadyApproved);
+      for (const doc of pendingDocuments) {
+        approved.set(doc.key, doc.content);
+      }
+      // Edits made while the prompt or the save was pending need their own answer.
+      return confirm(keys, approved);
     },
     [saveDocument],
   );
 
   const confirmUnsavedChangesInAllDocuments = useCallback(
-    () => confirmUnsavedChanges(documentsRef.current.documents.map((doc) => doc.key)),
+    (alreadyApproved?: ApprovedEdits) =>
+      confirmUnsavedChanges(
+        documentsRef.current.documents.map((doc) => doc.key),
+        alreadyApproved,
+      ),
     [confirmUnsavedChanges],
   );
 
@@ -168,11 +194,16 @@ function AppShell({ adapter }: AppProps) {
    * previous state intact rather than showing a root with no contents.
    *
    * @param opened - The workspace to adopt.
+   * @param approvedEdits - Unsaved edits the user already agreed to lose or saved before the
+   *   folder was picked. Edits made while the tree loads are asked about again.
    * @throws If the workspace tree cannot be read.
    */
   const adoptWorkspace = useCallback(
-    async (opened: Workspace) => {
+    async (opened: Workspace, approvedEdits?: ApprovedEdits) => {
       const nodes = await adapter.workspace.readTree(opened);
+      if (!(await confirmUnsavedChangesInAllDocuments(approvedEdits))) {
+        return;
+      }
       setWorkspace(opened);
       setTree(nodes);
       dispatchDocuments({ type: "close", keys: documentsRef.current.documents.map((doc) => doc.key) });
@@ -184,7 +215,7 @@ function AppShell({ adapter }: AppProps) {
         });
       }
     },
-    [adapter.workspace, toast],
+    [adapter.workspace, confirmUnsavedChangesInAllDocuments, toast],
   );
 
   const handleOpenFolder = useCallback(async () => {
@@ -192,8 +223,8 @@ function AppShell({ adapter }: AppProps) {
       toast.show({ kind: "error", text: "Local folder access is not supported in this browser or environment." });
       return;
     }
-    const canProceed = await confirmUnsavedChangesInAllDocuments();
-    if (!canProceed) {
+    const approvedEdits = await confirmUnsavedChangesInAllDocuments();
+    if (!approvedEdits) {
       return;
     }
     try {
@@ -202,7 +233,7 @@ function AppShell({ adapter }: AppProps) {
         return;
       }
       setIsLoading(true);
-      await adoptWorkspace(opened);
+      await adoptWorkspace(opened, approvedEdits);
     } catch (err) {
       console.error("Failed to open folder:", err);
       const message = err instanceof Error ? err.message : "Failed to open the selected folder.";
@@ -217,13 +248,14 @@ function AppShell({ adapter }: AppProps) {
    * explorer can offer a reopen button, and a folder that is gone is reported to the user.
    *
    * @param result - The outcome returned by `restoreFolder`.
+   * @param approvedEdits - Unsaved edits the user already agreed to lose or saved.
    * @throws If the restored workspace tree cannot be read.
    */
   const applyRestoreResult = useCallback(
-    async (result: RestoreFolderResult) => {
+    async (result: RestoreFolderResult, approvedEdits?: ApprovedEdits) => {
       switch (result.status) {
         case "restored":
-          await adoptWorkspace(result.workspace);
+          await adoptWorkspace(result.workspace, approvedEdits);
           return;
         case "needs-permission":
           setRestorableFolderName(result.name);
@@ -268,13 +300,13 @@ function AppShell({ adapter }: AppProps) {
   }, [adapter.workspace.isSupported, restoreLastFolder]);
 
   const handleReopenFolder = useCallback(async () => {
-    const canProceed = await confirmUnsavedChangesInAllDocuments();
-    if (!canProceed) {
+    const approvedEdits = await confirmUnsavedChangesInAllDocuments();
+    if (!approvedEdits) {
       return;
     }
     try {
       const result = await adapter.workspace.restoreFolder({ interactive: true });
-      await applyRestoreResult(result);
+      await applyRestoreResult(result, approvedEdits);
     } catch (err) {
       console.error("Failed to reopen the folder:", err);
       const message = err instanceof Error ? err.message : "Failed to reopen the folder.";
@@ -295,6 +327,11 @@ function AppShell({ adapter }: AppProps) {
       }
       try {
         const content = await adapter.workspace.readFile(path);
+        // A folder opened during the read makes this path meaningless, and saving it would write
+        // into the new folder. Hosts may reuse ids for same-named folders, so compare identity.
+        if (workspaceRef.current !== workspace) {
+          return;
+        }
         dispatchDocuments({ type: "open", workspaceId: workspace.id, path, content });
       } catch (err) {
         console.error("Failed to read file:", err);
@@ -399,12 +436,16 @@ function AppShell({ adapter }: AppProps) {
       const node = findTreeNode(tree, path);
       const name = node?.name ?? path;
       const isDirectory = node?.kind === "directory";
+      const dirtyDocuments = workspace
+        ? findAffectedDocuments(documentsRef.current, { workspaceId: workspace.id, path }).filter((doc) => doc.isDirty)
+        : [];
+      const deletionMessage = isDirectory
+        ? "This folder and everything in it will be permanently deleted."
+        : "This file will be permanently deleted.";
       try {
         const confirmed = await toast.confirm({
           title: `Delete "${name}"?`,
-          message: isDirectory
-            ? "This folder and everything in it will be permanently deleted."
-            : "This file will be permanently deleted.",
+          message: [deletionMessage, describeLostEdits(dirtyDocuments)].filter(Boolean).join(" "),
           confirmLabel: "Delete",
           destructive: true,
         });
@@ -435,7 +476,8 @@ function AppShell({ adapter }: AppProps) {
         id: "file.save",
         label: "Save",
         shortcut: "Mod+S",
-        isEnabled: activeDocument?.isDirty ?? false,
+        // A second prompt over a pending one would leave the first flow waiting forever.
+        isEnabled: !isPromptingForUnsavedChanges && (activeDocument?.isDirty ?? false),
         run: saveActiveDocument,
       },
       {
@@ -443,11 +485,11 @@ function AppShell({ adapter }: AppProps) {
         label: "Close Tab",
         // Browsers reserve Ctrl+W for closing their own tab, so the web host uses Alt+W.
         shortcut: adapter.platform === "native" ? "Mod+W" : "Alt+W",
-        isEnabled: activeDocument !== null,
+        isEnabled: !isPromptingForUnsavedChanges && activeDocument !== null,
         run: closeActiveDocument,
       },
     ],
-    [activeDocument, adapter.platform, closeActiveDocument, saveActiveDocument],
+    [activeDocument, adapter.platform, closeActiveDocument, isPromptingForUnsavedChanges, saveActiveDocument],
   );
   useCommandShortcuts(commands);
 
@@ -498,6 +540,26 @@ function AppShell({ adapter }: AppProps) {
       {unsavedRequest && <UnsavedChangesDialog fileNames={unsavedRequest.fileNames} onChoose={handleUnsavedChoice} />}
     </div>
   );
+}
+
+/** Buffer contents, by document key, that the user saved or agreed to lose. */
+type ApprovedEdits = ReadonlyMap<string, string>;
+
+const NO_APPROVED_EDITS: ApprovedEdits = new Map();
+
+/** One file is named; several are listed by path, since names can repeat across folders. */
+function describeUnsavedDocuments(documents: readonly OpenDocument[]): string[] {
+  return documents.length === 1 ? documents.map((doc) => doc.name) : documents.map((doc) => doc.path);
+}
+
+function describeLostEdits(dirtyDocuments: readonly OpenDocument[]): string {
+  const [first] = dirtyDocuments;
+  if (!first) {
+    return "";
+  }
+  return dirtyDocuments.length === 1
+    ? `Unsaved changes in "${first.name}" will be lost.`
+    : `Unsaved changes in ${dirtyDocuments.length} open files will be lost.`;
 }
 
 function describeDeletedDocuments(documents: readonly OpenDocument[]): string {

@@ -5,8 +5,9 @@ export type UnsavedChangesChoice = "save" | "discard" | "cancel";
 
 interface UnsavedChangesDialogProps {
   /**
-   * Names of the documents with unsaved changes. One name is shown in the title; several are
-   * counted in the title and listed, and Save becomes Save All.
+   * Labels of the documents with unsaved changes. One label is shown in the title; several are
+   * counted in the title and listed, and Save becomes Save All. Pass paths rather than bare names
+   * when listing several, so files with the same name stay distinguishable.
    */
   fileNames: readonly string[];
   /**
