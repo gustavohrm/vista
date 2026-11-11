@@ -4,11 +4,18 @@ import { matchesShortcut } from "./shortcuts";
 
 export { formatShortcut } from "./shortcuts";
 
-/** An action the user can trigger from a shortcut, and later from menus and the command palette. */
+/** An action the user can trigger from a shortcut or from the menus. */
 export interface Command {
   id: string;
   label: string;
   shortcut?: string;
+  /**
+   * A key the focused editor handles itself, shown in menus but not bound by the app, such as
+   * Ctrl+Z in the raw editor. Binding it here would take the key from every other text field.
+   */
+  shortcutHint?: string;
+  /** Makes the command a toggle in menus, showing this state. */
+  isChecked?: boolean;
   /** Disabled commands still swallow their shortcut, so Ctrl+S never falls through to the browser. */
   isEnabled?: boolean;
   run: () => void | Promise<void>;
@@ -37,7 +44,8 @@ export function useCommandShortcuts(commands: readonly Command[]): void {
   }, []);
 }
 
-async function runCommand(command: Command): Promise<void> {
+/** Runs a command, logging a failure instead of leaving a rejected promise unhandled. */
+export async function runCommand(command: Command): Promise<void> {
   try {
     await command.run();
   } catch (err) {

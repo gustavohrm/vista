@@ -749,6 +749,26 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
       throw new Error(`File not found: ${path}`);
     },
 
+    async readBinary(path: string): Promise<Uint8Array<ArrayBuffer>> {
+      if (rootDirectoryHandle) {
+        await ensurePermission(rootDirectoryHandle, "read");
+        const handle = await resolveFileHandle(path);
+        const file = await handle.getFile();
+        return new Uint8Array(await file.arrayBuffer());
+      }
+
+      if (fallbackOverrides.has(path)) {
+        return new TextEncoder().encode(fallbackOverrides.get(path)!);
+      }
+
+      const file = fallbackFiles.get(path);
+      if (file) {
+        return new Uint8Array(await file.arrayBuffer());
+      }
+
+      throw new Error(`File not found: ${path}`);
+    },
+
     async writeFile(path: string, content: string): Promise<void> {
       if (rootDirectoryHandle) {
         await ensurePermission(rootDirectoryHandle, "readwrite");

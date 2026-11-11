@@ -5,6 +5,7 @@ import { getViewer } from "../../domain/viewers";
 import type { FileDocument, ViewMode } from "../../ports";
 import type { OpenDocument } from "../../state/documents";
 import { Tooltip } from "../feedback/tooltip";
+import { Menu, type MenuEntry } from "../menu/menu";
 import { CsvTableEditor } from "./csv-table-editor";
 import { createDomFindTarget } from "./dom-find";
 import { EditorSettingsMenu } from "./editor-settings-menu";
@@ -46,6 +47,10 @@ interface EditorPaneProps {
   /** A position in the active document to move the raw editor's cursor to. */
   pendingJump: EditorPosition | null;
   onJumpApplied: () => void;
+  /** Items of the editor's right-click menu. */
+  contextMenuItems: readonly MenuEntry[];
+  /** Loads an image a Markdown document links to; see `MarkdownEditor`. */
+  loadImage?: (src: string) => Promise<string | Blob | null>;
 }
 
 /** Hosts the document header, the find bar, and the active document's editor. */
@@ -66,7 +71,10 @@ export function EditorPane({
   onFindClose,
   pendingJump,
   onJumpApplied,
+  contextMenuItems,
+  loadImage,
 }: EditorPaneProps) {
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const rawFindTargetRef = useRef<FindTarget>(null);
   const renderedViewRef = useRef<HTMLDivElement>(null);
   const renderedFindTarget = useMemo(() => createDomFindTarget(() => renderedViewRef.current), []);
@@ -123,7 +131,22 @@ export function EditorPane({
         </div>
       </header>
 
-      <div className="relative flex-1 overflow-hidden">
+      <div
+        className="relative flex-1 overflow-hidden"
+        onContextMenu={(event) => {
+          // Shift keeps the browser's own menu, for spelling suggestions and the like.
+          if (event.shiftKey) {
+            return;
+          }
+          event.preventDefault();
+          // The menu acts on the focused element, so it must be the field under the pointer.
+          const field = (event.target as Element).closest<HTMLElement>("input, textarea, [contenteditable='true']");
+          if (field && !field.contains(document.activeElement)) {
+            field.focus();
+          }
+          setContextMenu({ x: event.clientX, y: event.clientY });
+        }}
+      >
         {find && (
           <FindBar
             getTarget={getFindTarget}
@@ -159,6 +182,7 @@ export function EditorPane({
                 content={doc.content}
                 onChange={onContentChange}
                 onReady={() => setMarkdownRenders((count) => count + 1)}
+                loadImage={loadImage}
               />
             ) : (
               <CsvTableEditor content={doc.content} onChange={onContentChange} />
@@ -166,6 +190,15 @@ export function EditorPane({
           </div>
         )}
       </div>
+      {contextMenu && (
+        <Menu
+          label="Editor actions"
+          items={contextMenuItems}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </main>
   );
 }

@@ -12,6 +12,12 @@ interface MarkdownEditorProps {
   onChange: (newContent: string) => void;
   /** Called once the editor has rendered the document, which happens after mount. */
   onReady?: () => void;
+  /**
+   * Loads an image the document links to, by its source as written. Returns a URL to show as is, the
+   * file's contents to show through an object URL, or null when there is nothing to show. Without
+   * it, images show their placeholder.
+   */
+  loadImage?: (src: string) => Promise<string | Blob | null>;
 }
 
 /*
@@ -123,6 +129,125 @@ function createTaskItemView(initialNode: ProseNode, view: ProseEditorView, getPo
   };
 }
 
+/** Caches each image source's URL for one editor, and revokes the object URLs it made. */
+interface ImageLoader {
+  load: (src: string) => Promise<string | null>;
+  dispose: () => void;
+}
+
+function createImageLoader(getLoad: () => MarkdownEditorProps["loadImage"]): ImageLoader {
+  const urls = new Map<string, Promise<string | null>>();
+  const objectUrls: string[] = [];
+  let isDisposed = false;
+
+  const resolve = async (src: string): Promise<string | null> => {
+    let loaded: string | Blob | null | undefined;
+    try {
+      loaded = await getLoad()?.(src);
+    } catch (err) {
+      console.error(`Failed to load image "${src}":`, err);
+      return null;
+    }
+    if (!(loaded instanceof Blob)) {
+      return loaded ?? null;
+    }
+    if (isDisposed) {
+      return null;
+    }
+    const url = URL.createObjectURL(loaded);
+    objectUrls.push(url);
+    return url;
+  };
+
+  return {
+    load: (src) => {
+      let url = urls.get(src);
+      if (!url) {
+        url = resolve(src);
+        urls.set(src, url);
+      }
+      return url;
+    },
+    dispose: () => {
+      isDisposed = true;
+      for (const url of objectUrls) {
+        URL.revokeObjectURL(url);
+      }
+    },
+  };
+}
+
+/**
+ * Renders an `image` node from the image loader, since a relative source means nothing to the
+ * webview. The node's attributes, and so the Markdown, stay as written. An image that cannot be
+ * shown becomes a placeholder naming it.
+ */
+function createImageView(initialNode: ProseNode, loader: ImageLoader): ProseNodeView {
+  let node = initialNode;
+  const dom = document.createElement("span");
+  dom.className = "markdown-image";
+
+  const showPlaceholder = (current: ProseNode) => {
+    const placeholder = document.createElement("span");
+    const icon = document.createElement("i");
+    const label = document.createElement("span");
+    const name = current.attrs.alt || current.attrs.src || "image";
+    placeholder.className = "markdown-image-placeholder";
+    placeholder.setAttribute("role", "img");
+    placeholder.setAttribute("aria-label", `Image not shown: ${name}`);
+    placeholder.title = current.attrs.src;
+    icon.className = "ic-image-off";
+    icon.setAttribute("aria-hidden", "true");
+    label.textContent = name;
+    label.setAttribute("aria-hidden", "true");
+    placeholder.append(icon, label);
+    dom.replaceChildren(placeholder);
+  };
+
+  const render = (current: ProseNode) => {
+    const img = document.createElement("img");
+    img.alt = current.attrs.alt;
+    if (current.attrs.title) {
+      img.title = current.attrs.title;
+    }
+    img.addEventListener("error", () => {
+      if (node === current) {
+        showPlaceholder(current);
+      }
+    });
+    dom.replaceChildren(img);
+    const show = async () => {
+      const url = await loader.load(current.attrs.src);
+      if (node !== current) {
+        return;
+      }
+      if (url) {
+        img.src = url;
+      } else {
+        showPlaceholder(current);
+      }
+    };
+    void show();
+  };
+  render(node);
+
+  return {
+    dom,
+    update: (updated) => {
+      if (updated.type !== node.type) {
+        return false;
+      }
+      const isSame = ["src", "alt", "title"].every((attr) => updated.attrs[attr] === node.attrs[attr]);
+      node = updated;
+      if (!isSame) {
+        render(updated);
+      }
+      return true;
+    },
+    ignoreMutation: () => true,
+  };
+}
+
 /**
  * WYSIWYG Markdown editor backed by Milkdown, rendering and editing formatted content in place.
  *
@@ -134,12 +259,14 @@ function createTaskItemView(initialNode: ProseNode, view: ProseEditorView, getPo
  * @param props - MarkdownEditor properties.
  * @returns Editable rendered Markdown surface.
  */
-export function MarkdownEditor({ content, onChange, onReady }: MarkdownEditorProps) {
+export function MarkdownEditor({ content, onChange, onReady, loadImage }: MarkdownEditorProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const onReadyRef = useRef(onReady);
   onReadyRef.current = onReady;
+  const loadImageRef = useRef(loadImage);
+  loadImageRef.current = loadImage;
   // The editor is seeded once, on mount, so the effect below reads the content from the first render.
   const initialContentRef = useRef(content);
 
@@ -149,6 +276,7 @@ export function MarkdownEditor({ content, onChange, onReady }: MarkdownEditorPro
       return;
     }
 
+    const imageLoader = createImageLoader(() => loadImageRef.current);
     const editor = Editor.make()
       .config((ctx) => {
         ctx.set(rootCtx, root);
@@ -157,7 +285,8 @@ export function MarkdownEditor({ content, onChange, onReady }: MarkdownEditorPro
         // Appended, not passed as `nodeViews` in editorViewOptionsCtx: core spreads that option
         // over its own node views, so it would replace them.
         const listItemView: NodeViewEntry = ["list_item", createListItemView];
-        ctx.update(nodeViewCtx, (views) => [...views, listItemView]);
+        const imageView: NodeViewEntry = ["image", (node) => createImageView(node, imageLoader)];
+        ctx.update(nodeViewCtx, (views) => [...views, listItemView, imageView]);
         ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
           onChangeRef.current(markdown);
         });
@@ -182,6 +311,7 @@ export function MarkdownEditor({ content, onChange, onReady }: MarkdownEditorPro
 
     return () => {
       isMounted = false;
+      imageLoader.dispose();
       const destroyEditor = async () => {
         try {
           await editor.destroy();

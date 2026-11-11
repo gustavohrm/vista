@@ -46,6 +46,7 @@ function createMockWorkspaceCapability(overrides?: Partial<WorkspaceCapability>)
       }
       return Promise.resolve("Plain text");
     }),
+    readBinary: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
     writeFile: vi.fn().mockResolvedValue(undefined),
     createFile: vi.fn().mockResolvedValue(undefined),
     createDirectory: vi.fn().mockResolvedValue(undefined),
@@ -1095,5 +1096,240 @@ describe("App", () => {
         "Local folder access is not supported in this browser or environment.",
       );
     });
+  });
+
+  describe("menus", () => {
+    function openMenu(user: UserEvent, name: string) {
+      return user.click(screen.getByRole("menuitem", { name }));
+    }
+
+    it("saves every dirty file from File > Save All", async () => {
+      const user = userEvent.setup();
+      const mockWorkspace = createMockWorkspaceCapability();
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      await makeReadmeDirty(user);
+      await user.click(screen.getByText("data.csv"));
+      await appendToRawEditor(user, await screen.findByRole("textbox", { name: "Raw text content of data.csv" }), "!");
+
+      await openMenu(user, "File");
+      await user.click(screen.getByRole("menuitem", { name: "Save All" }));
+
+      await waitFor(() => expect(mockWorkspace.writeFile).toHaveBeenCalledTimes(2));
+      expect(mockWorkspace.writeFile).toHaveBeenCalledWith("readme.md", EDITED_README_CONTENT);
+      expect(mockWorkspace.writeFile).toHaveBeenCalledWith("data.csv", `${CSV_CONTENT}!`);
+    });
+
+    it("starts naming a new file at the root from File > New File", async () => {
+      const user = userEvent.setup();
+      const mockWorkspace = createMockWorkspaceCapability();
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      await openFolderFromWelcome(user);
+
+      await openMenu(user, "File");
+      await user.click(screen.getByRole("menuitem", { name: "New File" }));
+      await user.type(await screen.findByRole("textbox", { name: "Entry name" }), "todo.md{Enter}");
+
+      expect(mockWorkspace.createFile).toHaveBeenCalledWith("todo.md");
+    });
+
+    it("toggles word wrap from the View menu and with Alt+Z", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openRawReadme(user);
+
+      await openMenu(user, "View");
+      const wordWrap = screen.getByRole("menuitemcheckbox", { name: "Word Wrap" });
+      const wasChecked = wordWrap.getAttribute("aria-checked") === "true";
+      await user.click(wordWrap);
+      await user.keyboard("{Alt>}z{/Alt}");
+      await openMenu(user, "View");
+
+      expect(screen.getByRole("menuitemcheckbox", { name: "Word Wrap" })).toHaveAttribute(
+        "aria-checked",
+        String(wasChecked),
+      );
+    });
+
+    it("undoes in the raw editor from Edit > Undo, returning focus to it", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      const editor = await makeReadmeDirty(user);
+
+      await openMenu(user, "Edit");
+      await user.click(screen.getByRole("menuitem", { name: "Undo" }));
+
+      expect(rawEditorText(editor)).toBe(README_CONTENT);
+      expect(editor).toHaveFocus();
+    });
+
+    it("lists every command with a key in the Keyboard Shortcuts dialog", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+
+      await openMenu(user, "Help");
+      await user.click(screen.getByRole("menuitem", { name: "Keyboard Shortcuts" }));
+
+      const dialog = await screen.findByRole("dialog", { name: "Keyboard Shortcuts" });
+      expect(within(dialog).getByRole("row", { name: "Save Ctrl+S" })).toBeInTheDocument();
+      expect(within(dialog).getByRole("row", { name: "Word Wrap Alt+Z" })).toBeInTheDocument();
+      expect(within(dialog).getByRole("row", { name: "Undo Ctrl+Z" })).toBeInTheDocument();
+    });
+
+    it("closes the other tabs from a tab's menu", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      await user.click(screen.getByText("readme.md"));
+      await user.click(screen.getByText("data.csv"));
+
+      fireEvent.contextMenu(getTab("readme.md"));
+      await user.click(screen.getByRole("menuitem", { name: "Close Others" }));
+
+      await waitFor(() => expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["readme.md"]));
+    });
+
+    it("moves focus to the remaining tab when a tab closes itself from its menu", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      await user.click(screen.getByText("readme.md"));
+      await user.click(screen.getByText("data.csv"));
+      getTab("data.csv").focus();
+
+      fireEvent.contextMenu(getTab("data.csv"));
+      await user.keyboard("{Enter}");
+
+      await waitFor(() => expect(getTab("readme.md")).toHaveFocus());
+    });
+
+    it("does not move focus to the tabs later after a tab's close was cancelled", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      const editor = await makeReadmeDirty(user);
+      await user.click(screen.getByText("data.csv"));
+      await user.click(getTab("readme.md"));
+      getTab("readme.md").focus();
+      fireEvent.contextMenu(getTab("readme.md"));
+      await user.keyboard("{Enter}");
+      await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Cancel" }));
+
+      // Closing the same tab another way, from the editor, leaves the tabs alone.
+      await user.click(editor);
+      await openMenu(user, "File");
+      await user.click(screen.getByRole("menuitem", { name: "Close Tab" }));
+      await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Don't Save" }));
+
+      await waitFor(() => expect(screen.queryByRole("tab", { name: /readme\.md/ })).not.toBeInTheDocument());
+      expect(getTab("data.csv")).not.toHaveFocus();
+    });
+
+    it("copies a tree entry's relative path, and offers its full path only on desktop", async () => {
+      const user = userEvent.setup();
+      const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+
+      fireEvent.contextMenu(screen.getByText("readme.md"));
+      expect(screen.queryByRole("menuitem", { name: "Copy Path" })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("menuitem", { name: "Copy Relative Path" }));
+
+      expect(writeText).toHaveBeenCalledWith("readme.md");
+    });
+
+    it("copies a tree entry's full path on desktop", async () => {
+      const user = userEvent.setup();
+      const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+
+      fireEvent.contextMenu(screen.getByText("readme.md"));
+      await user.click(screen.getByRole("menuitem", { name: "Copy Path" }));
+
+      expect(writeText).toHaveBeenCalledWith("/notes/readme.md");
+    });
+
+    it("opens the app's editor menu on right click, and leaves Shift+right click to the browser", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      const editor = await openRawReadme(user);
+
+      expect(fireEvent.contextMenu(editor, { shiftKey: true })).toBe(true);
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+
+      fireEvent.contextMenu(editor);
+      const menu = screen.getByRole("menu", { name: "Editor actions" });
+      expect(within(menu).getByRole("menuitem", { name: "Replace" })).toBeInTheDocument();
+      expect(within(menu).getByRole("menuitem", { name: "Go to Line" })).toBeInTheDocument();
+    });
+
+    it("says how to paste when the clipboard cannot be read", async () => {
+      const user = userEvent.setup();
+      vi.spyOn(navigator.clipboard, "readText").mockRejectedValue(new Error("denied"));
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      const editor = await openRawReadme(user);
+
+      fireEvent.contextMenu(editor);
+      await user.click(screen.getByRole("menuitem", { name: "Paste" }));
+
+      expect(await screen.findByText("Press Ctrl+V to paste.")).toBeInTheDocument();
+      expect(rawEditorText(editor)).toBe(README_CONTENT);
+    });
+
+    it("pastes the clipboard's text into the raw editor", async () => {
+      const user = userEvent.setup();
+      vi.spyOn(navigator.clipboard, "readText").mockResolvedValue("Pasted. ");
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      const editor = await openRawReadme(user);
+
+      fireEvent.contextMenu(editor);
+      await user.click(screen.getByRole("menuitem", { name: "Paste" }));
+
+      await waitFor(() => expect(rawEditorText(editor)).toBe(`Pasted. ${README_CONTENT}`));
+    });
+  });
+
+  it("lists the path of every file with unsaved changes when closing several", async () => {
+    const user = userEvent.setup();
+    render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+    await makeReadmeDirty(user);
+    await user.click(screen.getByText("data.csv"));
+    await appendToRawEditor(user, await screen.findByRole("textbox", { name: "Raw text content of data.csv" }), "!");
+
+    await user.click(screen.getByRole("menuitem", { name: "File" }));
+    await user.click(screen.getByRole("menuitem", { name: "Close All Tabs" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Save changes to 2 files?" });
+    expect(
+      within(dialog)
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual(["readme.md", "data.csv"]);
+  });
+
+  it("drops a file read that finishes after another folder was opened", async () => {
+    const user = userEvent.setup();
+    let finishRead: (content: string) => void = () => {};
+    const mockWorkspace = createMockWorkspaceCapability({
+      openFolder: vi
+        .fn()
+        .mockResolvedValueOnce({ id: "workspace-1", name: "My Notes", rootPath: "/notes" })
+        .mockResolvedValueOnce({ id: "workspace-1", name: "My Notes", rootPath: "/notes" }),
+      readFile: vi.fn().mockImplementation(
+        () =>
+          new Promise<string>((resolve) => {
+            finishRead = resolve;
+          }),
+      ),
+    });
+    render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+    await openFolderFromWelcome(user);
+
+    await user.click(screen.getByText("readme.md"));
+    await user.click(screen.getByRole("button", { name: "Open Another Folder" }));
+    await waitFor(() => expect(mockWorkspace.readTree).toHaveBeenCalledTimes(2));
+    await act(async () => finishRead(README_CONTENT));
+
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
   });
 });

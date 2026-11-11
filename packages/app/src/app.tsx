@@ -1,17 +1,26 @@
+import { addCursorAbove, addCursorBelow, selectLine } from "@codemirror/commands";
+import { selectNextOccurrence, selectSelectionMatches } from "@codemirror/search";
+import type { EditorView } from "@codemirror/view";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import { useCommandShortcuts, type Command } from "./commands";
+import { findCodeMirrorView, runEditingAction, type EditingAction } from "./commands/editing";
 import { EditorPane, type FindRequest } from "./components/editor/editor-pane";
 import type { FindMode } from "./components/editor/find-bar";
 import type { CursorInfo, EditorPosition, RawEditorStateCache } from "./components/editor/raw-editor";
 import { ToastProvider, useToast } from "./components/feedback/toast";
 import { UnsavedChangesDialog, type UnsavedChangesChoice } from "./components/feedback/unsaved-changes-dialog";
+import { AboutDialog, KeyboardShortcutsDialog } from "./components/help/help-dialog";
 import { ActivityBar } from "./components/layout/activity-bar";
-import { Sidebar } from "./components/layout/sidebar";
+import { Sidebar, type NewEntryRequest } from "./components/layout/sidebar";
 import { StatusBar } from "./components/layout/status-bar";
 import { TabStrip } from "./components/layout/tab-strip";
+import { MENU_SEPARATOR } from "./components/menu/menu";
+import { commandMenuEntries, MenuBar, type MenuBarMenu } from "./components/menu/menu-bar";
 import { GoToDialog, type GoToRequest } from "./components/navigation/go-to-dialog";
+import { imageMimeType, resolveImageSource } from "./domain/image-source";
 import { joinWorkspacePath } from "./domain/path-validation";
+import { getViewer } from "./domain/viewers";
 import { isDesktopViewport } from "./domain/viewport";
 import type { AppAdapter, RestoreFolderResult, ViewMode, Workspace, WorkspaceNode } from "./ports";
 import {
@@ -37,6 +46,70 @@ interface UnsavedChangesRequest {
   /** Settles the waiting operation with the user's decision. */
   resolve: (choice: UnsavedChangesChoice) => void;
 }
+
+/** The application menus, by command id. */
+const MENUS: readonly MenuBarMenu[] = [
+  {
+    label: "File",
+    items: [
+      "file.openFolder",
+      "file.newFile",
+      "file.newFolder",
+      MENU_SEPARATOR,
+      "file.save",
+      "file.saveAll",
+      MENU_SEPARATOR,
+      "tabs.close",
+      "tabs.closeAll",
+    ],
+  },
+  {
+    label: "Edit",
+    items: [
+      "edit.undo",
+      "edit.redo",
+      MENU_SEPARATOR,
+      "edit.cut",
+      "edit.copy",
+      "edit.paste",
+      MENU_SEPARATOR,
+      "find.find",
+      "find.replace",
+    ],
+  },
+  {
+    label: "Selection",
+    items: [
+      "selection.all",
+      "selection.line",
+      MENU_SEPARATOR,
+      "selection.nextOccurrence",
+      "selection.allOccurrences",
+      MENU_SEPARATOR,
+      "selection.cursorAbove",
+      "selection.cursorBelow",
+    ],
+  },
+  {
+    label: "View",
+    items: [
+      "view.explorer",
+      "view.rawText",
+      MENU_SEPARATOR,
+      "view.wordWrap",
+      "view.lineNumbers",
+      "view.minimap",
+      "view.vim",
+      MENU_SEPARATOR,
+      "view.theme",
+    ],
+  },
+  { label: "Go", items: ["goto.file", "goto.line", MENU_SEPARATOR, "tabs.next", "tabs.previous"] },
+  { label: "Help", items: ["help.shortcuts", MENU_SEPARATOR, "help.about"] },
+];
+
+const EDITOR_MENU = ["edit.cut", "edit.copy", "edit.paste", "selection.all", MENU_SEPARATOR, "find.find"];
+const RAW_EDITOR_MENU = [...EDITOR_MENU, "find.replace", "goto.line"];
 
 /**
  * Renders the shared Vista application for a platform host.
@@ -81,6 +154,9 @@ function AppShell({ adapter }: AppProps) {
   const [goToQuery, setGoToQuery] = useState<string | null>(null);
   // A go-to target waiting for its tab's raw editor to show.
   const [pendingJump, setPendingJump] = useState<{ key: string; position: EditorPosition } | null>(null);
+  // A File menu request to name a new entry at the workspace root.
+  const [newEntryRequest, setNewEntryRequest] = useState<NewEntryRequest | null>(null);
+  const [helpDialog, setHelpDialog] = useState<"shortcuts" | "about" | null>(null);
   // Raw editor state of each open tab: selection, scroll position, and undo history.
   const rawEditorStatesRef = useRef<RawEditorStateCache>(new Map());
   // Holds the startup restore so StrictMode's second effect run reuses it instead of restoring
@@ -186,9 +262,11 @@ function AppShell({ adapter }: AppProps) {
 
   const closeDocuments = useCallback(
     async (keys: readonly string[]) => {
-      if (await confirmUnsavedChanges(keys)) {
-        dispatchDocuments({ type: "close", keys: [...keys] });
+      if (!(await confirmUnsavedChanges(keys))) {
+        return false;
       }
+      dispatchDocuments({ type: "close", keys: [...keys] });
+      return true;
     },
     [confirmUnsavedChanges],
   );
@@ -530,8 +608,111 @@ function AppShell({ adapter }: AppProps) {
 
   const filePaths = useMemo(() => listFilePaths(tree), [tree]);
 
+  const saveAllDocuments = useCallback(async () => {
+    for (const doc of documentsRef.current.documents) {
+      // One at a time, stopping at the first failure, which saveDocument has already reported.
+      // oxlint-disable-next-line eslint/no-await-in-loop -- a failed save should not be followed by more
+      if (doc.isDirty && !(await saveDocument(doc.key))) {
+        return;
+      }
+    }
+  }, [saveDocument]);
+
+  const closeAllDocuments = useCallback(
+    () => closeDocuments(documentsRef.current.documents.map((doc) => doc.key)),
+    [closeDocuments],
+  );
+
+  const activateNeighborTab = useCallback((step: 1 | -1) => {
+    const { documents, activeKey } = documentsRef.current;
+    const index = documents.findIndex((doc) => doc.key === activeKey);
+    const next = documents[(index + step + documents.length) % documents.length];
+    if (next) {
+      dispatchDocuments({ type: "activate", key: next.key });
+    }
+  }, []);
+
+  const requestNewEntry = useCallback((kind: NewEntryRequest["kind"]) => {
+    setIsSidebarOpen(true);
+    setNewEntryRequest((previous) => ({ kind, serial: (previous?.serial ?? 0) + 1 }));
+  }, []);
+
+  const copyText = useCallback(
+    async (text: string) => {
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch (err) {
+        console.error("Failed to copy to the clipboard:", err);
+        toast.show({ kind: "error", text: "Couldn't copy to the clipboard." });
+      }
+    },
+    [toast],
+  );
+
+  const runEditing = useCallback(
+    async (action: EditingAction) => {
+      if (!(await runEditingAction(action))) {
+        // Reading the clipboard needs a permission the keyboard shortcut does not.
+        toast.show({ kind: "info", text: "Press Ctrl+V to paste." });
+      }
+    },
+    [toast],
+  );
+
+  /** Runs a CodeMirror selection command in the focused raw editor, or else in the one on screen. */
+  const runSelection = useCallback((command: (view: EditorView) => boolean) => {
+    const view =
+      findCodeMirrorView(document.activeElement) ?? findCodeMirrorView(document.querySelector("main .cm-editor"));
+    if (view) {
+      command(view);
+      view.focus();
+    }
+  }, []);
+
+  const loadImage = useCallback(
+    async (src: string): Promise<string | Blob | null> => {
+      if (!activeDocument) {
+        return null;
+      }
+      const source = resolveImageSource(src, activeDocument.path);
+      if (source.kind === "url") {
+        return source.url;
+      }
+      if (source.kind === "none") {
+        return null;
+      }
+      const bytes = await adapter.workspace.readBinary(source.path);
+      return new Blob([bytes], { type: imageMimeType(source.path) });
+    },
+    [activeDocument, adapter.workspace],
+  );
+
+  const activeViewer = activeDocument ? getViewer(activeDocument.extension) : null;
+  const canToggleView = activeViewer !== null && activeViewer.hasRaw && activeViewer.enriched !== undefined;
+  const isRawShown =
+    activeDocument !== null && (activeDocument.viewMode !== "enriched" || activeViewer?.enriched === undefined);
+  const editorSettings = settings.editor;
+
   const commands = useMemo<Command[]>(
     () => [
+      {
+        id: "file.openFolder",
+        label: "Open Folder…",
+        isEnabled: !isPromptingForUnsavedChanges,
+        run: handleOpenFolder,
+      },
+      {
+        id: "file.newFile",
+        label: "New File",
+        isEnabled: !isPromptingForUnsavedChanges && workspace !== null,
+        run: () => requestNewEntry("file"),
+      },
+      {
+        id: "file.newFolder",
+        label: "New Folder",
+        isEnabled: !isPromptingForUnsavedChanges && workspace !== null,
+        run: () => requestNewEntry("directory"),
+      },
       {
         id: "file.save",
         label: "Save",
@@ -541,6 +722,12 @@ function AppShell({ adapter }: AppProps) {
         run: saveActiveDocument,
       },
       {
+        id: "file.saveAll",
+        label: "Save All",
+        isEnabled: !isPromptingForUnsavedChanges && hasDirtyDocuments,
+        run: saveAllDocuments,
+      },
+      {
         id: "tabs.close",
         label: "Close Tab",
         // Browsers reserve Ctrl+W for closing their own tab, so the web host uses Alt+W.
@@ -548,6 +735,18 @@ function AppShell({ adapter }: AppProps) {
         isEnabled: !isPromptingForUnsavedChanges && activeDocument !== null,
         run: closeActiveDocument,
       },
+      {
+        id: "tabs.closeAll",
+        label: "Close All Tabs",
+        isEnabled: !isPromptingForUnsavedChanges && activeDocument !== null,
+        run: closeAllDocuments,
+      },
+      // The editors handle these keys themselves, so the menus only show them.
+      { id: "edit.undo", label: "Undo", shortcutHint: "Mod+Z", run: () => runEditing("undo") },
+      { id: "edit.redo", label: "Redo", shortcutHint: "Mod+Y", run: () => runEditing("redo") },
+      { id: "edit.cut", label: "Cut", shortcutHint: "Mod+X", run: () => runEditing("cut") },
+      { id: "edit.copy", label: "Copy", shortcutHint: "Mod+C", run: () => runEditing("copy") },
+      { id: "edit.paste", label: "Paste", shortcutHint: "Mod+V", run: () => runEditing("paste") },
       {
         id: "find.find",
         label: "Find",
@@ -561,6 +760,86 @@ function AppShell({ adapter }: AppProps) {
         shortcut: "Mod+H",
         isEnabled: !isPromptingForUnsavedChanges && activeDocument !== null,
         run: () => openFind("replace"),
+      },
+      { id: "selection.all", label: "Select All", shortcutHint: "Mod+A", run: () => runEditing("selectAll") },
+      // These need the raw editor's multiple selections, which the rendered views do not have.
+      {
+        id: "selection.line",
+        label: "Select Line",
+        shortcutHint: "Alt+L",
+        isEnabled: isRawShown,
+        run: () => runSelection(selectLine),
+      },
+      {
+        id: "selection.nextOccurrence",
+        label: "Add Next Occurrence",
+        shortcutHint: "Mod+D",
+        isEnabled: isRawShown,
+        run: () => runSelection(selectNextOccurrence),
+      },
+      {
+        id: "selection.allOccurrences",
+        label: "Select All Occurrences",
+        shortcutHint: "Mod+Shift+L",
+        isEnabled: isRawShown,
+        run: () => runSelection(selectSelectionMatches),
+      },
+      {
+        id: "selection.cursorAbove",
+        label: "Add Cursor Above",
+        shortcutHint: "Mod+Alt+Up",
+        isEnabled: isRawShown,
+        run: () => runSelection(addCursorAbove),
+      },
+      {
+        id: "selection.cursorBelow",
+        label: "Add Cursor Below",
+        shortcutHint: "Mod+Alt+Down",
+        isEnabled: isRawShown,
+        run: () => runSelection(addCursorBelow),
+      },
+      {
+        id: "view.explorer",
+        label: "Explorer",
+        isChecked: isSidebarOpen,
+        run: () => setIsSidebarOpen((previous) => !previous),
+      },
+      {
+        id: "view.rawText",
+        label: "Raw Text",
+        isChecked: isRawShown,
+        isEnabled: canToggleView,
+        run: () => handleViewModeChange(isRawShown ? "enriched" : "raw"),
+      },
+      {
+        id: "view.wordWrap",
+        label: "Word Wrap",
+        shortcut: "Alt+Z",
+        isChecked: editorSettings.wordWrap,
+        run: () => updateEditorSettings({ wordWrap: !editorSettings.wordWrap }),
+      },
+      {
+        id: "view.lineNumbers",
+        label: "Line Numbers",
+        isChecked: editorSettings.lineNumbers,
+        run: () => updateEditorSettings({ lineNumbers: !editorSettings.lineNumbers }),
+      },
+      {
+        id: "view.minimap",
+        label: "Minimap",
+        isChecked: editorSettings.minimap,
+        run: () => updateEditorSettings({ minimap: !editorSettings.minimap }),
+      },
+      {
+        id: "view.vim",
+        label: "Vim Mode",
+        isChecked: editorSettings.vim,
+        run: () => updateEditorSettings({ vim: !editorSettings.vim }),
+      },
+      {
+        id: "view.theme",
+        label: theme.theme === "dark" ? "Switch to Light Theme" : "Switch to Dark Theme",
+        run: theme.toggleTheme,
       },
       {
         id: "goto.file",
@@ -576,16 +855,50 @@ function AppShell({ adapter }: AppProps) {
         isEnabled: !isPromptingForUnsavedChanges && activeDocument !== null,
         run: () => setGoToQuery(":"),
       },
+      {
+        id: "tabs.next",
+        label: "Next Tab",
+        isEnabled: !isPromptingForUnsavedChanges && documentsState.documents.length > 1,
+        run: () => activateNeighborTab(1),
+      },
+      {
+        id: "tabs.previous",
+        label: "Previous Tab",
+        isEnabled: !isPromptingForUnsavedChanges && documentsState.documents.length > 1,
+        run: () => activateNeighborTab(-1),
+      },
+      { id: "help.shortcuts", label: "Keyboard Shortcuts", run: () => setHelpDialog("shortcuts") },
+      { id: "help.about", label: "About Vista", run: () => setHelpDialog("about") },
     ],
     [
+      activateNeighborTab,
       activeDocument,
       adapter.platform,
+      canToggleView,
       closeActiveDocument,
+      closeAllDocuments,
+      documentsState.documents.length,
+      editorSettings,
+      handleOpenFolder,
+      handleViewModeChange,
+      hasDirtyDocuments,
       isPromptingForUnsavedChanges,
+      isRawShown,
+      isSidebarOpen,
       openFind,
+      requestNewEntry,
+      runEditing,
+      runSelection,
       saveActiveDocument,
+      saveAllDocuments,
+      theme,
+      updateEditorSettings,
       workspace,
     ],
+  );
+  const editorMenuItems = useMemo(
+    () => commandMenuEntries(isRawShown ? RAW_EDITOR_MENU : EDITOR_MENU, commands),
+    [commands, isRawShown],
   );
   useCommandShortcuts(commands);
   const reservedShortcuts = useMemo(
@@ -606,15 +919,15 @@ function AppShell({ adapter }: AppProps) {
     setVimMode({ key, mode });
   }, []);
   const handleJumpApplied = useCallback(() => setPendingJump(null), []);
-  const isRawEditorShown = activeDocument !== null && activeDocument.viewMode === "raw";
-  const activeCursor = isRawEditorShown && cursor?.key === activeDocument.key ? cursor.position : null;
-  const activeVimMode = isRawEditorShown && vimMode?.key === activeDocument.key ? vimMode.mode : null;
+  const activeCursor = isRawShown && cursor?.key === activeDocument.key ? cursor.position : null;
+  const activeVimMode = isRawShown && vimMode?.key === activeDocument.key ? vimMode.mode : null;
 
   return (
     <div
       data-platform={adapter.platform}
       className="bg-background text-text flex h-screen w-screen flex-col overflow-hidden"
     >
+      <MenuBar menus={MENUS} commands={commands} />
       <div className="flex flex-1 overflow-hidden">
         <ActivityBar
           theme={theme}
@@ -636,13 +949,22 @@ function AppShell({ adapter }: AppProps) {
           onCreateDirectory={handleCreateDirectory}
           onRename={handleRename}
           onDelete={handleDelete}
+          onCopyRelativePath={(path) => void copyText(path)}
+          onCopyPath={
+            adapter.platform === "native" && workspace
+              ? (path) => void copyText(joinAbsolutePath(workspace.rootPath, path))
+              : undefined
+          }
+          newEntryRequest={newEntryRequest}
         />
         <div className="flex flex-1 flex-col overflow-hidden">
           <TabStrip
             documents={documentsState.documents}
             activeKey={documentsState.activeKey}
             onActivate={(key) => dispatchDocuments({ type: "activate", key })}
-            onClose={(key) => void closeDocuments([key])}
+            onClose={(key) => closeDocuments([key])}
+            onCloseMany={(keys) => closeDocuments(keys)}
+            onCopyRelativePath={(path) => void copyText(path)}
           />
           <EditorPane
             platform={adapter.platform}
@@ -661,6 +983,8 @@ function AppShell({ adapter }: AppProps) {
             onFindClose={() => setFind(null)}
             pendingJump={pendingJump?.key === activeDocumentKey ? pendingJump.position : null}
             onJumpApplied={handleJumpApplied}
+            contextMenuItems={editorMenuItems}
+            loadImage={loadImage}
           />
         </div>
       </div>
@@ -679,6 +1003,10 @@ function AppShell({ adapter }: AppProps) {
           onClose={() => setGoToQuery(null)}
         />
       )}
+      {helpDialog === "shortcuts" && (
+        <KeyboardShortcutsDialog commands={commands} onClose={() => setHelpDialog(null)} />
+      )}
+      {helpDialog === "about" && <AboutDialog platform={adapter.platform} onClose={() => setHelpDialog(null)} />}
       {unsavedRequest && <UnsavedChangesDialog fileNames={unsavedRequest.fileNames} onChoose={handleUnsavedChoice} />}
     </div>
   );
@@ -709,6 +1037,12 @@ function describeDeletedDocuments(documents: readonly OpenDocument[]): string {
   return documents.length === 1 && first
     ? `"${first.name}" was deleted.`
     : `${documents.length} open files were deleted.`;
+}
+
+/** Joins a workspace-relative path onto a native root path, with the separator the root uses. */
+function joinAbsolutePath(rootPath: string, path: string): string {
+  const separator = rootPath.includes("\\") ? "\\" : "/";
+  return `${rootPath.replace(/[\\/]+$/, "")}${separator}${path.split("/").join(separator)}`;
 }
 
 /** Lists the paths of every file in a tree, for the go-to picker. */
