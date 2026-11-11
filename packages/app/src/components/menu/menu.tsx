@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { formatShortcut } from "../../commands";
@@ -9,8 +9,11 @@ const VIEWPORT_MARGIN_PX = 8;
 /** One action in a menu. */
 export interface MenuItem {
   label: string;
-  /** Icon class, such as `ic-copy`. */
-  icon?: string;
+  /**
+   * Icon element, such as `<i className="ic-copy" aria-hidden="true" />`. The icon transform only sees
+   * a literal `ic-*` class, so callers pass the element rather than its class name.
+   */
+  icon?: ReactNode;
   /** Shortcut shown beside the label, such as "Mod+S". Display only; the menu does not bind it. */
   shortcut?: string;
   disabled?: boolean;
@@ -68,7 +71,8 @@ export function Menu({ label, items, x, y, onClose, returnFocusTo, onNavigate, i
   }, [x, y]);
 
   useEffect(() => {
-    getEnabledItems(menuRef.current)[0]?.focus();
+    // With every item disabled, the menu itself takes focus so its keys still work.
+    (getEnabledItems(menuRef.current)[0] ?? menuRef.current)?.focus();
   }, []);
 
   useEffect(() => {
@@ -123,9 +127,12 @@ export function Menu({ label, items, x, y, onClose, returnFocusTo, onNavigate, i
         onNavigate(event.key === "ArrowLeft" ? -1 : 1);
         break;
       case "Escape":
-      case "Tab":
         closeAndReturnFocus();
         break;
+      case "Tab":
+        // Focus goes back first, so the browser's Tab then moves on from there in either direction.
+        closeAndReturnFocus();
+        return;
       default:
         return;
     }
@@ -173,7 +180,7 @@ interface MenuItemButtonProps {
 
 function MenuItemButton({ item, hasIconColumn, onChoose }: MenuItemButtonProps) {
   const isCheckbox = item.checked !== undefined;
-  const icon = isCheckbox ? (item.checked ? "ic-check" : undefined) : item.icon;
+  const icon = isCheckbox ? item.checked && <i className="ic-check" /> : item.icon;
   return (
     <button
       type="button"
@@ -194,8 +201,8 @@ function MenuItemButton({ item, hasIconColumn, onChoose }: MenuItemButtonProps) 
       }`}
     >
       {hasIconColumn && (
-        <span aria-hidden="true" className="flex w-4 flex-none justify-center">
-          {icon && <i className={`${icon} text-sm`} />}
+        <span aria-hidden="true" className="flex w-4 flex-none justify-center text-sm">
+          {icon}
         </span>
       )}
       <span className="flex-1 text-left whitespace-nowrap">{item.label}</span>

@@ -1108,11 +1108,15 @@ describe("App", () => {
       const mockWorkspace = createMockWorkspaceCapability();
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
       await makeReadmeDirty(user);
+      await user.click(screen.getByText("data.csv"));
+      await appendToRawEditor(user, await screen.findByRole("textbox", { name: "Raw text content of data.csv" }), "!");
 
       await openMenu(user, "File");
       await user.click(screen.getByRole("menuitem", { name: "Save All" }));
 
-      await waitFor(() => expect(mockWorkspace.writeFile).toHaveBeenCalledWith("readme.md", EDITED_README_CONTENT));
+      await waitFor(() => expect(mockWorkspace.writeFile).toHaveBeenCalledTimes(2));
+      expect(mockWorkspace.writeFile).toHaveBeenCalledWith("readme.md", EDITED_README_CONTENT);
+      expect(mockWorkspace.writeFile).toHaveBeenCalledWith("data.csv", `${CSV_CONTENT}!`);
     });
 
     it("starts naming a new file at the root from File > New File", async () => {
@@ -1182,6 +1186,20 @@ describe("App", () => {
       await user.click(screen.getByRole("menuitem", { name: "Close Others" }));
 
       await waitFor(() => expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["readme.md"]));
+    });
+
+    it("moves focus to the remaining tab when a tab closes itself from its menu", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      await user.click(screen.getByText("readme.md"));
+      await user.click(screen.getByText("data.csv"));
+      getTab("data.csv").focus();
+
+      fireEvent.contextMenu(getTab("data.csv"));
+      await user.keyboard("{Enter}");
+
+      await waitFor(() => expect(getTab("readme.md")).toHaveFocus());
     });
 
     it("copies a tree entry's relative path, and offers its full path only on desktop", async () => {

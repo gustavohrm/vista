@@ -25,6 +25,7 @@ describe("resolveImageSource", () => {
   it("decodes percent escapes and drops a query or fragment", () => {
     expect(resolveImageSource("my%20cat.png?v=2#top", "a.md")).toEqual({ kind: "workspace", path: "my cat.png" });
     expect(resolveImageSource("100%.png", "a.md")).toEqual({ kind: "workspace", path: "100%.png" });
+    expect(resolveImageSource("sub%5C..%5Ccat.png", "a.md")).toEqual({ kind: "workspace", path: "cat.png" });
   });
 
   it("does not load a path outside the workspace", () => {

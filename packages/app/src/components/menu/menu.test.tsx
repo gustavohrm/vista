@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -85,6 +85,30 @@ describe("Menu", () => {
     expect(props.onClose).toHaveBeenCalledOnce();
     expect(field).toHaveFocus();
     field.remove();
+  });
+
+  it("closes on Tab without stopping it, so focus moves on from where it returned", () => {
+    const field = document.createElement("input");
+    document.body.append(field);
+    field.focus();
+    const props = renderMenu();
+
+    const isNotPrevented = fireEvent.keyDown(screen.getByRole("menuitem", { name: "Cut" }), { key: "Tab" });
+
+    expect(isNotPrevented).toBe(true);
+    expect(props.onClose).toHaveBeenCalledOnce();
+    expect(field).toHaveFocus();
+    field.remove();
+  });
+
+  it("takes focus itself when every item is disabled, so Escape still closes it", async () => {
+    const user = userEvent.setup();
+    const props = renderMenu({ items: [{ label: "Copy", disabled: true, onSelect: vi.fn() }] });
+    expect(screen.getByRole("menu")).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+
+    expect(props.onClose).toHaveBeenCalledOnce();
   });
 
   it("closes on a pointer down outside it, but not inside it", async () => {

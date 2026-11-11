@@ -33,6 +33,13 @@ test.describe("menus and Markdown images", () => {
     await expect(page.getByRole("img", { name: "Image not shown: Missing picture" })).toBeVisible();
   });
 
+  test("draws the icons of the explorer's menu", async ({ page }) => {
+    await page.getByText("gallery.md").click({ button: "right" });
+
+    // The icon transform rewrites only literal ic-* classes into SVGs.
+    await expect(page.getByRole("menuitem", { name: "Rename" }).locator("svg")).toBeVisible();
+  });
+
   test("runs a command from the menu bar and returns focus to the editor", async ({ page }) => {
     await page.getByText("notes.md").click();
     await page.getByRole("button", { name: "Raw" }).click();

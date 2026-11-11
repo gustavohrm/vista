@@ -327,23 +327,52 @@ function buildTreeMenu({ path, kind }: ContextMenuTarget, actions: TreeMenuActio
   const isRoot = path === "";
   const groups: MenuEntry[][] = [
     kind === "file"
-      ? [{ label: "Open", icon: "ic-file", onSelect: () => actions.onOpen(path) }]
+      ? [{ label: "Open", icon: <i className="ic-file" aria-hidden="true" />, onSelect: () => actions.onOpen(path) }]
       : [
-          { label: "New File", icon: "ic-file-plus", onSelect: () => actions.onNewFile(path) },
-          { label: "New Folder", icon: "ic-folder-plus", onSelect: () => actions.onNewFolder(path) },
+          {
+            label: "New File",
+            icon: <i className="ic-file-plus" aria-hidden="true" />,
+            onSelect: () => actions.onNewFile(path),
+          },
+          {
+            label: "New Folder",
+            icon: <i className="ic-folder-plus" aria-hidden="true" />,
+            onSelect: () => actions.onNewFolder(path),
+          },
         ],
     isRoot
       ? []
       : [
-          { label: "Rename", icon: "ic-pencil", onSelect: () => actions.onRename(path) },
-          { label: "Delete", icon: "ic-trash-2", destructive: true, onSelect: () => actions.onDelete(path) },
+          {
+            label: "Rename",
+            icon: <i className="ic-pencil" aria-hidden="true" />,
+            onSelect: () => actions.onRename(path),
+          },
+          {
+            label: "Delete",
+            icon: <i className="ic-trash-2" aria-hidden="true" />,
+            destructive: true,
+            onSelect: () => actions.onDelete(path),
+          },
         ],
     [
       ...(isRoot
         ? []
-        : [{ label: "Copy Relative Path", icon: "ic-copy", onSelect: () => actions.onCopyRelativePath(path) }]),
+        : [
+            {
+              label: "Copy Relative Path",
+              icon: <i className="ic-copy" aria-hidden="true" />,
+              onSelect: () => actions.onCopyRelativePath(path),
+            },
+          ]),
       ...(actions.onCopyPath
-        ? [{ label: "Copy Path", icon: "ic-clipboard", onSelect: () => actions.onCopyPath?.(path) }]
+        ? [
+            {
+              label: "Copy Path",
+              icon: <i className="ic-clipboard" aria-hidden="true" />,
+              onSelect: () => actions.onCopyPath?.(path),
+            },
+          ]
         : []),
     ],
   ];

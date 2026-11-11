@@ -30,8 +30,9 @@ export function TabStrip({
 }: TabStripProps) {
   const [menu, setMenu] = useState<{ key: string; x: number; y: number } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  // Set when a tab is closed from its focused Close button. Closing removes the focused element,
-  // so focus follows the newly active tab once the close completes; a cancelled close keeps it.
+  // Set when a tab is closed from its focused Close button or from its menu. Closing removes the
+  // focused element, so focus follows the newly active tab once the close completes; a cancelled
+  // close keeps it.
   const keyboardClosedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -96,7 +97,17 @@ export function TabStrip({
       {menu && (
         <Menu
           label="Tab actions"
-          items={buildTabMenu(documents, menu.key, { onClose, onCloseMany, onCopyRelativePath })}
+          items={buildTabMenu(documents, menu.key, {
+            onClose: (key) => {
+              keyboardClosedKeyRef.current = key;
+              onClose(key);
+            },
+            onCloseMany: (keys) => {
+              keyboardClosedKeyRef.current = keys.includes(menu.key) ? menu.key : null;
+              onCloseMany(keys);
+            },
+            onCopyRelativePath,
+          })}
           x={menu.x}
           y={menu.y}
           onClose={() => setMenu(null)}
@@ -122,13 +133,17 @@ function buildTabMenu(
   const toTheRight = keysOf(documents.slice(index + 1));
   const saved = keysOf(documents.filter((doc) => !doc.isDirty));
   return [
-    { label: "Close", icon: "ic-x", onSelect: () => actions.onClose(key) },
+    { label: "Close", icon: <i className="ic-x" aria-hidden="true" />, onSelect: () => actions.onClose(key) },
     { label: "Close Others", disabled: others.length === 0, onSelect: () => actions.onCloseMany(others) },
     { label: "Close to the Right", disabled: toTheRight.length === 0, onSelect: () => actions.onCloseMany(toTheRight) },
     { label: "Close Saved", disabled: saved.length === 0, onSelect: () => actions.onCloseMany(saved) },
     { label: "Close All", onSelect: () => actions.onCloseMany(keysOf(documents)) },
     MENU_SEPARATOR,
-    { label: "Copy Relative Path", icon: "ic-copy", onSelect: () => actions.onCopyRelativePath(target.path) },
+    {
+      label: "Copy Relative Path",
+      icon: <i className="ic-copy" aria-hidden="true" />,
+      onSelect: () => actions.onCopyRelativePath(target.path),
+    },
   ];
 }
 

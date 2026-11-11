@@ -25,8 +25,8 @@ export function findCodeMirrorView(element: Element | null): EditorView | null {
  *
  * @param action - The action to apply.
  * @param target - The element to apply it to. Defaults to the focused element.
- * @returns False when paste could not read the clipboard, so the caller can say how to paste
- *   instead; true otherwise.
+ * @returns False when paste could not read the clipboard or insert its text, so the caller can say
+ *   how to paste instead; true otherwise, including when focus moved on while the clipboard was read.
  */
 export async function runEditingAction(
   action: EditingAction,
@@ -41,12 +41,16 @@ export async function runEditingAction(
       console.error("Failed to read the clipboard:", err);
       return false;
     }
+    // Reading can wait on a permission prompt; text must not land in a field the user moved to since.
+    const active = document.activeElement;
+    if (target && (!target.isConnected || (active !== target && active !== document.body))) {
+      return true;
+    }
     if (view) {
       view.dispatch({ ...view.state.replaceSelection(text), userEvent: "input.paste", scrollIntoView: true });
-    } else {
-      execCommand("insertText", text);
+      return true;
     }
-    return true;
+    return execCommand("insertText", text);
   }
   if (view && action !== "cut" && action !== "copy") {
     CODEMIRROR_COMMANDS[action](view);
@@ -57,10 +61,12 @@ export async function runEditingAction(
   return true;
 }
 
-function execCommand(command: string, value?: string): void {
+/** Runs a browser editing command, returning false when it is unsupported or did nothing. */
+function execCommand(command: string, value?: string): boolean {
   // jsdom has no execCommand. Browsers deprecate it but offer no replacement that keeps undo.
-  if (typeof document.execCommand === "function") {
-    // oxlint-disable-next-line typescript/no-deprecated -- see above
-    document.execCommand(command, false, value);
+  if (typeof document.execCommand !== "function") {
+    return false;
   }
+  // oxlint-disable-next-line typescript/no-deprecated -- see above
+  return document.execCommand(command, false, value);
 }

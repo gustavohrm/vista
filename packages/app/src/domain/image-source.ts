@@ -41,7 +41,8 @@ export function resolveImageSource(src: string, documentPath: string): ImageSour
   const withoutSuffix = source.replace(/[?#].*$/, "").replaceAll("\\", "/");
   const isFromRoot = withoutSuffix.startsWith("/");
   const segments = isFromRoot ? [] : documentPath.split("/").slice(0, -1);
-  for (const segment of decode(withoutSuffix).split("/")) {
+  // Decoding can produce more backslashes, from %5C.
+  for (const segment of decode(withoutSuffix).replaceAll("\\", "/").split("/")) {
     if (segment === "" || segment === ".") {
       continue;
     }

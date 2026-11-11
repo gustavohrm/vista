@@ -86,7 +86,7 @@ With a file open, the status bar shows the cursor and vim mode (raw view only; s
 
 ### Menus
 
-A menu bar above the editor offers File, Edit, Selection, View, Go, and Help. Every item is a command (see [Commands and shortcuts](../architecture.md#commands-and-shortcuts)), so an item shows its shortcut and is greyed out when it can't run.
+A menu bar above the editor offers File, Edit, Selection, View, Go, and Help. Every item is a command, as defined in [Commands and shortcuts](../architecture.md#commands-and-shortcuts), so an item shows its shortcut and is greyed out when it can't run.
 
 - **File**: Open Folder, New File, New Folder (at the workspace root, opening the explorer), Save, Save All, Close Tab, Close All Tabs.
 - **Edit**: Undo, Redo, Cut, Copy, Paste, Find, Replace.
