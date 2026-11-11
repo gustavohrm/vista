@@ -1,9 +1,10 @@
 import { EditorView } from "@codemirror/view";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ComponentProps } from "react";
+import { createRef, type ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { FindTarget } from "./find-target";
 import { DEFAULT_RAW_EDITOR_OPTIONS, RawEditor } from "./raw-editor";
 import type { RawEditorStateCache } from "./raw-editor";
 
@@ -188,5 +189,82 @@ describe("RawEditor", () => {
     await user.keyboard("x");
 
     expect(props.onChange).toHaveBeenLastCalledWith("irst line\nsecond line");
+  });
+
+  it("reports the vim mode while vim is enabled, and stops when it is turned off", async () => {
+    const user = userEvent.setup();
+    const onVimModeChange = vi.fn();
+    const { rerenderWith } = renderEditor({ options: { ...DEFAULT_RAW_EDITOR_OPTIONS, vim: true }, onVimModeChange });
+
+    await user.click(getEditor());
+    expect(onVimModeChange).toHaveBeenLastCalledWith("normal");
+    await user.keyboard("i");
+    expect(onVimModeChange).toHaveBeenLastCalledWith("insert");
+
+    rerenderWith({ options: DEFAULT_RAW_EDITOR_OPTIONS });
+    expect(onVimModeChange).toHaveBeenLastCalledWith(null);
+  });
+
+  it("moves to a requested position, clamped to the document", () => {
+    const onJumpApplied = vi.fn();
+    const { rerenderWith } = renderEditor({ onJumpApplied });
+
+    rerenderWith({ pendingJump: { line: 2, column: 3 } });
+    expect(getView().state.selection.main.head).toBe(13);
+    expect(onJumpApplied).toHaveBeenCalledTimes(1);
+
+    rerenderWith({ pendingJump: { line: 99, column: 99 } });
+    expect(getView().state.selection.main.head).toBe(22);
+  });
+});
+
+describe("RawEditor find", () => {
+  function renderWithFind(content: string) {
+    const ref = createRef<FindTarget>();
+    const rendered = renderEditor({ content, ref });
+    const target = ref.current;
+    if (!target) {
+      throw new Error("The raw editor exposes no find target.");
+    }
+    return { ...rendered, target };
+  }
+
+  const query = (text: string) => ({ text, caseSensitive: false, wholeWord: false, regexp: false });
+
+  it("selects the first match and counts all of them", () => {
+    const { target } = renderWithFind("one two one ONE");
+
+    const result = target.search(query("one"));
+
+    expect(result).toEqual({ total: 3, current: 1, invalid: false });
+    expect(getView().state.selection.main).toMatchObject({ from: 0, to: 3 });
+  });
+
+  it("moves between matches and wraps around", () => {
+    const { target } = renderWithFind("one two one");
+    target.search(query("one"));
+
+    expect(target.findNext()).toMatchObject({ current: 2 });
+    expect(target.findNext()).toMatchObject({ current: 1 });
+    expect(target.findPrevious()).toMatchObject({ current: 2 });
+  });
+
+  it("replaces one match, then all of them", () => {
+    const { target, props } = renderWithFind("one two one one");
+    target.search(query("one"));
+
+    target.replace("1");
+    expect(props.onChange).toHaveBeenLastCalledWith("1 two one one");
+
+    expect(target.replaceAll("1")).toMatchObject({ total: 0 });
+    expect(props.onChange).toHaveBeenLastCalledWith("1 two 1 1");
+  });
+
+  it("reports an invalid regular expression", () => {
+    const { target } = renderWithFind("text");
+
+    const result = target.search({ ...query("("), regexp: true });
+
+    expect(result).toMatchObject({ total: 0, invalid: true });
   });
 });

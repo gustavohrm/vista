@@ -1,6 +1,8 @@
 import Papa from "papaparse";
 import { useCallback, useMemo } from "react";
 
+import { lineSeparatorOf } from "../../domain/line-endings";
+
 interface CsvTableEditorProps {
   /** Raw CSV string content. */
   content: string;
@@ -26,6 +28,9 @@ export function CsvTableEditor({ content, onChange }: CsvTableEditorProps) {
     return rows;
   }, [content]);
 
+  // Papa writes CRLF by default; keeping the file's own line breaks stops one cell edit from rewriting every line.
+  const newline = lineSeparatorOf(content);
+
   const maxColumns = useMemo(() => {
     return parsedData.reduce((max, row) => Math.max(max, row.length), 1);
   }, [parsedData]);
@@ -37,23 +42,23 @@ export function CsvTableEditor({ content, onChange }: CsvTableEditorProps) {
         nextData[rowIndex].push("");
       }
       nextData[rowIndex][colIndex] = value;
-      const unparsed = Papa.unparse(nextData);
+      const unparsed = Papa.unparse(nextData, { newline });
       onChange(unparsed);
     },
-    [parsedData, onChange],
+    [parsedData, newline, onChange],
   );
 
   const handleAddRow = useCallback(() => {
     const nextData = [...parsedData.map((row) => [...row]), Array.from({ length: maxColumns }, () => "")];
-    const unparsed = Papa.unparse(nextData);
+    const unparsed = Papa.unparse(nextData, { newline });
     onChange(unparsed);
-  }, [parsedData, maxColumns, onChange]);
+  }, [parsedData, maxColumns, newline, onChange]);
 
   const handleAddColumn = useCallback(() => {
     const nextData = parsedData.map((row) => [...row, ""]);
-    const unparsed = Papa.unparse(nextData);
+    const unparsed = Papa.unparse(nextData, { newline });
     onChange(unparsed);
-  }, [parsedData, onChange]);
+  }, [parsedData, newline, onChange]);
 
   // Column header letters (A, B, C, ...)
   const columnLabels = useMemo(() => {

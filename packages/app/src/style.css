@@ -134,3 +134,22 @@ body,
   --tooltip-transform: translate(0, 100%);
   --tooltip-origin: top right;
 }
+
+/* Find matches in rendered views. Text matches are painted with the CSS Custom Highlight API, so
+   the rendered editors' DOM is left alone, and matching form fields such as CSV cells carry
+   `data-find-match` (see `components/editor/dom-find.ts`). Colors match the raw editor's. */
+::highlight(vista-find) {
+  background-color: var(--color-warning-subtle);
+}
+
+::highlight(vista-find-current) {
+  background-color: var(--color-primary-subtle);
+}
+
+[data-find-match] {
+  background-color: var(--color-warning-subtle);
+}
+
+[data-find-match="current"] {
+  background-color: var(--color-primary-subtle);
+}

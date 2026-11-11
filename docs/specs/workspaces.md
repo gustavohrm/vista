@@ -56,12 +56,31 @@ The Enriched view for `.md`/`.markdown` files (`packages/app/src/components/edit
 
 ### Raw editor
 
-The raw view (`packages/app/src/components/editor/raw-editor.tsx`) is a [CodeMirror 6](https://codemirror.net/) editor with line numbers, word wrap, search and replace (`Ctrl+F`), multiple selections, and undo history. Two more options exist but are off by default: a minimap (`@replit/codemirror-minimap`) and vim keybindings (`@replit/codemirror-vim`). The defaults are line numbers on, minimap off, vim off, and word wrap on, chosen for prose and narrow screens, the common case for Markdown and plain-text notes. They are constants until the settings UI makes them configurable.
+The raw view (`packages/app/src/components/editor/raw-editor.tsx`) is a [CodeMirror 6](https://codemirror.net/) editor with line numbers, word wrap, multiple selections (`Ctrl+D`, `Ctrl+Shift+L`), and undo history. Two more options exist but are off by default: a minimap (`@replit/codemirror-minimap`) and vim keybindings (`@replit/codemirror-vim`). The defaults are line numbers on, minimap off, vim off, and word wrap on, chosen for prose and narrow screens, the common case for Markdown and plain-text notes.
 
 - **One editor, per-tab state.** A single CodeMirror view serves every tab. Switching tabs, or switching a tab to the rendered view and back, saves that tab's editor state and restores it later, so each tab keeps its selection, scroll position, and undo history. The saved states live in `AppShell` outside the documents reducer, because they are not plain data. They are dropped when the tab closes, and renaming a file starts its tab with a fresh editor state. Keeping one view per tab hidden in the DOM was rejected, because memory and DOM size would grow with every open tab.
 - **The buffer stays the source of truth.** Typing reports the full text to the documents store. When the buffer changes elsewhere, such as in the CSV table or the Markdown editor, the raw editor applies only the changed range, which keeps the cursor and undo history around it, and does not report that change back as an edit. Line endings are kept: a file containing any CRLF line break is edited with CRLF, any other file with LF, and a buffer whose line endings change, such as after a CSV table edit, rebuilds the editor state for the new ending. Text it reported that the buffer echoes back late, after newer typing, is recognized as an echo and does not undo that typing.
-- **Keys.** Editing keys live in CodeMirror's keymap. App commands such as Save and Close Tab keep their shortcuts even with vim on: the editor ignores any key that matches a command shortcut. CodeMirror's own go-to-line binding (`Ctrl+Alt+G`) is removed so that the app's go-to command can own that action.
-- **Cursor.** The status bar shows the cursor as `Ln {line}, Col {column}`, counted from 1, with the column in UTF-16 code units as CodeMirror counts them, followed by the selected character count when there is a selection.
+- **Keys.** Editing keys live in CodeMirror's keymap. App commands such as Save and Close Tab keep their shortcuts even with vim on: the editor ignores any key that matches a command shortcut. CodeMirror's own search panel and go-to-line binding (`Ctrl+Alt+G`) are removed so that the app's find bar and go-to command own those actions.
+- **Cursor.** The status bar shows the cursor as `Ln {line}, Col {column}`, counted from 1, with the column in UTF-16 code units as CodeMirror counts them, followed by the selected character count when there is a selection. With vim on, it also shows the vim mode, such as `NORMAL` or `VISUAL LINE`.
+
+### Editor settings
+
+The gear button in the document header opens a popover with four switches: line numbers, word wrap, minimap, and vim mode. They apply to the raw editor at once and are remembered in the browser's `localStorage` under `vista.settings`, as `{ "version": 1, "editor": { "lineNumbers": true, "minimap": false, "vim": false, "wordWrap": true } }`. A stored value that is missing or of the wrong type falls back to its default, field by field, so one bad field does not reset the others. An unreadable or unwritable store leaves the defaults in effect for the session.
+
+### Find and replace
+
+`Ctrl+F` opens the find bar over the editor, and `Ctrl+H` opens it with the replace row. The Find button in the document header opens it too. Typing searches as you go, and the bar shows the position, such as `3 of 12`, or `No results`, or `Invalid regex`. Enter and Shift+Enter move to the next and previous match, wrapping around, and Escape closes the bar and returns focus to the document. Match case, whole word, and regular expression toggles start off each time and are not remembered.
+
+- **Raw view.** The bar drives CodeMirror's search, so matches are highlighted in the text and the current one is selected. Replace changes the current match and moves to the next one; Replace all changes every match as one undoable edit. The search follows the active tab, so switching tabs with the bar open searches the new tab.
+- **Rendered views.** Find works, but replace is hidden, since the rendered text is not the file's text. In the Markdown view, matches are highlighted in place with the CSS Custom Highlight API, which leaves the editor's DOM untouched; browsers without it still count and scroll to matches but do not highlight them. A match must lie within one run of text, so a phrase that crosses formatting, such as `**bold** text`, is not found. In the CSV table, the cells whose value matches are marked, and the current one scrolls into view.
+
+### Go to file and line
+
+`Ctrl+P` opens a picker that fuzzy-matches the query against every file path in the open folder, ranking matches at word starts, consecutive characters, and the file name higher. It lists at most 50 results. Arrow keys pick a result and Enter opens it. Adding `:line` or `:line:column` to the query, as in `readme:12:4`, opens the file at that position. `Ctrl+G`, or clicking the cursor position in the status bar, opens the same picker with `:` typed, so `:12` moves within the current file. Going to a position switches the tab to the raw view, since only the raw view has lines and columns. A line or column past the end moves to the last line or the end of the line.
+
+### Status bar
+
+With a file open, the status bar shows the cursor and vim mode (raw view only; see [Raw editor](#raw-editor)), then facts about the buffer: the line count, the size in bytes as UTF-8 (`B`, `KB`, or `MB`), the line ending (`CRLF` when the buffer contains any CRLF line break, `LF` otherwise), the format, and, for Markdown, the word count.
 
 ### Tabs
 

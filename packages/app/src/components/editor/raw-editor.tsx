@@ -1,5 +1,10 @@
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
+import {
+  closeSearchPanel,
+  highlightSelectionMatches,
+  selectNextOccurrence,
+  selectSelectionMatches,
+} from "@codemirror/search";
 import { Annotation, Compartment, EditorState, Prec, Transaction } from "@codemirror/state";
 import type { Extension, StateEffect } from "@codemirror/state";
 import {
@@ -11,27 +16,26 @@ import {
   lineNumbers,
 } from "@codemirror/view";
 import { showMinimap } from "@replit/codemirror-minimap";
-import { vim } from "@replit/codemirror-vim";
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { getCM, vim } from "@replit/codemirror-vim";
+import { useEffect, useImperativeHandle, useLayoutEffect, useRef, type Ref } from "react";
 
 import { matchesShortcut } from "../../commands/shortcuts";
+import { lineSeparatorOf } from "../../domain/line-endings";
+import { DEFAULT_EDITOR_SETTINGS, type EditorSettings } from "../../domain/settings";
 import { findTextChange } from "../../domain/text-change";
+import type { FindTarget } from "./find-target";
+import { createRawFindTarget, hiddenSearchPanel } from "./raw-find";
 
 /** Presentation and input options of the raw editor. */
-export interface RawEditorOptions {
-  lineNumbers: boolean;
-  minimap: boolean;
-  vim: boolean;
-  wordWrap: boolean;
-}
+export type RawEditorOptions = EditorSettings;
 
-/** Suits prose and narrow screens, the common case for Markdown and plain-text notes. */
-export const DEFAULT_RAW_EDITOR_OPTIONS: RawEditorOptions = {
-  lineNumbers: true,
-  minimap: false,
-  vim: false,
-  wordWrap: true,
-};
+export const DEFAULT_RAW_EDITOR_OPTIONS: RawEditorOptions = DEFAULT_EDITOR_SETTINGS;
+
+/** A place to move the cursor to, as people count it: lines and columns start at 1. */
+export interface EditorPosition {
+  line: number;
+  column?: number;
+}
 
 /** Where the main cursor is, as people count it: lines and columns start at 1. */
 export interface CursorInfo {
@@ -67,13 +71,25 @@ interface RawEditorProps {
   options?: RawEditorOptions;
   /** App command shortcuts, such as `Mod+S`. The editor and vim ignore these keys so the command runs instead. */
   reservedShortcuts?: readonly string[];
+  /** Called with vim's mode, such as "normal" or "visual line", and with null while vim is off. */
+  onVimModeChange?: (mode: string | null) => void;
+  /** A position to move the cursor to, scroll to, and focus. Positions past the end go to the end. */
+  pendingJump?: EditorPosition | null;
+  /** Called once `pendingJump` has been applied, so the owner can clear it. */
+  onJumpApplied?: () => void;
+  /** Receives the editor's find target, through which the find bar searches and replaces. */
+  ref?: Ref<FindTarget>;
 }
 
 /** Marks changes that bring the editor in line with the buffer, so they aren't reported back as edits. */
 const bufferSync = Annotation.define<boolean>();
 
-// Mod-Alt-g opens CodeMirror's own go-to-line prompt; the app's go-to command will own that action.
-const EDITOR_SEARCH_KEYMAP = searchKeymap.filter((binding) => binding.key !== "Mod-Alt-g");
+// The rest of CodeMirror's search keymap opens its own search panel or go-to prompt, which the app's
+// find bar and go-to commands replace.
+const SELECTION_SEARCH_KEYMAP = [
+  { key: "Mod-d", run: selectNextOccurrence, preventDefault: true },
+  { key: "Mod-Shift-l", run: selectSelectionMatches },
+];
 
 const editorTheme = EditorView.theme({
   "&": {
@@ -99,11 +115,6 @@ const editorTheme = EditorView.theme({
   ".cm-selectionMatch": { backgroundColor: "var(--color-accent-subtle)" },
   ".cm-searchMatch": { backgroundColor: "var(--color-warning-subtle)" },
   ".cm-searchMatch.cm-searchMatch-selected": { backgroundColor: "var(--color-primary-subtle)" },
-  ".cm-panels": {
-    backgroundColor: "var(--color-foreground)",
-    color: "var(--color-text)",
-  },
-  ".cm-panels.cm-panels-top": { borderBottom: "1px solid var(--color-border)" },
 });
 
 /**
@@ -118,8 +129,9 @@ const editorTheme = EditorView.theme({
 export function RawEditor(props: RawEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
-  const binding = useRef<EditorBinding>({ props, reportedTexts: [] }).current;
+  const binding = useRef<EditorBinding>(createBinding(props)).current;
   binding.props = props;
+  useImperativeHandle(props.ref, () => createRawFindTarget(() => viewRef.current), []);
 
   const { documentKey, content, fileName, stateCache } = props;
   const options = props.options ?? DEFAULT_RAW_EDITOR_OPTIONS;
@@ -137,6 +149,8 @@ export function RawEditor(props: RawEditorProps) {
     const saved = stateCache.get(documentKey);
     loadState(view, binding, saved?.state ?? createEditorState(current.content));
     syncWithBuffer({ view, binding, content: current.content, scroll: saved?.scroll });
+    // A tab saved while the find bar was open keeps its highlights; the bar searches again if it still is.
+    closeSearchPanel(view);
     binding.reportedTexts = [];
     current.onCursorChange?.(describeCursor(view.state));
 
@@ -175,6 +189,16 @@ export function RawEditor(props: RawEditorProps) {
     viewRef.current?.dispatch({ effects: reconfigure(binding) });
   }, [binding, fileName, showLineNumbers, minimap, isVimEnabled, wordWrap]);
 
+  const { pendingJump } = props;
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !pendingJump) {
+      return;
+    }
+    jumpTo(view, pendingJump);
+    binding.props.onJumpApplied?.();
+  }, [binding, documentKey, pendingJump]);
+
   return <div ref={hostRef} className="bg-background h-full w-full overflow-hidden" />;
 }
 
@@ -183,6 +207,25 @@ interface EditorBinding {
   props: RawEditorProps;
   /** Texts reported through `onChange` that the buffer has not echoed back yet, oldest first. */
   reportedTexts: string[];
+  /** Vim's adapter that mode changes are reported from, while vim is on. */
+  vim: VimAdapter | null;
+  /** Reports vim mode changes; one function, so it can be removed from the adapter again. */
+  handleVimModeChange: (event: { mode: string; subMode?: string }) => void;
+}
+
+type VimAdapter = NonNullable<ReturnType<typeof getCM>>;
+
+function createBinding(props: RawEditorProps): EditorBinding {
+  const binding: EditorBinding = {
+    props,
+    reportedTexts: [],
+    vim: null,
+    handleVimModeChange: ({ mode, subMode }) => {
+      const suffix = subMode === "linewise" ? " line" : subMode === "blockwise" ? " block" : "";
+      binding.props.onVimModeChange?.(mode + suffix);
+    },
+  };
+  return binding;
 }
 
 // Shared by every editor instance: a saved state can only be reconfigured through the compartments
@@ -197,18 +240,11 @@ const compartments = {
   wordWrap: new Compartment(),
 };
 
-/**
- * Keeps the file's line endings, so editing doesn't rewrite them. CodeMirror otherwise splits on any
- * line break and joins with LF. A file with any CRLF is treated as CRLF.
- */
-function lineSeparatorOf(content: string): string {
-  return content.includes("\r\n") ? "\r\n" : "\n";
-}
-
 function createEditorState(content: string): EditorState {
   return EditorState.create({
     doc: content,
     extensions: [
+      // CodeMirror otherwise splits on any line break and joins with LF, rewriting a CRLF file.
       EditorState.lineSeparator.of(lineSeparatorOf(content)),
       // Bindings come first so reserved shortcuts are checked before vim's and CodeMirror's keymaps.
       compartments.bindings.of([]),
@@ -221,9 +257,9 @@ function createEditorState(content: string): EditorState {
       drawSelection(),
       highlightActiveLine(),
       highlightSelectionMatches(),
-      search({ top: true }),
+      hiddenSearchPanel,
       EditorState.allowMultipleSelections.of(true),
-      keymap.of([...EDITOR_SEARCH_KEYMAP, ...historyKeymap, ...defaultKeymap]),
+      keymap.of([...SELECTION_SEARCH_KEYMAP, ...historyKeymap, ...defaultKeymap]),
       editorTheme,
     ],
   });
@@ -272,6 +308,7 @@ function createBindings(binding: EditorBinding): Extension {
       if (update.docChanged || update.selectionSet) {
         binding.props.onCursorChange?.(describeCursor(update.state));
       }
+      followVimMode(update.view, binding);
     }),
   ];
 }
@@ -316,6 +353,34 @@ function syncWithBuffer({ view, binding, content, scroll }: BufferSync) {
     effects: mappedScroll ? [mappedScroll] : [],
     annotations: [bufferSync.of(true), Transaction.addToHistory.of(false)],
   });
+}
+
+/**
+ * Starts reporting vim's mode when vim comes on, and stops when it goes off. Vim creates a new
+ * adapter whenever its extension is reconfigured, so the listener moves to the current one.
+ */
+function followVimMode(view: EditorView, binding: EditorBinding) {
+  const isVimEnabled = (binding.props.options ?? DEFAULT_RAW_EDITOR_OPTIONS).vim;
+  const adapter = isVimEnabled ? getCM(view) : null;
+  if (adapter === binding.vim) {
+    return;
+  }
+  binding.vim?.off("vim-mode-change", binding.handleVimModeChange);
+  binding.vim = adapter;
+  adapter?.on("vim-mode-change", binding.handleVimModeChange);
+  binding.props.onVimModeChange?.(adapter ? "normal" : null);
+}
+
+function jumpTo(view: EditorView, { line, column = 1 }: EditorPosition) {
+  const doc = view.state.doc;
+  const target = doc.line(Math.min(Math.max(line, 1), doc.lines));
+  const position = target.from + Math.min(Math.max(column, 1) - 1, target.length);
+  view.dispatch({
+    selection: { anchor: position },
+    effects: EditorView.scrollIntoView(position, { y: "center" }),
+    userEvent: "select",
+  });
+  view.focus();
 }
 
 function describeCursor(state: EditorState): CursorInfo {
