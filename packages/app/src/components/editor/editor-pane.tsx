@@ -1,67 +1,41 @@
-import { useEffect } from "react";
-
-import { supportsEnrichedView } from "../../domain/file-types";
+import { getViewer } from "../../domain/viewers";
 import type { FileDocument, ViewMode } from "../../ports";
+import type { OpenDocument } from "../../state/documents";
 import { Tooltip } from "../feedback/tooltip";
 import { CsvTableEditor } from "./csv-table-editor";
 import { MarkdownEditor } from "./markdown-editor";
 import { RawEditor } from "./raw-editor";
 
 interface EditorPaneProps {
-  /** Hosting platform identifier. */
   platform: string;
-  /** Currently active file document, or null if no file is open. */
-  file: FileDocument | null;
-  /** Current presentation mode. */
-  viewMode: ViewMode;
-  /** Callback fired when user switches the presentation mode. */
+  /** The active tab's document, or null when no tab is open. */
+  document: OpenDocument | null;
   onViewModeChange: (mode: ViewMode) => void;
-  /** Callback fired when the document content is modified. */
   onContentChange: (newContent: string) => void;
-  /** Callback fired to persist document changes to disk. */
   onSave: () => void;
 }
 
-/**
- * Main editing pane that hosts the document header, view mode toggle, and active editor. With no
- * document open it renders an empty surface.
- *
- * @param props - EditorPane properties.
- * @returns Editor pane component.
- */
-export function EditorPane({ platform, file, viewMode, onViewModeChange, onContentChange, onSave }: EditorPaneProps) {
-  // Global Ctrl+S / Cmd+S save shortcut handler
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-        e.preventDefault();
-        if (file?.isDirty) {
-          onSave();
-        }
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [file?.isDirty, onSave]);
-
-  if (!file) {
+/** Hosts the document header, the view mode toggle, and the active document's editor. */
+export function EditorPane({ platform, document: doc, onViewModeChange, onContentChange, onSave }: EditorPaneProps) {
+  if (!doc) {
     return <main role="main" data-platform={platform} className="bg-background text-text flex flex-1 flex-col" />;
   }
 
-  const hasEnriched = supportsEnrichedView(file.extension);
+  const viewer = getViewer(doc.extension);
+  const canToggleView = viewer.hasRaw && viewer.enriched !== undefined;
 
   return (
     <main role="main" data-platform={platform} className="bg-background text-text flex flex-1 flex-col overflow-hidden">
       <header className="border-border bg-background flex h-9 flex-none items-center justify-between gap-3 border-b px-3">
-        <DocumentBreadcrumb file={file} />
+        <DocumentBreadcrumb file={doc} />
         <div className="flex flex-none items-center gap-2">
-          {hasEnriched && <ViewModeToggle viewMode={viewMode} onViewModeChange={onViewModeChange} />}
+          {canToggleView && <ViewModeToggle viewMode={doc.viewMode} onViewModeChange={onViewModeChange} />}
           <Tooltip text="Save (Ctrl+S)" position="bottom" align="end">
             {(bubbleId) => (
               <button
                 type="button"
                 onClick={onSave}
-                disabled={!file.isDirty}
+                disabled={!doc.isDirty}
                 aria-label="Save file"
                 aria-describedby={bubbleId}
                 className="btn ghost icon sm"
@@ -74,18 +48,28 @@ export function EditorPane({ platform, file, viewMode, onViewModeChange, onConte
       </header>
 
       <div className="flex-1 overflow-hidden">
-        {viewMode === "raw" || !hasEnriched ? (
-          <RawEditor content={file.content} onChange={onContentChange} fileName={file.name} />
-        ) : file.extension === "md" || file.extension === "markdown" ? (
-          <MarkdownEditor key={file.path} content={file.content} onChange={onContentChange} />
-        ) : file.extension === "csv" ? (
-          <CsvTableEditor content={file.content} onChange={onContentChange} />
-        ) : (
-          <RawEditor content={file.content} onChange={onContentChange} fileName={file.name} />
-        )}
+        <DocumentView document={doc} onContentChange={onContentChange} />
       </div>
     </main>
   );
+}
+
+interface DocumentViewProps {
+  document: OpenDocument;
+  onContentChange: (newContent: string) => void;
+}
+
+function DocumentView({ document: doc, onContentChange }: DocumentViewProps) {
+  const enriched = doc.viewMode === "enriched" ? getViewer(doc.extension).enriched : undefined;
+  switch (enriched) {
+    case "markdown":
+      // The editor owns its document once mounted, so each tab gets its own instance.
+      return <MarkdownEditor key={doc.key} content={doc.content} onChange={onContentChange} />;
+    case "csv-table":
+      return <CsvTableEditor content={doc.content} onChange={onContentChange} />;
+    case undefined:
+      return <RawEditor content={doc.content} onChange={onContentChange} fileName={doc.name} />;
+  }
 }
 
 interface DocumentBreadcrumbProps {
@@ -185,17 +169,17 @@ function ViewModeToggle({ viewMode, onViewModeChange }: ViewModeToggleProps) {
           </button>
         )}
       </Tooltip>
-      <Tooltip text="Show enriched view" position="bottom" align="end">
+      <Tooltip text="Show rendered view" position="bottom" align="end">
         {(bubbleId) => (
           <button
             type="button"
             onClick={() => onViewModeChange("enriched")}
             aria-pressed={viewMode === "enriched"}
-            aria-label="Enriched"
+            aria-label="View"
             aria-describedby={bubbleId}
             className={viewMode === "enriched" ? "btn soft icon sm p-sm" : "btn ghost icon sm p-sm"}
           >
-            <i className="ic-sparkles" aria-hidden="true" />
+            <i className="ic-eye" aria-hidden="true" />
           </button>
         )}
       </Tooltip>

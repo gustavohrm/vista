@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-10-15
+last_updated: 2026-11-11
 scope: Boundaries between shared app code, platform hosts, and workspace packages.
 ---
 
@@ -53,15 +53,20 @@ Product icons use `@codenhub/icons` configured in Vite with `mode: "svg"`, which
 
 ### Responsive layout
 
-The application shell (`ActivityBar`, `Sidebar`, `EditorPane`, `StatusBar` in `packages/app/src/app.tsx`) is responsive using Tailwind's default breakpoints, and is shared unchanged between the web host and the Tauri mobile targets named in [Initial platform scope](#initial-platform-scope):
+The application shell (`ActivityBar`, `Sidebar`, `TabStrip`, `EditorPane`, `StatusBar` in `packages/app/src/app.tsx`) is responsive using Tailwind's default breakpoints, and is shared unchanged between the web host and the Tauri mobile targets named in [Initial platform scope](#initial-platform-scope):
 
 - Below `md` (768px): `Sidebar` renders as a dismissible overlay drawer (`fixed`, off-canvas when closed) that opens beside the activity bar (`left-12`), over a backdrop. The backdrop sits at `z-30` and the drawer at `z-40`. `ActivityBar` is `relative z-50`, so it stays above both the backdrop and the drawer, and its Explorer toggle is always reachable for closing. The toggle is an Explorer tab: a folder icon that shows the panel's open/closed state via `aria-pressed` and swaps between `ic-folder`/`ic-folder-open`. Tapping the backdrop also closes the drawer. Selecting a file closes the drawer, since it covers the document underneath.
 - `md` and above: `Sidebar` is the same persistent, in-flow column (narrower at `md`, full width at `lg` and above), but the same `ActivityBar` control still works: closing it collapses the column to zero width rather than overlaying content, and selecting a file no longer closes it, since it isn't covering anything.
 - Default state: the explorer opens by default at `md` and above (`packages/app/src/domain/viewport.ts`, `isDesktopViewport()`). Below `md` it opens at startup only when no folder was restored, so a first-time or phone user sees the Open Folder controls immediately. When a folder is restored at startup, the drawer starts closed on phones.
 - The editor area stays empty when no file is open. Opening a folder is done from the explorer, which offers "Open Folder" or "Reopen {name}" when a folder is remembered.
+- `TabStrip` shows one tab per open document above `EditorPane` and scrolls horizontally when tabs overflow. Open documents live in a reducer in `packages/app/src/state/documents.ts`; [Tabs](specs/workspaces.md#tabs) specifies their behavior.
 - `StatusBar` is a bottom bar that shows nothing when no file is open. With a file open it shows the document's size (a word count for Markdown, a line count otherwise) and its format name (Markdown, CSV, Plain Text, or the uppercased extension). It does not show platform identity or encoding.
 
 A Tauri mobile webview reports its real viewport dimensions, so this works through ordinary CSS media queries with no `platform === "native"` branching required.
+
+### Commands and shortcuts
+
+User actions with a keyboard shortcut are `Command` objects (`packages/app/src/commands`): an id, a label, an optional shortcut, whether it is enabled, and what it runs. `AppShell` builds the list from its state, and `useCommandShortcuts` installs one window `keydown` listener that runs the matching command. A disabled command still swallows its shortcut, so `Ctrl+S` with nothing to save never opens the browser's own Save dialog. Shortcuts are written like `Mod+Shift+S`, where `Mod` matches Ctrl or Cmd. Components MUST NOT add their own global shortcut listeners; the planned menu bar, context menus, and command palette read the same command list, so an action and its shortcut are defined once.
 
 Theming is managed via `@codenhub/theme`, supporting light and dark color schemes. The default color tokens provided by `@codenhub/styles` (`light-dark()`) are used without overriding base values, preserving room for future theme expansions.
 

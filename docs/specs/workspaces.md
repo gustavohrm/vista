@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-10-15
+last_updated: 2026-11-11
 scope: Local folder workspaces, file tree representation, document view modes, and persistence across hosts.
 ---
 
@@ -42,7 +42,7 @@ The initial format targets in v1 are `.txt`, `.md`, and `.csv`:
 
 | Format | Raw View                   | Enriched View                                                                   |
 | :----- | :------------------------- | :------------------------------------------------------------------------------ |
-| `.txt` | Plain-text editor          | Plain-text viewer/editor                                                        |
+| `.txt` | Plain-text editor          | None; plain text has only the raw view                                          |
 | `.md`  | Plain-text Markdown editor | WYSIWYG editable rendering (Milkdown), styled against `@codenhub/styles` tokens |
 | `.csv` | Plain-text CSV editor      | Interactive data table with in-place cell editing                               |
 
@@ -50,13 +50,22 @@ Future versions will expand to `.json`, `.yaml`, canvas representations, and emb
 
 ### Markdown WYSIWYG editing
 
-The Enriched view for `.md`/`.markdown` files (`packages/app/src/components/editor/markdown-editor.tsx`) is a WYSIWYG editor built on [Milkdown](https://milkdown.dev/), using its CommonMark and GFM presets (headings, emphasis, lists, links, code blocks, blockquotes, tables, task lists, strikethrough) with a minimal custom theme styled directly against `@codenhub/styles` tokens rather than Milkdown's bundled Nord theme. Editing in this view mutates the same `FileDocument` buffer as every other view ([Document buffer and dirty state](#document-buffer-and-dirty-state) describes it); switching to a different file remounts the editor rather than live-syncing content into the existing document, since the editor owns its document once mounted. Task list items render as real design-system checkboxes that toggle the item's checked state when clicked.
+The Enriched view for `.md`/`.markdown` files (`packages/app/src/components/editor/markdown-editor.tsx`) is a WYSIWYG editor built on [Milkdown](https://milkdown.dev/), using its CommonMark and GFM presets (headings, emphasis, lists, links, code blocks, blockquotes, tables, task lists, strikethrough) with a minimal custom theme styled directly against `@codenhub/styles` tokens rather than Milkdown's bundled Nord theme. Editing in this view mutates the same `FileDocument` buffer as every other view ([Document buffer and dirty state](#document-buffer-and-dirty-state) describes it); each tab gets its own editor instance, and switching tabs remounts it rather than live-syncing content into an existing document, since the editor owns its document once mounted. Task list items render as real design-system checkboxes that toggle the item's checked state when clicked.
 
 **Known limitation**: no WYSIWYG Markdown editor guarantees byte-for-byte round-trip on arbitrary existing Markdown. Parsing and re-serializing content the user never touched can still normalize source-level formatting that doesn't affect meaning, such as list bullet markers (`-`/`+` normalizing to `*`). This is intentional normalization, not data loss, and the accepted cases are enumerated and asserted in `packages/app/src/components/editor/markdown-round-trip.test.ts` rather than left undocumented.
 
+### Tabs
+
+Every opened file gets its own tab, and selecting a file that is already open switches to its tab instead of reloading it. There are no preview tabs: a tab stays until the user closes it. A new tab opens to the right of the active one. Closing the active tab shows its right neighbor, or its left neighbor when it was the last tab.
+
+- Each tab remembers its own view mode. Markdown opens in the rendered view; CSV and plain text open raw. Which views a format offers comes from the viewer registry in `packages/app/src/domain/viewers.ts`, so a later format with no raw form, such as PDF, hides the toggle.
+- A tab closes from its Close button, a middle click, or the Close Tab shortcut: `Ctrl+W` on native and `Alt+W` on the web, because browsers reserve `Ctrl+W` for closing their own tab. Arrow keys move between tabs.
+- Renaming a file or folder updates every open tab inside it in place. Deleting closes every open tab inside it, with an info toast naming the file or counting them.
+- Tabs are keyed by workspace and path, so several workspace roots can later hold files at the same relative path.
+
 ### Document buffer and dirty state
 
-Opening a file loads its contents into an in-memory `FileDocument` buffer:
+Opening a file loads its contents into an in-memory `FileDocument` buffer, one per tab:
 
 - `path`: relative or canonical path within the workspace.
 - `name`: file name.
@@ -64,13 +73,13 @@ Opening a file loads its contents into an in-memory `FileDocument` buffer:
 - `content`: current in-memory string representation.
 - `isDirty`: boolean indicating whether unsaved edits exist in the buffer.
 
-Edits made in either the Raw view or the Enriched view (such as editing a CSV cell, or typing in the Markdown WYSIWYG editor) update the in-memory document buffer and set `isDirty: true`. A small dot next to the file name in the document header breadcrumb marks unsaved edits. Invoking Save persists the current buffer string to disk via the platform's `writeFile` capability and resets `isDirty: false`.
+Edits made in either the Raw view or the rendered view (such as editing a CSV cell, or typing in the Markdown WYSIWYG editor) update that tab's buffer and set `isDirty: true`. A dot in the tab and next to the file name in the document header breadcrumb marks unsaved edits. Save (`Ctrl+S` or `Cmd+S`, or the Save button) writes the active tab's buffer to disk via the platform's `writeFile` capability. The tab becomes clean only if its buffer still matches what was written, so edits typed while a save is in flight stay marked unsaved.
 
 ### Unsaved changes
 
-Leaving a dirty document asks first. Selecting another file, or opening another folder, while the buffer has unsaved edits shows a modal titled "Save changes to {file}?" with **Save**, **Don't Save**, and **Cancel**. Cancel keeps the current document open with its edits intact, and the requested navigation does not happen. Escape and a backdrop click count as Cancel.
+Unsaved edits are never discarded silently. Switching tabs or opening another file keeps every buffer as it is. Closing a tab with unsaved edits, or opening another folder while any tab has them, shows a modal titled "Save changes to {file}?" with **Save**, **Don't Save**, and **Cancel**. When several tabs have unsaved edits, one modal titled "Save changes to {n} files?" lists them and offers **Save All**. The list shows paths, so two files with the same name stay distinguishable. Edits made after the user answers, such as typing while a save is in flight, are asked about again before the action continues. Cancel, Escape, and a backdrop click keep everything open with its edits intact, and the requested action does not happen. A failed save also stops the action and shows an error toast.
 
-Closing or reloading the browser tab while the buffer is dirty triggers the browser's own unload warning. Vista cannot customize that prompt's text.
+Closing or reloading the browser tab while any tab has unsaved edits triggers the browser's own unload warning. Vista cannot customize that prompt's text.
 
 ## Platform capability contract
 
@@ -116,7 +125,7 @@ Workspace operations do not fail silently. A user-initiated cancellation of the 
 
 Users create, rename/move, and delete files and folders from a right-click context menu on the sidebar file tree (right-clicking empty space targets the workspace root). Renaming is implemented as `move` within the same parent directory — there is no separate rename operation, matching VS Code's own model.
 
-- **Delete confirmation**: choosing "Delete" opens a modal dialog titled `Delete "{name}"?` with **Cancel** and **Delete** buttons, and nothing is removed until Delete is confirmed. The message warns that a folder's contents are deleted with it. The dialog is a native `<dialog>`, so Escape cancels it.
+- **Delete confirmation**: choosing "Delete" opens a modal dialog titled `Delete "{name}"?` with **Cancel** and **Delete** buttons, and nothing is removed until Delete is confirmed. The message warns that a folder's contents are deleted with it. When an open tab inside the deleted entry has unsaved edits, the message also warns that those edits will be lost. The dialog is a native `<dialog>`, so Escape cancels it.
 
 - **Validation**: candidate names are validated client-side before any disk operation, via `validateEntryName` (`packages/app/src/domain/path-validation.ts`). Rejected: empty or whitespace-padded names, the reserved names `.` and `..`, a trailing period, the characters `" * / : < > ? \ |` and ASCII control characters (disallowed universally rather than per-platform, since a name valid only on one OS could break when a workspace is later opened on another), and a case-insensitive collision with an existing sibling in the same directory.
 - **Active document handling**: renaming the open file updates its path and name in place, without re-reading the file from disk (the bytes did not change). Deleting the open file, or a directory that contains it, clears the editor and shows a toast explaining why.

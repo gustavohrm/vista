@@ -4,8 +4,12 @@ import { useEffect, useId, useRef, type MouseEvent, type SyntheticEvent } from "
 export type UnsavedChangesChoice = "save" | "discard" | "cancel";
 
 interface UnsavedChangesDialogProps {
-  /** Name of the document with unsaved changes, shown in the dialog title. */
-  fileName: string;
+  /**
+   * Labels of the documents with unsaved changes. One label is shown in the title; several are
+   * counted in the title and listed, and Save becomes Save All. Pass paths rather than bare names
+   * when listing several, so files with the same name stay distinguishable.
+   */
+  fileNames: readonly string[];
   /**
    * Callback invoked once with the user's decision. Escape, a click on the backdrop, and the
    * Cancel button all report `"cancel"`.
@@ -14,7 +18,7 @@ interface UnsavedChangesDialogProps {
 }
 
 /**
- * Modal asking whether to save, discard, or keep a document with unsaved changes open. Renders a
+ * Modal asking whether to save, discard, or keep one or more documents with unsaved changes. Renders a
  * native `<dialog>` opened with `showModal()`, so the browser provides focus containment and
  * inerts the page behind it. Save receives initial focus. The parent should unmount this component
  * once `onChoose` fires.
@@ -22,11 +26,13 @@ interface UnsavedChangesDialogProps {
  * @param props - UnsavedChangesDialog properties.
  * @returns Modal dialog element.
  */
-export function UnsavedChangesDialog({ fileName, onChoose }: UnsavedChangesDialogProps) {
+export function UnsavedChangesDialog({ fileNames, onChoose }: UnsavedChangesDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const saveButtonRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
   const descriptionId = useId();
+  const isSingle = fileNames.length === 1;
+  const title = isSingle ? `Save changes to ${fileNames[0]}?` : `Save changes to ${fileNames.length} files?`;
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -71,11 +77,19 @@ export function UnsavedChangesDialog({ fileName, onChoose }: UnsavedChangesDialo
       <div className="flex flex-col gap-4 p-5">
         <div className="flex flex-col gap-1.5">
           <h2 id={titleId} className="text-title-sm text-text-strong">
-            {`Save changes to ${fileName}?`}
+            {title}
           </h2>
           <p id={descriptionId} className="text-body text-text-secondary">
             Your changes will be lost if you don&apos;t save them.
           </p>
+          {!isSingle && (
+            <ul className="text-body text-text max-h-40 list-inside list-disc overflow-y-auto">
+              {fileNames.map((name, index) => (
+                // oxlint-disable-next-line react/no-array-index-key -- names can repeat across folders, so the position keeps keys unique
+                <li key={`${index}:${name}`}>{name}</li>
+              ))}
+            </ul>
+          )}
         </div>
         <div className="flex justify-end gap-2">
           <button type="button" onClick={() => onChoose("cancel")} className="btn ghost sm">
@@ -85,7 +99,7 @@ export function UnsavedChangesDialog({ fileName, onChoose }: UnsavedChangesDialo
             Don&apos;t Save
           </button>
           <button ref={saveButtonRef} type="button" onClick={() => onChoose("save")} className="btn primary sm">
-            Save
+            {isSingle ? "Save" : "Save All"}
           </button>
         </div>
       </div>
