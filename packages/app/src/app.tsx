@@ -262,9 +262,11 @@ function AppShell({ adapter }: AppProps) {
 
   const closeDocuments = useCallback(
     async (keys: readonly string[]) => {
-      if (await confirmUnsavedChanges(keys)) {
-        dispatchDocuments({ type: "close", keys: [...keys] });
+      if (!(await confirmUnsavedChanges(keys))) {
+        return false;
       }
+      dispatchDocuments({ type: "close", keys: [...keys] });
+      return true;
     },
     [confirmUnsavedChanges],
   );
@@ -960,8 +962,8 @@ function AppShell({ adapter }: AppProps) {
             documents={documentsState.documents}
             activeKey={documentsState.activeKey}
             onActivate={(key) => dispatchDocuments({ type: "activate", key })}
-            onClose={(key) => void closeDocuments([key])}
-            onCloseMany={(keys) => void closeDocuments(keys)}
+            onClose={(key) => closeDocuments([key])}
+            onCloseMany={(keys) => closeDocuments(keys)}
             onCopyRelativePath={(path) => void copyText(path)}
           />
           <EditorPane

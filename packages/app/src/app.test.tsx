@@ -1202,6 +1202,27 @@ describe("App", () => {
       await waitFor(() => expect(getTab("readme.md")).toHaveFocus());
     });
 
+    it("does not move focus to the tabs later after a tab's close was cancelled", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      const editor = await makeReadmeDirty(user);
+      await user.click(screen.getByText("data.csv"));
+      await user.click(getTab("readme.md"));
+      getTab("readme.md").focus();
+      fireEvent.contextMenu(getTab("readme.md"));
+      await user.keyboard("{Enter}");
+      await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Cancel" }));
+
+      // Closing the same tab another way, from the editor, leaves the tabs alone.
+      await user.click(editor);
+      await openMenu(user, "File");
+      await user.click(screen.getByRole("menuitem", { name: "Close Tab" }));
+      await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Don't Save" }));
+
+      await waitFor(() => expect(screen.queryByRole("tab", { name: /readme\.md/ })).not.toBeInTheDocument());
+      expect(getTab("data.csv")).not.toHaveFocus();
+    });
+
     it("copies a tree entry's relative path, and offers its full path only on desktop", async () => {
       const user = userEvent.setup();
       const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();

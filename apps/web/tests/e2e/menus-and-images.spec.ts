@@ -40,6 +40,36 @@ test.describe("menus and Markdown images", () => {
     await expect(page.getByRole("menuitem", { name: "Rename" }).locator("svg")).toBeVisible();
   });
 
+  test("lets Tab and Shift+Tab leave a menu in either direction", async ({ page }) => {
+    const describeFocus = () =>
+      page.evaluate(() => {
+        const el = document.activeElement;
+        return el ? `${el.tagName}:${el.getAttribute("aria-label") ?? el.textContent?.trim().slice(0, 20)}` : "none";
+      });
+    const fileMenu = page.getByRole("menuitem", { name: "File" });
+
+    await fileMenu.focus();
+    await page.keyboard.press("Tab");
+    const after = await describeFocus();
+    await fileMenu.focus();
+    await page.keyboard.press("Shift+Tab");
+    const before = await describeFocus();
+    expect(new Set([after, before, "BUTTON:File"]).size).toBe(3);
+
+    await fileMenu.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("menu", { name: "File" })).toBeVisible();
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("menu", { name: "File" })).toBeHidden();
+    expect(await describeFocus()).toBe(after);
+
+    await fileMenu.focus();
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Shift+Tab");
+    await expect(page.getByRole("menu", { name: "File" })).toBeHidden();
+    expect(await describeFocus()).toBe(before);
+  });
+
   test("runs a command from the menu bar and returns focus to the editor", async ({ page }) => {
     await page.getByText("notes.md").click();
     await page.getByRole("button", { name: "Raw" }).click();

@@ -10,9 +10,10 @@ interface TabStripProps {
   documents: readonly OpenDocument[];
   activeKey: string | null;
   onActivate: (key: string) => void;
-  onClose: (key: string) => void;
+  /** Closes a tab, resolving to false when the user cancelled at the unsaved-changes prompt. */
+  onClose: (key: string) => Promise<boolean>;
   /** Closes several tabs at once, from the tab menu. The caller asks about unsaved changes. */
-  onCloseMany: (keys: string[]) => void;
+  onCloseMany: (keys: string[]) => Promise<boolean>;
   onCopyRelativePath: (path: string) => void;
 }
 
@@ -34,6 +35,14 @@ export function TabStrip({
   // focused element, so focus follows the newly active tab once the close completes; a cancelled
   // close keeps it.
   const keyboardClosedKeyRef = useRef<string | null>(null);
+
+  const closeTabs = async (focusedKey: string | null, close: () => Promise<boolean>) => {
+    keyboardClosedKeyRef.current = focusedKey;
+    // A cancelled close must not move focus later, when that tab goes some other way.
+    if (!(await close()) && keyboardClosedKeyRef.current === focusedKey) {
+      keyboardClosedKeyRef.current = null;
+    }
+  };
 
   useEffect(() => {
     const closedKey = keyboardClosedKeyRef.current;
@@ -84,8 +93,7 @@ export function TabStrip({
           onActivate={() => onActivate(doc.key)}
           onClose={(event) => {
             // A click with no pointer detail came from the keyboard (Enter or Space).
-            keyboardClosedKeyRef.current = event.detail === 0 ? doc.key : null;
-            onClose(doc.key);
+            void closeTabs(event.detail === 0 ? doc.key : null, () => onClose(doc.key));
           }}
           onKeyDown={handleKeyDown}
           onContextMenu={(event) => {
@@ -98,14 +106,8 @@ export function TabStrip({
         <Menu
           label="Tab actions"
           items={buildTabMenu(documents, menu.key, {
-            onClose: (key) => {
-              keyboardClosedKeyRef.current = key;
-              onClose(key);
-            },
-            onCloseMany: (keys) => {
-              keyboardClosedKeyRef.current = keys.includes(menu.key) ? menu.key : null;
-              onCloseMany(keys);
-            },
+            onClose: (key) => void closeTabs(key, () => onClose(key)),
+            onCloseMany: (keys) => void closeTabs(keys.includes(menu.key) ? menu.key : null, () => onCloseMany(keys)),
             onCopyRelativePath,
           })}
           x={menu.x}
@@ -121,7 +123,11 @@ export function TabStrip({
 function buildTabMenu(
   documents: readonly OpenDocument[],
   key: string,
-  actions: Pick<TabStripProps, "onClose" | "onCloseMany" | "onCopyRelativePath">,
+  actions: {
+    onClose: (key: string) => void;
+    onCloseMany: (keys: string[]) => void;
+    onCopyRelativePath: (path: string) => void;
+  },
 ): MenuEntry[] {
   const index = documents.findIndex((doc) => doc.key === key);
   const target = documents[index];
