@@ -42,8 +42,7 @@ export async function runEditingAction(
       return false;
     }
     // Reading can wait on a permission prompt; text must not land in a field the user moved to since.
-    const active = document.activeElement;
-    if (target && (!target.isConnected || (active !== target && active !== document.body))) {
+    if (target && (!target.isConnected || document.activeElement !== target)) {
       return true;
     }
     if (view) {
