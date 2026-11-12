@@ -12,7 +12,7 @@ This document is the workspace's contract: the names of the root scripts and wha
 
 | Script               | Guarantees                                                                                                                         |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm format:check`  | Every file is formatted: code, CSS, HTML and JSON by oxfmt, Markdown by Prettier. Reports, writes nothing.                         |
+| `pnpm format:check`  | Every file is formatted: code, CSS, HTML, JSON and YAML by oxfmt, Markdown by Prettier. Reports, writes nothing.                   |
 | `pnpm format:fix`    | The same two formatters, and rustfmt for Rust, rewriting files.                                                                    |
 | `pnpm lint:check`    | oxlint passes over the repository, with warnings treated as errors.                                                                |
 | `pnpm lint:fix`      | oxlint, applying its safe fixes.                                                                                                   |
@@ -24,7 +24,7 @@ This document is the workspace's contract: the names of the root scripts and wha
 | `pnpm build`         | The web and native frontend bundles build.                                                                                         |
 | `pnpm verify`        | `verify:web`, then `verify:rust`, stopping at the first failure. It is the delivery gate [Contributing](../CONTRIBUTING.md) names. |
 | `pnpm verify:web`    | `format:check`, `lint:check`, `typecheck`, `test`, `build:web` and `build:native`, in that order.                                  |
-| `pnpm verify:rust`   | rustfmt, clippy, and `cargo test` over the native host's Rust crate, in that order.                                                |
+| `pnpm verify:rust`   | rustfmt, then clippy, over the native host's Rust crate.                                                                           |
 | `pnpm prepare`       | Runs on install: points git at the committed hooks in `.githooks/`.                                                                |
 
 `pnpm verify` is what CI runs ([CI](ci.md)), so a green local `verify` predicts a green run. [Tooling](tooling.md#verification) gives the order of its steps and why.

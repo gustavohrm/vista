@@ -6,7 +6,7 @@ scope: How durable project documentation under `docs/` is structured, maintained
 
 # Documentation guidelines
 
-This document covers how the documentation in this project is structured, maintained, and how it should be interpreted, including this document itself.
+This document defines how the documentation in this repository is structured, maintained, and interpreted, including this document itself, and how any text a person reads here is written.
 
 ## Required header
 
@@ -32,7 +32,7 @@ scope: Area governed by this document.
 ---
 ```
 
-The header is YAML rather than bold lines in the body because a tool can read it without parsing prose.
+The header is YAML rather than bold lines in the body because a tool can read it without parsing prose, and because the Markdown formatter, which keeps Markdown unwrapped, would otherwise join the lines into one.
 
 ## Formatting
 
@@ -46,10 +46,10 @@ Documentation MUST be updated in the same change when behavior, architecture, co
 
 APPROVED and IMPLEMENTED documents record decisions. A decision binds work while it stands, and changing it is legitimate work: the document is the current answer, not a final one. Judge work against a document on two separate questions, and keep the answers apart:
 
-- **Conformance:** does the work match the recorded decision? Where it does not, the work is brought in line, or the departure is recorded under "Exceptions".
+- **Conformance:** does the work match the recorded decision? Where it does not, the work is brought in line, or the departure is recorded under [Exceptions](#exceptions).
 - **Merit:** is the recorded decision right? Where it is not, the decision and its document change, together with the code that follows them.
 
-Matching a document does not make work correct, and a merit finding is not a code defect: it is a proposal to change a decision, made as one and under "Recording decisions".
+Matching a document does not make work correct, and a merit finding is not a code defect: it is a proposal to change a decision, made as one and under [Recording decisions](#recording-decisions).
 
 Truth priority settles conformance, which is what work follows while a decision stands:
 
@@ -71,6 +71,8 @@ A document that settles a choice MUST say why. Where real alternatives existed, 
 
 A change that reverses a recorded decision MUST name what the decision did not weigh: a concrete case it gets wrong, a measurement, or a constraint that has changed since. Preferring another option is not enough; without new evidence, the recorded decision stands. The reversing change records the old choice among the rejected alternatives, with the evidence that reversed it, so the decision is not reopened on arguments already heard.
 
+This applies to every document that uses this status model, wherever it lives in the repository.
+
 ## Exceptions
 
 Exceptions to APPROVED or IMPLEMENTED documents MUST be explicit, scoped, and justified.
@@ -82,7 +84,7 @@ An exception MUST state:
 - Why the exception is acceptable.
 - Whether it is temporary or permanent.
 
-Do not create broad exceptions for one-off cases. Prefer changing the rule when repeated exceptions show the rule is wrong. Record an exception next to the rule it bypasses.
+Record an exception next to the rule it bypasses, unless a dedicated register serves that scope better. Do not create broad exceptions for one-off cases. Repeated exceptions show the rule is wrong: change the rule.
 
 ## Document roles
 
@@ -162,6 +164,8 @@ A guide, a README, or any page meant to teach what the project ships to someone 
 ### Voice
 
 Documents that teach, such as guides, READMEs, and tutorials, use the voice below. Everything else a person reads to check or decide, such as specifications, guidelines, changelogs, issues, and pull request descriptions, is plain: precise and friendly, without the jokes. A reader of a specification is checking compliance, and a reader of a changelog is deciding whether to upgrade; neither is helped by a wink. The guardrails below hold for plain text too.
+
+An earlier version of this section applied the playful voice to every document, changelogs and pull request descriptions included. It was narrowed because those are read to check or decide, where a joke costs the reader time and rewards nothing.
 
 Write like a knowledgeable friend explaining something they built: precise, a little dry, and happy to grin about the odd parts. Humor lives in the connective prose, such as introductions, transitions, and asides, and in notes, tips, informational callouts, and anything else where nothing is at risk. There it rewards the reader without slowing them down.
 

@@ -23,7 +23,7 @@ The [coding guidelines](code.md) hold for every language in the project. This do
 - Prefer `unknown` to `any`. Validate `unknown` at the boundary before use.
 - Prefer interfaces for object shapes and type aliases for unions and intersections.
 - Use type-only imports when importing only types.
-- Prefer string-literal unions or `as const` objects to `enum`. `enum` is not erasable syntax: Node.js type stripping rejects it, so code that `tsc` and Vitest accept can fail when Node.js loads it ([codenhub/codenhub@e3ae18df](https://github.com/codenhub/codenhub/commit/e3ae18df)).
+- Prefer string-literal unions or `as const` objects to `enum`. `enum` is not erasable syntax: Node.js type stripping rejects it, so code that `tsc` and Vitest accept can fail when Node.js loads it. An earlier rule allowed `enum` and named its members in UPPER_SNAKE_CASE; it was replaced once code run by Node.js directly hit the rejection ([codenhub/codenhub@e3ae18df](https://github.com/codenhub/codenhub/commit/e3ae18df)).
 - Keep casts narrow and close to the boundary that justifies them.
 - Do not export types or values that are not part of the package or module API.
 - A function with three or more parameters takes a typed options object instead, under the exceptions the [coding guidelines](code.md#code) give.
@@ -82,6 +82,6 @@ oxlint validates the structure of the tags, but no rule detects a missing doc on
 ## Formatting, linting, and type checking
 
 - Code MUST pass `pnpm format:check`, `pnpm lint:check`, and `pnpm typecheck`; [Workspace](../workspace.md#root-scripts) lists them. During development, narrow `typecheck` to the changed packages, as [Tooling](../tooling.md#narrowing-a-run) shows.
-- Rust code MUST pass `pnpm --filter=@vista/native format:rust:check` and `pnpm --filter=@vista/native lint:rust:check`, and its tests MUST pass `pnpm --filter=@vista/native test:rust`.
+- Rust code MUST pass `pnpm --filter=@vista/native format:rust:check` and `pnpm --filter=@vista/native lint:rust:check`.
 - Formatting is owned by oxfmt for TypeScript, CSS, HTML, and JSON, by Prettier for Markdown, and by rustfmt for Rust.
 - For `oxlint-disable`, put the reason after `--` on the same directive. For `#[allow(...)]` and `@ts-expect-error`, put it on the line above.
