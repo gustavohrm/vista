@@ -27,7 +27,7 @@ Vista issues and stores no secrets: it has no accounts, sessions, or server-side
 ## Untrusted input
 
 - Every input crossing a trust boundary is validated at that boundary, before any other code sees it, and parsed into a typed value. What does not parse is rejected, not passed along.
-- Every input has a size bound. New code that reads input bounds it before parsing. File reads from the user's folder have no bound yet: a very large file is read whole into memory by both hosts' adapters.
+- Every input has a size bound. New code that reads input bounds the read itself, such as by checking a file's size before reading it or reading it as a stream with a limit, rather than reading it whole and checking afterwards, when the memory is already spent. File reads from the user's folder have no bound yet: a very large file is read whole into memory by both hosts' adapters.
 - Files in the user's folder are untrusted input: the user or another program can edit them. So is state Vista stores, such as the settings in `localStorage`, which `packages/app/src/domain/settings.ts` reads field by field and replaces with the default where a field does not parse. A value read from either is checked as if it came from outside.
 - A file or folder name the user types is checked against what the file system accepts, as `packages/app/src/domain/path-validation.ts` does, before any adapter sees it.
 - Do not build a path by concatenating input. Resolve it through the adapter, which keeps it inside the granted folder.

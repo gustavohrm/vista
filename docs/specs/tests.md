@@ -21,7 +21,7 @@ This document defines how the project is tested: what kinds of tests exist, wher
 | ----------- | -------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | Unit        | Next to the code it tests              | With the default suite, `pnpm test`           | One module, its boundaries replaced by fakes.                                             |
 | Integration | In the package or app it belongs to    | With the default suite, `pnpm test`           | Several modules together, or a real boundary such as storage or a server. None exist yet. |
-| Browser     | In the web host, apart from its code   | Apart from the default suite, `pnpm test:e2e` | Full user journeys, rendering, and visual regression in real browsers.                    |
+| Browser     | In the web host, apart from its code   | Apart from the default suite, `pnpm test:e2e` | Full user journeys and rendering in real browsers. No visual regression tests yet.        |
 | Git hooks   | Beside the scripts, in `scripts/`      | With the default suite, `pnpm test`           | Real commits and pushes through the hooks, in temporary repositories.                     |
 | Rust        | In the module it tests, in `src-tauri` | With `pnpm verify`, through `verify:rust`     | The native host's Rust code. None exist yet; the command runs no tests.                   |
 
