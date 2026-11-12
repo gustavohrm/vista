@@ -16,6 +16,8 @@ There is no task runner. Vista is one application split across a few packages, a
 
 [Contributing](../CONTRIBUTING.md#setup) lists what to install and the commands to run. `pnpm install` runs the root `prepare` script, which installs the git hooks as [Workspace](workspace.md#git-hooks) describes. If lifecycle scripts were disabled during the install, run `pnpm hooks:install`.
 
+pnpm is installed apart from Node, with the standalone script in [pnpm's installation guide](https://pnpm.io/installation): a pnpm installed through `npm` belongs to the Node version it was installed under, and `nvm install` switching versions takes it off the `PATH`. Any pnpm 10 or later switches itself to the version the `packageManager` field in `package.json` pins before it runs, unless its `manage-package-manager-versions` setting has been turned off; with it off, install the pinned version itself. Node does not bring pnpm with it: Node 24 ships Corepack switched off, and later versions do not ship it at all.
+
 nvm for Windows does not read `.nvmrc`, and `nvm install` and `nvm use` without a version fail, so name it; in PowerShell, `nvm install (Get-Content .nvmrc)`, then `nvm use (Get-Content .nvmrc)`. Checked with nvm for Windows 1.2.2, and in the source of 2.0.1, whose `install` requires the version.
 
 ## Scripts

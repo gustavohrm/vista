@@ -23,6 +23,7 @@ Vista issues and stores no secrets: it has no accounts, sessions, or server-side
 - Note and document content stays out of logs, error messages, and test snapshots. An error message names what failed, never the content involved.
 - Logs go only to the local console. Today they include folder paths and file names, as [Errors](../specs/errors.md#logging) records; a change that sends a log or an error anywhere off the device is a decision, recorded first, and keeps paths and names out of what it sends.
 - [Errors](../specs/errors.md#direction) proposes that the interface show a fixed message for an unexpected failure and leave the raw error to the console. Until it is approved, toasts show the error's own message.
+- Where a leak would matter, a test proves it: it feeds known note content through the flow and asserts it never appears in what was logged, shown, or snapshotted.
 
 ## Untrusted input
 
@@ -31,6 +32,7 @@ Vista issues and stores no secrets: it has no accounts, sessions, or server-side
 - Files in the user's folder are untrusted input: the user or another program can edit them. So is state Vista stores, such as the settings in `localStorage`, which `packages/app/src/domain/settings.ts` reads field by field and replaces with the default where a field does not parse. A value read from either is checked as if it came from outside.
 - A file or folder name the user types is checked against what the file system accepts, as `packages/app/src/domain/path-validation.ts` does, before any adapter sees it.
 - Do not build a path by concatenating input. Resolve it through the adapter, which keeps it inside the granted folder.
+- Do not build a command by concatenating input. Pass its arguments as an array, as `scripts/` does when it runs `git` and `gh` through `spawnSync`.
 - Do not build HTML from input. Rendered Markdown and document content go through the editor's own rendering, never through `innerHTML` or `dangerouslySetInnerHTML`.
 
 ## Folder access and host permissions
@@ -50,5 +52,5 @@ A change that touches any of the above names it in its pull request and adds or 
 
 - Does it add a way for untrusted input, such as a file from the user's folder, to reach the code? Is that input validated and bounded at the boundary?
 - Does note content, a file name, or a path now reach a log, an error, or a snapshot?
-- Does it widen a Tauri capability or permission, loosen the content security policy, or add an outbound call? Is that named in the pull request?
+- Does it widen a Tauri capability or permission, loosen the content security policy, or add an outbound call? Is that named in the pull request and tested?
 - Can it reach a file outside the folder the user granted?

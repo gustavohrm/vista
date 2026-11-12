@@ -8,14 +8,15 @@ This document defines the contributor workflow, from a working tree through vali
 
 Vista is a pnpm workspace. You need:
 
-- Node and pnpm at the versions the repository pins. With `nvm`, `nvm use` reads `.nvmrc`; pnpm installs the version `packageManager` names. An install outside the `engines` range fails rather than warns (`pnpm-workspace.yaml` sets `engineStrict`).
+- Node at the version `.nvmrc` pins. With `nvm`, `nvm install` reads it, downloads that version when it is missing, and switches to it.
+- pnpm on the `PATH`, installed apart from Node with the standalone script in [pnpm's installation guide](https://pnpm.io/installation), not through `npm` or Corepack; [Tooling](docs/tooling.md#setup) says why. It switches itself to the version `packageManager` names. An install outside the `engines` range fails rather than warns (`pnpm-workspace.yaml` sets `engineStrict`).
 - For the native desktop and mobile host, Rust through `rustup`. `rust-toolchain.toml` pins the version, and rustup installs it, with `clippy` and `rustfmt`, the first time cargo runs here.
 - For the native host, [Tauri's prerequisites](https://tauri.app/start/prerequisites/) for your platform.
 
 Then:
 
 ```sh
-nvm use
+nvm install
 pnpm install
 pnpm dev:web
 ```
@@ -51,7 +52,7 @@ A defect hit while working on something else is filed and worked around, not fix
 File it with what triage needs:
 
 ```sh
-gh issue create --title "<what is wrong>" --label "type:bug,status:needs-triage" --body "<what happened, what was expected, and the workaround>"
+gh issue create --title "<area>: <what is wrong>" --label "type:bug,status:needs-triage" --body "<what happened, what was expected, and the workaround>"
 ```
 
 Then mark the workaround where it lives, naming the issue in full so the reference is unambiguous wherever it is read:
@@ -138,10 +139,10 @@ Formatting churn, unrelated fixes, and drive-by refactors are their own commits 
 A commit an AI agent wrote or substantially shaped MUST carry a `Co-authored-by` trailer naming the **model**, not the tool or harness it ran in:
 
 ```
-Co-authored-by: Claude Opus 5 <noreply@anthropic.com>
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
 ```
 
-`Claude Opus 5`, not `Claude Code`; the model is what produced the change, and it is what someone auditing the history needs to know. A harness name records which client a person happened to open, which explains nothing about the commit. Use the model vendor's no-reply address when it publishes one.
+`Claude Opus 5.5`, not `Claude Code`; the model is what produced the change, and it is what someone auditing the history needs to know. A harness name records which client a person happened to open, which explains nothing about the commit. Use the model vendor's no-reply address when it publishes one.
 
 The human directing the work stays the commit author. The trailer is an addition to authorship, never a replacement for it.
 

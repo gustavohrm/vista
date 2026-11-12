@@ -12,7 +12,7 @@ This document is the workspace's contract: the names of the root scripts and wha
 
 | Script               | Guarantees                                                                                                                         |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm format:check`  | Every file is formatted: code, CSS, HTML and JSON by oxfmt, Markdown by Prettier. Reports, writes nothing.                         |
+| `pnpm format:check`  | Every file is formatted: code, CSS, HTML, JSON and YAML by oxfmt, Markdown by Prettier. Reports, writes nothing.                   |
 | `pnpm format:fix`    | The same two formatters, and rustfmt for Rust, rewriting files.                                                                    |
 | `pnpm lint:check`    | oxlint passes over the repository, with warnings treated as errors.                                                                |
 | `pnpm lint:fix`      | oxlint, applying its safe fixes.                                                                                                   |

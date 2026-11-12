@@ -6,19 +6,11 @@ scope: Continuous integration, the pinned toolchain, action pinning, dependency 
 
 # Continuous integration
 
-`.github/workflows/ci.yml` verifies every pull request, every merge-queue check, and every push to `main`. It runs the same root and package scripts a contributor runs locally, so a green run means those scripts passed rather than some CI-only approximation of them. It runs what `pnpm verify` runs, and the end-to-end tests besides.
+`.github/workflows/ci.yml` verifies every pull request, every merge-queue check, and every push to `main`. It runs the same root and package scripts a contributor runs locally, so a green run means those scripts passed rather than some CI-only approximation of them. It runs what `pnpm verify` runs, and the end-to-end tests besides. [Workspace](workspace.md) says what each check guarantees.
 
 ## Toolchain
 
-Local and CI runs resolve the same versions, each declared once:
-
-| Where                                | Declares                                              |
-| ------------------------------------ | ----------------------------------------------------- |
-| `package.json` `engines`             | The Node and pnpm range every run must satisfy        |
-| `package.json` `packageManager`      | The exact pnpm version pnpm installs itself           |
-| `.nvmrc`                             | The exact Node version, read by `nvm` and CI          |
-| `pnpm-workspace.yaml` `engineStrict` | Makes an install outside `engines` fail               |
-| `rust-toolchain.toml`                | The exact Rust version and its `clippy` and `rustfmt` |
+Local and CI runs resolve the same versions, each declared once; [Workspace](workspace.md#toolchain) lists where.
 
 CI reads those same files rather than repeating a version: `pnpm/action-setup` takes pnpm from `packageManager`, `actions/setup-node` takes Node from `.nvmrc`, and `rustup toolchain install` takes Rust from `rust-toolchain.toml`. A version is raised in one place, and a machine that cannot satisfy it is told at install time instead of failing later in a way nobody can reproduce.
 
@@ -102,7 +94,7 @@ The check names are the job `name:` values in `ci.yml`. If a job is renamed, the
 
 Admin enforcement is what makes the rest hold: without it, a maintainer's direct push to `main` is stopped only by the `pre-push` hook, which `--no-verify` skips.
 
-Up-to-date branches are stricter than the template, which leaves them off. A merge queue would check the merge result without the extra update, but GitHub offers merge queues only on repositories owned by an organization, and this one belongs to a user. "Allow updating pull request branches" is on, so bringing a branch up to date is one button.
+Up-to-date branches are required so that what CI checked is what lands: a branch behind `main` was checked without the commits it will merge onto. A merge queue would check the merge result without the extra update, but GitHub offers merge queues only on repositories owned by an organization, and this one belongs to a user. "Allow updating pull request branches" is on, so bringing a branch up to date is one button.
 
 "Automatically delete head branches" is on too. Deleting a merged branch is what makes GitHub retarget a pull request built on it to that branch's own base. With the branch left behind, the next pull request merges into it and never reaches `main`.
 
