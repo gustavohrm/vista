@@ -2,7 +2,11 @@
 
 ## Reporting a vulnerability
 
-Report it privately through [GitHub's private vulnerability reporting](https://github.com/gustavohrm/vista/security/advisories/new), not in a public issue. Describe the impact, the commit you found it in, and include the smallest reproduction you have.
+Report it privately through [GitHub's private vulnerability reporting](https://github.com/gustavohrm/vista/security/advisories/new), not in a public issue. Include the version or commit you found it in, the impact, and the smallest reproduction you have. Remove secrets, tokens, and personal data, including note content, from anything you paste.
+
+A report is acknowledged on GitHub, and the advisory stays private until the vulnerability is fixed.
+
+A vulnerability in a dependency that Vista uses goes to that dependency's maintainers. If you are not sure which side it is on, report it here.
 
 ## What matters most
 

@@ -2,6 +2,8 @@ packages:
   - "apps/*"
   - "packages/*"
 
+# Every version is declared once, here, and packages refer to it as `catalog:`, so the workspace can never
+# hold two versions of one dependency by accident. A new third-party dependency adds its version here.
 catalog:
   "@codemirror/commands": 6.11.1
   "@codemirror/language": 6.13.1
@@ -49,10 +51,24 @@ catalog:
   vitest: 4.1.10
   wrangler: 4.160.0
 
+# Supply-chain rules, applied to every install, local and in CI alike.
+# Refuses a transitive dependency that resolves to a git repository or a tarball URL instead of the registry.
 blockExoticSubdeps: true
+# Refuses a version published with weaker trust evidence (provenance, trusted publishing) than an earlier
+# version of the same package, a common sign of a compromised publish.
 trustPolicy: no-downgrade
+# Seven days, in minutes: a version published longer ago than this is no longer held to the trust policy, so
+# a long-standing release that predates provenance is not refused as a downgrade.
 trustPolicyIgnoreAfter: 10080
+# The only dependencies whose install scripts may run. A dependency that needs one gets an entry in the same
+# change, with the reason in a comment.
 allowBuilds:
-  "@parcel/watcher": true
+  # Vite's bundler; its install script checks that the platform binary it ships resolved.
   esbuild: true
+  # The Workers runtime Wrangler runs locally; its install script links the platform binary.
   workerd: true
+
+# Makes pnpm refuse an install outside `engines` in package.json instead of only printing a warning, so a
+# mismatch surfaces before it turns into a failure no one can reproduce. It lives here because pnpm ignores
+# `engine-strict` in .npmrc: checked with pnpm 11.7.
+engineStrict: true

@@ -1,6 +1,6 @@
 # Contributing
 
-This document defines the contributor workflow, from a working tree through validation and review. It applies to maintainers, contributors, and AI agents.
+This document defines the contributor workflow, from a working tree through validation, review, and release. It applies to maintainers, contributors, and AI agents.
 
 [Documentation](docs/README.md) maps the architecture, guidelines, and specifications. [Tooling](docs/tooling.md) describes the commands below. [Agent instructions](AGENTS.md) contain agent-specific behavior and context guidance. Vulnerabilities are reported privately, as [`SECURITY.md`](SECURITY.md) describes.
 
@@ -8,7 +8,7 @@ This document defines the contributor workflow, from a working tree through vali
 
 Vista is a pnpm workspace. You need:
 
-- Node and pnpm at the versions the repository pins. With `nvm`, `nvm use` reads `.nvmrc`; pnpm installs the version `packageManager` names. An install outside the `engines` range fails rather than warns (`.npmrc` sets `engine-strict`).
+- Node and pnpm at the versions the repository pins. With `nvm`, `nvm use` reads `.nvmrc`; pnpm installs the version `packageManager` names. An install outside the `engines` range fails rather than warns (`pnpm-workspace.yaml` sets `engineStrict`).
 - For the native desktop and mobile host, Rust through `rustup`. `rust-toolchain.toml` pins the version, and rustup installs it, with `clippy` and `rustfmt`, the first time cargo runs here.
 - For the native host, [Tauri's prerequisites](https://tauri.app/start/prerequisites/) for your platform.
 
@@ -25,9 +25,9 @@ Use `pnpm dev:native` for the Tauri host. `pnpm install` also points git at `.gi
 ## Changes
 
 - Keep each change within its requested scope and preserve unrelated work.
-- Applicable coding standards, specifications, and APPROVED or IMPLEMENTED documentation govern the change. Existing code may lag those contracts; conflicts and exceptions are resolved under the documentation guidelines.
-- Update affected documentation in the same change when behavior, architecture, workspace exports, conventions, or platform rules change. Each contract has one owning document; references point to that owner rather than repeat its requirements.
-- Do not commit secrets, build artifacts, or unrelated changes.
+- Applicable coding standards, specifications, and APPROVED or IMPLEMENTED documentation govern the change. Existing code may lag those contracts; conflicts and exceptions are resolved under the [documentation guidelines](docs/guidelines/documentation.md).
+- Update affected documentation in the same change when behavior, architecture, workspace exports, conventions, platform rules, or decisions change. Each contract has one owning document; references point to that owner rather than repeat its requirements.
+- Do not commit secrets, `.env` or `.dev.vars` files, build artifacts, or unrelated changes.
 
 ## Issues
 
@@ -35,12 +35,14 @@ Defects and requests are tracked as GitHub issues, opened through the bug and fe
 
 Each issue carries one label from each group that applies:
 
-| Group     | Labels                            | Says                                 |
-| --------- | --------------------------------- | ------------------------------------ |
-| `type:`   | `bug`, `feature`, `docs`, `chore` | What kind of work it is              |
-| `status:` | `needs-triage`, `blocked`         | Why it is not moving, when it is not |
+| Group     | Labels                                        | Says                                 |
+| --------- | --------------------------------------------- | ------------------------------------ |
+| `type:`   | `bug`, `feature`, `security`, `docs`, `chore` | What kind of work it is              |
+| `status:` | `needs-triage`, `blocked`, `upstream`         | Why it is not moving, when it is not |
 
-The bug and feature forms apply `type:bug` or `type:feature` and `status:needs-triage` themselves. `.github/labels.json` holds the full list. After editing it, run `node scripts/sync-labels.mjs` with an authenticated `gh` for this repository. The script creates or updates each label and never deletes one; a label on GitHub that the list no longer has is printed for a maintainer to remove by hand.
+`status:upstream` means the issue waits on a change in a dependency Vista's maintainers also maintain, as [below](#a-defect-found-mid-task) describes. The bug and feature forms apply `type:bug` or `type:feature` and `status:needs-triage` themselves, and Dependabot labels its pull requests `type:chore`, so those labels must exist before either uses them.
+
+`.github/labels.json` holds the full list. After editing it, run `node scripts/sync-labels.mjs` (or `pnpm labels`) with an authenticated `gh` for this repository. The script writes every label with `gh label create --force`, so a run is safe to repeat and updates colors and descriptions in place. It never deletes a label: deleting one strips it from every issue that carries it, so a label on GitHub that the list no longer has is printed for a maintainer to remove by hand. Renaming a label on GitHub, rather than creating it again, keeps it on the issues that carry it.
 
 ### A defect found mid-task
 
@@ -60,6 +62,8 @@ Then mark the workaround where it lives, naming the issue in full so the referen
 
 Once the fix lands, searching for `gustavohrm/vista#123` finds every workaround to remove. A defect with no workaround blocks the task; say so, and the fix goes first, in its own pull request.
 
+A defect or gap in a dependency Vista's maintainers also maintain, such as an `@codenhub/*` package, is fixed upstream, not around. File it in that dependency's repository, label the local issue that waits on it `status:upstream`, and mark the workaround with the upstream issue. Once the fix is released, raise the dependency to that version and remove every workaround that names the issue.
+
 Opening an issue is outward-facing. An agent drafts it and asks before filing, as it does before pushing.
 
 ## Branches
@@ -70,7 +74,7 @@ Work happens on a branch. Do not commit to `main`.
 
 The exception is real but narrow: it takes an explicit request from a maintainer, in the moment, for that specific commit. Because protection is enforced for admins, the exception means lifting it for that push and restoring it straight after. An agent must ask and be told yes. Neither a general instruction to "just fix it" nor a previous approval carries over to the next commit.
 
-Name the branch `<type>/<slug>`, where `<type>` is the [commit type](#type) of the work and `<slug>` is kebab-case. A version in the slug keeps its dots.
+Name the branch `<type>/<slug>`, where `<type>` is the [commit type](#type) of the work and `<slug>` is kebab-case. A version in the slug keeps its dots, as in `chore/tauri-2.9-upgrade`.
 
 ```
 feat/tab-search
@@ -115,7 +119,7 @@ Imperative mood, lowercase, no trailing period: "add", not "added" or "Adds". Ai
 
 Describe what the change does for someone reading the log later, not which files moved. `feat(app): add markdown note editor` or `fix(web): handle permission revocation gracefully` says what happens; `fix(web): update adapter.ts` says nothing a diff would not.
 
-Append `!` after the scope for a change that breaks a contract, such as the format of persisted settings or folder metadata, and describe what breaks in the body.
+Append `!` after the scope for a change that breaks a contract someone relies on, such as the format of persisted settings or folder metadata, and say in the body what breaks and what to do about it.
 
 ### Body
 
@@ -137,7 +141,7 @@ A commit an AI agent wrote or substantially shaped MUST carry a `Co-authored-by`
 Co-authored-by: Claude Opus 5 <noreply@anthropic.com>
 ```
 
-The model is what produced the change, and it is what someone auditing the history needs to know. Use the model vendor's no-reply address when it publishes one.
+`Claude Opus 5`, not `Claude Code`; the model is what produced the change, and it is what someone auditing the history needs to know. A harness name records which client a person happened to open, which explains nothing about the commit. Use the model vendor's no-reply address when it publishes one.
 
 The human directing the work stays the commit author. The trailer is an addition to authorship, never a replacement for it.
 
@@ -153,24 +157,30 @@ pnpm verify
 
 Report any step that was skipped or failed. [Tooling](docs/tooling.md) documents what `pnpm verify` runs and the narrower commands.
 
+`pnpm verify` does not run the end-to-end tests, which need a browser installed; CI runs them on every pull request. Run `pnpm test:e2e` as well when a change touches what a user sees or how the web host serves it.
+
 ## Pull requests
 
-Every change reaches `main` through a pull request, using the template in `.github/pull_request_template.md`. [CI](docs/ci.md) runs two jobs on every pull request: `Web`, on Ubuntu, covers formatting, linting, typecheck, tests, the web build, and end-to-end tests; `Rust`, on Windows, covers the native layer's formatting, linting, and tests.
+Every change reaches `main` through a pull request, using the template in `.github/pull_request_template.md`, and [CI](docs/ci.md) verifies it.
 
 Pushing a branch and opening a pull request are outward-facing actions. An agent asks first and does neither on its own initiative.
 
 Keep a pull request to one subject. A branch that fixes a bug and also restructures a doc is two pull requests, for the same reason a commit that does both is two commits.
 
-A pull request that resolves an issue says `Fixes #123` in its description, so merging it closes the issue.
+A pull request that resolves an issue says `Fixes #123` in its description, so merging it closes the issue. Merging is not releasing: a fix reaches users with the next release or deployment.
+
+A pull request that builds on another unmerged one targets that one's branch and names it in its description. Merge them in order, the base first. GitHub then deletes the merged branch, with the setting [CI](docs/ci.md#branch-protection) recommends, and retargets the next pull request to `main`; merged out of order or before that retarget, it lands in the other branch instead of `main`.
 
 ## Deployment and releases
 
-Vista is an end-user application, not a set of published npm packages.
+Releasing is a maintainer action, and it is separate from merging. Merging changes `main`; a release or deployment puts a version where people install or reach it, and a published version can be superseded but rarely taken back. Bump the version and record what users need to know in an ordinary pull request first; the release itself names a commit already on `main`.
 
-- **Web App**: Cloudflare Workers hosting is approved for the web app (`apps/web`). Deployment is performed via `pnpm deploy:web` or automated CI when publication is enabled in the future.
+Vista is an end-user application, not a set of published npm packages, and it has no releases yet.
+
+- **Web App**: Cloudflare Workers hosting is approved for the web app (`apps/web`), but production deployment is not set up yet: no account, credentials, or deployment workflow exist. `pnpm deploy:web` builds the web host and runs `wrangler deploy`, and is there for when publication is enabled; `pnpm --filter=@vista/web deploy:check` runs the same build with `--dry-run`.
 - **Desktop and Mobile App**: The native app (`apps/native`) produces desktop executables and mobile packages via Tauri (`build:desktop`, `build:android`, `build:ios`). App store distribution, code signing, and release packaging are handled at release milestones.
 
-Deploying or publishing releases are outward-facing actions. An agent asks first and never triggers deployments on its own initiative.
+Pushing a release tag, deploying, and publishing a release are outward-facing actions. An agent asks first and never does any of them on its own initiative.
 
 ## Hooks
 

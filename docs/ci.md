@@ -1,45 +1,49 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-10-15
-scope: Continuous integration, the pinned toolchain, and the checks that report on pull requests.
+last_updated: 2026-11-12
+scope: Continuous integration, the pinned toolchain, action pinning, dependency updates, and the checks that report on pull requests.
 ---
 
 # Continuous integration
 
-`.github/workflows/ci.yml` verifies every pull request and every push to `main`. It runs the same root and package scripts a contributor runs locally, so a green run means those scripts passed rather than some CI-only approximation of them.
+`.github/workflows/ci.yml` verifies every pull request, every merge-queue check, and every push to `main`. It runs the same root and package scripts a contributor runs locally, so a green run means those scripts passed rather than some CI-only approximation of them. It runs what `pnpm verify` runs, and the end-to-end tests besides.
 
 ## Toolchain
 
 Local and CI runs resolve the same versions, each declared once:
 
-| Where                           | Declares                                              |
-| ------------------------------- | ----------------------------------------------------- |
-| `package.json` `engines`        | The Node and pnpm range every run must satisfy        |
-| `package.json` `packageManager` | The exact pnpm version pnpm installs itself           |
-| `.nvmrc`                        | The exact Node version, read by `nvm` and CI          |
-| `.npmrc` `engine-strict`        | Makes an install outside `engines` fail               |
-| `rust-toolchain.toml`           | The exact Rust version and its `clippy` and `rustfmt` |
+| Where                                | Declares                                              |
+| ------------------------------------ | ----------------------------------------------------- |
+| `package.json` `engines`             | The Node and pnpm range every run must satisfy        |
+| `package.json` `packageManager`      | The exact pnpm version pnpm installs itself           |
+| `.nvmrc`                             | The exact Node version, read by `nvm` and CI          |
+| `pnpm-workspace.yaml` `engineStrict` | Makes an install outside `engines` fail               |
+| `rust-toolchain.toml`                | The exact Rust version and its `clippy` and `rustfmt` |
 
 CI reads those same files rather than repeating a version: `pnpm/action-setup` takes pnpm from `packageManager`, `actions/setup-node` takes Node from `.nvmrc`, and `rustup toolchain install` takes Rust from `rust-toolchain.toml`. A version is raised in one place, and a machine that cannot satisfy it is told at install time instead of failing later in a way nobody can reproduce.
 
 `rust-toolchain.toml` sits at the repository root rather than in `apps/native/` because rustup resolves it from the working directory, and the Rust scripts run cargo from the package with `--manifest-path`, so the root file applies to every Rust command.
 
-`engine-strict` is deliberate friction. A patch-level difference rarely matters, and the one time it does, the failure looks like a bug in the change under review rather than a difference in the runtime.
+`engineStrict` is deliberate friction. A patch-level difference rarely matters, and the one time it does, the failure looks like a bug in the change under review rather than a difference in the runtime. It is set in `pnpm-workspace.yaml` because pnpm 11 ignores `engine-strict` in `.npmrc`, where it used to be: `pnpm config get engine-strict` printed `undefined`, and an install outside `engines` only warned.
 
 ## Jobs
 
-| Job    | Runner           | Runs                                                                                                                          |
-| ------ | ---------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `Web`  | `ubuntu-latest`  | `pnpm format:check`, `pnpm lint:check`, `pnpm typecheck`, `pnpm test`, `pnpm build:web`, `pnpm build:native`, `pnpm test:e2e` |
-| `Rust` | `windows-latest` | `pnpm --filter=@vista/native` `format:rust:check`, `lint:rust:check`, `test:rust`                                             |
+| Job    | Runner           | Runs                                                                                                                                                        |
+| ------ | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Web`  | `ubuntu-latest`  | `pnpm format:check`, `pnpm lint:check`, `pnpm typecheck`, `pnpm test`, `pnpm build:web`, `pnpm build:native`, `pnpm test:e2e`, then `Working tree is clean` |
+| `Rust` | `windows-latest` | `pnpm --filter=@vista/native` `format:rust:check`, `lint:rust:check`, `test:rust`, then `Working tree is clean`                                             |
 
-Both jobs run on every pull request and every push to `main`, in parallel. There is no change-based selection: the repository is one application, and a check that skips half of it on a pull request is a check that lets the other half reach `main` unverified.
+Both jobs run on every pull request, every merge-queue check, and every push to `main`, in parallel. There is no change-based selection: the repository is one application, and a check that skips half of it on a pull request is a check that lets the other half reach `main` unverified.
 
 The `Web` job covers the shared interface in `packages/app` and the web host in `apps/web`, along with the repository-wide format, lint, typecheck, and test scripts. Those parts are platform-independent, so they run on the fastest, cheapest runner. End-to-end tests run Chromium only, through the Playwright configuration in `apps/web`, which builds the web app and starts a local Cloudflare Worker before the tests run.
 
 The `Rust` job runs on Windows because Windows is the platform the native layer is built and used on. It runs the Rust scripts in `apps/native` without building the frontend first, so the `frontendDist` directory is not produced before the Rust checks.
 
 The `Rust` job also sets up Node and the dependencies, because the Rust scripts are run through `pnpm --filter`, which needs the workspace installed.
+
+`Working tree is clean`, the last step of each job, fails when a check has left a tracked or untracked file changed. A check that writes has changed what it was checking, so it is reported rather than passing. On the Windows runner the step runs under `bash`, so both jobs run the same command.
+
+Runs for the same pull request cancel each other, because only the newest push is worth a verdict. A merge-queue run or a push to `main` is never cancelled to make way for a newer one: each is the authoritative check of a commit, so each is grouped by its commit rather than its branch. Grouping by branch would not hold that: a concurrency group holds one running and one pending run, and GitHub cancels the pending one when a third arrives, whatever `cancel-in-progress` says, so three quick pushes to `main` would leave the second without a verdict. The cost is that runs on `main` can run in parallel. The `merge_group` trigger never fires while the repository has no merge queue. Requiring one would make the `push` trigger redundant: the queue lands the exact commit it checked, so a push run would only repeat a passed check. The workflow's token is read-only (`permissions: contents: read`); a job that needs more asks for it on that job alone.
 
 ## Changing the workflow
 
@@ -57,39 +61,46 @@ uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
 A tag is a mutable pointer. `@v5` resolves to whatever its owner last pointed it at, so a compromised or simply retagged release changes what runs here without any change landing in this repository. A SHA cannot move, which turns an action upgrade into a reviewable diff. The comment carries the human-readable version, because a bare SHA says nothing about how far behind it is.
 
-The rule is all or nothing on purpose. Pinning some actions and not others is worse than pinning none: a reader cannot tell a reference that was reviewed from one that was missed. Adding an action means resolving its SHA in the same change.
+The rule is all or nothing on purpose. Pinning some actions and not others is worse than pinning none: a reader cannot tell a reference that was reviewed from one that was missed. Adding an action means resolving its SHA in the same change. The repository's Actions settings can enforce the rule, refusing any workflow that references another repository's action by anything but a full SHA; that setting is dashboard state, so it is turned on by hand.
 
 `./.github/actions/setup` is deliberately not pinned. It is a path in this repository, already versioned by the commit under test.
 
-Nothing updates these automatically. That is the cost of the rule, accepted rather than overlooked: upgrades are manual. Resolve the new SHA with `gh` and update the comment alongside it:
+For a hand upgrade, resolve the new SHA with `gh` and update the comment alongside it:
 
 ```sh
 gh api repos/actions/checkout/commits/v7.0.1 --jq .sha
 ```
 
+## Dependency updates
+
+`.github/dependabot.yml` proposes weekly updates for the GitHub Actions, including the composite action under `.github/actions/`, for the npm dependencies in the workspace, and for the Rust crates in `apps/native/src-tauri`. It moves an action's SHA and its version comment together, so a pin and its label cannot drift apart. Every update pull request is labelled `type:chore`.
+
+The groups take minor and patch updates only, so a week is one grouped pull request per ecosystem and directory. Dependabot groups each listed directory on its own, so the workflows and `.github/actions/*` can each get one: two pull requests for the actions in one week is the configuration working, not a duplicate. A major update arrives as a pull request of its own: it is a decision that may need code changes, and inside a group it would hold the routine updates back until it is dealt with.
+
+A dependency held back for a known breakage gets an `ignore` entry with the reason and the condition for removing it.
+
+Upgrades used to be manual: nothing updated the pins automatically, a cost the pinning rule accepted rather than overlooked. That decision did not weigh that Dependabot moves the SHA pin and its version comment together, so an automated upgrade is still a pinned, reviewable diff, and the cost no longer has to be paid. Renovate does the same job and was rejected: it runs as a GitHub App with a configuration of its own, while Dependabot is built into GitHub and already raises the repository's security updates.
+
 ## Labels
 
-`.github/labels.json` is the source for the repository's labels. Each entry is created or updated by:
-
-```sh
-node scripts/sync-labels.mjs
-```
-
-The script needs an authenticated `gh` for this repository. It writes every label with `gh label create --force`, so a run is safe to repeat and updates colors and descriptions in place. It never deletes a label: a label on GitHub that the list no longer has is printed for a maintainer to remove by hand, because deleting it strips the label from every issue that carries it.
-
-Issue forms in `.github/ISSUE_TEMPLATE` apply `type:*` and `status:needs-triage` labels, so those labels must exist before an issue is filed from a form.
+`.github/labels.json` is the source for the repository's labels, and [Contributing](../CONTRIBUTING.md#issues) describes the groups and how they are synced to GitHub. Dependabot's pull requests and the issue forms apply labels from that list, so a label they name must exist on GitHub first.
 
 ## Branch protection
 
-The workflow reports; it does not block on its own. What blocks is branch protection on GitHub, a repository setting no file here can enforce. The recommended configuration for `main` is:
+The workflow reports; it does not block on its own. What blocks is a branch protection rule or a ruleset on `main`, repository settings no file here can enforce. A ruleset does the same job with more control, and either works if nobody can bypass it. The recommended configuration:
 
 | Setting                | Recommended value                                                                                                   |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | Required status checks | `Web` and `Rust`, from the GitHub Actions app, so no other integration can report a passing check under those names |
 | Pull requests          | Required before merging                                                                                             |
+| Enforced for admins    | Yes, with no bypass actors                                                                                          |
 | Force pushes, deletion | Refused                                                                                                             |
 
 The check names are the job `name:` values in `ci.yml`. If a job is renamed, the required check must be updated to match, or the renamed check will never report as required.
+
+Admin enforcement is what makes the rest hold: without it, a maintainer's direct push to `main` is stopped only by the `pre-push` hook, which `--no-verify` skips.
+
+Turn on "Automatically delete head branches" in the repository's general settings too; it is available on every plan. Deleting a merged branch is what makes GitHub retarget a pull request built on it to that branch's own base. With the branch left behind, the next pull request merges into it and never reaches `main`.
 
 ## Not covered yet
 

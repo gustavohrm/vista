@@ -2,6 +2,12 @@ name: Bug
 description: Vista does not behave the way it should.
 labels: ["type:bug", "status:needs-triage"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        A security vulnerability is not a bug report. Report it as SECURITY.md describes.
+
+        Everyone who can read this repository can read this issue. Remove secrets, tokens, and personal data from everything you write or paste below.
   - type: input
     id: commit
     attributes:

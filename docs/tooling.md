@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-11
+last_updated: 2026-11-12
 scope: The root `package.json` scripts, what `pnpm verify` runs, formatting and linting configuration, git hooks, and generated and ignored output.
 ---
 
@@ -14,13 +14,13 @@ There is no task runner. Vista is one application split across a few packages, a
 
 The versions are declared once and read by both local runs and CI:
 
-| Where                           | Declares                                              |
-| ------------------------------- | ----------------------------------------------------- |
-| `package.json` `engines`        | The Node and pnpm range every run must satisfy        |
-| `package.json` `packageManager` | The exact pnpm version pnpm installs itself           |
-| `.nvmrc`                        | The exact Node version                                |
-| `.npmrc` `engine-strict`        | Makes an install outside `engines` fail               |
-| `rust-toolchain.toml`           | The exact Rust version and its `clippy` and `rustfmt` |
+| Where                                | Declares                                              |
+| ------------------------------------ | ----------------------------------------------------- |
+| `package.json` `engines`             | The Node and pnpm range every run must satisfy        |
+| `package.json` `packageManager`      | The exact pnpm version pnpm installs itself           |
+| `.nvmrc`                             | The exact Node version                                |
+| `pnpm-workspace.yaml` `engineStrict` | Makes an install outside `engines` fail               |
+| `rust-toolchain.toml`                | The exact Rust version and its `clippy` and `rustfmt` |
 
 [CI](ci.md) covers how the workflow reads them.
 
