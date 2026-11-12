@@ -61,7 +61,7 @@ uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
 A tag is a mutable pointer. `@v5` resolves to whatever its owner last pointed it at, so a compromised or simply retagged release changes what runs here without any change landing in this repository. A SHA cannot move, which turns an action upgrade into a reviewable diff. The comment carries the human-readable version, because a bare SHA says nothing about how far behind it is.
 
-The rule is all or nothing on purpose. Pinning some actions and not others is worse than pinning none: a reader cannot tell a reference that was reviewed from one that was missed. Adding an action means resolving its SHA in the same change. The repository's Actions settings can enforce the rule, refusing any workflow that references another repository's action by anything but a full SHA; that setting is dashboard state, so it is turned on by hand.
+The rule is all or nothing on purpose. Pinning some actions and not others is worse than pinning none: a reader cannot tell a reference that was reviewed from one that was missed. Adding an action means resolving its SHA in the same change. The repository's Actions settings can enforce the rule, refusing any workflow that references another repository's action by anything but a full SHA; that setting is dashboard state, turned on by hand, and is on for this repository.
 
 `./.github/actions/setup` is deliberately not pinned. It is a path in this repository, already versioned by the commit under test.
 
@@ -87,12 +87,14 @@ Upgrades used to be manual: nothing updated the pins automatically, a cost the p
 
 ## Branch protection
 
-The workflow reports; it does not block on its own. What blocks is a branch protection rule or a ruleset on `main`, repository settings no file here can enforce. A ruleset does the same job with more control, and either works if nobody can bypass it. The recommended configuration:
+The workflow reports; it does not block on its own. What blocks is the `main` ruleset on the default branch, repository settings no file here can enforce. It replaced a classic branch protection rule in November 2026; a ruleset does the same job with more control, and either works if nobody can bypass it. The ruleset holds:
 
-| Setting                | Recommended value                                                                                                   |
+| Setting                | Value                                                                                                               |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | Required status checks | `Web` and `Rust`, from the GitHub Actions app, so no other integration can report a passing check under those names |
-| Pull requests          | Required before merging                                                                                             |
+| Up-to-date branches    | Required: a pull request merges only after its checks ran against the current `main`                                |
+| Pull requests          | Required before merging, with every review thread resolved; no approval is required, since one maintainer reviews   |
+| Merge method           | Merge commits only, so `main` keeps each pull request's commits as they were checked                                |
 | Enforced for admins    | Yes, with no bypass actors                                                                                          |
 | Force pushes, deletion | Refused                                                                                                             |
 
@@ -100,7 +102,19 @@ The check names are the job `name:` values in `ci.yml`. If a job is renamed, the
 
 Admin enforcement is what makes the rest hold: without it, a maintainer's direct push to `main` is stopped only by the `pre-push` hook, which `--no-verify` skips.
 
-Turn on "Automatically delete head branches" in the repository's general settings too; it is available on every plan. Deleting a merged branch is what makes GitHub retarget a pull request built on it to that branch's own base. With the branch left behind, the next pull request merges into it and never reaches `main`.
+Up-to-date branches are stricter than the template, which leaves them off. A merge queue would check the merge result without the extra update, but GitHub offers merge queues only on repositories owned by an organization, and this one belongs to a user. "Allow updating pull request branches" is on, so bringing a branch up to date is one button.
+
+"Automatically delete head branches" is on too. Deleting a merged branch is what makes GitHub retarget a pull request built on it to that branch's own base. With the branch left behind, the next pull request merges into it and never reaches `main`.
+
+## Security settings
+
+These are repository settings, not files, and are on for this repository:
+
+- **Dependabot alerts and security updates.** An alert opens for a vulnerable dependency, and Dependabot opens a pull request that fixes it when it can, outside the weekly schedule above.
+- **CodeQL default setup**, for the workflows, JavaScript and TypeScript, and Rust. It runs on pull requests and on `main`, and reports to code scanning; its check is not required.
+- **Secret scanning with push protection.** A push that contains a recognized secret is refused before it lands.
+- **Private vulnerability reporting**, which [`SECURITY.md`](../SECURITY.md) points reporters to.
+- **Actions restricted to SHA-pinned references**, as [Pinning third-party actions](#pinning-third-party-actions) describes, with the default workflow token read-only.
 
 ## Not covered yet
 
