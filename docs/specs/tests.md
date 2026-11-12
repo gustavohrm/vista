@@ -19,14 +19,14 @@ This document outlines the testing strategy, architecture, and standards for thi
 
 Tests in this repository use the following categories as needed, based on scope and isolation level.
 
-| Category    | Where                                  | Runs                                          | Covers                                                                    |
-| ----------- | -------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------- |
-| Unit        | Next to the code it tests              | With the default suite, `pnpm test`           | One module, its boundaries replaced by fakes.                             |
-| Integration | In the package or app it belongs to    | With the default suite, `pnpm test`           | Several modules together, or a real boundary such as storage or a server. |
-| E2E         | In the app host, apart from its code   | Apart from the default suite, `pnpm test:e2e` | Full user journeys, rendering, and visual regression in real browsers.    |
-| Rust        | In the module it tests, in `src-tauri` | With `pnpm verify`, through `verify:rust`     | The native host's Rust code.                                              |
+| Category    | Where                                  | Runs                                          | Covers                                                                                    |
+| ----------- | -------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Unit        | Next to the code it tests              | With the default suite, `pnpm test`           | One module, its boundaries replaced by fakes.                                             |
+| Integration | In the package or app it belongs to    | With the default suite, `pnpm test`           | Several modules together, or a real boundary such as storage or a server. None exist yet. |
+| E2E         | In the app host, apart from its code   | Apart from the default suite, `pnpm test:e2e` | Full user journeys, rendering, and visual regression in real browsers.                    |
+| Rust        | In the module it tests, in `src-tauri` | With `pnpm verify`, through `verify:rust`     | The native host's Rust code. None exist yet; the command runs no tests.                   |
 
-Add a category only when the project has tests for it: an empty suite, or a script that passes without running anything, misleads more than a missing one.
+A category without tests yet is marked so in the table: an empty suite, or a script that passes without running anything, misleads when it reads as coverage.
 
 ### 1. Unit Tests
 

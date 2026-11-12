@@ -157,7 +157,7 @@ A guide, a README, or any page meant to teach what the project ships to someone 
 - **Order by need, not by module.** Put first what a newcomer needs first, then what they reach for next. Source layout is the wrong order more often than not.
 - **Carry a running example.** One small, realistic scenario that grows across pages connects them and shows how features combine. Add something on each page instead of starting over.
 - **Common case first, edge cases after.** Start with the smallest example that works, then realistic use, then limits, failures, and workarounds. A reader who stops early has still learned something correct.
-- **Hand off at the end.** Each page ends by saying where to go next and why.
+- **Hand off at the end.** Each page ends by naming the page that comes next in the order and what it covers. That is a description, so it holds for a README too, which as a leaf never tells the reader when to read another page.
 
 ### Voice
 
