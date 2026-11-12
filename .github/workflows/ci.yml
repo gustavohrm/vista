@@ -122,9 +122,6 @@ jobs:
       - name: Lint Rust
         run: pnpm --filter=@vista/native lint:rust:check
 
-      - name: Test Rust
-        run: pnpm --filter=@vista/native test:rust
-
       # A check that writes a file has changed what it was checking, so the run
       # fails. `--untracked-files=all` lists a new file, not only the directory
       # that holds it.

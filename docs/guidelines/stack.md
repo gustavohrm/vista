@@ -82,6 +82,6 @@ oxlint validates the structure of the tags, but no rule detects a missing doc on
 ## Formatting, linting, and type checking
 
 - Code MUST pass `pnpm format:check`, `pnpm lint:check`, and `pnpm typecheck`; [Workspace](../workspace.md#root-scripts) lists them. During development, narrow `typecheck` to the changed packages, as [Tooling](../tooling.md#narrowing-a-run) shows.
-- Rust code MUST pass `pnpm --filter=@vista/native format:rust:check` and `pnpm --filter=@vista/native lint:rust:check`, and its tests MUST pass `pnpm --filter=@vista/native test:rust`.
+- Rust code MUST pass `pnpm --filter=@vista/native format:rust:check` and `pnpm --filter=@vista/native lint:rust:check`.
 - Formatting is owned by oxfmt for TypeScript, CSS, HTML, and JSON, by Prettier for Markdown, and by rustfmt for Rust.
 - For `oxlint-disable`, put the reason after `--` on the same directive. For `#[allow(...)]` and `@ts-expect-error`, put it on the line above.

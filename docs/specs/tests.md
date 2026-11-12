@@ -17,15 +17,13 @@ This document defines how the project is tested: what kinds of tests exist, wher
 
 ## Categories
 
-| Category    | Where                                  | Runs                                          | Covers                                                                                    |
-| ----------- | -------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Unit        | Next to the code it tests              | With the default suite, `pnpm test`           | One module, its boundaries replaced by fakes.                                             |
-| Integration | In the package or app it belongs to    | With the default suite, `pnpm test`           | Several modules together, or a real boundary such as storage or a server. None exist yet. |
-| Browser     | In the web host, apart from its code   | Apart from the default suite, `pnpm test:e2e` | Full user journeys and rendering in real browsers. No visual regression tests yet.        |
-| Git hooks   | Beside the scripts, in `scripts/`      | With the default suite, `pnpm test`           | Real commits and pushes through the hooks, in temporary repositories.                     |
-| Rust        | In the module it tests, in `src-tauri` | With `pnpm verify`, through `verify:rust`     | The native host's Rust code. None exist yet; the command runs no tests.                   |
+| Category  | Where                                | Runs                                          | Covers                                                                             |
+| --------- | ------------------------------------ | --------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Unit      | Next to the code it tests            | With the default suite, `pnpm test`           | One module, its boundaries replaced by fakes.                                      |
+| Browser   | In the web host, apart from its code | Apart from the default suite, `pnpm test:e2e` | Full user journeys and rendering in real browsers. No visual regression tests yet. |
+| Git hooks | Beside the scripts, in `scripts/`    | With the default suite, `pnpm test`           | Real commits and pushes through the hooks, in temporary repositories.              |
 
-The default suite is what the gate's test step runs. A category without tests yet is marked so in the table: an empty suite, or a script that passes without running anything, misleads when it reads as coverage.
+The default suite is what the gate's test step runs. Add a category only when the project has tests for it: an empty suite, or a script that passes without running anything, misleads more than a missing one. Vista has no integration tests and no Rust tests yet; the first of either adds its row here, its section below, and its runner to [stack tests](stack-tests.md).
 
 Manual usage scenarios, such as running the dev server during development, are outside these categories.
 
@@ -34,11 +32,6 @@ Manual usage scenarios, such as running the dev server during development, are o
 - A test file is named after the file it covers, as [stack tests](stack-tests.md#runners-and-file-names) gives.
 - What to mock, and what to test against real temporary state instead, is owned by the [coding guidelines](../guidelines/code.md#testing).
 - Do not import test utilities across distant packages, except from a package or subpath that exists to share them.
-
-### Integration tests
-
-- Integration tests live inside the package or app they belong to, in a `tests/integration/` directory such as `packages/app/tests/integration/` once the first one is added. Do not add a repository-root `tests/` directory by default.
-- When a journey or orchestration genuinely spans packages, a dedicated workspace package for those tests is allowed, rather than placing them in one of the packages they cross.
 
 ### Browser tests
 
@@ -51,10 +44,6 @@ The web host's smoke test builds the frontend and serves it with local Wrangler.
 ### Git hook tests
 
 The hook tests in `scripts/git-hooks.test.mjs` use Node's built-in test runner rather than Vitest, a scoped exception that keeps repository tooling free of dependencies. They use temporary repositories and local bare remotes, and substitute only the expensive pnpm checks, so they verify real commit and push acceptance, rejection, and failure propagation without touching the working repository or GitHub.
-
-### Rust tests
-
-Rust tests cover the native host in `apps/native/src-tauri`, in a `#[cfg(test)] mod tests` inside the module under test. None exist yet: `src/lib.rs` registers the dialog, filesystem, and persisted-scope plugins and defines no commands of its own. Folder access and restore logic lives in the TypeScript adapter `apps/native/src/workspace-adapter.ts`.
 
 ## Coverage
 

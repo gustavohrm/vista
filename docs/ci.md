@@ -23,7 +23,7 @@ CI reads those same files rather than repeating a version: `pnpm/action-setup` t
 | Job    | Runner           | Runs                                                                                                                                                        |
 | ------ | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Web`  | `ubuntu-latest`  | `pnpm format:check`, `pnpm lint:check`, `pnpm typecheck`, `pnpm test`, `pnpm build:web`, `pnpm build:native`, `pnpm test:e2e`, then `Working tree is clean` |
-| `Rust` | `windows-latest` | `pnpm --filter=@vista/native` `format:rust:check`, `lint:rust:check`, `test:rust`, then `Working tree is clean`                                             |
+| `Rust` | `windows-latest` | `pnpm --filter=@vista/native` `format:rust:check`, `lint:rust:check`, then `Working tree is clean`                                                          |
 
 Both jobs run on every pull request, every merge-queue check, and every push to `main`, in parallel. There is no change-based selection: the repository is one application, and a check that skips half of it on a pull request is a check that lets the other half reach `main` unverified.
 

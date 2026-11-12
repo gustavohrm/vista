@@ -10,13 +10,11 @@ The [testing specification](tests.md) defines the categories, where they live, a
 
 ## Runners and file names
 
-| Category    | Runner                                            | File                                                    | Runs with                               |
-| ----------- | ------------------------------------------------- | ------------------------------------------------------- | --------------------------------------- |
-| Unit        | [Vitest](https://vitest.dev/)                     | `src/<file>.test.ts` or `.tsx`, next to `src/<file>.ts` | `pnpm test`                             |
-| Integration | Vitest                                            | `<package>/tests/integration/`                          | `pnpm test`                             |
-| Browser     | [Playwright](https://playwright.dev/)             | `apps/web/tests/e2e/<journey>.spec.ts`                  | `pnpm test:e2e`                         |
-| Git hooks   | [`node --test`](https://nodejs.org/api/test.html) | `scripts/git-hooks.test.mjs`                            | `pnpm test`, or `pnpm test:hooks` alone |
-| Rust        | `cargo test`                                      | A `#[cfg(test)] mod tests` in the module                | `pnpm verify`, through `verify:rust`    |
+| Category  | Runner                                            | File                                                    | Runs with                               |
+| --------- | ------------------------------------------------- | ------------------------------------------------------- | --------------------------------------- |
+| Unit      | [Vitest](https://vitest.dev/)                     | `src/<file>.test.ts` or `.tsx`, next to `src/<file>.ts` | `pnpm test`                             |
+| Browser   | [Playwright](https://playwright.dev/)             | `apps/web/tests/e2e/<journey>.spec.ts`                  | `pnpm test:e2e`                         |
+| Git hooks | [`node --test`](https://nodejs.org/api/test.html) | `scripts/git-hooks.test.mjs`                            | `pnpm test`, or `pnpm test:hooks` alone |
 
 Shared React tests use React Testing Library, jest-dom matchers, and an explicit jsdom environment, with user-event for user interactions. Test setup cleans up mounted components after each test.
 
@@ -28,7 +26,7 @@ Shared React tests use React Testing Library, jest-dom matchers, and an explicit
   - `test`: runs unit and integration tests once, and nothing that needs a browser.
   - `test:watch`: runs those tests in watch mode.
   - `test:coverage`: runs those tests and writes a coverage report.
-- A host with only browser tests exposes `test:e2e`; the native host's Rust tests are `test:rust`. Do not add empty suites or commands that silently pass without tests just to fill out scripts.
+- A host with only browser tests exposes `test:e2e`. Do not add empty suites or commands that silently pass without tests just to fill out scripts. The native host's first Rust test adds `test:rust`, `cargo test --locked --manifest-path src-tauri/Cargo.toml`, and runs it from `verify:rust` and the CI `Rust` job.
 
 ## Browser suites
 
@@ -66,7 +64,6 @@ Narrow a run while working on one area. `--filter` selects the package, and a pa
 pnpm --filter=@vista/app test
 pnpm --filter=@vista/app test src/domain/path-validation.test.ts
 pnpm --filter=@vista/app test:watch
-pnpm --filter=@vista/native test:rust
 ```
 
-No root script runs `test:rust` alone, but `pnpm verify` runs it through `verify:rust`, after the Rust formatting and lint checks. [Tooling](../tooling.md#narrowing-a-run) describes the other ways to narrow a run.
+[Tooling](../tooling.md#narrowing-a-run) describes the other ways to narrow a run.

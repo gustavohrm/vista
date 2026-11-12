@@ -42,7 +42,7 @@ nvm for Windows does not read `.nvmrc`, and `nvm install` and `nvm use` without 
 
 `lint:check` and `lint:fix` accept a root-relative path, such as `pnpm lint:fix packages/app/src`, to narrow oxlint to it.
 
-The Rust scripts live in `apps/native/package.json`: `format:rust:check`, `format:rust:fix`, `lint:rust:check`, and `test:rust`. `verify:rust` and `format:fix` reach them with `pnpm --filter=@vista/native`. Each passes `--manifest-path src-tauri/Cargo.toml`, so nothing needs to run from inside `apps/native/src-tauri`. They also pass `--locked` where cargo resolves dependencies, the Rust counterpart to `pnpm install --frozen-lockfile`: a `Cargo.lock` that disagrees with `Cargo.toml` fails rather than being rewritten.
+The Rust scripts live in `apps/native/package.json`: `format:rust:check`, `format:rust:fix`, and `lint:rust:check`. `verify:rust` and `format:fix` reach them with `pnpm --filter=@vista/native`. Each passes `--manifest-path src-tauri/Cargo.toml`, so nothing needs to run from inside `apps/native/src-tauri`. They also pass `--locked` where cargo resolves dependencies, the Rust counterpart to `pnpm install --frozen-lockfile`: a `Cargo.lock` that disagrees with `Cargo.toml` fails rather than being rewritten.
 
 ## Verification
 
@@ -61,7 +61,6 @@ The Rust scripts live in `apps/native/package.json`: `format:rust:check`, `forma
 
 1. `format:rust:check`: rustfmt, without writing.
 2. `lint:rust:check`: clippy over every target, with warnings denied.
-3. `test:rust`: `cargo test`.
 
 The order is by cost. Within the web half, the checks that report in seconds run first, and each bundle runs after the tests that would catch the same mistake sooner. The workspace packages are consumed as source, not built output, so type checking and tests need no build first. The web half runs before the Rust half because it reports in seconds, while the Rust half may compile for minutes.
 

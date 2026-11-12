@@ -21,7 +21,6 @@ Native checks are separate from the frontend checks:
 ```sh
 pnpm --filter=@vista/native format:rust:check
 pnpm --filter=@vista/native lint:rust:check
-pnpm --filter=@vista/native test:rust
 ```
 
 ## Mobile preparation
