@@ -5,24 +5,21 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
 
 # Dependencies
 node_modules
 
-# Build output
+# Build output and caches
 dist
 target
 **/src-tauri/gen
 coverage
-**/coverage
 test-results
-**/test-results
 playwright-report
 .wrangler
 *.tsbuildinfo
 
-# Local configuration and credentials
+# Local configuration and credentials; an example file is committed instead.
 .env
 .env.*
 !.env.example
@@ -31,7 +28,10 @@ playwright-report
 .dev.vars.*
 !.dev.vars.example
 
-# AI agents
+# AI agents: every agent directory is ignored, including the settings and skills a tool treats as
+# shared. Contributors use different harnesses, skills, and settings, so committing one person's setup
+# would impose it on everyone else. AGENTS.md holds the shared instructions; a harness that does not read it
+# by default, such as Gemini CLI, is pointed at it in each contributor's own settings.
 .agents
 .antigravity
 .claude
@@ -39,4 +39,6 @@ playwright-report
 .cursor
 .gemini
 .opencode
+
+# Short-lived plans (docs/guidelines/documentation.md, "What belongs here").
 docs/plans

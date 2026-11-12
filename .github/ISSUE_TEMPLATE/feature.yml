@@ -19,3 +19,8 @@ body:
     attributes:
       label: Alternatives
       description: What you tried or considered instead.
+  - type: textarea
+    id: contracts
+    attributes:
+      label: Contracts touched
+      description: Which persisted formats, settings, defaults, limits, host adapter capabilities, or Tauri commands the proposal adds or changes, if any, and why each is needed.

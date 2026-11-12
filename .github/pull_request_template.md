@@ -7,5 +7,11 @@ Fixes #
 ## Checks
 
 - [ ] `pnpm verify` passes, or the skipped steps are listed here
-- [ ] Rust checks pass if `apps/native/src-tauri` changed: `pnpm --filter=@vista/native format:rust:check`, `pnpm --filter=@vista/native lint:rust:check`, `pnpm --filter=@vista/native test:rust`
+- [ ] `pnpm test:e2e` passes if the web app's behavior changed; `pnpm verify` does not run it
 - [ ] Documentation affected by behavior, architecture, or convention changes is updated in this pull request
+
+## Security
+
+- [ ] No secret, token, or personal data, such as note content, can reach a log, an error, or a snapshot
+- [ ] New untrusted input, such as a file or setting read from the workspace folder, is validated where it enters, with a bounded size
+- [ ] A new dependency, Tauri capability or permission, or externally reachable surface is named in the description

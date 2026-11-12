@@ -2,14 +2,23 @@ name: CI
 
 on:
   pull_request:
+  # A merge queue's check of the merge result before it lands. It never fires in a
+  # repository without a queue.
+  merge_group:
+  # The full check after a merge. A project that requires a merge queue removes this
+  # trigger: the queue lands the exact commit it checked, so a push run would only
+  # repeat a passed check.
   push:
     branches: [main]
   workflow_dispatch:
 
-# A pull request that is pushed to again abandons the run it just superseded;
-# `main` keeps every run, because each merge is the authoritative check of a commit.
+# A pull request that is pushed to again abandons the run it just superseded; a
+# merge-queue run, a push to `main` or a manual run keeps every run, because each is
+# the authoritative check of a commit. Those runs are grouped by commit, not by
+# branch: a group holds one pending run, and GitHub cancels it when another joins,
+# whatever `cancel-in-progress` says.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -52,6 +61,19 @@ jobs:
 
       - name: End-to-end tests
         run: pnpm test:e2e
+
+      # A check that writes a file has changed what it was checking, so the run
+      # fails. `--untracked-files=all` lists a new file, not only the directory
+      # that holds it.
+      - name: Working tree is clean
+        run: |
+          changes="$(git status --porcelain --untracked-files=all)"
+          if [ -n "$changes" ]; then
+            echo "$changes"
+            echo "::error::A check left the working tree changed."
+            exit 1
+          fi
+        shell: bash
 
       - name: Upload browser test results
         if: failure()
@@ -102,3 +124,16 @@ jobs:
 
       - name: Test Rust
         run: pnpm --filter=@vista/native test:rust
+
+      # A check that writes a file has changed what it was checking, so the run
+      # fails. `--untracked-files=all` lists a new file, not only the directory
+      # that holds it.
+      - name: Working tree is clean
+        run: |
+          changes="$(git status --porcelain --untracked-files=all)"
+          if [ -n "$changes" ]; then
+            echo "$changes"
+            echo "::error::A check left the working tree changed."
+            exit 1
+          fi
+        shell: bash

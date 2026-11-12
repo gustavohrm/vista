@@ -1,12 +1,14 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-10-15
+last_updated: 2026-11-12
 scope: Index of the project documentation.
 ---
 
 # Documentation
 
 `docs/` holds durable project knowledge. [Contributing](../CONTRIBUTING.md) contains the contributor workflow; [agent instructions](../AGENTS.md) contain agent behavior guidance. [Documentation guidelines](guidelines/documentation.md) define how these documents are written, what their status means, and how they change.
+
+Every document in `docs/` is listed here. Adding, moving, or deleting one updates this index in the same change.
 
 ## Overview
 
@@ -20,14 +22,14 @@ scope: Index of the project documentation.
 | Document              | Contains                                                                                                |
 | --------------------- | ------------------------------------------------------------------------------------------------------- |
 | [Tooling](tooling.md) | Root scripts, what `pnpm verify` runs and why, formatters and linters, git hooks, and generated output. |
-| [CI](ci.md)           | Pinned toolchain, the `Web` and `Rust` jobs, action pinning, and labels.                                |
+| [CI](ci.md)           | Pinned toolchain, the `Web` and `Rust` jobs, action pinning, dependency updates, and branch protection. |
 
 ## Guidelines
 
-| Document                                     | Contains                                                                                            |
-| -------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| [Code](guidelines/code.md)                   | Naming, structure, TypeScript, async and error handling, testing, and tooling.                      |
-| [Documentation](guidelines/documentation.md) | Required header, status and authority, recording decisions, exceptions, document roles, and layout. |
+| Document                                     | Contains                                                                                                     |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| [Code](guidelines/code.md)                   | Naming, structure, fixing dependencies upstream, TypeScript, errors, inputs and state, testing, and tooling. |
+| [Documentation](guidelines/documentation.md) | Required header, status and authority, recording decisions, exceptions, document roles, layout, and writing. |
 
 ## Specifications
 

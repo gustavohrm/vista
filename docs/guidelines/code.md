@@ -1,7 +1,7 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-10-15
-scope: Code conventions for naming, structure, TypeScript, React and UI, Rust, testing, and documentation in this repository.
+last_updated: 2026-11-12
+scope: Code conventions for naming, structure, TypeScript, inputs and state, React and UI, Rust, testing, and documentation in this repository.
 ---
 
 # Coding guidelines
@@ -25,11 +25,15 @@ Use names that describe domain intent. Avoid names based only on type or impleme
 - Single Responsibility: each function/class does ONE thing well
 - High Cohesion: logic that belongs together stays together
 - Loose Coupling: minimize dependencies between modules
-- Prefer dependency injection over hard-coding
+- Prefer dependency injection over hard-coding. Whatever makes code hard to test or tied to one environment, such as the clock, randomness, the network, and storage, arrives as a dependency.
 - Prefer using folders to group related files, with an `index.ts` entrypoint
 - Keep public API surface small and intentional
 - Do not add compatibility layers unless there is a real consumer, persisted data, shipped behavior, or explicit requirement
 - Do not add dependencies unless simple in-house code is worse
+
+### Fix it upstream
+
+When a dependency lacks something or gets it wrong, the fix goes upstream where the project can report it, and the project takes it from a release. A local workaround is temporary and names the issue it waits on, as [a defect found mid-task](../../CONTRIBUTING.md#a-defect-found-mid-task) describes. That holds for a third-party dependency as much as for one Vista's maintainers also maintain, such as the `@codenhub/*` packages; only the latter is fixed upstream by the project itself.
 
 ## Coding good/bad practices
 
@@ -37,7 +41,7 @@ Use names that describe domain intent. Avoid names based only on type or impleme
 - Prefer `const` over `let`; never use `var`
 - Avoid magic numbers and strings; extract to named constants when the value has domain meaning or is reused
 - Code should be self-explanatory; use descriptive names
-- Design for predictable, deterministic behavior
+- Design for predictable, deterministic behavior. Time and randomness come from an injected source, so a test controls them.
 - Avoid God Objects, Feature Envy, and excessive method chaining
 - ALWAYS prefer readable code over clever code
 
@@ -79,6 +83,17 @@ How failures are classified and shown to people is specified in [Errors](../spec
 - Do not log secrets, tokens, credentials, or private user data.
 - `console` is allowed for examples, CLIs, debugging utilities, and deliberate diagnostics. Do not use casual logging as a substitute for error handling.
 
+## Inputs, failures, and state
+
+Most review findings that hold up are about these, not about style: a [study of the review threads in codenhub/codenhub](https://github.com/codenhub/codenhub/blob/37b44e7adc31f628c94fb9ff8bd257c869f64996/packages/skills/docs/internal/coding-skill-research.md), a monorepo whose code agents wrote, records the evidence.
+
+- Validate input from outside the code's control after it is converted, against the limits of what consumes it: `--timeout 1e308` passes "positive number" and becomes an infinite timer. A number parsed from such input rejects empty, whitespace-only, NaN, Infinity, and partial values such as `10s`. In Vista, a file or folder name the user types and the contents of a file read from their folder are such input too, each checked against what consumes it: a name against what the file system accepts, contents against the format the parser reads.
+- When required input is missing or matches nothing, fail with a message naming it. A run whose required input was absent never reports success.
+- Mark state as written, such as a note's saved status, only after the write succeeds, and never swallow a write error. Unsaved edits live in memory before any write; it is the claim that they reached disk that waits for it. A note shown as saved whose write to disk failed is lost on the next restart.
+- Apply a new option or fix to every path the same input or behavior flows through: each source of the value, sync and async variants, create and update, every caller, and each host adapter. Name any path left out, with the reason.
+- A hand-written parser rejects syntax it does not support, naming the file and line, instead of reading it as data.
+- Keep input order and any order a contract defines; sort output whose order is unspecified by a defined key with a tie-breaker.
+
 ## React and UI
 
 - Shared UI in `packages/app` MUST NOT import Tauri, File System Access, or other host APIs. It consumes capabilities through the contracts in `packages/app/src/ports.ts`, and each host implements them. [Architecture](../architecture.md#platform-adapters) describes the adapter model.
@@ -103,6 +118,9 @@ Formatting and linting are owned by `rustfmt` and `clippy`, as [Formatting, lint
 - One behavior per test. Name each test after the behavior it asserts, as a sentence, such as `it("shows an error toast when saving a file fails")`.
 - Test files are colocated with the code they test: `*.test.ts` or `*.test.tsx` beside the source. Rust unit tests live in a `#[cfg(test)] mod tests` block in the module they cover.
 - Mock only real boundaries: network, storage, filesystem, timers, and browser or host APIs. Pure logic is tested directly, as `packages/app/src/domain/path-validation.test.ts` does.
+- Give each behavior decision a test that fails when the decision is reversed, and see a new test fail before keeping it.
+- A test that writes files uses its own directory under the system temporary directory, never the package or the current directory, and removes it afterwards.
+- Poll for a condition instead of sleeping a fixed time.
 - Prefer observable behavior over implementation details.
 - Update affected tests when changing behavior.
 

@@ -3,15 +3,7 @@
   "bracketSpacing": true,
   "htmlWhitespaceSensitivity": "ignore",
   "ignorePatterns": [
-    "dist/**",
-    "target/**",
-    "**/target/**",
-    "**/src-tauri/gen/**",
-    "**/.wrangler/**",
-    "coverage/**",
-    "**/coverage/**",
-    "test-results/**",
-    "**/test-results/**",
+    // Committed paths to leave unformatted. oxfmt already skips what .gitignore and .prettierignore list.
     "**/*.md"
   ],
   "printWidth": 120,

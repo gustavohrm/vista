@@ -7,6 +7,7 @@
 **/dist/
 **/coverage/
 **/test-results/
+**/playwright-report/
 **/target/
 **/src-tauri/gen/
 **/.wrangler/

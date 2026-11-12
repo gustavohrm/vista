@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-10-15
+last_updated: 2026-11-12
 scope: Test categories, locations, tooling, and coverage targets.
 ---
 
@@ -12,12 +12,21 @@ This document outlines the testing strategy, architecture, and standards for thi
 
 - **Test Behavior, Not Implementation**: Write tests that verify the observable behavior of your API or component, rather than its internal implementation details.
 - **No Permanent Absence Checks**: A test asserting only that a removed name is gone verifies nothing about current behavior. It earns its place only while a rename or removal is in flight; delete it once the change is verified, in the same pull request. If the rule it guards is durable, enforce it as a repository check rather than as a permanent unit test.
-- **Fast and Deterministic**: Tests must run quickly and yield consistent, predictable results. Flaky tests are unacceptable.
+- **Fast and Deterministic**: Tests must run quickly and yield consistent, predictable results. A flaky test is a bug. Time, randomness, and the network come from sources a test controls; a test that depends on real timing, the network, or a real window does not belong in the default suite.
 - **Fail Fast**: Test inputs and edge cases early. Ensure error paths are tested alongside happy paths.
 
 ## Test Categorization
 
 Tests in this repository use the following categories as needed, based on scope and isolation level.
+
+| Category    | Where                                  | Runs                                          | Covers                                                                                    |
+| ----------- | -------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Unit        | Next to the code it tests              | With the default suite, `pnpm test`           | One module, its boundaries replaced by fakes.                                             |
+| Integration | In the package or app it belongs to    | With the default suite, `pnpm test`           | Several modules together, or a real boundary such as storage or a server. None exist yet. |
+| E2E         | In the app host, apart from its code   | Apart from the default suite, `pnpm test:e2e` | Full user journeys, rendering, and visual regression in real browsers.                    |
+| Rust        | In the module it tests, in `src-tauri` | With `pnpm verify`, through `verify:rust`     | The native host's Rust code. None exist yet; the command runs no tests.                   |
+
+A category without tests yet is marked so in the table: an empty suite, or a script that passes without running anything, misleads when it reads as coverage.
 
 ### 1. Unit Tests
 
@@ -28,7 +37,7 @@ Unit tests verify the correctness of small, isolated blocks of code (such as ind
 - **Tooling**: [Vitest](https://vitest.dev/).
 - **Conventions**:
   - Mock external dependencies (network APIs, local storage, databases, file system, timers, and browser-specific globals).
-  - Do not cross-import test utilities across distant packages unless exposed via explicit shared test packages.
+  - Do not import test utilities across distant packages, except from a package or subpath that exists to share them.
   - Run on every pull request through GitHub Actions.
   - Shared React tests use React Testing Library, jest-dom matchers, and an explicit jsdom environment. Use user-event for user interactions when features introduce them. Test setup cleans up mounted components after each test.
 
@@ -40,7 +49,7 @@ Integration tests verify that multiple modules or packages interact correctly, i
 - **Tooling**: [Vitest](https://vitest.dev/).
 - **Conventions**:
   - Do not use a repository-root global `tests/` directory by default. Keep tests colocated within the package/app scope.
-  - Do not create a hard rule banning global repository-level integration directories if complex, multi-package orchestration tests become necessary in the future.
+  - When a journey or orchestration genuinely spans packages, a dedicated workspace package for those tests is allowed, rather than placing them in one of the packages they cross.
 
 ### 3. End-to-End (E2E) & Visual Tests
 
@@ -51,6 +60,7 @@ E2E tests verify full user journeys, page transitions, rendering, and visual reg
 - **Conventions**:
   - Add visual regression tests when a component has an agreed visual design. The current shell uses a browser startup smoke test, including a computed-style check, rather than maintaining snapshots of placeholder UI.
   - Since E2E tests are slower and require browser environments, configure them separately to avoid blocking fast unit test loops.
+  - A suite SHOULD cover every engine its users run, because catching what one engine does differently is what the suite is for. The suite runs Chromium only today, as [Not Covered Yet](#not-covered-yet) records.
 
 ### 4. Rust Tests
 
@@ -61,8 +71,6 @@ Rust tests cover the native host in `apps/native/src-tauri`.
 - **Scope**: `src/lib.rs` registers the dialog, filesystem, and persisted-scope plugins and defines no commands of its own. Folder access and restore logic lives in the TypeScript adapter `apps/native/src/workspace-adapter.ts`, which has no automated test.
 
 The web host's Playwright smoke test builds the frontend and serves it with local Wrangler. It verifies shared-app startup, styles, direct navigation, reload, and JavaScript errors through the deployment runtime. Chromium covers the initial desktop Chrome/Edge web target. The test starts its own server and fails on a port collision rather than silently using another app.
-
-CI in `.github/workflows/ci.yml` has two jobs. The `Web` job runs on `ubuntu-latest` and executes format, lint, typecheck, `pnpm test` (which includes the Git-hook tests), `pnpm build:web`, `pnpm build:native`, and then `pnpm test:e2e` with Chromium. The browser suite runs after the build and does not rebuild the frontend. The `Rust` job runs on `windows-latest` and executes Rust formatting, Rust linting, and `test:rust`, covered in [Rust Tests](#4-rust-tests).
 
 Native executable builds are not run in CI. Build the native app manually when changing Tauri configuration or implementing native adapters.
 
@@ -86,7 +94,7 @@ These standard scripts apply to packages with Vitest suites. A host with only br
 ## Code Coverage
 
 - **Suggested Target**: **80%** code coverage.
-- **Non-Blocking Target**: Code coverage is a target to guide development and review discussions. It must not block the CI/CD pipeline or fail builds due to minor discrepancies, preventing false-positive failures and unnecessary development overhead.
+- **Non-Blocking Target**: Code coverage is a target to guide development and review discussions. It must not block the CI/CD pipeline or fail builds, because a coverage threshold that blocks merges gets satisfied with tests that execute lines without asserting anything.
 
 ## Execution Commands
 
@@ -126,7 +134,7 @@ Rust tests run with:
 pnpm --filter=@vista/native test:rust
 ```
 
-The root scripts do not include `test:rust`; it is only reachable through the native package filter.
+No root script runs `test:rust` alone, but `pnpm verify` runs it through `verify:rust`, after the Rust formatting and lint checks.
 
 ## Not Covered Yet
 
