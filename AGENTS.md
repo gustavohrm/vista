@@ -19,6 +19,12 @@ This repository is docs-first. [`docs/README.md`](docs/README.md) indexes every 
 - Ground each finding in a realistic case: the input or action, what goes wrong, and for whom. A concern you cannot ground is a question; state it as one.
 - A fix that adds or changes a contract, such as a workspace export, a host adapter capability, a Tauri command or capability, a persisted setting or on-disk format, a default, a limit, or a dependency, is a decision, not a fix. Present it as the problem, the options, your recommendation, and why, and wait for approval before making it.
 
+## Project specifics
+
+- **Shared UI stays host-free.** `packages/app` never imports Tauri, the File System Access API, or another host API; it reaches them through the contracts in `packages/app/src/ports.ts`, as [the stack guidelines](docs/guidelines/stack.md#react-and-ui) describe.
+- **No browser dialogs.** Never use `alert`, `confirm`, or `prompt`; messages and confirmations go through `useToast()`, as [the stack guidelines](docs/guidelines/stack.md#react-and-ui) describe.
+- **Icon classes are literal.** An `ic-*` class appears as a literal string in `className`, because the `@codenhub/icons` build-time rewrite matches only literals, as [the stack guidelines](docs/guidelines/stack.md#react-and-ui) describe; a class computed at runtime is never rewritten.
+
 ## Knowledge
 
 - Do not keep agent memory files. Knowledge worth keeping belongs in the repository, where it is versioned, reviewed, and available in every checkout: a recorded decision in documentation, a test, or a trap in a scoped `AGENTS.md`.
