@@ -2,8 +2,9 @@ import { addCursorAbove, addCursorBelow, selectLine } from "@codemirror/commands
 import { selectNextOccurrence, selectSelectionMatches } from "@codemirror/search";
 import type { EditorView } from "@codemirror/view";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 
-import { useCommandShortcuts, type Command } from "./commands";
+import { runCommand, useCommandShortcuts, type Command } from "./commands";
 import { findCodeMirrorView, runEditingAction, type EditingAction } from "./commands/editing";
 import { EditorPane, type FindRequest } from "./components/editor/editor-pane";
 import type { FindMode } from "./components/editor/find-bar";
@@ -11,13 +12,19 @@ import type { CursorInfo, EditorPosition, RawEditorStateCache } from "./componen
 import { ToastProvider, useToast } from "./components/feedback/toast";
 import { UnsavedChangesDialog, type UnsavedChangesChoice } from "./components/feedback/unsaved-changes-dialog";
 import { AboutDialog, KeyboardShortcutsDialog } from "./components/help/help-dialog";
-import { ActivityBar } from "./components/layout/activity-bar";
 import { Sidebar, type NewEntryRequest } from "./components/layout/sidebar";
+import { StartScreen, type StartAction } from "./components/layout/start-screen";
 import { StatusBar } from "./components/layout/status-bar";
 import { TabStrip } from "./components/layout/tab-strip";
+import { TitleBar } from "./components/layout/title-bar";
 import { MENU_SEPARATOR } from "./components/menu/menu";
-import { commandMenuEntries, MenuBar, type MenuBarMenu } from "./components/menu/menu-bar";
-import { GoToDialog, type GoToRequest } from "./components/navigation/go-to-dialog";
+import { commandMenuEntries, type MenuBarMenu } from "./components/menu/menu-bar";
+import {
+  COMMAND_QUERY_PREFIX,
+  GoToDialog,
+  type GoToRequest,
+  type PaletteCommand,
+} from "./components/navigation/go-to-dialog";
 import { imageMimeType, resolveImageSource } from "./domain/image-source";
 import { joinWorkspacePath } from "./domain/path-validation";
 import { getViewer } from "./domain/viewers";
@@ -93,6 +100,8 @@ const MENUS: readonly MenuBarMenu[] = [
   {
     label: "View",
     items: [
+      "palette.commands",
+      MENU_SEPARATOR,
       "view.explorer",
       "view.rawText",
       MENU_SEPARATOR,
@@ -107,6 +116,9 @@ const MENUS: readonly MenuBarMenu[] = [
   { label: "Go", items: ["goto.file", "goto.line", MENU_SEPARATOR, "tabs.next", "tabs.previous"] },
   { label: "Help", items: ["help.shortcuts", MENU_SEPARATOR, "help.about"] },
 ];
+
+const GO_TO_FILE_SHORTCUT = "Mod+P";
+const COMMANDS_SHORTCUT = "Mod+Shift+P";
 
 const EDITOR_MENU = ["edit.cut", "edit.copy", "edit.paste", "selection.all", MENU_SEPARATOR, "find.find"];
 const RAW_EDITOR_MENU = [...EDITOR_MENU, "find.replace", "goto.line"];
@@ -340,6 +352,8 @@ function AppShell({ adapter }: AppProps) {
       }
       setIsLoading(true);
       await adoptWorkspace(opened, approvedEdits);
+      // Shows the files of the folder the user just picked, also where the explorer is a drawer.
+      setIsSidebarOpen(true);
     } catch (err) {
       console.error("Failed to open folder:", err);
       const message = err instanceof Error ? err.message : "Failed to open the selected folder.";
@@ -385,14 +399,10 @@ function AppShell({ adapter }: AppProps) {
     try {
       const result = await adapter.workspace.restoreFolder({ interactive: false });
       await applyRestoreResult(result);
-      if (result.status !== "restored") {
-        setIsSidebarOpen(true);
-      }
     } catch (err) {
       console.error("Failed to restore the last folder:", err);
       const message = err instanceof Error ? err.message : "Failed to restore the last folder.";
       toast.show({ kind: "error", text: message });
-      setIsSidebarOpen(true);
     } finally {
       setIsLoading(false);
     }
@@ -413,6 +423,9 @@ function AppShell({ adapter }: AppProps) {
     try {
       const result = await adapter.workspace.restoreFolder({ interactive: true });
       await applyRestoreResult(result, approvedEdits);
+      if (result.status === "restored") {
+        setIsSidebarOpen(true);
+      }
     } catch (err) {
       console.error("Failed to reopen the folder:", err);
       const message = err instanceof Error ? err.message : "Failed to reopen the folder.";
@@ -799,6 +812,13 @@ function AppShell({ adapter }: AppProps) {
         run: () => runSelection(addCursorBelow),
       },
       {
+        id: "palette.commands",
+        label: "Show All Commands",
+        shortcut: COMMANDS_SHORTCUT,
+        isEnabled: !isPromptingForUnsavedChanges,
+        run: () => setGoToQuery(COMMAND_QUERY_PREFIX),
+      },
+      {
         id: "view.explorer",
         label: "Explorer",
         isChecked: isSidebarOpen,
@@ -844,7 +864,7 @@ function AppShell({ adapter }: AppProps) {
       {
         id: "goto.file",
         label: "Go to File",
-        shortcut: "Mod+P",
+        shortcut: GO_TO_FILE_SHORTCUT,
         isEnabled: !isPromptingForUnsavedChanges && workspace !== null,
         run: () => setGoToQuery(""),
       },
@@ -901,6 +921,55 @@ function AppShell({ adapter }: AppProps) {
     [commands, isRawShown],
   );
   useCommandShortcuts(commands);
+  // Every menu command, named with its menu, except the one that opens this list.
+  const paletteCommands = useMemo<PaletteCommand[]>(
+    () =>
+      MENUS.flatMap((menu) =>
+        menu.items.flatMap((id) => {
+          const command = id === "palette.commands" ? undefined : commands.find((candidate) => candidate.id === id);
+          return command ? [{ command, title: `${menu.label}: ${command.label}` }] : [];
+        }),
+      ),
+    [commands],
+  );
+  const handleRunPaletteCommand = useCallback((command: Command) => {
+    // Closing the picker first returns focus to where it was, so editing commands act there.
+    flushSync(() => setGoToQuery(null));
+    void runCommand(command);
+  }, []);
+  // Without a folder there are no files to find, so the search field lists commands instead.
+  const openSearch = useCallback(() => setGoToQuery(workspace ? "" : COMMAND_QUERY_PREFIX), [workspace]);
+  const dirtyPaths = useMemo(
+    () => new Set(documentsState.documents.filter((doc) => doc.isDirty).map((doc) => doc.path)),
+    [documentsState.documents],
+  );
+  const startActions = useMemo<StartAction[]>(
+    () => [
+      {
+        label: "Search files",
+        icon: <i className="ic-search" aria-hidden="true" />,
+        shortcut: GO_TO_FILE_SHORTCUT,
+        onSelect: () => setGoToQuery(""),
+      },
+      {
+        label: "Create a new file",
+        icon: <i className="ic-file-plus" aria-hidden="true" />,
+        onSelect: () => requestNewEntry("file"),
+      },
+      {
+        label: "Show all commands",
+        icon: <i className="ic-terminal" aria-hidden="true" />,
+        shortcut: COMMANDS_SHORTCUT,
+        onSelect: () => setGoToQuery(COMMAND_QUERY_PREFIX),
+      },
+      {
+        label: "Keyboard shortcuts",
+        icon: <i className="ic-keyboard" aria-hidden="true" />,
+        onSelect: () => setHelpDialog("shortcuts"),
+      },
+    ],
+    [requestNewEntry],
+  );
   const reservedShortcuts = useMemo(
     () => commands.flatMap((command) => (command.shortcut ? [command.shortcut] : [])),
     [commands],
@@ -925,24 +994,26 @@ function AppShell({ adapter }: AppProps) {
   return (
     <div
       data-platform={adapter.platform}
-      className="bg-background text-text flex h-screen w-screen flex-col overflow-hidden"
+      className="bg-foreground text-text flex h-screen w-screen flex-col overflow-hidden"
     >
-      <MenuBar menus={MENUS} commands={commands} />
-      <div className="flex flex-1 overflow-hidden">
-        <ActivityBar
-          theme={theme}
-          isSidebarOpen={isSidebarOpen}
-          onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
-        />
+      <TitleBar
+        menus={MENUS}
+        commands={commands}
+        theme={theme}
+        isSidebarOpen={isSidebarOpen}
+        onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+        onSearch={openSearch}
+        searchShortcut={workspace ? GO_TO_FILE_SHORTCUT : COMMANDS_SHORTCUT}
+      />
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         <Sidebar
           workspace={workspace}
           tree={tree}
           activePath={activeDocument?.path}
+          dirtyPaths={dirtyPaths}
           onSelectFile={handleSelectFile}
           onOpenFolder={handleOpenFolder}
           isLoading={isLoading}
-          restorableFolderName={restorableFolderName}
-          onReopenFolder={handleReopenFolder}
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
           onCreateFile={handleCreateFile}
@@ -957,7 +1028,10 @@ function AppShell({ adapter }: AppProps) {
           }
           newEntryRequest={newEntryRequest}
         />
-        <div className="flex flex-1 flex-col overflow-hidden">
+        {/* The document frame: a rounded panel set into the chrome on wide screens, edge to edge on narrow ones. */}
+        <div
+          className={`bg-background flex min-w-0 flex-1 flex-col overflow-hidden md:mr-1.5 md:rounded-lg ${isSidebarOpen ? "" : "md:ml-1.5"}`}
+        >
           <TabStrip
             documents={documentsState.documents}
             activeKey={documentsState.activeKey}
@@ -975,7 +1049,6 @@ function AppShell({ adapter }: AppProps) {
             onVimModeChange={handleVimModeChange}
             rawEditorStates={rawEditorStatesRef.current}
             reservedShortcuts={reservedShortcuts}
-            onSave={() => void saveActiveDocument()}
             editorSettings={settings.editor}
             onEditorSettingsChange={updateEditorSettings}
             find={find}
@@ -985,6 +1058,16 @@ function AppShell({ adapter }: AppProps) {
             onJumpApplied={handleJumpApplied}
             contextMenuItems={editorMenuItems}
             loadImage={loadImage}
+            emptyState={
+              <StartScreen
+                workspaceName={workspace?.name ?? null}
+                isLoading={isLoading}
+                restorableFolderName={restorableFolderName}
+                onOpenFolder={() => void handleOpenFolder()}
+                onReopenFolder={() => void handleReopenFolder()}
+                actions={startActions}
+              />
+            }
           />
         </div>
       </div>
@@ -996,15 +1079,20 @@ function AppShell({ adapter }: AppProps) {
       />
       {goToQuery !== null && (
         <GoToDialog
+          // The field takes its starting text once, so a shortcut for another mode pressed while
+          // the picker is open starts it over in that mode.
+          key={goToQuery}
           files={filePaths}
+          commands={paletteCommands}
           initialQuery={goToQuery}
           hasCurrentFile={activeDocument !== null}
           onGo={(request) => void handleGoTo(request)}
+          onRunCommand={handleRunPaletteCommand}
           onClose={() => setGoToQuery(null)}
         />
       )}
       {helpDialog === "shortcuts" && (
-        <KeyboardShortcutsDialog commands={commands} onClose={() => setHelpDialog(null)} />
+        <KeyboardShortcutsDialog commands={commands} groups={MENUS} onClose={() => setHelpDialog(null)} />
       )}
       {helpDialog === "about" && <AboutDialog platform={adapter.platform} onClose={() => setHelpDialog(null)} />}
       {unsavedRequest && <UnsavedChangesDialog fileNames={unsavedRequest.fileNames} onChoose={handleUnsavedChoice} />}

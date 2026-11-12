@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-10-15
+last_updated: 2026-11-11
 scope: The root `package.json` scripts, what `pnpm verify` runs, formatting and linting configuration, git hooks, and generated and ignored output.
 ---
 
@@ -92,7 +92,7 @@ oxfmt ignores Markdown: `**/*.md` is in its ignore list. Prettier formats only t
 
 rustfmt runs at width 120, the same as oxfmt's `printWidth`, so both languages wrap at the same column.
 
-oxlint runs with `--deny-warnings`, so a warning fails the check as an error does. Its rules are in `.oxlintrc.json`: the core, oxc, and TypeScript rules, JSDoc, Vitest, unicorn, promise, and the React and jsx-a11y plugins. A finding that is wrong for one place is suppressed on that line with a comment naming the rule and the reason, in the form `// oxlint-disable-next-line <rule> -- <reason>`. A rule that is wrong everywhere is changed in `.oxlintrc.json`, and this document changes with it.
+oxlint runs with `--deny-warnings`, so a warning fails the check as an error does. Its rules are in `.oxlintrc.json`: the core, oxc, and TypeScript rules, JSDoc, Vitest, unicorn, promise, and the React and jsx-a11y plugins. The React Compiler rules oxlint 1.93 turned on by default (`react/refs`, `react/set-state-in-effect`, `react/immutability`, and `react/preserve-manual-memoization`) are off: Vista does not build with the React Compiler, and they flag the latest-value refs and state-syncing effects the app uses on purpose. A finding that is wrong for one place is suppressed on that line with a comment naming the rule and the reason, in the form `// oxlint-disable-next-line <rule> -- <reason>`. A rule that is wrong everywhere is changed in `.oxlintrc.json`, and this document changes with it.
 
 clippy runs with warnings denied over every target. A lint that is wrong for one place is allowed there with `#[allow(...)]` and a comment saying why.
 

@@ -7,10 +7,10 @@ interface TooltipProps {
   position: "top" | "bottom" | "left" | "right";
   /**
    * Horizontal alignment of a `top` or `bottom` bubble. `"end"` lines the bubble up with the
-   * trigger's right edge, for controls near the right edge of a header, where a centered bubble
-   * would overflow. Defaults to the package's centered bubble.
+   * trigger's right edge and `"start"` with its left edge, for controls near an edge of the
+   * window, where a centered bubble would overflow. Defaults to the package's centered bubble.
    */
-  align?: "center" | "end";
+  align?: "center" | "start" | "end";
   /** Extra layout classes for the wrapper, such as `flex` or `flex-none`. */
   className?: string;
   /** Renders the trigger, given the bubble's id for the trigger's `aria-describedby`. */
@@ -40,7 +40,7 @@ export function Tooltip({ text, position, align = "center", className, children 
   return (
     // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- the handlers only dismiss the bubble; the trigger inside is the interactive element
     <span
-      className={`tooltip ${align === "end" ? "tooltip-end" : ""} ${className ?? ""}`}
+      className={`tooltip ${align === "center" ? "" : `tooltip-${align}`} ${className ?? ""}`}
       data-tooltip-position={position}
       data-state={isDismissed ? "closed" : undefined}
       onPointerDown={() => setIsDismissed(true)}

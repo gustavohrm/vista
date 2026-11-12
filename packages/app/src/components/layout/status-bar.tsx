@@ -28,7 +28,7 @@ export function StatusBar({ activeFile, cursor, vimMode, onGoToLine }: StatusBar
   return (
     <footer
       aria-label="Status Bar"
-      className="border-border bg-foreground text-text-secondary flex h-6 items-center justify-end border-t px-3 text-[11px] select-none"
+      className="bg-foreground text-text-secondary flex h-6 flex-none items-center justify-end px-3 text-xs select-none"
     >
       {activeFile && (
         <div className="flex min-w-0 [scrollbar-width:none] items-center gap-4 overflow-x-auto whitespace-nowrap">

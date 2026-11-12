@@ -1,7 +1,11 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useState } from "react";
 
 import type { EditorSettings } from "../../domain/settings";
 import { Tooltip } from "../feedback/tooltip";
+import { Menu, type MenuItem } from "../menu/menu";
+
+/** Space between the button and its menu, in pixels. */
+const MENU_GAP_PX = 4;
 
 interface EditorSettingsMenuProps {
   settings: EditorSettings;
@@ -16,82 +20,61 @@ const SETTING_LABELS: { name: keyof EditorSettings; label: string }[] = [
 ];
 
 /**
- * Gear button that opens a popover of raw editor switches. The popover closes on Escape, which
- * returns focus to the button, and on a click outside it.
+ * Gear button that opens the raw editor settings as a menu of check items, the same menu the
+ * menu bar and the right-click menus use.
  *
  * @param props - EditorSettingsMenu properties.
- * @returns The button and, while open, its popover.
+ * @returns The button and, while open, its menu.
  */
 export function EditorSettingsMenu({ settings, onChange }: EditorSettingsMenuProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const popoverId = useId();
+  const [button, setButton] = useState<HTMLButtonElement | null>(null);
+  const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null);
 
-  useEffect(() => {
-    if (!isOpen) {
+  const toggle = () => {
+    if (anchor || !button) {
+      setAnchor(null);
       return;
     }
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [isOpen]);
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape" && isOpen) {
-      event.preventDefault();
-      setIsOpen(false);
-      buttonRef.current?.focus();
-    }
+    const rect = button.getBoundingClientRect();
+    // The menu keeps itself inside the viewport, so it ends up right-aligned under the button.
+    setAnchor({ x: rect.left, y: rect.bottom + MENU_GAP_PX });
   };
 
+  const items: MenuItem[] = SETTING_LABELS.map(({ name, label }) => ({
+    label,
+    checked: settings[name],
+    onSelect: () => onChange({ [name]: !settings[name] }),
+  }));
+
   return (
-    // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- Escape anywhere in the menu closes it; the controls inside are the interactive elements
-    <div ref={containerRef} onKeyDown={handleKeyDown} className="relative flex flex-none">
+    <>
       <Tooltip text="Editor settings" position="bottom" align="end">
         {(bubbleId) => (
           <button
-            ref={buttonRef}
+            ref={setButton}
             type="button"
-            onClick={() => setIsOpen((open) => !open)}
+            onClick={toggle}
             aria-label="Editor settings"
-            aria-expanded={isOpen}
-            aria-controls={isOpen ? popoverId : undefined}
+            aria-haspopup="menu"
+            aria-expanded={anchor !== null}
             aria-describedby={bubbleId}
-            className={isOpen ? "btn soft icon sm" : "btn ghost icon sm"}
+            className={anchor ? "btn soft icon sm" : "btn ghost icon sm"}
           >
-            <i className="ic-settings" aria-hidden="true" />
+            <i className="ic-settings-2" aria-hidden="true" />
           </button>
         )}
       </Tooltip>
-      {isOpen && (
-        <fieldset
-          id={popoverId}
-          className="card soft floating absolute top-full right-0 z-20 mt-1 flex w-52 flex-col p-1 text-xs"
-        >
-          <legend className="visually-hidden">Editor settings</legend>
-          {SETTING_LABELS.map(({ name, label }) => (
-            <label
-              key={name}
-              className="hover:bg-foreground flex cursor-pointer items-center justify-between gap-3 rounded px-2 py-1.5"
-            >
-              <span>{label}</span>
-              <input
-                type="checkbox"
-                role="switch"
-                checked={settings[name]}
-                aria-checked={settings[name]}
-                onChange={(event) => onChange({ [name]: event.target.checked })}
-                className="switch primary"
-              />
-            </label>
-          ))}
-        </fieldset>
+      {anchor && (
+        <Menu
+          label="Editor settings"
+          items={items}
+          x={anchor.x}
+          y={anchor.y}
+          onClose={() => setAnchor(null)}
+          returnFocusTo={button}
+          ignorePointerDownIn={button}
+        />
       )}
-    </div>
+    </>
   );
 }

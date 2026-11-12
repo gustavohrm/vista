@@ -7,16 +7,15 @@ test("boots the styled shared app on direct navigation and reload", async ({ pag
   const response = await page.goto("/workspace/example");
 
   expect(response?.status()).toBe(200);
-  const explorer = page.getByRole("navigation", { name: "File Explorer" });
-  await expect(explorer.getByRole("button", { name: "Open Folder" })).toBeVisible();
-  await expect(page.getByRole("main")).toHaveAttribute("data-platform", "web");
-  await expect(page.getByRole("main")).toHaveCSS("display", "flex");
-  await expect(page.getByRole("main")).toBeEmpty();
+  const main = page.getByRole("main");
+  await expect(main.getByRole("heading", { name: "Vista" })).toBeVisible();
+  await expect(main.getByRole("button", { name: "Open Folder" })).toBeVisible();
+  await expect(main).toHaveAttribute("data-platform", "web");
+  await expect(main).toHaveCSS("display", "flex");
 
   await page.reload();
 
-  await expect(explorer.getByRole("button", { name: "Open Folder" })).toBeVisible();
-  await expect(page.getByRole("main")).toBeEmpty();
+  await expect(main.getByRole("button", { name: "Open Folder" })).toBeVisible();
   expect(errors).toEqual([]);
 });
 

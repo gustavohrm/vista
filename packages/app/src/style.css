@@ -136,11 +136,18 @@ body,
   padding: 0;
 }
 
-/* End-aligned variant of the design system's bottom tooltip, for controls near the right edge of
-   a header. The package only centers a bottom bubble, which would overflow the edge, and a side
-   bubble would cover the neighbouring buttons while it lingers. It sets the same positioning
-   custom properties the package's own `data-tooltip-position` rules set. Unlayered, so it wins
-   over the package's layered rules. */
+/* Edge-aligned variants of the design system's bottom tooltip, for controls near the left or right
+   edge of the window. The package only centers a bottom bubble, which would overflow the edge, and
+   a side bubble would cover the neighbouring buttons while it lingers. They set the same
+   positioning custom properties the package's own `data-tooltip-position` rules set. Unlayered, so
+   they win over the package's layered rules. */
+.tooltip.tooltip-start[data-tooltip-position="bottom"] {
+  --tooltip-left: 0;
+  --tooltip-right: auto;
+  --tooltip-transform: translate(0, 100%);
+  --tooltip-origin: top left;
+}
+
 .tooltip.tooltip-end[data-tooltip-position="bottom"] {
   --tooltip-left: auto;
   --tooltip-right: 0;

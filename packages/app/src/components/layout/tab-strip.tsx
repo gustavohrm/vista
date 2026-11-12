@@ -83,7 +83,7 @@ export function TabStrip({
       ref={listRef}
       role="tablist"
       aria-label="Open files"
-      className="border-border bg-foreground flex h-9 flex-none overflow-x-auto overflow-y-hidden border-b"
+      className="bg-background flex h-10 flex-none [scrollbar-width:none] items-center gap-1 overflow-x-auto overflow-y-hidden px-2"
     >
       {documents.map((doc) => (
         <Tab
@@ -183,8 +183,8 @@ function Tab({ document: doc, isActive, onActivate, onClose, onKeyDown, onContex
       onAuxClick={handleAuxClick}
       onMouseDown={handleMouseDown}
       onContextMenu={onContextMenu}
-      className={`group border-border flex max-w-56 flex-none items-center border-r ${
-        isActive ? "bg-background text-text-strong" : "text-text-secondary hover:bg-surface hover:text-text"
+      className={`group flex h-7 max-w-56 flex-none items-center rounded-md ${
+        isActive ? "bg-surface text-text-strong" : "text-text-secondary hover:bg-surface/60 hover:text-text"
       }`}
     >
       <button
@@ -196,9 +196,9 @@ function Tab({ document: doc, isActive, onActivate, onClose, onKeyDown, onContex
         title={doc.path}
         onClick={onActivate}
         onKeyDown={onKeyDown}
-        className="flex h-full min-w-0 items-center gap-1.5 pr-1 pl-3 text-xs outline-none focus-visible:underline"
+        className="flex h-full min-w-0 items-center gap-1.5 rounded-md pr-1 pl-2.5 text-[13px] outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-inset"
       >
-        <FileIcon extension={doc.extension} className="text-text-secondary flex-none" />
+        <FileIcon extension={doc.extension} className="text-text-secondary flex flex-none text-sm" />
         <span className="min-w-0 truncate">{doc.name}</span>
         {doc.isDirty && <span className="visually-hidden">(unsaved)</span>}
       </button>
@@ -207,13 +207,13 @@ function Tab({ document: doc, isActive, onActivate, onClose, onKeyDown, onContex
         aria-label={`Close ${doc.name}`}
         tabIndex={isActive ? 0 : -1}
         onClick={onClose}
-        className="btn ghost icon sm mr-1 flex-none"
+        className="btn ghost icon sm mr-1 size-5! min-h-0! min-w-0! flex-none p-0! text-[11px] [--ui-radius:4px]"
       >
         {doc.isDirty ? (
           <>
             <span
               aria-hidden="true"
-              className="bg-text-secondary inline-block size-2 rounded-full group-hover:hidden"
+              className="bg-text-secondary inline-block size-1.5 rounded-full group-hover:hidden"
             />
             <span className="hidden group-hover:inline-flex">
               <i className="ic-x" aria-hidden="true" />

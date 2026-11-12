@@ -7,6 +7,11 @@ import { ToastProvider, useToast, type ShowToastInput } from "./toast";
 
 const TOAST_DURATION_MS = 5000;
 
+/** The visible toasts. They carry no role: the toaster announces them through separate live regions. */
+function getToasts(): HTMLElement[] {
+  return [...document.querySelectorAll<HTMLElement>(".coden-toast")];
+}
+
 function ToastTrigger({ input }: { input: ShowToastInput }) {
   const toast = useToast();
   return (
@@ -37,7 +42,7 @@ function ConfirmTrigger({ onResult }: { onResult: (confirmed: boolean) => void }
 }
 
 describe("ToastProvider", () => {
-  it("shows an error message with role=alert", async () => {
+  it("shows an error message", async () => {
     const user = userEvent.setup();
     render(
       <ToastProvider>
@@ -47,10 +52,12 @@ describe("ToastProvider", () => {
 
     await user.click(screen.getByRole("button", { name: "Trigger" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Something went wrong");
+    await waitFor(() => expect(getToasts()).toHaveLength(1));
+    expect(getToasts()[0]).toHaveTextContent("Something went wrong");
+    expect(getToasts()[0]).toHaveClass("coden-toast-error");
   });
 
-  it.each(["info", "success"] as const)("shows a %s message with role=status", async (kind) => {
+  it.each(["info", "success"] as const)("shows a %s message", async (kind) => {
     const user = userEvent.setup();
     render(
       <ToastProvider>
@@ -60,7 +67,9 @@ describe("ToastProvider", () => {
 
     await user.click(screen.getByRole("button", { name: "Trigger" }));
 
-    expect(await screen.findByRole("status")).toHaveTextContent("Heads up");
+    await waitFor(() => expect(getToasts()).toHaveLength(1));
+    expect(getToasts()[0]).toHaveTextContent("Heads up");
+    expect(getToasts()[0]).toHaveClass(`coden-toast-${kind}`);
   });
 
   it("stacks multiple messages", async () => {
@@ -75,7 +84,7 @@ describe("ToastProvider", () => {
     await user.click(trigger);
     await user.click(trigger);
 
-    expect(await screen.findAllByRole("status")).toHaveLength(2);
+    await waitFor(() => expect(getToasts()).toHaveLength(2));
   });
 
   it("dismisses a message when its close button is clicked", async () => {
@@ -87,11 +96,11 @@ describe("ToastProvider", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Trigger" }));
-    await screen.findByText("Dismiss me");
+    await waitFor(() => expect(getToasts()).toHaveLength(1));
 
     await user.click(screen.getByRole("button", { name: "Dismiss message" }));
 
-    expect(screen.queryByText("Dismiss me")).not.toBeInTheDocument();
+    await waitFor(() => expect(getToasts()).toHaveLength(0));
   });
 
   it("auto-dismisses a message after the display duration", async () => {
@@ -106,13 +115,13 @@ describe("ToastProvider", () => {
       act(() => {
         screen.getByRole("button", { name: "Trigger" }).click();
       });
-      expect(screen.getByText("Fades away")).toBeInTheDocument();
+      expect(getToasts()[0]).toHaveTextContent("Fades away");
 
       act(() => {
         vi.advanceTimersByTime(TOAST_DURATION_MS);
       });
 
-      expect(screen.queryByText("Fades away")).not.toBeInTheDocument();
+      expect(getToasts()).toHaveLength(0);
     } finally {
       vi.useRealTimers();
     }

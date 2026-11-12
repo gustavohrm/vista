@@ -13,7 +13,7 @@ This specification covers how Vista manages local folder workspaces, file tree r
 Vista is an Obsidian-, Notion-, and VS Code-inspired personal workspace application that operates directly on user-selected local folders:
 
 - **Local-first, direct disk access**: No proprietary database, shadow sync sandbox, or browser-isolated storage is used as a surrogate for user files.
-- **Explicit saving**: Changes are saved only when the user explicitly triggers save (via `Ctrl+S`, `Cmd+S`, or the icon-only Save button in the document header). There is no automatic, background saving in v1. Navigating away from unsaved changes asks the user first, as [Unsaved changes](#unsaved-changes) describes, so edits are never discarded silently.
+- **Explicit saving**: Changes are saved only when the user explicitly triggers save (via `Ctrl+S`, `Cmd+S`, or **File > Save**). There is no automatic, background saving in v1. Navigating away from unsaved changes asks the user first, as [Unsaved changes](#unsaved-changes) describes, so edits are never discarded silently.
 - **Dual-view paradigm**: Every supported file can be inspected and edited as raw text or rendered in an enriched presentation.
 
 ## Workspace lifecycle
@@ -27,14 +27,14 @@ In v1, Vista operates on **one active open folder** at a time:
 
 ### Reopening the last folder
 
-Each host remembers the most recently opened folder so the explorer can offer to reopen it at startup. Opening a different folder replaces the remembered one. `restoreFolder` reports `restored`, `needs-permission`, `unavailable` (remembered but gone or inaccessible), or `none` (nothing remembered). Per-host behavior:
+Each host remembers the most recently opened folder so the start screen can offer to reopen it at startup. Opening a different folder replaces the remembered one. `restoreFolder` reports `restored`, `needs-permission`, `unavailable` (remembered but gone or inaccessible), or `none` (nothing remembered). Per-host behavior:
 
-- **Web (File System Access)**: the folder's `FileSystemDirectoryHandle` is stored in IndexedDB (database `vista`, store `workspace`, key `lastFolder`). At startup the folder reopens silently only when the browser already reports read permission as granted, for example after the user chose "Allow on every visit". Otherwise the explorer shows a "Reopen {name}" button. Clicking it requests permission, which needs a user gesture, so the restore never prompts on its own. "Open Folder" stays available in both states.
+- **Web (File System Access)**: the folder's `FileSystemDirectoryHandle` is stored in IndexedDB (database `vista`, store `workspace`, key `lastFolder`). At startup the folder reopens silently only when the browser already reports read permission as granted, for example after the user chose "Allow on every visit". Otherwise the start screen shows a "Reopen {name}" button. Clicking it requests permission, which needs a user gesture, so the restore never prompts on its own. "Open Folder" stays available in both states.
 - **Web fallback (`webkitdirectory`)**: these folders cannot be remembered. Opening one forgets any stored handle, so the next startup shows the plain "Open Folder" state.
 - **Native**: the root path is stored in the webview's `localStorage` under `vista.lastFolder` and probed with a directory read. Access survives restarts because the scope granted by the folder picker is persisted by `tauri-plugin-persisted-scope`, registered after the filesystem plugin; without it, dialog-granted scope would not survive a restart.
 - **Mobile (Android and iOS)**: not supported yet. `@tauri-apps/plugin-dialog` has no folder picker on those platforms, so there is nothing to restore.
 
-Failure handling: a remembered folder that no longer exists or is inaccessible is forgotten, and the user sees an info toast, `Couldn't reopen "{name}". It may have been moved or deleted.` The explorer then shows the plain "Open Folder" state. Unexpected failures surface as error toasts.
+Failure handling: a remembered folder that no longer exists or is inaccessible is forgotten, and the user sees an info toast, `Couldn't reopen "{name}". It may have been moved or deleted.` The start screen then shows the plain "Open Folder" state. Unexpected failures surface as error toasts.
 
 ## Supported formats & view modes
 
@@ -67,7 +67,7 @@ The raw view (`packages/app/src/components/editor/raw-editor.tsx`) is a [CodeMir
 
 ### Editor settings
 
-The gear button in the document header opens a popover with four switches: line numbers, word wrap, minimap, and vim mode. The View menu toggles the same four, and `Alt+Z` toggles word wrap. They apply to the raw editor at once and are remembered in the browser's `localStorage` under `vista.settings`, as `{ "version": 1, "editor": { "lineNumbers": true, "minimap": false, "vim": false, "wordWrap": true } }`. A stored value that is missing or of the wrong type falls back to its default, field by field, so one bad field does not reset the others. When the store can't be read, the editor starts with the defaults. When it can't be written, a changed setting still applies for the rest of the session but is lost on reload.
+The gear button in the document header opens a menu of four check items: line numbers, word wrap, minimap, and vim mode. It is the same menu component as the menu bar and the right-click menus. The View menu toggles the same four, and `Alt+Z` toggles word wrap. They apply to the raw editor at once and are remembered in the browser's `localStorage` under `vista.settings`, as `{ "version": 1, "editor": { "lineNumbers": true, "minimap": false, "vim": false, "wordWrap": true } }`. A stored value that is missing or of the wrong type falls back to its default, field by field, so one bad field does not reset the others. When the store can't be read, the editor starts with the defaults. When it can't be written, a changed setting still applies for the rest of the session but is lost on reload.
 
 ### Find and replace
 
@@ -76,9 +76,24 @@ The gear button in the document header opens a popover with four switches: line 
 - **Raw view.** The bar drives CodeMirror's search, so matches are highlighted in the text and the current one is selected. Replace changes the current match and moves to the next one; Replace all changes every match as one undoable edit. The search follows the active tab, so switching tabs with the bar open searches the new tab.
 - **Rendered views.** Find works, but replace is hidden, since the rendered text is not the file's text. In the Markdown view, matches are highlighted in place with the CSS Custom Highlight API, which leaves the editor's DOM untouched; browsers without it still count and scroll to matches but do not highlight them. A match must lie within one run of text, so a phrase that crosses formatting, such as `**bold** text`, is not found. In the CSV table, the cells whose value matches are marked, and the current one scrolls into view.
 
+### Start screen
+
+With no file open, the editor area shows a start screen instead of staying empty, so the next step is always on screen.
+
+- **No folder open.** It names the app, says what it does in one sentence, and offers **Open Folder**. When a folder is remembered, **Reopen {name}** comes first as the primary action, as [Reopening the last folder](#reopening-the-last-folder) describes. Nothing is offered while a folder is still being opened or restored.
+- **Folder open.** It shows the folder's name and four next steps, each with its shortcut: Search files, Create a new file, Show all commands, and Keyboard shortcuts.
+
+### Document header
+
+The header above a document shows its path as a breadcrumb and, on the right, the view switch, Find, and Editor settings. There is no Save button: saving is `Ctrl+S` or **File > Save**, and the dot beside the file name shows unsaved edits.
+
+- The view switch is two icon buttons in one tinted group, named in their tooltips and to assistive technology: **Rich text** (eye) and **Raw** (code) for Markdown, **Table** (table) and **Raw** for CSV. The pressed one is the view shown. A format with one view shows no switch.
+
 ### Go to file and line
 
 `Ctrl+P` opens a picker that fuzzy-matches the query against every file path in the open folder, ranking matches at word starts, consecutive characters, and the file name higher. It lists at most 50 results. Arrow keys pick a result and Enter opens it. Adding `:line` or `:line:column` to the query, as in `readme:12:4`, opens the file at that position. `Ctrl+G`, or clicking the cursor position in the status bar, opens the same picker with `:` typed, so `:12` moves within the current file. Going to a position switches the tab to the raw view, since only the raw view has lines and columns. A line or column past the end moves to the last line or the end of the line.
+
+The same picker runs commands. `Ctrl+Shift+P`, or typing `>` first, lists every menu command as `Menu: Command` with its shortcut, a check mark on a toggle that is on, and commands that cannot run now dimmed; Enter does not run those. The query fuzzy-matches the same way as for files. A chosen command runs after the picker has closed and focus is back where it was, so Edit commands act on the editor the picker was opened from. The search field in the title bar opens the picker: on files when a folder is open, on commands when none is. A footer in the picker names its keys.
 
 ### Status bar
 
@@ -86,14 +101,14 @@ With a file open, the status bar shows the cursor and vim mode (raw view only; s
 
 ### Menus
 
-A menu bar above the editor offers File, Edit, Selection, View, Go, and Help. Every item is a command, as defined in [Commands and shortcuts](../architecture.md#commands-and-shortcuts), so an item shows its shortcut and is greyed out when it can't run.
+A menu bar in the title bar offers File, Edit, Selection, View, Go, and Help. Every item is a command, as defined in [Commands and shortcuts](../architecture.md#commands-and-shortcuts), so an item shows its shortcut and is greyed out when it can't run.
 
 - **File**: Open Folder, New File, New Folder (at the workspace root, opening the explorer), Save, Save All, Close Tab, Close All Tabs.
 - **Edit**: Undo, Redo, Cut, Copy, Paste, Find, Replace.
 - **Selection**: Select All, Select Line, Add Next Occurrence, Select All Occurrences, Add Cursor Above, Add Cursor Below. All but Select All need the raw view's multiple selections, so they are disabled in the rendered views.
-- **View**: Explorer, Raw Text, Word Wrap, Line Numbers, Minimap, Vim Mode, and the light or dark theme.
+- **View**: Show All Commands, Explorer, Raw Text, Word Wrap, Line Numbers, Minimap, Vim Mode, and the light or dark theme.
 - **Go**: Go to File, Go to Line, Next Tab, Previous Tab.
-- **Help**: Keyboard Shortcuts, a dialog listing every command with a key, and About Vista.
+- **Help**: Keyboard Shortcuts, a dialog listing every command with a key under its menu, and About Vista.
 
 The menu bar is one Tab stop: ArrowLeft and ArrowRight move between menus, Enter, Space, or ArrowDown opens one, the arrow keys move within it, and Escape closes it. Clicking a menu does not take focus from the editor first, and choosing an item returns focus to where it was before running it, so Edit and Selection items apply to the editor the user was in. Undo, Redo, Cut, Copy, Paste, Select All, and the Selection items show the keys the editors handle themselves; the app does not bind those keys, so they keep working in every text field. Paste from a menu reads the clipboard with the Clipboard API, which can ask for permission; when reading fails, a toast says to press `Ctrl+V` instead.
 
@@ -119,7 +134,7 @@ Opening a file loads its contents into an in-memory `FileDocument` buffer, one p
 - `content`: current in-memory string representation.
 - `isDirty`: boolean indicating whether unsaved edits exist in the buffer.
 
-Edits made in either the Raw view or the rendered view (such as editing a CSV cell, or typing in the Markdown WYSIWYG editor) update that tab's buffer and set `isDirty: true`. A dot in the tab and next to the file name in the document header breadcrumb marks unsaved edits. Save (`Ctrl+S` or `Cmd+S`, or the Save button) writes the active tab's buffer to disk via the platform's `writeFile` capability. The tab becomes clean only if its buffer still matches what was written, so edits typed while a save is in flight stay marked unsaved.
+Edits made in either the Raw view or the rendered view (such as editing a CSV cell, or typing in the Markdown WYSIWYG editor) update that tab's buffer and set `isDirty: true`. A dot in the tab and next to the file name in the document header breadcrumb marks unsaved edits. Save (`Ctrl+S` or `Cmd+S`, or **File > Save**) writes the active tab's buffer to disk via the platform's `writeFile` capability. The tab becomes clean only if its buffer still matches what was written, so edits typed while a save is in flight stay marked unsaved.
 
 ### Unsaved changes
 
@@ -171,6 +186,8 @@ export type RestoreFolderResult = { status: "restored"; workspace: Workspace } |
 Workspace operations do not fail silently. A user-initiated cancellation of the folder picker (the platform picker's own Cancel/Escape) resolves `openFolder()` to `null` with no error and no user-visible message — this is expected, ordinary behavior, not a failure. Any other failure — permission denied or revoked, a file or folder that no longer exists, an unreadable/unwritable path — rejects with a descriptive `Error` and is surfaced to the user as a toast message (`packages/app/src/components/feedback/toast.tsx`), not just logged to the console. This applies to every `WorkspaceCapability` operation, including the file management operations below.
 
 ## File and folder management
+
+The explorer follows the open documents: opening a file from anywhere, such as the picker or a tab, expands the folders above it and highlights its row, and a file with unsaved edits shows a dot beside its name.
 
 Users create, rename/move, and delete files and folders from a right-click context menu on the sidebar file tree (right-clicking empty space targets the workspace root). The menu offers Open for a file, New File and New Folder for a folder or the root, Rename, Delete, and Copy Relative Path, plus Copy Path, the full path on disk, in the desktop app; the browser has no full path to copy. Renaming is implemented as `move` within the same parent directory — there is no separate rename operation, matching VS Code's own model.
 

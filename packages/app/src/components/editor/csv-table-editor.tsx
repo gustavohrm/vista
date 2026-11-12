@@ -69,19 +69,18 @@ export function CsvTableEditor({ content, onChange }: CsvTableEditorProps) {
 
   return (
     <div className="csv-table bg-background text-text flex h-full w-full flex-col">
-      <div data-find-skip className="border-border bg-foreground flex items-center gap-2 border-b px-4 py-2">
-        <span className="text-text-secondary text-xs font-medium">Table Actions:</span>
-        <button type="button" onClick={handleAddRow} className="btn sm">
+      <div data-find-skip className="flex items-center gap-1 px-3 pb-1">
+        <button type="button" onClick={handleAddRow} className="btn ghost sm">
           <i className="ic-plus text-xs" aria-hidden="true" />
           Add Row
         </button>
-        <button type="button" onClick={handleAddColumn} className="btn sm">
+        <button type="button" onClick={handleAddColumn} className="btn ghost sm">
           <i className="ic-plus text-xs" aria-hidden="true" />
           Add Column
         </button>
       </div>
 
-      <div className="flex-1 overflow-auto p-4">
+      <div className="flex-1 overflow-auto px-4 pb-4">
         <div className="table-wrap">
           <table className="data-table ruled edged">
             <thead data-find-skip>

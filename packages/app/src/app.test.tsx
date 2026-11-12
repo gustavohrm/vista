@@ -58,7 +58,17 @@ function createMockWorkspaceCapability(overrides?: Partial<WorkspaceCapability>)
 }
 
 /**
- * Opens the mock folder from the explorer's welcome state and waits for its tree to appear.
+ * Finds a visible toast by its text. Toasts carry no role: the toaster announces them through
+ * separate live regions, which repeat the text.
+ *
+ * @param text - The toast's whole message.
+ */
+function findToast(text: string) {
+  return screen.findByText(text, { selector: ".coden-toast *" });
+}
+
+/**
+ * Opens the mock folder from the start screen and waits for its tree to appear.
  *
  * @param user - The user-event instance driving the interaction.
  */
@@ -124,7 +134,7 @@ function getTab(name: string): HTMLElement {
 }
 
 describe("App", () => {
-  it.each(["web", "native"] as const)("renders an empty editor surface for the %s host", async (platform) => {
+  it.each(["web", "native"] as const)("renders the start screen for the %s host", async (platform) => {
     const adapter: AppAdapter = {
       platform,
       workspace: createMockWorkspaceCapability(),
@@ -133,7 +143,7 @@ describe("App", () => {
     const { container } = render(<App adapter={adapter} />);
 
     await screen.findByRole("button", { name: "Open Folder" });
-    expect(screen.getByRole("main")).toBeEmptyDOMElement();
+    expect(within(screen.getByRole("main")).getByRole("heading", { name: "Vista" })).toBeInTheDocument();
     expect(screen.getByRole("main")).toHaveAttribute("data-platform", platform);
     expect(container.firstChild).toHaveAttribute("data-platform", platform);
   });
@@ -171,12 +181,7 @@ describe("App", () => {
     // Edit content to trigger dirty state
     await appendToRawEditor(user, editor, "\nNew line");
 
-    // Save button should be enabled
-    const saveBtn = screen.getByRole("button", { name: "Save file" });
-    expect(saveBtn).toBeEnabled();
-
-    // Click save
-    await user.click(saveBtn);
+    await user.keyboard("{Control>}s{/Control}");
     expect(mockWorkspace.writeFile).toHaveBeenCalledWith("readme.md", EDITED_README_CONTENT);
   });
 
@@ -196,12 +201,12 @@ describe("App", () => {
     await user.click(screen.getByText("data.csv"));
 
     // Toggle to enriched mode
-    const enrichedBtn = screen.getByRole("button", { name: "View" });
+    const enrichedBtn = screen.getByRole("button", { name: "Table" });
     await user.click(enrichedBtn);
 
     // Should display table actions and cells
     await waitFor(() => {
-      expect(screen.getByText("Table Actions:")).toBeVisible();
+      expect(screen.getByRole("button", { name: "Add Row" })).toBeVisible();
       expect(screen.getByDisplayValue("Alice")).toBeVisible();
     });
 
@@ -210,10 +215,7 @@ describe("App", () => {
     await user.clear(cellInput);
     await user.type(cellInput, "Alicia");
 
-    // Save changes
-    const saveBtn = screen.getByRole("button", { name: "Save file" });
-    expect(saveBtn).toBeEnabled();
-    await user.click(saveBtn);
+    await user.keyboard("{Control>}s{/Control}");
 
     // The file's LF line breaks survive the table's rewrite.
     expect(mockWorkspace.writeFile).toHaveBeenCalledWith("data.csv", "Name,Age\nAlicia,30\nBob,25");
@@ -230,7 +232,7 @@ describe("App", () => {
 
     await user.click(await screen.findByRole("button", { name: "Open Folder" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Permission to read this folder was not granted.");
+    expect(await findToast("Permission to read this folder was not granted.")).toBeInTheDocument();
   });
 
   it("shows no error toast when the user cancels the folder picker", async () => {
@@ -245,7 +247,7 @@ describe("App", () => {
     await user.click(await screen.findByRole("button", { name: "Open Folder" }));
 
     await waitFor(() => expect(mockWorkspace.openFolder).toHaveBeenCalled());
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(document.querySelector(".coden-toast")).not.toBeInTheDocument();
     expect(screen.getByText("No folder open")).toBeInTheDocument();
   });
 
@@ -285,9 +287,9 @@ describe("App", () => {
 
     const editor = await screen.findByRole("textbox", { name: /Raw text content of readme\.md/i });
     await appendToRawEditor(user, editor, "!");
-    await user.click(screen.getByRole("button", { name: "Save file" }));
+    await user.keyboard("{Control>}s{/Control}");
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Write access was denied.");
+    expect(await findToast("Write access was denied.")).toBeInTheDocument();
   });
 
   it("toggles the mobile explorer drawer open and closed", async () => {
@@ -296,13 +298,13 @@ describe("App", () => {
 
     render(<App adapter={adapter} />);
 
-    // Startup opens the explorer on phones when no folder is restored, so it starts open here.
-    const toggleBtn = await screen.findByRole("button", { name: "Close explorer" });
-    expect(toggleBtn).toHaveAttribute("aria-pressed", "true");
+    // The explorer is a drawer at this width, and the start screen offers the folder, so it starts closed.
+    const toggleBtn = await screen.findByRole("button", { name: "Open explorer" });
+    expect(toggleBtn).toHaveAttribute("aria-pressed", "false");
 
     await user.click(toggleBtn);
 
-    expect(screen.getByRole("button", { name: "Open explorer" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Close explorer" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("closes the mobile explorer drawer after selecting a file", async () => {
@@ -354,7 +356,7 @@ describe("App", () => {
     await user.click(screen.getByRole("menuitem", { name: "New File" }));
     await user.type(screen.getByRole("textbox", { name: "Entry name" }), "todo.md{Enter}");
 
-    expect(await screen.findByRole("alert")).toHaveTextContent('"todo.md" already exists.');
+    expect(await findToast('"todo.md" already exists.')).toBeInTheDocument();
   });
 
   it("renames the active file and updates the open editor's path without a reload", async () => {
@@ -511,7 +513,7 @@ describe("App", () => {
       await user.click(screen.getByText("readme.md"));
       await user.click(await screen.findByRole("button", { name: "Raw" }));
       await user.click(screen.getByText("data.csv"));
-      await user.click(await screen.findByRole("button", { name: "View" }));
+      await user.click(await screen.findByRole("button", { name: "Table" }));
 
       await user.click(getTab("readme.md"));
 
@@ -638,7 +640,7 @@ describe("App", () => {
       );
       expect(statusBar).toHaveTextContent("Ln 2, Col 16");
 
-      await user.click(screen.getByRole("button", { name: "View" }));
+      await user.click(screen.getByRole("button", { name: "Rich text" }));
       expect(statusBar).not.toHaveTextContent("Ln");
     });
 
@@ -677,7 +679,7 @@ describe("App", () => {
       expect(document.querySelector(".cm-lineNumbers")).toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: "Editor settings" }));
-      await user.click(screen.getByRole("switch", { name: "Line numbers" }));
+      await user.click(screen.getByRole("menuitemcheckbox", { name: "Line numbers" }));
 
       expect(document.querySelector(".cm-lineNumbers")).not.toBeInTheDocument();
       expect(JSON.parse(localStorage.getItem("vista.settings") ?? "null")).toMatchObject({
@@ -750,7 +752,7 @@ describe("App", () => {
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
       await openFolderFromWelcome(user);
       await user.click(screen.getByText("data.csv"));
-      await user.click(screen.getByRole("button", { name: "View" }));
+      await user.click(screen.getByRole("button", { name: "Table" }));
       await screen.findByDisplayValue("Alice");
 
       await user.keyboard("{Control>}f{/Control}");
@@ -800,6 +802,166 @@ describe("App", () => {
       await user.keyboard("99:99{Enter}");
 
       expect(screen.getByRole("contentinfo", { name: "Status Bar" })).toHaveTextContent("Ln 2, Col 15");
+    });
+  });
+
+  describe("commands picker", () => {
+    it("lists commands with Ctrl+Shift+P and runs the chosen one", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+
+      await user.keyboard("{Control>}{Shift>}p{/Shift}{/Control}");
+      expect(screen.getByRole("combobox", { name: "Run a command" })).toHaveValue(">");
+      expect(screen.getByRole("option", { name: "File: Open Folder…" })).toHaveAttribute("aria-selected", "true");
+      await user.keyboard("about{Enter}");
+
+      expect(await screen.findByRole("dialog", { name: "About Vista" })).toBeInTheDocument();
+      expect(screen.queryByRole("dialog", { name: "Commands" })).not.toBeInTheDocument();
+    });
+
+    it("shows a command that cannot run now as disabled and does not run it", async () => {
+      const user = userEvent.setup();
+      const mockWorkspace = createMockWorkspaceCapability();
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      await openRawReadme(user);
+
+      await user.keyboard("{Control>}{Shift>}p{/Shift}{/Control}");
+      await user.keyboard("file save");
+      const save = screen.getByRole("option", { name: /^File: Save\s*Ctrl\+S$/ });
+      expect(save).toHaveAttribute("aria-selected", "true");
+      expect(save).toHaveAttribute("aria-disabled", "true");
+      await user.keyboard("{Enter}");
+
+      expect(screen.getByRole("dialog", { name: "Commands" })).toBeInTheDocument();
+      expect(mockWorkspace.writeFile).not.toHaveBeenCalled();
+    });
+
+    it("runs an editing command in the editor the picker was opened from", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      const editor = await makeReadmeDirty(user);
+
+      await user.keyboard("{Control>}{Shift>}p{/Shift}{/Control}");
+      await user.keyboard("undo{Enter}");
+
+      await waitFor(() => expect(rawEditorText(editor)).not.toBe(EDITED_README_CONTENT));
+    });
+
+    it("runs an editing command in the editor when opened by clicking the search field", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      const editor = await makeReadmeDirty(user);
+
+      await user.click(screen.getByRole("button", { name: "Search files and commands" }));
+      await user.keyboard(">undo{Enter}");
+
+      await waitFor(() => expect(rawEditorText(editor)).not.toBe(EDITED_README_CONTENT));
+    });
+
+    it("switches the open picker between files, commands, and lines by shortcut", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openRawReadme(user);
+
+      await user.keyboard("{Control>}p{/Control}");
+      await user.keyboard("read");
+      await user.keyboard("{Control>}{Shift>}p{/Shift}{/Control}");
+      expect(screen.getByRole("combobox", { name: "Run a command" })).toHaveValue(">");
+
+      await user.keyboard("{Control>}g{/Control}");
+      expect(screen.getByRole("combobox", { name: "Go to file, or :line:column" })).toHaveValue(":");
+
+      await user.keyboard("{Control>}p{/Control}");
+      expect(screen.getByRole("combobox", { name: "Go to file, or :line:column" })).toHaveValue("");
+    });
+
+    it("opens from the title bar's search field, listing commands while no folder is open", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await screen.findByRole("button", { name: "Open Folder" });
+
+      await user.click(screen.getByRole("button", { name: "Search files and commands" }));
+      expect(screen.getByRole("combobox", { name: "Run a command" })).toHaveValue(">");
+      // jsdom does not turn Escape into the dialog's cancel event.
+      fireEvent(screen.getByRole("dialog", { name: "Commands" }), new Event("cancel", { cancelable: true }));
+
+      await openFolderFromWelcome(user);
+      await user.click(screen.getByRole("button", { name: "Search files and commands" }));
+      expect(screen.getByRole("combobox", { name: "Go to file, or :line:column" })).toHaveValue("");
+    });
+  });
+
+  describe("start screen", () => {
+    it("lists ways to get to a file once a folder is open", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      const main = screen.getByRole("main");
+
+      expect(within(main).getByRole("heading", { name: "My Notes" })).toBeInTheDocument();
+      await user.click(within(main).getByRole("button", { name: "Search files" }));
+      // jsdom does not turn Escape into the dialog's cancel event.
+      fireEvent(screen.getByRole("dialog", { name: "Go to file" }), new Event("cancel", { cancelable: true }));
+
+      await user.click(within(main).getByRole("button", { name: "Create a new file" }));
+      expect(screen.getByRole("textbox", { name: "Entry name" })).toBeInTheDocument();
+    });
+
+    it("gives way to the document when a file is opened", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+
+      await user.click(screen.getByText("readme.md"));
+
+      await screen.findByRole("heading", { name: "Hello Vista" });
+      expect(screen.queryByRole("button", { name: "Search files" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("explorer", () => {
+    it("expands the folders of a file opened from the picker", async () => {
+      const user = userEvent.setup();
+      const guide: WorkspaceNode = {
+        id: "docs/guide.md",
+        name: "guide.md",
+        path: "docs/guide.md",
+        kind: "file",
+        extension: "md",
+      };
+      const mockWorkspace = createMockWorkspaceCapability({
+        readTree: vi
+          .fn()
+          .mockResolvedValue([
+            ...ROOT_TREE,
+            { id: "docs", name: "docs", path: "docs", kind: "directory", children: [guide] },
+          ]),
+      });
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      await openFolderFromWelcome(user);
+      const explorer = screen.getByRole("navigation", { name: "File Explorer" });
+      expect(within(explorer).getByRole("button", { name: "docs" })).toHaveAttribute("aria-expanded", "false");
+
+      await user.keyboard("{Control>}p{/Control}");
+      await user.keyboard("guide{Enter}");
+
+      await waitFor(() =>
+        expect(within(explorer).getByRole("button", { name: "docs" })).toHaveAttribute("aria-expanded", "true"),
+      );
+      expect(within(explorer).getByRole("button", { name: "guide.md" })).toBeInTheDocument();
+    });
+
+    it("marks a file with unsaved changes", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      const explorer = () => screen.getByRole("navigation", { name: "File Explorer" });
+
+      await makeReadmeDirty(user);
+      expect(within(explorer()).getByRole("button", { name: /^readme\.md\s*\(unsaved\)$/ })).toBeInTheDocument();
+
+      await user.keyboard("{Control>}s{/Control}");
+      await waitFor(() => expect(within(explorer()).getByRole("button", { name: "readme.md" })).toBeInTheDocument());
     });
   });
 
@@ -859,7 +1021,7 @@ describe("App", () => {
       const dialog = await screen.findByRole("dialog", { name: "Save changes to readme.md?" });
       await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
-      expect(await screen.findByRole("alert")).toHaveTextContent("Write access was denied.");
+      expect(await findToast("Write access was denied.")).toBeInTheDocument();
       expect(rawEditorText(screen.getByRole("textbox", { name: /Raw text content of readme\.md/i }))).toBe(
         EDITED_README_CONTENT,
       );
@@ -891,13 +1053,12 @@ describe("App", () => {
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
       const editor = await makeReadmeDirty(user);
 
-      await user.click(screen.getByRole("button", { name: "Save file" }));
+      await user.keyboard("{Control>}s{/Control}");
       await appendToRawEditor(user, editor, "!");
       await act(async () => finishWrite());
 
       expect(mockWorkspace.writeFile).toHaveBeenCalledTimes(1);
       expect(getTab("readme.md")).toHaveTextContent("(unsaved)");
-      expect(screen.getByRole("button", { name: "Save file" })).toBeEnabled();
     });
 
     it("asks again when the tab was edited while its save-then-close was in flight", async () => {
@@ -1037,7 +1198,7 @@ describe("App", () => {
 
       await waitFor(() => expect(mockWorkspace.restoreFolder).toHaveBeenCalledWith({ interactive: true }));
       expect(screen.getByRole("button", { name: "Reopen My Notes" })).toBeInTheDocument();
-      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(document.querySelector(".coden-toast")).not.toBeInTheDocument();
     });
 
     it("shows an info message and no reopen button when the last folder can no longer be opened", async () => {
@@ -1053,13 +1214,13 @@ describe("App", () => {
       expect(screen.getByRole("button", { name: "Open Folder" })).toBeInTheDocument();
     });
 
-    it("shows the Open Folder state and an open explorer when no folder is remembered", async () => {
+    it("offers Open Folder on the start screen when no folder is remembered", async () => {
       const mockWorkspace = createMockWorkspaceCapability();
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
 
       expect(await screen.findByRole("button", { name: "Open Folder" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /^Reopen/ })).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Close explorer" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Open explorer" })).toBeInTheDocument();
     });
 
     it("shows an error message when restoring the last folder fails unexpectedly", async () => {
@@ -1068,7 +1229,7 @@ describe("App", () => {
       });
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
 
-      expect(await screen.findByRole("alert")).toHaveTextContent("Storage is unavailable.");
+      expect(await findToast("Storage is unavailable.")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Open Folder" })).toBeInTheDocument();
     });
 
@@ -1092,9 +1253,9 @@ describe("App", () => {
       await user.click(await screen.findByRole("button", { name: "Open Folder" }));
 
       expect(mockWorkspace.restoreFolder).not.toHaveBeenCalled();
-      expect(await screen.findByRole("alert")).toHaveTextContent(
-        "Local folder access is not supported in this browser or environment.",
-      );
+      expect(
+        await findToast("Local folder access is not supported in this browser or environment."),
+      ).toBeInTheDocument();
     });
   });
 
