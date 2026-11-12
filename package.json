@@ -13,29 +13,31 @@
     "dev:web": "pnpm --filter=@vista/web dev",
     "format:check": "oxfmt --check && prettier --check --log-level warn \"**/*.md\"",
     "format:fix": "oxfmt && prettier --write --log-level warn \"**/*.md\" && pnpm --filter=@vista/native format:rust:fix",
-    "hooks:install": "node scripts/install-hooks.mjs",
     "labels": "node scripts/sync-labels.mjs",
     "lint:check": "oxlint --deny-warnings",
     "lint:fix": "oxlint --fix",
-    "prepare": "node scripts/install-hooks.mjs",
-    "test": "pnpm test:hooks && pnpm -r --if-present test",
-    "test:hooks": "node --test scripts/git-hooks.test.mjs",
-    "test:coverage": "pnpm -r --if-present test:coverage",
+    "prepare": "git config core.hooksPath .githooks || echo Skipped git hook setup",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:e2e": "pnpm --filter=@vista/web test:e2e",
-    "test:watch": "pnpm -r --if-present test:watch",
-    "typecheck": "pnpm -r --if-present typecheck",
+    "test:watch": "vitest",
+    "typecheck": "tsc -b",
     "verify": "pnpm verify:web && pnpm verify:rust",
     "verify:rust": "pnpm --filter=@vista/native format:rust:check && pnpm --filter=@vista/native lint:rust:check",
     "verify:web": "pnpm format:check && pnpm lint:check && pnpm typecheck && pnpm test && pnpm build:web && pnpm build:native"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
-    "prettier": "catalog:"
+    "prettier": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "engines": {
-    "node": ">=24.14.1 <25",
-    "pnpm": "11.7.0"
+    "node": ">=24.22.1 <25",
+    "pnpm": ">=12.16.1 <13"
   },
-  "packageManager": "pnpm@11.7.0"
+  "packageManager": "pnpm@12.16.1"
 }

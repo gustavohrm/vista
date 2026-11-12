@@ -35,4 +35,4 @@ Theming is powered by `@codenhub/theme` and `@codenhub/styles`. It defaults to s
 
 ## Tests
 
-Run `pnpm --filter=@vista/app test` from the repository root. Tests use Vitest with jsdom, React Testing Library, and jest-dom matchers. Use `@testing-library/user-event` for interactions and keep test files beside their components. `test:watch` and `test:coverage` are also available.
+Run `pnpm test --project app` from the repository root. Tests use Vitest with jsdom, React Testing Library, and jest-dom matchers. Use `@testing-library/user-event` for interactions and keep test files beside their components. `pnpm test:watch` and `pnpm test:coverage` work the same way.

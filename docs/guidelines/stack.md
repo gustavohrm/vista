@@ -18,7 +18,7 @@ The [coding guidelines](code.md) hold for every language in the project. This do
 
 ## TypeScript
 
-- Use strict TypeScript; the root `tsconfig.json` sets the flags.
+- Use strict TypeScript; `tsconfig.base.json` sets the flags.
 - Prefer `const` to `let`; never use `var`.
 - Prefer `unknown` to `any`. Validate `unknown` at the boundary before use.
 - Prefer interfaces for object shapes and type aliases for unions and intersections.

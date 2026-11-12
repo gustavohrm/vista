@@ -32,10 +32,14 @@ export function CsvTableEditor({ content, onChange }: CsvTableEditorProps) {
   const handleCellChange = useCallback(
     (rowIndex: number, colIndex: number, value: string) => {
       const nextData = parsedData.map((row) => [...row]);
-      while (nextData[rowIndex].length <= colIndex) {
-        nextData[rowIndex].push("");
+      const row = nextData[rowIndex];
+      if (!row) {
+        return;
       }
-      nextData[rowIndex][colIndex] = value;
+      while (row.length <= colIndex) {
+        row.push("");
+      }
+      row[colIndex] = value;
       const unparsed = Papa.unparse(nextData, { newline });
       onChange(unparsed);
     },

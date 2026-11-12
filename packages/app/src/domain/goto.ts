@@ -69,8 +69,9 @@ export function rankFiles(paths: readonly string[], query: string): FileMatch[] 
 function foldCase(text: string): string {
   let folded = "";
   for (let i = 0; i < text.length; i++) {
-    const lower = text[i].toLowerCase();
-    folded += lower.length === 1 ? lower : text[i];
+    const unit = text.charAt(i);
+    const lower = unit.toLowerCase();
+    folded += lower.length === 1 ? lower : unit;
   }
   return folded;
 }
@@ -82,7 +83,8 @@ function scorePath(path: string, needle: string): { score: number; positions: nu
   const haystack = foldCase(path);
   const nameStart = path.lastIndexOf("/") + 1;
   let best: { score: number; positions: number[] } | null = null;
-  for (let start = haystack.indexOf(needle[0]); start >= 0; start = haystack.indexOf(needle[0], start + 1)) {
+  const first = needle.charAt(0);
+  for (let start = haystack.indexOf(first); start >= 0; start = haystack.indexOf(first, start + 1)) {
     const positions = matchFrom(haystack, needle, start);
     if (!positions) {
       break;
@@ -124,7 +126,7 @@ function scorePositions(path: string, positions: readonly number[], nameStart: n
     const isWordStart =
       before === undefined ||
       WORD_SEPARATORS.has(before) ||
-      (before === before.toLowerCase() && path[position] !== path[position].toLowerCase());
+      (before === before.toLowerCase() && path.charAt(position) !== path.charAt(position).toLowerCase());
     if (isWordStart) {
       score += 4;
     }

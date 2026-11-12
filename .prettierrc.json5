@@ -1,4 +1,6 @@
+// Prettier formats Markdown only; oxfmt owns every other format. JSON5, rather than JSON, so this file can
+// carry comments.
 {
-  "$schema": "https://json.schemastore.org/prettierrc",
-  "proseWrap": "never"
+  $schema: "https://json.schemastore.org/prettierrc",
+  proseWrap: "never",
 }

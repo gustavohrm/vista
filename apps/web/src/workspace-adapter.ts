@@ -57,11 +57,12 @@ function splitPath(path: string): { parentPath: string; name: string } {
  */
 function buildTreeFromInputFiles(files: File[]): DirectoryInputResult {
   const fileMap = new Map<string, File>();
-  if (files.length === 0) {
+  const [firstFile] = files;
+  if (!firstFile) {
     return { rootName: "Workspace", nodes: [], fileMap };
   }
 
-  const firstPath = files[0].webkitRelativePath || files[0].name;
+  const firstPath = firstFile.webkitRelativePath || firstFile.name;
   const rootName = firstPath.split("/")[0] || "Workspace";
 
   interface DirBucket {
@@ -87,16 +88,18 @@ function buildTreeFromInputFiles(files: File[]): DirectoryInputResult {
     const relPath = innerSegments.join("/");
     fileMap.set(relPath, file);
 
+    const fileName = innerSegments.pop();
+    if (fileName === undefined) {
+      continue;
+    }
     let current = rootBucket;
-    for (let i = 0; i < innerSegments.length - 1; i++) {
-      const seg = innerSegments[i];
+    for (const seg of innerSegments) {
       if (!current.directories.has(seg)) {
         current.directories.set(seg, { directories: new Map(), files: new Map() });
       }
       current = current.directories.get(seg)!;
     }
 
-    const fileName = innerSegments[innerSegments.length - 1];
     current.files.set(fileName, file);
   }
 
@@ -314,7 +317,7 @@ function removeNodeAtPath(nodes: WorkspaceNode[], path: string): WorkspaceNode |
   const index = nodes.findIndex((node) => node.path === path);
   if (index !== -1) {
     const [removed] = nodes.splice(index, 1);
-    return removed;
+    return removed ?? null;
   }
   for (const node of nodes) {
     if (node.kind === "directory" && node.children) {
@@ -886,6 +889,9 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
 
       for (const [index, oldPath] of oldPaths.entries()) {
         const newPath = newPaths[index];
+        if (newPath === undefined) {
+          continue;
+        }
         const file = fallbackFiles.get(oldPath);
         if (file) {
           fallbackFiles.delete(oldPath);

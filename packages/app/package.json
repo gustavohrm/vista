@@ -11,11 +11,7 @@
     "format:check": "oxfmt --check",
     "format:fix": "oxfmt",
     "lint:check": "oxlint",
-    "lint:fix": "oxlint --fix",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest watch",
-    "typecheck": "tsc --noEmit"
+    "lint:fix": "oxlint --fix"
   },
   "dependencies": {
     "@codemirror/commands": "catalog:",

@@ -10,19 +10,18 @@ The [testing specification](tests.md) defines the categories, where they live, a
 
 ## Runners and file names
 
-| Category  | Runner                                            | File                                                    | Runs with                               |
-| --------- | ------------------------------------------------- | ------------------------------------------------------- | --------------------------------------- |
-| Unit      | [Vitest](https://vitest.dev/)                     | `src/<file>.test.ts` or `.tsx`, next to `src/<file>.ts` | `pnpm test`                             |
-| Browser   | [Playwright](https://playwright.dev/)             | `apps/web/tests/e2e/<journey>.spec.ts`                  | `pnpm test:e2e`                         |
-| Git hooks | [`node --test`](https://nodejs.org/api/test.html) | `scripts/git-hooks.test.mjs`                            | `pnpm test`, or `pnpm test:hooks` alone |
+| Category | Runner                                | File                                                    | Runs with       |
+| -------- | ------------------------------------- | ------------------------------------------------------- | --------------- |
+| Unit     | [Vitest](https://vitest.dev/)         | `src/<file>.test.ts` or `.tsx`, next to `src/<file>.ts` | `pnpm test`     |
+| Browser  | [Playwright](https://playwright.dev/) | `apps/web/tests/e2e/<journey>.spec.ts`                  | `pnpm test:e2e` |
 
 Shared React tests use React Testing Library, jest-dom matchers, and an explicit jsdom environment, with user-event for user interactions. Test setup cleans up mounted components after each test.
 
 ## Configuration
 
-- A package or app that needs custom options, such as path aliases, environment variables, plugins, or a DOM environment, MUST include its own explicit configuration file, `vite.config.ts`, `vitest.config.ts`, or `playwright.config.ts`. Do not rely on implicit or undocumented fallback behavior.
+- A package or app that needs custom options, such as path aliases, environment variables, plugins, or a DOM environment, MUST include its own explicit configuration file, `vitest.config.ts` or `playwright.config.ts`, and not `vite.config.ts` for tests: the root `vitest.config.ts` discovers packages by their `vitest.config.ts`, so one configured through `vite.config.ts` would silently drop out of `pnpm test`. Do not rely on implicit or undocumented fallback behavior.
 - Test scripts MUST NOT chain their own build step. The browser suite's `webServer` builds the web host before serving it, which is the server's setup, not a test script's.
-- A package with a Vitest suite defines the root names and meanings:
+- The root scripts run every package's Vitest suite, so a package needs no test scripts of its own. One that defines them uses the root names and meanings:
   - `test`: runs unit and integration tests once, and nothing that needs a browser.
   - `test:watch`: runs those tests in watch mode.
   - `test:coverage`: runs those tests and writes a coverage report.
@@ -58,12 +57,12 @@ pnpm test:coverage
 pnpm test:e2e
 ```
 
-Narrow a run while working on one area. `--filter` selects the package, and a path after the script is forwarded to the runner:
+Narrow a run while working on one area. `--project` selects a package by the name its `vitest.config.ts` gives, and a path runs one file:
 
 ```sh
-pnpm --filter=@vista/app test
-pnpm --filter=@vista/app test src/domain/path-validation.test.ts
-pnpm --filter=@vista/app test:watch
+pnpm test --project app
+pnpm test packages/app/src/domain/path-validation.test.ts
+pnpm test:watch --project app
 ```
 
 [Tooling](../tooling.md#narrowing-a-run) describes the other ways to narrow a run.
