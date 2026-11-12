@@ -5,10 +5,13 @@
 * text=auto eol=lf
 
 # Binary assets must never be touched by end-of-line conversion.
+*.avif binary
+*.gif binary
 *.icns binary
 *.ico binary
 *.jpeg binary
 *.jpg binary
+*.otf binary
 *.pdf binary
 *.png binary
 *.ttf binary

@@ -1,61 +1,46 @@
 ---
 status: IMPLEMENTED
 last_updated: 2026-11-12
-scope: The root `package.json` scripts, what `pnpm verify` runs, formatting and linting configuration, git hooks, and generated and ignored output.
+scope: Setup, how the root scripts are implemented, the order of `pnpm verify`, narrowing a run, adding a package, and generated and ignored output.
 ---
 
 # Tooling
+
+[Workspace](workspace.md) names the root scripts and what each one guarantees. This document is how Vista implements them.
 
 Every check is a root `package.json` script, run from the repository root. Package scripts are reached with `pnpm --filter=<package>` rather than by changing directory. CI runs the same scripts, and [CI](ci.md) describes how.
 
 There is no task runner. Vista is one application split across a few packages, and a set of scripts chained with `&&` is easier to read and reproduce than a tool that would have to be learned, versioned, and trusted first.
 
-## Toolchain
+## Setup
 
-The versions are declared once and read by both local runs and CI:
+[Contributing](../CONTRIBUTING.md#setup) lists what to install and the commands to run. `pnpm install` runs the root `prepare` script, which installs the git hooks as [Workspace](workspace.md#git-hooks) describes. If lifecycle scripts were disabled during the install, run `pnpm hooks:install`.
 
-| Where                                | Declares                                              |
-| ------------------------------------ | ----------------------------------------------------- |
-| `package.json` `engines`             | The Node and pnpm range every run must satisfy        |
-| `package.json` `packageManager`      | The exact pnpm version pnpm installs itself           |
-| `.nvmrc`                             | The exact Node version                                |
-| `pnpm-workspace.yaml` `engineStrict` | Makes an install outside `engines` fail               |
-| `rust-toolchain.toml`                | The exact Rust version and its `clippy` and `rustfmt` |
-
-[CI](ci.md) covers how the workflow reads them.
+nvm for Windows does not read `.nvmrc`, and `nvm install` and `nvm use` without a version fail, so name it; in PowerShell, `nvm install (Get-Content .nvmrc)`, then `nvm use (Get-Content .nvmrc)`. Checked with nvm for Windows 1.2.2, and in the source of 2.0.1, whose `install` requires the version.
 
 ## Scripts
 
-| Script               | Runs                                                              |
-| -------------------- | ----------------------------------------------------------------- |
-| `pnpm dev:web`       | The web host's Vite dev server                                    |
-| `pnpm dev:native`    | `tauri dev`, the native app with the interface served by Vite     |
-| `pnpm build`         | `build:web`, then `build:native`                                  |
-| `pnpm build:web`     | The web host's production bundle                                  |
-| `pnpm build:native`  | The native host's frontend bundle, which the Tauri build packages |
-| `pnpm deploy:web`    | `build:web`, then `wrangler deploy` for the web host              |
-| `pnpm verify`        | `verify:web`, then `verify:rust`                                  |
-| `pnpm verify:web`    | Format, lint, type check, tests, and both frontend bundles        |
-| `pnpm verify:rust`   | rustfmt, clippy, and `cargo test`, through `@vista/native`        |
-| `pnpm format:check`  | oxfmt, and Prettier for Markdown, without writing                 |
-| `pnpm format:fix`    | oxfmt, Prettier for Markdown, and `cargo fmt` for Rust, writing   |
-| `pnpm lint:check`    | oxlint, with warnings denied                                      |
-| `pnpm lint:fix`      | oxlint's automatic fixes                                          |
-| `pnpm typecheck`     | `tsc --noEmit` in every package that has a `typecheck` script     |
-| `pnpm test`          | The git hook tests, then each package's `test` script             |
-| `pnpm test:hooks`    | The git hook tests alone, with `node --test`                      |
-| `pnpm test:watch`    | Each package's `test:watch` script                                |
-| `pnpm test:coverage` | Each package's `test:coverage` script                             |
-| `pnpm test:e2e`      | The Playwright end-to-end tests for the web host                  |
-| `pnpm labels`        | Creates or updates the GitHub labels in `.github/labels.json`     |
-| `pnpm hooks:install` | Points `core.hooksPath` at `.githooks`, the step `prepare` runs   |
-| `pnpm prepare`       | Installs the git hooks, run automatically by `pnpm install`       |
+| Script               | Runs                                                                       |
+| -------------------- | -------------------------------------------------------------------------- |
+| `pnpm format:check`  | `oxfmt --check`, then `prettier --check` over `**/*.md`.                   |
+| `pnpm format:fix`    | The same two formatters, rewriting files, then `cargo fmt` for Rust.       |
+| `pnpm lint:check`    | `oxlint --deny-warnings`.                                                  |
+| `pnpm lint:fix`      | `oxlint --fix`.                                                            |
+| `pnpm typecheck`     | `tsc --noEmit` in every package that has a `typecheck` script.             |
+| `pnpm test`          | `test:hooks`, then each package's `test` script, which runs `vitest run`.  |
+| `pnpm test:hooks`    | `node --test scripts/git-hooks.test.mjs`.                                  |
+| `pnpm test:watch`    | Each package's `test:watch` script.                                        |
+| `pnpm test:coverage` | Each package's `test:coverage` script, with a V8 coverage report.          |
+| `pnpm test:e2e`      | `playwright test` in `@vista/web`.                                         |
+| `pnpm build`         | `build:web`, then `build:native`, each `vite build` in its host.           |
+| `pnpm deploy:web`    | `build:web`, then `wrangler deploy`, in `@vista/web`.                      |
+| `pnpm verify`        | `verify:web`, then `verify:rust`, in the order [below](#verification).     |
+| `pnpm labels`        | `node scripts/sync-labels.mjs`, which needs an authenticated `gh`.         |
+| `pnpm prepare`       | `node scripts/install-hooks.mjs`, the same script as `pnpm hooks:install`. |
 
 `lint:check` and `lint:fix` accept a root-relative path, such as `pnpm lint:fix packages/app/src`, to narrow oxlint to it.
 
-The Rust scripts live in `apps/native/package.json`: `format:rust:check`, `lint:rust:check`, and `test:rust`. `verify:rust` reaches them with `pnpm --filter=@vista/native`. Each passes `--manifest-path src-tauri/Cargo.toml`, so nothing needs to run from inside `apps/native/src-tauri`. They also pass `--locked` where cargo resolves dependencies, the Rust counterpart to `pnpm install --frozen-lockfile`: a `Cargo.lock` that disagrees with `Cargo.toml` fails rather than being rewritten.
-
-There is no `pnpm format` script. When a name matches no pnpm script, pnpm runs the executable of that name from `PATH` instead, and on Windows `format` is the system disk formatter. The explicit `format:check` and `format:fix` names avoid that.
+The Rust scripts live in `apps/native/package.json`: `format:rust:check`, `format:rust:fix`, `lint:rust:check`, and `test:rust`. `verify:rust` and `format:fix` reach them with `pnpm --filter=@vista/native`. Each passes `--manifest-path src-tauri/Cargo.toml`, so nothing needs to run from inside `apps/native/src-tauri`. They also pass `--locked` where cargo resolves dependencies, the Rust counterpart to `pnpm install --frozen-lockfile`: a `Cargo.lock` that disagrees with `Cargo.toml` fails rather than being rewritten.
 
 ## Verification
 
@@ -76,47 +61,30 @@ There is no `pnpm format` script. When a name matches no pnpm script, pnpm runs 
 2. `lint:rust:check`: clippy over every target, with warnings denied.
 3. `test:rust`: `cargo test`.
 
-The order is by cost. Within the web half, the checks that report in seconds run first, and each bundle runs after the tests that would catch the same mistake sooner. The web half runs before the Rust half because it reports in seconds, while the Rust half may compile for minutes.
+The order is by cost. Within the web half, the checks that report in seconds run first, and each bundle runs after the tests that would catch the same mistake sooner. The workspace packages are consumed as source, not built output, so type checking and tests need no build first. The web half runs before the Rust half because it reports in seconds, while the Rust half may compile for minutes.
 
 `verify` does not run `test:e2e`, `build:desktop`, `build:android`, or `build:ios`. The end-to-end tests need a browser and a local Worker, and the native installers need a platform toolchain. CI runs the end-to-end tests on every pull request.
 
-## Formatting and linting
+## Narrowing a run
 
-| Language                    | Formatter | Linter | Configuration                         |
-| --------------------------- | --------- | ------ | ------------------------------------- |
-| TypeScript, CSS, HTML, JSON | oxfmt     | oxlint | `.oxfmtrc.json`, `.oxlintrc.json`     |
-| Markdown                    | Prettier  | —      | `.prettierrc.json`, `.prettierignore` |
-| Rust                        | rustfmt   | clippy | `apps/native/src-tauri/rustfmt.toml`  |
+pnpm's `--filter` runs any script of one package, and a path after a Vitest script runs one directory or file:
 
-oxfmt ignores Markdown: `**/*.md` is in its ignore list. Prettier formats only the `**/*.md` set the scripts pass it, and runs with `proseWrap: "never"`, which is the no-hard-wrap rule [Documentation guidelines](guidelines/documentation.md) set.
+```sh
+pnpm --filter=@vista/app test
+pnpm --filter=@vista/app test src/domain/path-validation.test.ts
+pnpm --filter=@vista/app typecheck
+pnpm --filter=@vista/web test:e2e tests/e2e/startup.spec.ts
+```
 
-rustfmt runs at width 120, the same as oxfmt's `printWidth`, so both languages wrap at the same column.
+oxlint and oxfmt take paths: `pnpm lint:check packages/app/src` and `pnpm exec oxfmt --check packages/app`.
 
-oxlint runs with `--deny-warnings`, so a warning fails the check as an error does. Its rules are in `.oxlintrc.json`: the core, oxc, and TypeScript rules, JSDoc, Vitest, unicorn, promise, and the React and jsx-a11y plugins. The React Compiler rules oxlint 1.93 turned on by default (`react/refs`, `react/set-state-in-effect`, `react/immutability`, and `react/preserve-manual-memoization`) are off: Vista does not build with the React Compiler, and they flag the latest-value refs and state-syncing effects the app uses on purpose. A finding that is wrong for one place is suppressed on that line with a comment naming the rule and the reason, in the form `// oxlint-disable-next-line <rule> -- <reason>`. A rule that is wrong everywhere is changed in `.oxlintrc.json`, and this document changes with it.
+## Adding a package
 
-clippy runs with warnings denied over every target. A lint that is wrong for one place is allowed there with `#[allow(...)]` and a comment saying why.
-
-## Git hooks
-
-Three hooks live in `.githooks/`. The `prepare` script runs `scripts/install-hooks.mjs` on every `pnpm install`, which points `core.hooksPath` at that directory and makes the hooks executable. The setting is local to the clone rather than tracked, so a fresh clone runs no hooks until it installs. The script does nothing in CI, and nothing in a tree without a `.git` directory. It refuses to replace a `core.hooksPath` that already points somewhere else, so a different hook setup is reconciled by hand rather than overwritten.
-
-| Hook         | Checks                                                                                                                                                   |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pre-commit` | Refuses commits on `main` or a detached HEAD, untracked files, unstaged changes, and unresolved merges; then runs `pnpm format:check && pnpm lint:check` |
-| `commit-msg` | The Conventional Commits subject described in [Contributing](../CONTRIBUTING.md)                                                                         |
-| `pre-push`   | Refuses a push to `main`, a branch not named `<type>/<slug>`, a commit other than the checked-out one, and a dirty working tree                          |
-
-`pre-commit` is the one hook that runs a formatter and a linter, and it runs them over the whole repository, not over the staged files. A failure can come from a file the commit does not touch. Type checking, tests, and the Rust checks take minutes, and a hook that slow gets bypassed until it may as well not exist; `pnpm verify` is where they belong.
-
-`commit-msg` checks the subject line only: a known type, an optional scope, an imperative lowercase subject, no trailing period, and 72 characters at most. No hook can tell whether a message describes the commit honestly, so that half stays with review. Merges, reverts, and `fixup!`, `squash!`, and `amend!` subjects pass unchecked, because git composed them.
-
-`pre-push` reads the destination ref rather than the current branch, so it holds for a push from `main`, for an explicit refspec targeting it, and for a deletion. It checks the branch name because the name is often not a choice anyone made: an agent harness can create a branch before anyone has chosen its name. Deleting a remote branch passes whatever it is called, and tags are not checked.
-
-The checks that are not shell live in `scripts/check-git-state.mjs`, which `pre-commit` and `pre-push` call. The hook tests in `scripts/git-hooks.test.mjs` run as part of `pnpm test`.
-
-Each hook ignores SIGPIPE. Git for Windows counts a hook killed by any signal as passed, and when the caller pipes git through something that closes early, a hook writing its rejection message can be killed mid-message. Ignoring the signal leaves the hook's own verdict in charge of its exit status.
-
-`--no-verify` bypasses the hooks: on `git commit` for `pre-commit` and `commit-msg`, on `git push` for `pre-push`. It is for the change that genuinely has to land unfixed, and using it is worth saying out loud.
+1. Create it under `packages/` (shared code) or `apps/` (a host that is deployed or run), with a `package.json` named `@vista/<directory>`, `"private": true`, `"type": "module"`, and its dependencies as `catalog:` or `workspace:*`. A new third-party version goes in the catalog.
+2. Give it a `tsconfig.json` that extends `../../tsconfig.json` and adds the `lib` and `jsx` its runtime needs, and a `typecheck` script running `tsc --noEmit`; `pnpm typecheck` runs it.
+3. If it has unit tests, give it a `vitest.config.ts` and the `test`, `test:watch`, and `test:coverage` scripts [stack tests](specs/stack-tests.md#configuration) names; `pnpm test` runs them.
+4. Give it `format:check`, `format:fix`, `lint:check`, and `lint:fix` scripts as the other packages have, and a `build` script if it produces output, which a root `build:*` script then reaches.
+5. List it in [Architecture](architecture.md) and in the README's repository list.
 
 ## Generated and ignored output
 

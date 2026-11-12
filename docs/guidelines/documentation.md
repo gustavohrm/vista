@@ -38,7 +38,7 @@ The header is YAML rather than bold lines in the body because a tool can read it
 
 Markdown in this repository is not hard-wrapped. Write each paragraph and list item as a single line and let the editor wrap it on screen. Markdown renders a lone newline inside a paragraph as a space, so wrapped and unwrapped source read identically once rendered, and unwrapped prose keeps an edit to one word from reflowing a whole paragraph in the diff.
 
-Prettier enforces this: `pnpm format:check` runs it over every Markdown file with `proseWrap: "never"`, and `pnpm format:fix` unwraps hard-wrapped prose. `.editorconfig` sets no line length for Markdown, so editors do not wrap it either. [Tooling](../tooling.md) covers the formatter setup.
+Prettier enforces this: `pnpm format:check` runs it over every Markdown file with `proseWrap: "never"`, and `pnpm format:fix` unwraps hard-wrapped prose. `.editorconfig` sets no line length for Markdown, so editors do not wrap it either. [Workspace](../workspace.md#two-formatters) covers the formatter setup.
 
 ## Source of truth
 

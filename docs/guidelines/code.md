@@ -1,167 +1,106 @@
 ---
 status: IMPLEMENTED
 last_updated: 2026-11-12
-scope: Code conventions for naming, structure, TypeScript, inputs and state, React and UI, Rust, testing, and documentation in this repository.
+scope: Coding conventions for every part of the project, in any language.
 ---
 
 # Coding guidelines
 
-This document outlines the patterns, conventions, and guidelines that apply to this codebase.
+This document outlines the patterns, conventions, and guidelines to follow when working on this codebase. The [testing specification](../specs/tests.md) owns how tests are organized and run, and the [security guidelines](security.md) own how code keeps Vista's security commitments. The [stack guidelines](stack.md) add the conventions of TypeScript, React, and Rust and the tools that check them, such as casing and the format of API documentation.
 
-## Naming conventions
+## Naming
 
-- Files & Folders: kebab-case (`user-service.ts`, `api-routes/`). Rust files and modules are snake_case, as [Rust](#rust) describes.
-- Variables & Functions: camelCase (`getUserById`, `isValid`)
-- Classes & Types: PascalCase (`UserService`, `ApiResponse`)
-- Constants & Enums: UPPER_SNAKE_CASE (`MAX_RETRY_ATTEMPTS`)
-- Booleans: prefix with is/has/can/should (`isLoading`, `hasPermission`)
-- Arrays: plural nouns (`users`, `items`)
-- Functions: verb phrases (`calculateTotal`, `fetchUser`)
+- Casing: each language's convention, which the [stack guidelines](stack.md#naming) name.
+- Booleans: prefixed with is, has, can, or should (`isLoading`, `hasPermission`).
+- Arrays: plural nouns (`users`, `items`).
+- Functions: verb phrases (`calculateTotal`, `fetchUser`).
 
-Use names that describe domain intent. Avoid names based only on type or implementation, such as `data`, `item`, `manager`, or `helper`, unless the scope makes the meaning obvious.
+Name by domain intent. Avoid names that say only the type or the mechanism, such as `data`, `item`, `manager`, or `helper`, unless the scope makes the meaning obvious.
 
-## Architecture & design
+## Architecture and design
 
-- Single Responsibility: each function/class does ONE thing well
-- High Cohesion: logic that belongs together stays together
-- Loose Coupling: minimize dependencies between modules
-- Prefer dependency injection over hard-coding. Whatever makes code hard to test or tied to one environment, such as the clock, randomness, the network, and storage, arrives as a dependency.
-- Prefer using folders to group related files, with an `index.ts` entrypoint
-- Keep public API surface small and intentional
-- Do not add compatibility layers unless there is a real consumer, persisted data, shipped behavior, or explicit requirement
-- Do not add dependencies unless simple in-house code is worse
+- Single responsibility: each function, class, and module does one thing well.
+- High cohesion: logic that belongs together stays together.
+- Loose coupling: minimize dependencies between modules.
+- Prefer dependency injection to hard-coding. Whatever makes code hard to test or tied to one environment, such as the clock, randomness, the network, and storage, arrives as a dependency.
+- Keep each package's public surface small and intentional.
+- Keep dependency direction clear: shared code does not import app-specific code.
+- Do not add compatibility layers unless there is a real consumer, persisted data, shipped behavior, or explicit requirement that needs one.
+- Do not add a dependency unless simple in-house code is clearly worse.
+
+[Architecture](../architecture.md) records the split between the shared app in `packages/app` and the platform hosts in `apps/`, and the adapter contracts code uses to cross it.
 
 ### Fix it upstream
 
 When a dependency lacks something or gets it wrong, the fix goes upstream where the project can report it, and the project takes it from a release. A local workaround is temporary and names the issue it waits on, as [a defect found mid-task](../../CONTRIBUTING.md#a-defect-found-mid-task) describes. That holds for a third-party dependency as much as for one Vista's maintainers also maintain, such as the `@codenhub/*` packages; only the latter is fixed upstream by the project itself.
 
-## Coding good/bad practices
+## Code
 
-- Functions should be small and clearly nameable
-- Prefer `const` over `let`; never use `var`
-- Avoid magic numbers and strings; extract to named constants when the value has domain meaning or is reused
-- Code should be self-explanatory; use descriptive names
+- Functions are small and clearly nameable.
+- Avoid magic numbers and strings: extract a value to a named constant when it has domain meaning or is reused.
+- Code should explain itself through its names.
 - Design for predictable, deterministic behavior. Time and randomness come from an injected source, so a test controls them.
-- Avoid God Objects, Feature Envy, and excessive method chaining
-- ALWAYS prefer readable code over clever code
+- Avoid god objects, feature envy, and long method chains.
+- Prefer readable code to clever code.
 
 Literal values MAY stay inline when extraction makes code worse, such as protocol literals, package names, CSS selectors, event names, test fixtures, one-off validation messages, and external API values used once near their boundary.
 
 Function parameters:
 
-- 0-1 parameters: excellent
-- 2 parameters: acceptable
-- 3+ parameters: refactor into typed object
+- 0–1 parameters: excellent.
+- 2 parameters: acceptable.
+- 3 or more: refactor into an options object.
 
 Exceptions: framework callbacks, test helpers, tiny local functions, and APIs where an object parameter would hide meaning instead of improving it.
 
-## TypeScript
-
-- Use strict TypeScript.
-- Prefer `unknown` over `any`.
-- Prefer interfaces for object shapes and type aliases for unions/intersections.
-- Use type-only imports when importing only types.
-- Validate `unknown` at boundaries before use.
-- Keep casts close to the boundary and make them narrow.
-- Do not export types or values that are not part of the package or module API.
-
-## Modules and imports
-
-- Prefer named exports for shared application code and modules.
-- Use barrel files only as package or folder entrypoints.
-- Avoid deep imports across package internals unless the subpath is part of `exports`.
-- Keep dependency direction clear: shared code must not import app-specific code.
-
-## Async and errors
+## Concurrency and errors
 
 How failures are classified and shown to people is specified in [Errors](../specs/errors.md) (DRAFT).
 
-- Use `async`/`await` for asynchronous code.
-- Run independent async work in parallel with `Promise.all()`.
+- Run independent asynchronous work concurrently. Waiting for each in turn needs a reason, given where the code does it.
 - Do not swallow errors silently.
-- Throw or return errors with enough context to debug.
-- Do not log secrets, tokens, credentials, or private user data.
-- `console` is allowed for examples, CLIs, debugging utilities, and deliberate diagnostics. Do not use casual logging as a substitute for error handling.
+- Throw or return errors with enough context to debug them.
+- Do not log secrets, tokens, credentials, or private user data, which includes note and document content.
+- Logging is not a substitute for error handling.
 
 ## Inputs, failures, and state
 
 Most review findings that hold up are about these, not about style: a [study of the review threads in codenhub/codenhub](https://github.com/codenhub/codenhub/blob/37b44e7adc31f628c94fb9ff8bd257c869f64996/packages/skills/docs/internal/coding-skill-research.md), a monorepo whose code agents wrote, records the evidence.
 
-- Validate input from outside the code's control after it is converted, against the limits of what consumes it: `--timeout 1e308` passes "positive number" and becomes an infinite timer. A number parsed from such input rejects empty, whitespace-only, NaN, Infinity, and partial values such as `10s`. In Vista, a file or folder name the user types and the contents of a file read from their folder are such input too, each checked against what consumes it: a name against what the file system accepts, contents against the format the parser reads.
+- Validate input from outside the code's control after it is converted, against the limits of what consumes it: `--timeout 1e308` passes "positive number" and becomes an infinite timer. Reject empty, whitespace-only, NaN, Infinity, and partial numbers such as `10s`. In Vista, a file or folder name the user types and the contents of a file read from their folder are such input too, each checked against what consumes it: a name against what the file system accepts, contents against the format the parser reads.
 - When required input is missing or matches nothing, fail with a message naming it. A run whose required input was absent never reports success.
 - Mark state as written, such as a note's saved status, only after the write succeeds, and never swallow a write error. Unsaved edits live in memory before any write; it is the claim that they reached disk that waits for it. A note shown as saved whose write to disk failed is lost on the next restart.
 - Apply a new option or fix to every path the same input or behavior flows through: each source of the value, sync and async variants, create and update, every caller, and each host adapter. Name any path left out, with the reason.
 - A hand-written parser rejects syntax it does not support, naming the file and line, instead of reading it as data.
 - Keep input order and any order a contract defines; sort output whose order is unspecified by a defined key with a tie-breaker.
 
-## React and UI
-
-- Shared UI in `packages/app` MUST NOT import Tauri, File System Access, or other host APIs. It consumes capabilities through the contracts in `packages/app/src/ports.ts`, and each host implements them. [Architecture](../architecture.md#platform-adapters) describes the adapter model.
-- Never use `alert`, `confirm`, or `prompt`. Show transient messages and confirmations through `useToast()` from `packages/app/src/components/feedback/toast.tsx`, which keeps them consistent with the rest of the app. [Toasts and confirmations](../architecture.md#toasts-and-confirmations) describes the toast and confirmation behavior.
-- A gesture that must stay smooth, such as dragging, SHOULD update the DOM through a ref during the gesture and commit to state on release, rather than re-rendering on every frame.
-- Use the `@codenhub/styles` component classes when one fits, and Tailwind utilities for layout only. [Shared presentation](../architecture.md#shared-presentation) defines the full styling contract.
-- Icons are rendered by the build-time `@codenhub/icons` rewrite, which only matches literal class names. The `ic-*` class MUST appear as a literal string in `className`; never compute it at runtime.
-
-## Rust
-
-Rust code lives in `apps/native/src-tauri`, the Tauri host for Vista.
-
-- Public fallible functions return `Result`, and their rustdoc MUST include an `# Errors` section that lists the failure conditions.
-- Keep logic that does not need Tauri types out of Tauri-facing entrypoints, so it can be unit-tested without a window.
-- Avoid `unwrap()` outside tests. Use `?` to propagate errors, or `expect()` with a message that names the invariant being relied on.
-
-Formatting and linting are owned by `rustfmt` and `clippy`, as [Formatting, linting, and type checking](#formatting-linting-and-type-checking) describes.
-
 ## Testing
 
-- Test behavior, edge cases, and error paths (not just happy paths).
-- One behavior per test. Name each test after the behavior it asserts, as a sentence, such as `it("shows an error toast when saving a file fails")`.
-- Test files are colocated with the code they test: `*.test.ts` or `*.test.tsx` beside the source. Rust unit tests live in a `#[cfg(test)] mod tests` block in the module they cover.
-- Mock only real boundaries: network, storage, filesystem, timers, and browser or host APIs. Pure logic is tested directly, as `packages/app/src/domain/path-validation.test.ts` does.
+- Test behavior, edge cases, and error paths, not just the happy path.
+- One behavior per test, named by the behavior it proves, as a sentence (`it("shows an error toast when saving a file fails")`).
+- Unit tests sit next to the code they test. Rust unit tests live in a `#[cfg(test)] mod tests` block in the module they cover.
+- Mock the network, timers, and browser and host APIs. Test code whose job is file access against a real temporary directory where practical, and mock it elsewhere. Pure logic is tested directly, as `packages/app/src/domain/path-validation.test.ts` does.
 - Give each behavior decision a test that fails when the decision is reversed, and see a new test fail before keeping it.
 - A test that writes files uses its own directory under the system temporary directory, never the package or the current directory, and removes it afterwards.
 - Poll for a condition instead of sleeping a fixed time.
-- Prefer observable behavior over implementation details.
-- Update affected tests when changing behavior.
+- Prefer observable behavior to implementation details.
+- A change in behavior changes its tests in the same change.
 
-The [testing specification](../specs/tests.md) defines test categories, configuration requirements, and coverage targets.
+Mocking the filesystem and storage everywhere was the earlier rule. It was narrowed because a mock answers only what the test tells it, so it cannot show the containment, symlink, and stale-output bugs found in review threads on [codenhub/codenhub#24](https://github.com/codenhub/codenhub/pull/24#discussion_r3875960231), [#25](https://github.com/codenhub/codenhub/pull/25#discussion_r3888570403), and [#293](https://github.com/codenhub/codenhub/pull/293#discussion_r4304630356); a real temporary directory does. In Vista's TypeScript, file access goes through the File System Access API or Tauri, which a test cannot reach without a browser or a window, so those adapters stay mocked in unit tests; the rule bites on code that runs under Node.js, such as `scripts/`, and on Rust.
 
-## Documentation
+The [testing specification](../specs/tests.md) defines the test categories, configuration, scripts, and coverage target.
 
-- Comments explain WHY, not WHAT or HOW.
-- Remove and avoid redundant comments, decorations and outdated docs.
-- Public workspace and contract APIs MUST have JSDoc/TSDoc in source, even when the package or app README also documents them.
-- Public Rust items MUST have rustdoc.
+## Documentation in code
 
-In this application workspace, symbols exposed through `package.json` `exports` (such as in `@vista/app`) form the shared contracts and components consumed across platform hosts. Public workspace API includes exported components, capability contracts, interfaces, type aliases, constants, and host adapter types.
+- Comments explain why, not what or how.
+- Remove redundant comments, decorations, and outdated docs, in the change that makes them outdated.
 
-Contract and component JSDoc/TSDoc MUST describe purpose, important parameters or properties, return values or side effects, and observable error or failure behavior. It MUST NOT restate the type signature in prose or document private implementation details.
+Every symbol a package exports through `package.json` `exports` is that package's API and MUST have API documentation in source, even when a README also documents it, in the format the [stack guidelines](stack.md#tsdoc) give. Vista's packages are private, but their exports are the contracts between the shared app and its hosts, so the rule holds for them in full. The documentation describes the caller-facing purpose, important inputs, return values or side effects, and observable failure, including the states a caller must handle and the conditions under which it fails. It MUST NOT restate the type signature in prose or describe private implementation details. An example in it MUST be realistic and work against the current API.
 
-Specifically, public API JSDoc/TSDoc MUST:
-
-- Open with a one-sentence summary of what the symbol does for the caller, in the present tense. Longer explanation goes in `@remarks`, not the summary.
-- Document every parameter and type parameter with `@param` / `@typeParam`, giving intent and any constraint, unit, or accepted range rather than a restatement of the type. Omit `@param` only when the parameter name already fixes its meaning exactly.
-- Document the returned value with `@returns` whenever the symbol returns one, including the states a caller must handle, such as an empty collection, `null`, or a failed result. Omit it for `void`.
-- Describe observable failure with one `@throws` per error type and the condition that triggers it. A symbol that reports failure by return value instead of throwing MUST say so where a reader would otherwise expect a throw.
-- Give `@defaultValue` to an optional parameter or property whose default a caller cannot infer.
-- Carry `@deprecated` with the replacement and, when known, the version that removes it.
-- Document each public member of a class or interface with its own TSDoc. A bare member is an incomplete public API.
-- Prefer `{@link OtherSymbol}` to repeating another symbol's contract.
-
-`@example` blocks are encouraged for any non-obvious usage; each MUST be realistic and compile against the current public API.
-
-Internal exports used only to compose package entrypoints SHOULD stay unexported from public entrypoints. If an internal export is necessary, mark it with `@internal` and keep it out of package README examples.
-
-When changing workspace `exports`, shared symbols, capability contracts, or observable failure behavior, update source JSDoc/TSDoc and the package or app README in the same change.
-
-Oxlint validates JSDoc structure and tag quality where supported, but current Oxlint rules do not fully detect missing docs for workspace public exports. Code authors and reviewers MUST enforce public API JSDoc/TSDoc coverage during implementation and review until a dedicated lint rule or custom plugin exists.
+When a change touches a package's exports or its observable behavior or failures, it updates the API documentation and every README or document describing them in the same change. Whether every export is documented, and how well, is a review responsibility, as the [stack guidelines](stack.md#tsdoc) record.
 
 ## Formatting, linting, and type checking
 
-- Code MUST pass `pnpm format:check`.
-- Code MUST pass `pnpm lint:check`.
-- Code MUST pass `pnpm typecheck` for changed packages or the full workspace when practical.
-- Rust code in `apps/native/src-tauri` MUST pass `pnpm --filter=@vista/native format:rust:check` and `pnpm --filter=@vista/native lint:rust:check`, and its tests MUST pass `pnpm --filter=@vista/native test:rust`.
-- Formatting is owned by Oxfmt for TypeScript, CSS, HTML, and JSON, by Prettier for Markdown, and by `rustfmt` for Rust. Do not manually fight formatter output.
-- Lint rules are enforceable project policy. Change the rule or document an exception instead of ignoring it broadly.
-- Every local suppression (`oxlint-disable`, `@ts-expect-error`, `#[allow(...)]`) MUST carry a comment that says why it is needed. For `oxlint-disable`, put the reason after `--` on the same directive. For `#[allow(...)]` and `@ts-expect-error`, put it on the line above.
+- Code MUST pass `pnpm verify`. [Workspace](../workspace.md#root-scripts) lists what it runs, and the [stack guidelines](stack.md#formatting-linting-and-type-checking) the narrower checks.
+- Do not fight the formatter's output.
+- Lint rules are enforceable project policy. Change the rule, or add a scoped override with its reason recorded, rather than ignoring it broadly. A local suppression comment (`oxlint-disable`, `@ts-expect-error`, `#[allow(...)]`) says why it is there.
