@@ -1,149 +1,73 @@
 ---
 status: IMPLEMENTED
 last_updated: 2026-11-12
-scope: Test categories, locations, tooling, and coverage targets.
+scope: Test categories, where each lives, coverage expectations, and what no automated test reaches.
 ---
 
-# Testing specification
+# Tests
 
-This document outlines the testing strategy, architecture, and standards for this repository. It defines test categories, tooling, configuration requirements, and code coverage targets.
+This document defines how the project is tested: what kinds of tests exist, where they live, how they run, and what they are expected to cover. The conventions for writing an individual test are in the [coding guidelines](../guidelines/code.md#testing), and the runners, file names, configuration, and commands are in [stack tests](stack-tests.md).
 
-## Philosophy
+## Principles
 
-- **Test Behavior, Not Implementation**: Write tests that verify the observable behavior of your API or component, rather than its internal implementation details.
-- **No Permanent Absence Checks**: A test asserting only that a removed name is gone verifies nothing about current behavior. It earns its place only while a rename or removal is in flight; delete it once the change is verified, in the same pull request. If the rule it guards is durable, enforce it as a repository check rather than as a permanent unit test.
-- **Fast and Deterministic**: Tests must run quickly and yield consistent, predictable results. A flaky test is a bug. Time, randomness, and the network come from sources a test controls; a test that depends on real timing, the network, or a real window does not belong in the default suite.
-- **Fail Fast**: Test inputs and edge cases early. Ensure error paths are tested alongside happy paths.
+- **Test behavior, not implementation.** A test verifies what a caller can observe, not how the code produces it.
+- **Fast and deterministic.** A flaky test is a bug. Time, randomness, and the network come from sources a test controls; a test that depends on real timing, the network, or a real window does not belong in the default suite.
+- **Error paths count.** Failure cases are tested as carefully as the happy path, and inputs and edge cases early.
+- **No permanent absence checks.** A test asserting only that a removed name, class, or token is gone, such as an assertion that some output does not contain `old-name`, verifies nothing about current behavior: it is indistinguishable from asserting the absence of a string that never existed. Such a check earns its place only while a rename or removal is in flight, as a guard against a forgotten reference; delete it once the change is verified, in the same pull request. A durable rule, such as "no compatibility aliases", is a lint rule or repository check, not a permanent unit test.
 
-## Test Categorization
-
-Tests in this repository use the following categories as needed, based on scope and isolation level.
+## Categories
 
 | Category    | Where                                  | Runs                                          | Covers                                                                                    |
 | ----------- | -------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | Unit        | Next to the code it tests              | With the default suite, `pnpm test`           | One module, its boundaries replaced by fakes.                                             |
 | Integration | In the package or app it belongs to    | With the default suite, `pnpm test`           | Several modules together, or a real boundary such as storage or a server. None exist yet. |
-| E2E         | In the app host, apart from its code   | Apart from the default suite, `pnpm test:e2e` | Full user journeys, rendering, and visual regression in real browsers.                    |
+| Browser     | In the web host, apart from its code   | Apart from the default suite, `pnpm test:e2e` | Full user journeys and rendering in real browsers. No visual regression tests yet.        |
+| Git hooks   | Beside the scripts, in `scripts/`      | With the default suite, `pnpm test`           | Real commits and pushes through the hooks, in temporary repositories.                     |
 | Rust        | In the module it tests, in `src-tauri` | With `pnpm verify`, through `verify:rust`     | The native host's Rust code. None exist yet; the command runs no tests.                   |
 
-A category without tests yet is marked so in the table: an empty suite, or a script that passes without running anything, misleads when it reads as coverage.
+The default suite is what the gate's test step runs. A category without tests yet is marked so in the table: an empty suite, or a script that passes without running anything, misleads when it reads as coverage.
 
-### 1. Unit Tests
+Manual usage scenarios, such as running the dev server during development, are outside these categories.
 
-Unit tests verify the correctness of small, isolated blocks of code (such as individual functions, classes, or hooks) in isolation.
+### Unit tests
 
-- **Location**: Colocated in the same directory as the source code they verify.
-- **File Naming**: `[filename].test.ts` or `[filename].test.tsx` (e.g., `src/normalize.test.ts`).
-- **Tooling**: [Vitest](https://vitest.dev/).
-- **Conventions**:
-  - Mock external dependencies (network APIs, local storage, databases, file system, timers, and browser-specific globals).
-  - Do not import test utilities across distant packages, except from a package or subpath that exists to share them.
-  - Run on every pull request through GitHub Actions.
-  - Shared React tests use React Testing Library, jest-dom matchers, and an explicit jsdom environment. Use user-event for user interactions when features introduce them. Test setup cleans up mounted components after each test.
+- A test file is named after the file it covers, as [stack tests](stack-tests.md#runners-and-file-names) gives.
+- What to mock, and what to test against real temporary state instead, is owned by the [coding guidelines](../guidelines/code.md#testing).
+- Do not import test utilities across distant packages, except from a package or subpath that exists to share them.
 
-### 2. Integration Tests
+### Integration tests
 
-Integration tests verify that multiple modules or packages interact correctly, including boundaries such as database adapters, network middleware, or cache layers.
+- Integration tests live inside the package or app they belong to, in a `tests/integration/` directory such as `packages/app/tests/integration/` once the first one is added. Do not add a repository-root `tests/` directory by default.
+- When a journey or orchestration genuinely spans packages, a dedicated workspace package for those tests is allowed, rather than placing them in one of the packages they cross.
 
-- **Location**: Housed in a `tests/integration/` directory inside the package or application root, such as `packages/app/tests/integration/`, when the first integration test is added. No integration tests exist yet, and `packages/app/tests/` is not present.
-- **Tooling**: [Vitest](https://vitest.dev/).
-- **Conventions**:
-  - Do not use a repository-root global `tests/` directory by default. Keep tests colocated within the package/app scope.
-  - When a journey or orchestration genuinely spans packages, a dedicated workspace package for those tests is allowed, rather than placing them in one of the packages they cross.
+### Browser tests
 
-### 3. End-to-End (E2E) & Visual Tests
+- Browser suites are configured and run apart from the default suite, so the loop everyone runs constantly stays fast and needs no browser installed.
+- A suite SHOULD cover every engine its users run, because catching what one engine does differently is what the suite is for. The suite runs Chromium only today, as [Not covered by automated tests](#not-covered-by-automated-tests) records.
+- Add visual regression tests once a component has an agreed visual design, not for placeholder interfaces. The current shell uses a browser startup smoke test, including a computed-style check, rather than maintaining snapshots of placeholder UI.
 
-E2E tests verify full user journeys, page transitions, rendering, and visual regression across real browser environments.
+The web host's smoke test builds the frontend and serves it with local Wrangler. It verifies shared-app startup, styles, direct navigation, reload, and JavaScript errors through the deployment runtime. Chromium covers the initial desktop Chrome/Edge web target.
 
-- **Location**: Housed in `tests/e2e/` or `tests/browser/` directories within the target application host (such as `apps/web/tests/e2e/`).
-- **Tooling**: [Playwright](https://playwright.dev/).
-- **Conventions**:
-  - Add visual regression tests when a component has an agreed visual design. The current shell uses a browser startup smoke test, including a computed-style check, rather than maintaining snapshots of placeholder UI.
-  - Since E2E tests are slower and require browser environments, configure them separately to avoid blocking fast unit test loops.
-  - A suite SHOULD cover every engine its users run, because catching what one engine does differently is what the suite is for. The suite runs Chromium only today, as [Not Covered Yet](#not-covered-yet) records.
+### Git hook tests
 
-### 4. Rust Tests
+The hook tests in `scripts/git-hooks.test.mjs` use Node's built-in test runner rather than Vitest, a scoped exception that keeps repository tooling free of dependencies. They use temporary repositories and local bare remotes, and substitute only the expensive pnpm checks, so they verify real commit and push acceptance, rejection, and failure propagation without touching the working repository or GitHub.
 
-Rust tests cover the native host in `apps/native/src-tauri`.
+### Rust tests
 
-- **Location**: In a `#[cfg(test)] mod tests` inside the module under test. No Rust tests exist yet: `#[cfg(test)]` does not appear in `apps/native/src-tauri/src`.
-- **Tooling**: `cargo test`, run through `pnpm --filter=@vista/native test:rust`.
-- **Scope**: `src/lib.rs` registers the dialog, filesystem, and persisted-scope plugins and defines no commands of its own. Folder access and restore logic lives in the TypeScript adapter `apps/native/src/workspace-adapter.ts`, which has no automated test.
+Rust tests cover the native host in `apps/native/src-tauri`, in a `#[cfg(test)] mod tests` inside the module under test. None exist yet: `src/lib.rs` registers the dialog, filesystem, and persisted-scope plugins and defines no commands of its own. Folder access and restore logic lives in the TypeScript adapter `apps/native/src/workspace-adapter.ts`.
 
-The web host's Playwright smoke test builds the frontend and serves it with local Wrangler. It verifies shared-app startup, styles, direct navigation, reload, and JavaScript errors through the deployment runtime. Chromium covers the initial desktop Chrome/Edge web target. The test starts its own server and fails on a port collision rather than silently using another app.
+## Coverage
 
-Native executable builds are not run in CI. Build the native app manually when changing Tauri configuration or implementing native adapters.
+The coverage script writes a report, as [stack tests](stack-tests.md#coverage) describes. The suggested target is **80%**. It guides development and review; it is not a gate and never fails a build, because a coverage threshold that blocks merges gets satisfied with tests that execute lines without asserting anything.
 
-Repository Git-hook integration tests live beside the scripts in `scripts/git-hooks.test.mjs` and use Node's built-in test runner. This scoped exception to the Vitest/package layout keeps repository tooling dependency-free. Tests use temporary repositories and local bare remotes, and substitute only the expensive pnpm checks. They verify real Git commit/push acceptance, rejection, and failure propagation without touching the working repository or GitHub. `pnpm test:hooks` runs them independently; `pnpm test` includes them.
-
-## Configuration Requirements
-
-To maintain clean and explicit testing setups, follow these configuration rules:
-
-- **Config Files**:
-  - If a package or application requires custom options (such as path aliases, environment variables, vitest plugins, or specific setups), it **MUST** include an explicit configuration file (`vite.config.ts`, `vitest.config.ts`, or `playwright.config.ts`).
-  - Do not rely on implicit or undocumented fallback behavior.
-- **Package Scripts**:
-  - Every testable package or app `package.json` must expose standard test scripts:
-    - `"test"`: Runs tests once.
-    - `"test:watch"`: Runs tests in interactive watch mode.
-    - `"test:coverage"`: Runs tests and outputs a coverage report.
-
-These standard scripts apply to packages with Vitest suites. A host with only browser tests exposes `test:e2e`; native Rust checks expose `test:rust`. Do not add empty suites or commands that silently pass without tests just to fill out scripts.
-
-## Code Coverage
-
-- **Suggested Target**: **80%** code coverage.
-- **Non-Blocking Target**: Code coverage is a target to guide development and review discussions. It must not block the CI/CD pipeline or fail builds, because a coverage threshold that blocks merges gets satisfied with tests that execute lines without asserting anything.
-
-## Execution Commands
-
-Always run tests from the repository root:
-
-### Workspace-wide Checks
-
-```sh
-pnpm test
-pnpm test:coverage
-pnpm test:e2e
-```
-
-### Package-filtered Checks
-
-Prefer using package-filtered commands when testing a single package or to avoid workspace timeouts:
-
-```sh
-pnpm --filter=<package-name> test
-pnpm --filter=<package-name> test:watch
-pnpm --filter=<package-name> test:coverage
-```
-
-_(Replace `<package-name>` with a workspace package name, e.g., `pnpm --filter=@vista/app test`.)_
-
-Install the browser once before running E2E tests:
-
-```sh
-pnpm --filter=@vista/web exec playwright install chromium
-```
-
-CI installs Chromium with the same command, adding `--with-deps` for the Ubuntu runner. Browser tests remain separate from `pnpm test` and `pnpm verify` so local unit-test loops do not need a browser installation. CI runs both hook/unit tests and browser tests. Coverage is available locally through `pnpm test:coverage`; it includes untested implementation files in the shared package and excludes tests, setup, re-export entrypoints, and the current type-only platform contract. The 80% target remains advisory.
-
-Rust tests run with:
-
-```sh
-pnpm --filter=@vista/native test:rust
-```
-
-No root script runs `test:rust` alone, but `pnpm verify` runs it through `verify:rust`, after the Rust formatting and lint checks.
-
-## Not Covered Yet
+## Not covered by automated tests
 
 These areas have no automated test. They are verified by hand, or not verified at all, until a test for them exists.
 
-- **Native app.** `apps/native` has no automated UI or end-to-end test. Folder picking, filesystem scope, and restoring a folder after a restart are checked by running the app.
+- **Native app.** `apps/native` has no automated UI or end-to-end test. Folder picking, filesystem scope, and restoring a folder after a restart are checked by running the app. Build it by hand when changing Tauri configuration or implementing native adapters.
 - **Native executable.** The native build is not in CI, and no Rust test exists yet.
 - **Native and web folder adapters.** Neither `apps/native/src/workspace-adapter.ts` nor `apps/web/src/workspace-adapter.ts` has a Vitest suite.
-- **File System Access in the browser.** The E2E suite in `apps/web/tests/e2e/workspace-crud-fallback.spec.ts` forces the `webkitdirectory` fallback, because automation cannot drive the native folder picker. The primary File System Access path, including permission prompts and reopening a remembered folder, is checked by hand.
-- **Other browsers.** E2E runs Chromium only. Firefox and Safari are not covered.
+- **File System Access in the browser.** The browser suite in `apps/web/tests/e2e/workspace-crud-fallback.spec.ts` forces the `webkitdirectory` fallback, because automation cannot drive the native folder picker. The primary File System Access path, including permission prompts and reopening a remembered folder, is checked by hand.
+- **Other browsers.** The browser suite runs Chromium only. Firefox and Safari are not covered.
 - **Mobile.** Android and iOS are not supported, so nothing is tested there.
 - **Packaging.** Installers, signing, and automatic updates are not verified.

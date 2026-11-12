@@ -8,7 +8,7 @@ This repository is docs-first. [`docs/README.md`](docs/README.md) indexes every 
 - Ask when different interpretations would lead to different work. Do not settle an unstated choice about behavior, a host adapter contract, a security property, or a recorded decision by assuming it. Do everything independent of the answer first, then ask at the point the answer is needed.
 - Keep changes small and within the requested scope. Preserve unrelated work.
 - A defect found while working on something else is filed and worked around, not fixed on the spot, as [`CONTRIBUTING.md`](CONTRIBUTING.md#a-defect-found-mid-task) describes. That includes a defect in a dependency you also maintain, such as an `@codenhub/*` package: the fix belongs in that dependency's repository.
-- Never put a secret, token, password, or personal data in a log, an error, a test snapshot, a commit, or a message to the user, including test values you generate. Note and document content in a user's folder counts as personal data; [`SECURITY.md`](SECURITY.md) describes what Vista protects.
+- Never put a secret, token, password, or personal data in a log, an error, a test snapshot, a commit, or a message to the user, including test values you generate. Note and document content in a user's folder counts as personal data; [`SECURITY.md`](SECURITY.md) describes what Vista protects, and [`docs/guidelines/security.md`](docs/guidelines/security.md) how code keeps it.
 - Report failing checks, skipped steps, and unfinished work plainly, with the output that shows it. Never describe a partial result as complete.
 - Close by listing material judgment calls and assumptions so they can be confirmed or reversed.
 

@@ -155,7 +155,7 @@ Before delivering a change, run the whole gate:
 pnpm verify
 ```
 
-Report any step that was skipped or failed. [Tooling](docs/tooling.md) documents what `pnpm verify` runs and the narrower commands.
+Report any step that was skipped or failed. [Workspace](docs/workspace.md#root-scripts) documents what `pnpm verify` guarantees, and [Tooling](docs/tooling.md) its order and the narrower commands.
 
 `pnpm verify` does not run the end-to-end tests, which need a browser installed; CI runs them on every pull request. Run `pnpm test:e2e` as well when a change touches what a user sees or how the web host serves it.
 
@@ -192,4 +192,4 @@ Three hooks run locally, all from `.githooks/`. `pre-commit` and `pre-push` dele
 | `commit-msg` | The subject line shape described above: a type, an optional scope, an optional `!`, a colon, a subject of 72 characters or fewer that does not start with a capital and does not end with a period. Merge, revert, `fixup!`, `squash!`, and `amend!` subjects are exempt, since git writes them rather than a person. |
 | `pre-push`   | Refuses any update or deletion of `main`, and any push of a commit other than the one checked out. Refuses a branch name that does not match `<type>/<slug>`, though a deletion of a misnamed branch passes. Requires a clean working tree, including untracked files.                                                |
 
-`--no-verify` bypasses them. It is for the commit that genuinely has to land unfixed, and an agent that reaches for it MUST say so in the same breath rather than quietly routing around a failing check. [Tooling](docs/tooling.md#git-hooks) describes what each hook does and why it does no more than that.
+`--no-verify` bypasses them. It is for the commit that genuinely has to land unfixed, and an agent that reaches for it MUST say so in the same breath rather than quietly routing around a failing check. [Workspace](docs/workspace.md#git-hooks) describes how the hooks are wired, and why each does no more than it does.
