@@ -17,11 +17,10 @@ This document defines how the project is tested: what kinds of tests exist, wher
 
 ## Categories
 
-| Category  | Where                                | Runs                                          | Covers                                                                             |
-| --------- | ------------------------------------ | --------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Unit      | Next to the code it tests            | With the default suite, `pnpm test`           | One module, its boundaries replaced by fakes.                                      |
-| Browser   | In the web host, apart from its code | Apart from the default suite, `pnpm test:e2e` | Full user journeys and rendering in real browsers. No visual regression tests yet. |
-| Git hooks | Beside the scripts, in `scripts/`    | With the default suite, `pnpm test`           | Real commits and pushes through the hooks, in temporary repositories.              |
+| Category | Where                                | Runs                                          | Covers                                                                             |
+| -------- | ------------------------------------ | --------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Unit     | Next to the code it tests            | With the default suite, `pnpm test`           | One module, its boundaries replaced by fakes.                                      |
+| Browser  | In the web host, apart from its code | Apart from the default suite, `pnpm test:e2e` | Full user journeys and rendering in real browsers. No visual regression tests yet. |
 
 The default suite is what the gate's test step runs. Add a category only when the project has tests for it: an empty suite, or a script that passes without running anything, misleads more than a missing one. Vista has no integration tests and no Rust tests yet; the first of either adds its row here, its section below, and its runner to [stack tests](stack-tests.md).
 
@@ -40,10 +39,6 @@ Manual usage scenarios, such as running the dev server during development, are o
 - Add visual regression tests once a component has an agreed visual design, not for placeholder interfaces. The current shell uses a browser startup smoke test, including a computed-style check, rather than maintaining snapshots of placeholder UI.
 
 The web host's smoke test builds the frontend and serves it with local Wrangler. It verifies shared-app startup, styles, direct navigation, reload, and JavaScript errors through the deployment runtime. Chromium covers the initial desktop Chrome/Edge web target.
-
-### Git hook tests
-
-The hook tests in `scripts/git-hooks.test.mjs` use Node's built-in test runner rather than Vitest, a scoped exception that keeps repository tooling free of dependencies. They use temporary repositories and local bare remotes, and substitute only the expensive pnpm checks, so they verify real commit and push acceptance, rejection, and failure propagation without touching the working repository or GitHub.
 
 ## Coverage
 

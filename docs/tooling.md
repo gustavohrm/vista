@@ -1,7 +1,7 @@
 ---
 status: IMPLEMENTED
 last_updated: 2026-11-12
-scope: Setup, how the root scripts are implemented, the order of `pnpm verify`, narrowing a run, adding a package, and generated and ignored output.
+scope: Setup, how the root scripts are implemented, the TypeScript and Vitest configuration, the order of `pnpm verify`, narrowing a run, adding a package, and generated and ignored output.
 ---
 
 # Tooling
@@ -14,7 +14,7 @@ There is no task runner. Vista is one application split across a few packages, a
 
 ## Setup
 
-[Contributing](../CONTRIBUTING.md#setup) lists what to install and the commands to run. `pnpm install` runs the root `prepare` script, which installs the git hooks as [Workspace](workspace.md#git-hooks) describes. If lifecycle scripts were disabled during the install, run `pnpm hooks:install`.
+[Contributing](../CONTRIBUTING.md#setup) lists what to install and the commands to run. `pnpm install` runs the root `prepare` script, which points git at `.githooks/` through `core.hooksPath`, as [Workspace](workspace.md#git-hooks) describes. If lifecycle scripts were disabled during the install, run `git config core.hooksPath .githooks`.
 
 pnpm is installed apart from Node, with the standalone script in [pnpm's installation guide](https://pnpm.io/installation): a pnpm installed through `npm` belongs to the Node version it was installed under, and `nvm install` switching versions takes it off the `PATH`. Any pnpm 10 or later switches itself to the version the `packageManager` field in `package.json` pins before it runs, unless its `manage-package-manager-versions` setting has been turned off; with it off, install the pinned version itself. Node does not bring pnpm with it: Node 24 ships Corepack switched off, and later versions do not ship it at all.
 
@@ -22,27 +22,38 @@ nvm for Windows does not read `.nvmrc`, and `nvm install` and `nvm use` without 
 
 ## Scripts
 
-| Script               | Runs                                                                       |
-| -------------------- | -------------------------------------------------------------------------- |
-| `pnpm format:check`  | `oxfmt --check`, then `prettier --check` over `**/*.md`.                   |
-| `pnpm format:fix`    | The same two formatters, rewriting files, then `cargo fmt` for Rust.       |
-| `pnpm lint:check`    | `oxlint --deny-warnings`.                                                  |
-| `pnpm lint:fix`      | `oxlint --fix`.                                                            |
-| `pnpm typecheck`     | `tsc --noEmit` in every package that has a `typecheck` script.             |
-| `pnpm test`          | `test:hooks`, then each package's `test` script, which runs `vitest run`.  |
-| `pnpm test:hooks`    | `node --test scripts/git-hooks.test.mjs`.                                  |
-| `pnpm test:watch`    | Each package's `test:watch` script.                                        |
-| `pnpm test:coverage` | Each package's `test:coverage` script, with a V8 coverage report.          |
-| `pnpm test:e2e`      | `playwright test` in `@vista/web`.                                         |
-| `pnpm build`         | `build:web`, then `build:native`, each `vite build` in its host.           |
-| `pnpm deploy:web`    | `build:web`, then `wrangler deploy`, in `@vista/web`.                      |
-| `pnpm verify`        | `verify:web`, then `verify:rust`, in the order [below](#verification).     |
-| `pnpm labels`        | `node scripts/sync-labels.mjs`, which needs an authenticated `gh`.         |
-| `pnpm prepare`       | `node scripts/install-hooks.mjs`, the same script as `pnpm hooks:install`. |
+| Script               | Runs                                                                                        |
+| -------------------- | ------------------------------------------------------------------------------------------- |
+| `pnpm format:check`  | `oxfmt --check`, then `prettier --check` over `**/*.md`.                                    |
+| `pnpm format:fix`    | The same two formatters, rewriting files, then `cargo fmt` for Rust.                        |
+| `pnpm lint:check`    | `oxlint --deny-warnings`.                                                                   |
+| `pnpm lint:fix`      | `oxlint --fix`.                                                                             |
+| `pnpm typecheck`     | `tsc -b` over the solution in `tsconfig.json`: the root files and every referenced package. |
+| `pnpm test`          | `vitest run`: every package's and app's Vitest project, in one run.                         |
+| `pnpm test:watch`    | `vitest`, in watch mode.                                                                    |
+| `pnpm test:coverage` | `vitest run --coverage`, with a V8 coverage report in `coverage/`.                          |
+| `pnpm test:e2e`      | `playwright test` in `@vista/web`.                                                          |
+| `pnpm build`         | `build:web`, then `build:native`, each `vite build` in its host.                            |
+| `pnpm deploy:web`    | `build:web`, then `wrangler deploy`, in `@vista/web`.                                       |
+| `pnpm verify`        | `verify:web`, then `verify:rust`, in the order [below](#verification).                      |
+| `pnpm labels`        | `node scripts/sync-labels.mjs`, which needs an authenticated `gh`.                          |
+| `pnpm prepare`       | `git config core.hooksPath .githooks`, reporting rather than failing when git cannot.       |
 
 `lint:check` and `lint:fix` accept a root-relative path, such as `pnpm lint:fix packages/app/src`, to narrow oxlint to it.
 
 The Rust scripts live in `apps/native/package.json`: `format:rust:check`, `format:rust:fix`, and `lint:rust:check`. `verify:rust` and `format:fix` reach them with `pnpm --filter=@vista/native`. Each passes `--manifest-path src-tauri/Cargo.toml`, so nothing needs to run from inside `apps/native/src-tauri`. They also pass `--locked` where cargo resolves dependencies, the Rust counterpart to `pnpm install --frozen-lockfile`: a `Cargo.lock` that disagrees with `Cargo.toml` fails rather than being rewritten.
+
+## TypeScript and Vitest
+
+| File                      | Configures                                                                                                                                                                                                                                                       |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tsconfig.base.json`      | The compiler settings every project shares: strict, `noUncheckedIndexedAccess`, `verbatimModuleSyntax`, bundler resolution, and type-checking only (`noEmit`).                                                                                                   |
+| `tsconfig.json`           | The solution `tsc -b` builds. It lists projects and holds no files.                                                                                                                                                                                              |
+| `tsconfig.root.json`      | The project for code outside the packages: root config files such as `vitest.config.ts`, and `scripts/`. Node.js runs these directly, so it checks them by Node's rules: Node.js types, NodeNext resolution, and relative imports with the file's own extension. |
+| `<package>/tsconfig.json` | One project per package and app. It extends `tsconfig.base.json` and adds the DOM `lib`, `jsx`, and, in the hosts, the `vite/client` types.                                                                                                                      |
+| `vitest.config.ts`        | The Vitest projects: the root project for tests in `scripts/`, and every package and app with a `vitest.config.ts`, which names its project. Coverage is configured here, for every project at once.                                                             |
+
+The hosts import `@vista/app` as source, so `tsc -b` checks its files in each project that reaches them, not only in `packages/app`. The cost is repeated work, and an error in shared code is reported once per project.
 
 ## Verification
 
@@ -50,10 +61,10 @@ The Rust scripts live in `apps/native/package.json`: `format:rust:check`, `forma
 
 `verify:web`:
 
-1. `format:check`: oxfmt over code, CSS, HTML, and JSON, then Prettier over Markdown.
+1. `format:check`: oxfmt over code, CSS, HTML, JSON, and YAML, then Prettier over Markdown.
 2. `lint:check`: oxlint with `--deny-warnings`.
-3. `typecheck`: `tsc --noEmit` in every package.
-4. `test`: the hook tests, then Vitest in `packages/app`.
+3. `typecheck`: `tsc -b` over the solution.
+4. `test`: Vitest, over every project.
 5. `build:web`: the web host's production bundle, where a missing import or a broken virtual module shows up.
 6. `build:native`: the native host's frontend bundle, which the Tauri build packages.
 
@@ -68,12 +79,13 @@ The order is by cost. Within the web half, the checks that report in seconds run
 
 ## Narrowing a run
 
-pnpm's `--filter` runs any script of one package, and a path after a Vitest script runs one directory or file:
+Vitest names each project in its own `vitest.config.ts`, so one package runs on its own, and a path runs one file. `tsc -b` takes one project's directory. pnpm's `--filter` runs any script of one package:
 
 ```sh
-pnpm --filter=@vista/app test
-pnpm --filter=@vista/app test src/domain/path-validation.test.ts
-pnpm --filter=@vista/app typecheck
+pnpm test --project app
+pnpm test packages/app/src/domain/path-validation.test.ts
+pnpm test:watch --project app
+pnpm exec tsc -b packages/app
 pnpm --filter=@vista/web test:e2e tests/e2e/startup.spec.ts
 ```
 
@@ -82,8 +94,8 @@ oxlint and oxfmt take paths: `pnpm lint:check packages/app/src` and `pnpm exec o
 ## Adding a package
 
 1. Create it under `packages/` (shared code) or `apps/` (a host that is deployed or run), with a `package.json` named `@vista/<directory>`, `"private": true`, `"type": "module"`, and its dependencies as `catalog:` or `workspace:*`. A new third-party version goes in the catalog.
-2. Give it a `tsconfig.json` that extends `../../tsconfig.json` and adds the `lib` and `jsx` its runtime needs, and a `typecheck` script running `tsc --noEmit`; `pnpm typecheck` runs it.
-3. If it has unit tests, give it a `vitest.config.ts` and the `test`, `test:watch`, and `test:coverage` scripts [stack tests](specs/stack-tests.md#configuration) names; `pnpm test` runs them.
+2. Give it a `tsconfig.json` that extends `../../tsconfig.base.json`, sets `tsBuildInfoFile` to `./node_modules/.cache/tsconfig.tsbuildinfo`, adds the `lib`, `jsx`, and `types` its runtime needs, and includes its `src/`, tests, and config files. Add its path to `references` in the root `tsconfig.json`.
+3. If it has unit tests, give it a `vitest.config.ts` that names its project (`test: { name: "<directory>" }`). The root configuration picks it up through its glob.
 4. Give it `format:check`, `format:fix`, `lint:check`, and `lint:fix` scripts as the other packages have, and a `build` script if it produces output, which a root `build:*` script then reaches.
 5. List it in [Architecture](architecture.md) and in the README's repository list.
 

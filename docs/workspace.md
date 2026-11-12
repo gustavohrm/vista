@@ -16,10 +16,10 @@ This document is the workspace's contract: the names of the root scripts and wha
 | `pnpm format:fix`    | The same two formatters, and rustfmt for Rust, rewriting files.                                                                    |
 | `pnpm lint:check`    | oxlint passes over the repository, with warnings treated as errors.                                                                |
 | `pnpm lint:fix`      | oxlint, applying its safe fixes.                                                                                                   |
-| `pnpm typecheck`     | Every package with TypeScript type-checks.                                                                                         |
-| `pnpm test`          | The git hook tests and every package's unit and integration suites pass.                                                           |
-| `pnpm test:watch`    | The package suites, in watch mode.                                                                                                 |
-| `pnpm test:coverage` | The package suites, with a coverage report.                                                                                        |
+| `pnpm typecheck`     | Every package and the repository's own TypeScript type-check.                                                                      |
+| `pnpm test`          | Every package's and app's unit and integration suites pass.                                                                        |
+| `pnpm test:watch`    | The same, in watch mode.                                                                                                           |
+| `pnpm test:coverage` | The same, with a coverage report in `coverage/`.                                                                                   |
 | `pnpm test:e2e`      | The web host's browser suite passes. Needs a browser installed; `pnpm verify` does not run it.                                     |
 | `pnpm build`         | The web and native frontend bundles build.                                                                                         |
 | `pnpm verify`        | `verify:web`, then `verify:rust`, stopping at the first failure. It is the delivery gate [Contributing](../CONTRIBUTING.md) names. |
@@ -33,16 +33,14 @@ Keep these names as they are: CI, the git hooks and the agent instructions call 
 
 Vista's own root scripts:
 
-| Script               | Does                                                                            |
-| -------------------- | ------------------------------------------------------------------------------- |
-| `pnpm dev:web`       | The web host's Vite dev server.                                                 |
-| `pnpm dev:native`    | `tauri dev`, the native app with the interface served by Vite.                  |
-| `pnpm build:web`     | The web host's production bundle.                                               |
-| `pnpm build:native`  | The native host's frontend bundle, which the Tauri build packages.              |
-| `pnpm deploy:web`    | `build:web`, then `wrangler deploy` for the web host. Production is not set up. |
-| `pnpm test:hooks`    | The git hook tests alone.                                                       |
-| `pnpm labels`        | Creates or updates the GitHub labels in `.github/labels.json`.                  |
-| `pnpm hooks:install` | Points `core.hooksPath` at `.githooks`, the step `prepare` runs.                |
+| Script              | Does                                                                            |
+| ------------------- | ------------------------------------------------------------------------------- |
+| `pnpm dev:web`      | The web host's Vite dev server.                                                 |
+| `pnpm dev:native`   | `tauri dev`, the native app with the interface served by Vite.                  |
+| `pnpm build:web`    | The web host's production bundle.                                               |
+| `pnpm build:native` | The native host's frontend bundle, which the Tauri build packages.              |
+| `pnpm deploy:web`   | `build:web`, then `wrangler deploy` for the web host. Production is not set up. |
+| `pnpm labels`       | Creates or updates the GitHub labels in `.github/labels.json`.                  |
 
 There is no `pnpm format` script. When a name matches no pnpm script, pnpm runs the executable of that name from `PATH` instead, and on Windows `format` is the system disk formatter. The explicit `format:check` and `format:fix` names avoid that.
 
@@ -57,11 +55,11 @@ There is no `pnpm format` script. When a name matches no pnpm script, pnpm runs 
 | `.editorconfig`                      | Indentation, final newline, LF line endings, four-space Rust, and no hard wrap in Markdown.                                                            |
 | `.gitattributes`                     | LF line endings in the repository and the working tree on every platform, and the binary file types.                                                   |
 | `.oxfmtrc.json`                      | oxfmt: 120 columns, double quotes, semicolons, trailing commas, sorted imports and `package.json` keys. Markdown is excluded; Prettier owns it.        |
-| `.prettierrc.json`                   | Prettier, for Markdown only: `proseWrap: "never"`, so a paragraph is one line and a diff shows the sentence that changed.                              |
+| `.prettierrc.json5`                  | Prettier, for Markdown only: `proseWrap: "never"`, so a paragraph is one line and a diff shows the sentence that changed.                              |
 | `.prettierignore`                    | Paths inside the Markdown set Prettier leaves alone: build output and caches.                                                                          |
 | `.oxlintrc.json`                     | oxlint's plugins and rules, described [below](#lint-rules).                                                                                            |
 | `apps/native/src-tauri/rustfmt.toml` | rustfmt at width 120, the same as oxfmt's, so both languages wrap at the same column.                                                                  |
-| `tsconfig.json`                      | The compiler settings every package's `tsconfig.json` extends: strict, `verbatimModuleSyntax`, bundler resolution, and type-checking only (`noEmit`).  |
+| `tsconfig*.json`, `vitest.config.ts` | The compiler and test runner configuration, which [Tooling](tooling.md#typescript-and-vitest) describes file by file.                                  |
 
 ### Two formatters
 
@@ -109,16 +107,10 @@ Local and CI runs resolve the same versions, each declared once:
 
 ## Git hooks
 
-[Contributing](../CONTRIBUTING.md#hooks) lists what each hook checks. This section records how they are wired and why each does that much and no more.
+[Contributing](../CONTRIBUTING.md#hooks) lists what each hook checks and why each does that much and no more. This section records what is particular to this stack.
 
-The `prepare` script runs `scripts/install-hooks.mjs` on every `pnpm install`, which points `core.hooksPath` at `.githooks/` and makes the hooks executable. The setting is local to the clone rather than tracked, so a fresh clone runs no hooks until it installs; doing it from `prepare` keeps a hook manager out of the dependency list. The script does nothing in CI, and nothing in a tree without a `.git` directory. It refuses to replace a `core.hooksPath` that already points somewhere else, so a different hook setup is reconciled by hand rather than overwritten.
+`pre-commit` itself knows nothing of the stack: it finds the staged files, keeps partly staged ones out of the rewrite, and calls `profile_fix` and `profile_check` from `.githooks/profile.sh`, which run oxfmt, Prettier, oxlint, and rustfmt. oxfmt is handed every staged file and formats those it understands, so the hook covers the same files as `pnpm format:check`, YAML and the formats oxfmt gains later included, with no list of extensions to fall behind. rustfmt gets the staged `.rs` files with the edition `Cargo.toml` sets, because rustfmt run on a file does not read `Cargo.toml`; `pnpm format:fix` runs the same formatter through `cargo fmt`, and `pnpm verify:rust` checks it, not `format:check`, because the `Web` CI job has no Rust toolchain. clippy, like the type checker, belongs to `pnpm verify`.
 
-`pre-commit` is the one hook that runs a formatter and a linter, and it runs `pnpm format:check && pnpm lint:check` over the whole repository, not over the staged files. A failure can come from a file the commit does not touch. Type checking, tests, and the Rust checks take minutes, and a hook that slow gets bypassed until it may as well not exist; `pnpm verify` is where they belong.
-
-`commit-msg` checks the subject line only. No hook can tell whether a message describes the commit honestly, so that half stays with review. Merges, reverts, and `fixup!`, `squash!`, and `amend!` subjects pass unchecked, because git composed them.
-
-`pre-push` reads the destination ref rather than the current branch, so it holds for a push from `main`, for an explicit refspec targeting it, and for a deletion. It checks the branch name because the name is often not a choice anyone made: an agent harness can create a branch before anyone has chosen its name. Deleting a remote branch passes whatever it is called, and tags are not checked.
-
-The checks that are not shell live in `scripts/check-git-state.mjs`, which `pre-commit` and `pre-push` call. The hook tests in `scripts/git-hooks.test.mjs` run as part of `pnpm test`.
+The hooks are wired by `core.hooksPath`, which the root `prepare` script sets on every install with `git config`. That is a local git setting rather than a tracked one, so a fresh clone runs no hooks until something sets it; doing it from `prepare` keeps a hook manager out of the dependency list. The setup step never fails an install: a tree without git, or without permission to write its config, reports and carries on.
 
 Each hook ignores SIGPIPE. Git for Windows counts a hook killed by any signal as passed, and when the caller pipes git through something that closes early, a hook writing its rejection message can be killed mid-message. Ignoring the signal leaves the hook's own verdict in charge of its exit status.

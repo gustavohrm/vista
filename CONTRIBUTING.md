@@ -21,7 +21,7 @@ pnpm install
 pnpm dev:web
 ```
 
-Use `pnpm dev:native` for the Tauri host. `pnpm install` also points git at `.githooks/` through `core.hooksPath` (the `prepare` script), so the hooks described below start working after the first install and not before. If `core.hooksPath` already points somewhere else, the install stops and asks for it to be reconciled. [CI](docs/ci.md) covers why the versions are pinned where they are.
+Use `pnpm dev:native` for the Tauri host. `pnpm install` also points git at `.githooks/` through `core.hooksPath` (the `prepare` script), so the hooks described below start working after the first install and not before. [CI](docs/ci.md) covers why the versions are pinned where they are.
 
 ## Changes
 
@@ -185,12 +185,22 @@ Pushing a release tag, deploying, and publishing a release are outward-facing ac
 
 ## Hooks
 
-Three hooks run locally, all from `.githooks/`. `pre-commit` and `pre-push` delegate their git checks to `scripts/check-git-state.mjs`, which holds the branch and tree rules; `commit-msg` checks the subject line itself.
+Three hooks run locally, all from `.githooks/`:
 
-| Hook         | Checks                                                                                                                                                                                                                                                                                                                |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pre-commit` | Refuses commits on `main` or a detached HEAD, and refuses while there are untracked files, unstaged changes, or unresolved conflicts. Then runs `pnpm format:check` and `pnpm lint:check`, which report and do not fix.                                                                                               |
-| `commit-msg` | The subject line shape described above: a type, an optional scope, an optional `!`, a colon, a subject of 72 characters or fewer that does not start with a capital and does not end with a period. Merge, revert, `fixup!`, `squash!`, and `amend!` subjects are exempt, since git writes them rather than a person. |
-| `pre-push`   | Refuses any update or deletion of `main`, and any push of a commit other than the one checked out. Refuses a branch name that does not match `<type>/<slug>`, though a deletion of a misnamed branch passes. Requires a clean working tree, including untracked files.                                                |
+| Hook         | Checks                                                       |
+| ------------ | ------------------------------------------------------------ |
+| `pre-commit` | Formats and lints the staged files, re-staging what it fixed |
+| `commit-msg` | The subject line shape described above                       |
+| `pre-push`   | Refuses a direct push to `main`, and a misnamed branch       |
 
-`--no-verify` bypasses them. It is for the commit that genuinely has to land unfixed, and an agent that reaches for it MUST say so in the same breath rather than quietly routing around a failing check. [Workspace](docs/workspace.md#git-hooks) describes how the hooks are wired, and why each does no more than it does.
+`--no-verify` bypasses them: on `git commit` for the first two, on `git push` for the last. It is for the commit that genuinely has to land unfixed, and an agent that reaches for it MUST say so in the same breath rather than quietly routing around a failing check. The whole point of a hook is that skipping one is visible.
+
+### Why each hook does that much and no more
+
+`pre-commit` runs only the formatters and linters, the checks `.githooks/profile.sh` declares for the stack. Type checking and tests take minutes, and a hook that slow gets bypassed until it may as well not exist; `pnpm verify` is where the rest belongs. [Workspace](docs/workspace.md#git-hooks) says which tools the profile runs and how the hooks are set up.
+
+`pre-commit` reads files from the working tree rather than from the index. For a file that is only partly staged that matters: the hook never rewrites it, because re-staging would sweep in the parts deliberately left out of the commit, and it checks the file as it sits on disk. A commit whose staged content is already clean can therefore still fail. The reverse also holds: when the file was formatted on disk after its changes were staged, the hook passes while the staged content is still unformatted, and `pnpm verify` in CI then fails it. After formatting a partly staged file, stage the formatted parts again and review the staged content with `git diff --cached`. The alternative, skipping such files, would let unformatted code through in every case rather than this one.
+
+`commit-msg` checks the subject line and nothing else. A body is optional, and no hook can tell whether a message describes the commit honestly, so the mechanical half is automated and the rest stays with review. Merges, reverts, and `fixup!`, `squash!`, and `amend!` markers pass unchecked: git composes those subjects, and rejecting a message nobody wrote would only train people to reach for `--no-verify` out of habit, which costs the checks that do matter. The 72-character limit is where practice already sat rather than a number from a style guide: replayed over 200 earlier commits of codenhub/codenhub, the monorepo the template was extracted from, it rejected six, three merely long and three joining two changes with "and", which is the split the convention asks for anyway.
+
+`pre-push` reads the destination ref rather than the branch you are standing on, so its refusal to push to `main` holds for a push from `main`, for an explicit refspec that targets it from elsewhere, and for a `--delete`. It also refuses a branch whose name is not `<type>/<slug>`. That check sits in a hook rather than in wording alone because the name is often not a choice anyone made: an agent harness creates `claude/...` or `codex/...` before the agent has read a file, and a rule about naming a branch does not read as applying to a branch that already has a name. Deleting a remote branch passes whatever it is called, since removing a misnamed branch is the cleanup, and tags are not checked.
