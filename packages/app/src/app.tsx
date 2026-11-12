@@ -1079,6 +1079,9 @@ function AppShell({ adapter }: AppProps) {
       />
       {goToQuery !== null && (
         <GoToDialog
+          // The field takes its starting text once, so a shortcut for another mode pressed while
+          // the picker is open starts it over in that mode.
+          key={goToQuery}
           files={filePaths}
           commands={paletteCommands}
           initialQuery={goToQuery}

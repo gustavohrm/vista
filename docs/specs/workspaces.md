@@ -29,7 +29,7 @@ In v1, Vista operates on **one active open folder** at a time:
 
 Each host remembers the most recently opened folder so the start screen can offer to reopen it at startup. Opening a different folder replaces the remembered one. `restoreFolder` reports `restored`, `needs-permission`, `unavailable` (remembered but gone or inaccessible), or `none` (nothing remembered). Per-host behavior:
 
-- **Web (File System Access)**: the folder's `FileSystemDirectoryHandle` is stored in IndexedDB (database `vista`, store `workspace`, key `lastFolder`). At startup the folder reopens silently only when the browser already reports read permission as granted, for example after the user chose "Allow on every visit". Otherwise the explorer shows a "Reopen {name}" button. Clicking it requests permission, which needs a user gesture, so the restore never prompts on its own. "Open Folder" stays available in both states.
+- **Web (File System Access)**: the folder's `FileSystemDirectoryHandle` is stored in IndexedDB (database `vista`, store `workspace`, key `lastFolder`). At startup the folder reopens silently only when the browser already reports read permission as granted, for example after the user chose "Allow on every visit". Otherwise the start screen shows a "Reopen {name}" button. Clicking it requests permission, which needs a user gesture, so the restore never prompts on its own. "Open Folder" stays available in both states.
 - **Web fallback (`webkitdirectory`)**: these folders cannot be remembered. Opening one forgets any stored handle, so the next startup shows the plain "Open Folder" state.
 - **Native**: the root path is stored in the webview's `localStorage` under `vista.lastFolder` and probed with a directory read. Access survives restarts because the scope granted by the folder picker is persisted by `tauri-plugin-persisted-scope`, registered after the filesystem plugin; without it, dialog-granted scope would not survive a restart.
 - **Mobile (Android and iOS)**: not supported yet. `@tauri-apps/plugin-dialog` has no folder picker on those platforms, so there is nothing to restore.
@@ -88,7 +88,6 @@ With no file open, the editor area shows a start screen instead of staying empty
 The header above a document shows its path as a breadcrumb and, on the right, the view switch, Find, and Editor settings. There is no Save button: saving is `Ctrl+S` or **File > Save**, and the dot beside the file name shows unsaved edits.
 
 - The view switch is two icon buttons in one tinted group, named in their tooltips and to assistive technology: **Rich text** (eye) and **Raw** (code) for Markdown, **Table** (table) and **Raw** for CSV. The pressed one is the view shown. A format with one view shows no switch.
-- **Save** is the primary button while the document has unsaved edits, and disabled and quiet when there is nothing to save. Below `sm` it shows only its icon.
 
 ### Go to file and line
 

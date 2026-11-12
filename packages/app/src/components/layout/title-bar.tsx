@@ -64,6 +64,9 @@ export function TitleBar({
       <button
         type="button"
         onClick={onSearch}
+        // A click does not take focus from the editor, so the picker returns focus there and an
+        // Edit command chosen in it acts on the editor, as with the menu bar.
+        onMouseDown={(event) => event.preventDefault()}
         aria-label="Search files and commands"
         className="btn soft sm text-text-secondary flex-none justify-start gap-2 font-normal md:w-72 lg:w-96"
       >

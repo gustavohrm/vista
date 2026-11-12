@@ -848,6 +848,34 @@ describe("App", () => {
       await waitFor(() => expect(rawEditorText(editor)).not.toBe(EDITED_README_CONTENT));
     });
 
+    it("runs an editing command in the editor when opened by clicking the search field", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      const editor = await makeReadmeDirty(user);
+
+      await user.click(screen.getByRole("button", { name: "Search files and commands" }));
+      await user.keyboard(">undo{Enter}");
+
+      await waitFor(() => expect(rawEditorText(editor)).not.toBe(EDITED_README_CONTENT));
+    });
+
+    it("switches the open picker between files, commands, and lines by shortcut", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openRawReadme(user);
+
+      await user.keyboard("{Control>}p{/Control}");
+      await user.keyboard("read");
+      await user.keyboard("{Control>}{Shift>}p{/Shift}{/Control}");
+      expect(screen.getByRole("combobox", { name: "Run a command" })).toHaveValue(">");
+
+      await user.keyboard("{Control>}g{/Control}");
+      expect(screen.getByRole("combobox", { name: "Go to file, or :line:column" })).toHaveValue(":");
+
+      await user.keyboard("{Control>}p{/Control}");
+      expect(screen.getByRole("combobox", { name: "Go to file, or :line:column" })).toHaveValue("");
+    });
+
     it("opens from the title bar's search field, listing commands while no folder is open", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
