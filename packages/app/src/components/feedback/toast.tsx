@@ -1,4 +1,5 @@
 import { createToaster, type Toaster, type ToasterConfig } from "@codenhub/toaster";
+import { createDialogs, type Dialogs } from "@codenhub/toaster/dialog";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
 
 /** Severity of a toast message, controlling its intent styling and accessible role. */
@@ -54,7 +55,7 @@ interface ToastApi {
 
 const TOASTER_CONFIG: ToasterConfig = {
   position: "bottom-right",
-  closeButton: true,
+  dismissible: true,
   duration: 5000,
   // Lifts toasts clear of the 24px status bar along the bottom edge of the shell.
   margin: { y: "2.25rem" },
@@ -72,6 +73,7 @@ const ToastContext = createContext<ToastApi | null>(null);
  */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const toasterRef = useRef<Toaster | null>(null);
+  const dialogsRef = useRef<Dialogs | null>(null);
 
   // Created lazily rather than in an effect: child effects (such as startup restore) run before
   // this provider's effects, so they must be able to show messages immediately.
@@ -82,6 +84,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     return toasterRef.current;
   }, []);
 
+  const getDialogs = useCallback((): Dialogs => {
+    if (!dialogsRef.current) {
+      dialogsRef.current = createDialogs();
+    }
+    return dialogsRef.current;
+  }, []);
+
   // `destroy()` is irreversible and makes later calls throw. Under StrictMode the effect runs,
   // cleans up, and runs again, so the ref is cleared here and recreated on the next use instead
   // of reusing a destroyed instance. `destroy()` also removes the dialog and container nodes
@@ -90,6 +99,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     return () => {
       toasterRef.current?.destroy();
       toasterRef.current = null;
+      dialogsRef.current?.destroy();
+      dialogsRef.current = null;
     };
   }, []);
 
@@ -101,7 +112,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         toaster[kind](text, options);
       },
       confirm: async ({ title, message, confirmLabel, cancelLabel, destructive }) => {
-        const handle = getToaster().dialog.confirm(message, {
+        const handle = getDialogs().confirm(message, {
           title,
           confirmLabel,
           cancelLabel,
@@ -111,7 +122,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         return confirmed;
       },
     }),
-    [getToaster],
+    [getDialogs, getToaster],
   );
 
   return <ToastContext.Provider value={api}>{children}</ToastContext.Provider>;

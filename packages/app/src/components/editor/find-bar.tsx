@@ -107,24 +107,10 @@ export function FindBar({ getTarget, targetKey, content, canReplace, mode, focus
     <search
       aria-label="Find in file"
       onKeyDown={handleKeyDown}
-      className="card soft floating absolute top-2 right-4 z-10 flex max-w-[calc(100%-2rem)] gap-1 p-1"
+      className="card soft floating absolute top-2 right-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-col gap-1 p-1 [--ui-radius-surface:8px]"
     >
-      {canReplace && (
-        <BarButton
-          label={isReplaceShown ? "Hide replace" : "Show replace"}
-          icon={
-            isReplaceShown ? (
-              <i className="ic-chevron-down" aria-hidden="true" />
-            ) : (
-              <i className="ic-chevron-right" aria-hidden="true" />
-            )
-          }
-          onClick={() => setIsReplaceShown((shown) => !shown)}
-          expanded={isReplaceShown}
-        />
-      )}
-      <div className="flex min-w-0 flex-col gap-1">
-        <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5">
+        <div className={FIELD_CLASS}>
           <input
             ref={findInputRef}
             type="text"
@@ -134,45 +120,58 @@ export function FindBar({ getTarget, targetKey, content, canReplace, mode, focus
             value={query.text}
             onChange={(event) => setQuery((previous) => ({ ...previous, text: event.target.value }))}
             onKeyDown={handleFindKeyDown}
-            className="ipt h-7 w-52 min-w-0 text-xs"
+            className="ipt min-w-0 flex-1 text-[13px]"
           />
+          <output className="text-text-secondary flex-none px-1 text-xs whitespace-nowrap tabular-nums">
+            {describeResult(query, result)}
+          </output>
           <BarButton
             label="Match case"
             icon={<i className="ic-case-sensitive" aria-hidden="true" />}
             pressed={query.caseSensitive}
             onClick={() => toggle("caseSensitive")}
+            isInField
           />
           <BarButton
             label="Match whole word"
             icon={<i className="ic-whole-word" aria-hidden="true" />}
             pressed={query.wholeWord}
             onClick={() => toggle("wholeWord")}
+            isInField
           />
           <BarButton
             label="Use regular expression"
             icon={<i className="ic-regex" aria-hidden="true" />}
             pressed={query.regexp}
             onClick={() => toggle("regexp")}
+            isInField
           />
-          <output className="text-text-secondary w-20 flex-none px-1 text-center text-xs">
-            {describeResult(query, result)}
-          </output>
-          <BarButton
-            label="Previous match (Shift+Enter)"
-            icon={<i className="ic-arrow-up" aria-hidden="true" />}
-            disabled={!hasMatches}
-            onClick={() => run((target) => target.findPrevious())}
-          />
-          <BarButton
-            label="Next match (Enter)"
-            icon={<i className="ic-arrow-down" aria-hidden="true" />}
-            disabled={!hasMatches}
-            onClick={() => run((target) => target.findNext())}
-          />
-          <BarButton label="Close (Escape)" icon={<i className="ic-x" aria-hidden="true" />} onClick={close} />
         </div>
-        {showsReplace && (
-          <div className="flex items-center gap-1">
+        <BarButton
+          label="Previous match (Shift+Enter)"
+          icon={<i className="ic-arrow-up" aria-hidden="true" />}
+          disabled={!hasMatches}
+          onClick={() => run((target) => target.findPrevious())}
+        />
+        <BarButton
+          label="Next match (Enter)"
+          icon={<i className="ic-arrow-down" aria-hidden="true" />}
+          disabled={!hasMatches}
+          onClick={() => run((target) => target.findNext())}
+        />
+        {canReplace && (
+          <BarButton
+            label={isReplaceShown ? "Hide replace" : "Show replace"}
+            icon={<i className="ic-replace" aria-hidden="true" />}
+            onClick={() => setIsReplaceShown((shown) => !shown)}
+            expanded={isReplaceShown}
+          />
+        )}
+        <BarButton label="Close (Escape)" icon={<i className="ic-x" aria-hidden="true" />} onClick={close} />
+      </div>
+      {showsReplace && (
+        <div className="flex items-center gap-0.5">
+          <div className={FIELD_CLASS}>
             <input
               type="text"
               aria-label="Replace"
@@ -180,26 +179,36 @@ export function FindBar({ getTarget, targetKey, content, canReplace, mode, focus
               value={replacement}
               onChange={(event) => setReplacement(event.target.value)}
               onKeyDown={handleReplaceKeyDown}
-              className="ipt h-7 w-52 min-w-0 text-xs"
-            />
-            <BarButton
-              label="Replace (Enter)"
-              icon={<i className="ic-replace" aria-hidden="true" />}
-              disabled={!hasMatches}
-              onClick={() => run((target) => target.replace(replacement))}
-            />
-            <BarButton
-              label="Replace all"
-              icon={<i className="ic-replace-all" aria-hidden="true" />}
-              disabled={!hasMatches}
-              onClick={() => run((target) => target.replaceAll(replacement))}
+              className="ipt min-w-0 flex-1 text-[13px]"
             />
           </div>
-        )}
-      </div>
+          <button
+            type="button"
+            aria-label="Replace (Enter)"
+            disabled={!hasMatches}
+            onClick={() => run((target) => target.replace(replacement))}
+            className="btn ghost sm ml-0.5 font-normal [--ui-radius:4px]"
+          >
+            Replace
+          </button>
+          <button
+            type="button"
+            aria-label="Replace all"
+            disabled={!hasMatches}
+            onClick={() => run((target) => target.replaceAll(replacement))}
+            className="btn ghost sm font-normal [--ui-radius:4px]"
+          >
+            All
+          </button>
+        </div>
+      )}
     </search>
   );
 }
+
+/** A sunk field with no border; the bar is its frame, and its options sit inside its end. */
+const FIELD_CLASS =
+  "input-group soft edgeless w-72 max-w-full min-w-0 [--control-height:2rem] [--input-group-gap:2px] [--input-group-pad:0.375rem] [--ui-radius:4px]";
 
 function describeResult(query: FindQuery, result: FindResult): string {
   if (result.invalid) {
@@ -225,9 +234,12 @@ interface BarButtonProps {
   /** Set for disclosure buttons: whether what they show is shown. */
   expanded?: boolean;
   disabled?: boolean;
+  /** Set for a button inside a field, which is smaller so the field keeps its height. */
+  isInField?: boolean;
 }
 
-function BarButton({ label, icon, onClick, pressed, expanded, disabled }: BarButtonProps) {
+function BarButton({ label, icon, onClick, pressed, expanded, disabled, isInField }: BarButtonProps) {
+  const size = isInField ? "size-6! min-h-0! min-w-0! p-0! [--ui-radius:3px]" : "[--ui-radius:4px]";
   return (
     <Tooltip text={label} position="bottom" align="end" className="flex flex-none">
       {(bubbleId) => (
@@ -239,7 +251,7 @@ function BarButton({ label, icon, onClick, pressed, expanded, disabled }: BarBut
           aria-pressed={pressed}
           aria-expanded={expanded}
           aria-describedby={bubbleId}
-          className={pressed ? "btn soft icon sm" : "btn ghost icon sm"}
+          className={`btn icon sm ${pressed || expanded ? "soft" : "ghost"} ${size}`}
         >
           {icon}
         </button>

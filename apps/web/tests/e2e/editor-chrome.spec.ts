@@ -35,7 +35,7 @@ test.describe("editor settings and go-to", () => {
     await expect(page.locator(".cm-lineNumbers")).toBeVisible();
 
     await page.getByRole("button", { name: "Editor settings" }).click();
-    await page.getByRole("switch", { name: "Line numbers" }).click();
+    await page.getByRole("menuitemcheckbox", { name: "Line numbers" }).click();
     await expect(page.locator(".cm-lineNumbers")).toHaveCount(0);
 
     await page.reload();
@@ -44,7 +44,27 @@ test.describe("editor settings and go-to", () => {
 
     await expect(page.locator(".cm-lineNumbers")).toHaveCount(0);
     await page.getByRole("button", { name: "Editor settings" }).click();
-    await expect(page.getByRole("switch", { name: "Line numbers" })).not.toBeChecked();
+    await expect(page.getByRole("menuitemcheckbox", { name: "Line numbers" })).not.toBeChecked();
+  });
+
+  test("runs a command from the picker in the editor it was opened from", async ({ page }) => {
+    await page.goto("/workspace/example");
+    await openFixtureVault(page);
+    await openNotesRaw(page);
+    const editor = page.getByRole("textbox", { name: "Raw text content of notes.md" });
+    const original = await editor.innerText();
+    await editor.click();
+    await page.keyboard.type("typed by the test");
+    await expect(editor).toContainText("typed by the test");
+
+    await page.keyboard.press("Control+Shift+p");
+    await page.getByRole("combobox", { name: "Run a command" }).pressSequentially("undo");
+    await expect(page.getByRole("option", { name: /^Edit: Undo/ })).toHaveAttribute("aria-selected", "true");
+    await page.keyboard.press("Enter");
+
+    await expect(page.getByRole("dialog", { name: "Commands" })).toHaveCount(0);
+    await expect(editor).toBeFocused();
+    await expect.poll(() => editor.innerText()).toBe(original);
   });
 
   test("opens a file at a line and column from the go-to picker", async ({ page }) => {

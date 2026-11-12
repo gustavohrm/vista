@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { EditorSettings } from "../../domain/settings";
 import { getViewer } from "../../domain/viewers";
@@ -32,7 +32,6 @@ interface EditorPaneProps {
   onCursorChange: (key: string, cursor: CursorInfo) => void;
   /** Called with the active tab's key when vim's mode changes, and with null when vim goes off. */
   onVimModeChange: (key: string, mode: string | null) => void;
-  onSave: () => void;
   /** Raw editor state of each open tab, kept by the owner of the tabs. */
   rawEditorStates: RawEditorStateCache;
   /** App command shortcuts that the raw editor leaves to the commands layer. */
@@ -51,6 +50,8 @@ interface EditorPaneProps {
   contextMenuItems: readonly MenuEntry[];
   /** Loads an image a Markdown document links to; see `MarkdownEditor`. */
   loadImage?: (src: string) => Promise<string | Blob | null>;
+  /** Shown in place of an editor while no tab is open. */
+  emptyState?: ReactNode;
 }
 
 /** Hosts the document header, the find bar, and the active document's editor. */
@@ -61,7 +62,6 @@ export function EditorPane({
   onContentChange,
   onCursorChange,
   onVimModeChange,
-  onSave,
   rawEditorStates,
   reservedShortcuts,
   editorSettings,
@@ -73,6 +73,7 @@ export function EditorPane({
   onJumpApplied,
   contextMenuItems,
   loadImage,
+  emptyState,
 }: EditorPaneProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const rawFindTargetRef = useRef<FindTarget>(null);
@@ -88,7 +89,15 @@ export function EditorPane({
   );
 
   if (!doc) {
-    return <main role="main" data-platform={platform} className="bg-background text-text flex flex-1 flex-col" />;
+    return (
+      <main
+        role="main"
+        data-platform={platform}
+        className="bg-background text-text flex min-h-0 flex-1 flex-col overflow-hidden"
+      >
+        {emptyState}
+      </main>
+    );
   }
 
   const viewer = getViewer(doc.extension);
@@ -96,10 +105,12 @@ export function EditorPane({
 
   return (
     <main role="main" data-platform={platform} className="bg-background text-text flex flex-1 flex-col overflow-hidden">
-      <header className="border-border bg-background flex h-9 flex-none items-center justify-between gap-3 border-b px-3">
+      <header className="bg-background flex h-10 flex-none items-center justify-between gap-3 pr-2 pl-3 sm:pl-4">
         <DocumentBreadcrumb file={doc} />
         <div className="flex flex-none items-center gap-1">
-          {canToggleView && <ViewModeToggle viewMode={doc.viewMode} onViewModeChange={onViewModeChange} />}
+          {canToggleView && viewer.enriched !== undefined && (
+            <ViewModeToggle viewMode={doc.viewMode} enriched={viewer.enriched} onViewModeChange={onViewModeChange} />
+          )}
           <Tooltip text="Find (Ctrl+F)" position="bottom" align="end">
             {(bubbleId) => (
               <button
@@ -114,20 +125,6 @@ export function EditorPane({
             )}
           </Tooltip>
           <EditorSettingsMenu settings={editorSettings} onChange={onEditorSettingsChange} />
-          <Tooltip text="Save (Ctrl+S)" position="bottom" align="end">
-            {(bubbleId) => (
-              <button
-                type="button"
-                onClick={onSave}
-                disabled={!doc.isDirty}
-                aria-label="Save file"
-                aria-describedby={bubbleId}
-                className="btn ghost icon sm"
-              >
-                <i className="ic-save" aria-hidden="true" />
-              </button>
-            )}
-          </Tooltip>
         </div>
       </header>
 
@@ -220,7 +217,7 @@ function DocumentBreadcrumb({ file }: DocumentBreadcrumbProps) {
 
   return (
     <nav aria-label="Breadcrumb" className="min-w-0 flex-1 overflow-hidden">
-      <ol className="flex min-w-0 items-center gap-1 text-xs">
+      <ol className="flex min-w-0 items-center gap-1 text-[13px]">
         {folderNames.map((folderName, index) => {
           const isNearestFolder = index === folderNames.length - 1;
           return (
@@ -269,48 +266,61 @@ function FileTypeIcon({ extension }: FileTypeIconProps) {
   return <i className="ic-file-text text-text-secondary shrink-0 text-xs" aria-hidden="true" />;
 }
 
+/** Buttons of the view switch: smaller than a header button, so the group around them is as tall as one. */
+const VIEW_BUTTON_CLASS = "size-7! min-h-0! min-w-0! p-0! [--ui-radius:4px]";
+
+/** The tinted box that makes the two view buttons read as one control. */
+const VIEW_GROUP_CLASS = "bg-surface/60 mr-1 flex flex-none items-center gap-0.5 rounded-md p-0.5";
+
 interface ViewModeToggleProps {
   /** Currently selected presentation mode. */
   viewMode: ViewMode;
+  /** Which enriched presentation the format has, which picks its icon and name. */
+  enriched: "markdown" | "csv-table";
   /** Callback fired when the user selects a presentation mode. */
   onViewModeChange: (mode: ViewMode) => void;
 }
 
 /**
- * Compact segmented control for switching between the raw and enriched presentations.
+ * Two icon buttons for switching between the enriched and raw presentations, named in tooltips.
  *
  * @param props - ViewModeToggle properties.
- * @returns Segmented control element.
+ * @returns The pair of toggle buttons.
  */
-function ViewModeToggle({ viewMode, onViewModeChange }: ViewModeToggleProps) {
+function ViewModeToggle({ viewMode, enriched, onViewModeChange }: ViewModeToggleProps) {
+  const enrichedLabel = enriched === "markdown" ? "Rich text" : "Table";
   return (
-    // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- the segmented control is styled by its `panel` class; a native fieldset would bring browser styling the class does not reset
-    <div role="group" aria-label="Document view mode" className="panel p-xs flex flex-none items-center gap-0.5">
-      <Tooltip text="Show raw text" position="bottom" align="end">
-        {(bubbleId) => (
-          <button
-            type="button"
-            onClick={() => onViewModeChange("raw")}
-            aria-pressed={viewMode === "raw"}
-            aria-label="Raw"
-            aria-describedby={bubbleId}
-            className={viewMode === "raw" ? "btn soft icon sm p-sm" : "btn ghost icon sm p-sm"}
-          >
-            <i className="ic-code" aria-hidden="true" />
-          </button>
-        )}
-      </Tooltip>
-      <Tooltip text="Show rendered view" position="bottom" align="end">
+    // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a plain row of two toggles; a native fieldset would bring browser styling to reset
+    <div role="group" aria-label="Document view mode" className={VIEW_GROUP_CLASS}>
+      <Tooltip text={enrichedLabel} position="bottom" align="end">
         {(bubbleId) => (
           <button
             type="button"
             onClick={() => onViewModeChange("enriched")}
-            aria-pressed={viewMode === "enriched"}
-            aria-label="View"
+            aria-label={enrichedLabel}
             aria-describedby={bubbleId}
-            className={viewMode === "enriched" ? "btn soft icon sm p-sm" : "btn ghost icon sm p-sm"}
+            aria-pressed={viewMode === "enriched"}
+            className={`btn icon sm ${VIEW_BUTTON_CLASS} ${viewMode === "enriched" ? "soft" : "ghost"}`}
           >
-            <i className="ic-eye" aria-hidden="true" />
+            {enriched === "markdown" ? (
+              <i className="ic-eye" aria-hidden="true" />
+            ) : (
+              <i className="ic-table" aria-hidden="true" />
+            )}
+          </button>
+        )}
+      </Tooltip>
+      <Tooltip text="Raw" position="bottom" align="end">
+        {(bubbleId) => (
+          <button
+            type="button"
+            onClick={() => onViewModeChange("raw")}
+            aria-label="Raw"
+            aria-describedby={bubbleId}
+            aria-pressed={viewMode === "raw"}
+            className={`btn icon sm ${VIEW_BUTTON_CLASS} ${viewMode === "raw" ? "soft" : "ghost"}`}
+          >
+            <i className="ic-code" aria-hidden="true" />
           </button>
         )}
       </Tooltip>

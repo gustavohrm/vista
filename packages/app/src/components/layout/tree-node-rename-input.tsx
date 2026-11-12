@@ -4,10 +4,10 @@ import { validateEntryName } from "../../domain/path-validation";
 
 /** Horizontal distance between nested tree levels, in pixels. */
 export const TREE_INDENT_PX = 16;
-/** Space between the sidebar edge and the first level's chevron column, in pixels. */
-export const TREE_ROW_INSET_PX = 4;
-/** Width of the chevron column every tree row reserves, in pixels. Directories show a chevron in it, files leave it empty. */
-export const TREE_CHEVRON_COLUMN_PX = 12;
+/** Space between the sidebar edge and the first level's icon, in pixels. */
+export const TREE_ROW_INSET_PX = 8;
+/** Width of a tree row's icon, in pixels. An indent guide runs under the middle of its folder's icon. */
+export const TREE_ICON_PX = 14;
 
 interface TreeEntryNameInputProps {
   /** Indentation depth, matching the tree row it replaces or is inserted alongside. */
@@ -16,11 +16,6 @@ interface TreeEntryNameInputProps {
   initialValue: string;
   /** Icon element shown beside the input, matching the row's file or folder icon. */
   icon: ReactNode;
-  /**
-   * Chevron element shown in the chevron column, matching a directory row being renamed. Omit for
-   * files and new entries, which leave the column empty so names stay aligned.
-   */
-  disclosure?: ReactNode;
   /** Existing sibling names in the same parent directory, excluding this entry's own current name. */
   siblingNames: readonly string[];
   /** Callback fired with the trimmed, validated name when the user commits (Enter or blur). */
@@ -31,8 +26,8 @@ interface TreeEntryNameInputProps {
 
 /**
  * Inline text input that replaces a tree row for renaming an existing entry, or is inserted
- * as a draft row for creating a new one. It uses the same height, indentation, and chevron and
- * icon columns as a tree row, so the swap does not shift the entry. Validates the name locally
+ * as a draft row for creating a new one. It uses the same height, indentation, and icon column
+ * as a tree row, so the swap does not shift the entry. Validates the name locally
  * before committing.
  *
  * @param props - TreeEntryNameInput properties.
@@ -42,7 +37,6 @@ export function TreeEntryNameInput({
   level,
   initialValue,
   icon,
-  disclosure,
   siblingNames,
   onCommit,
   onCancel,
@@ -73,8 +67,7 @@ export function TreeEntryNameInput({
 
   return (
     <div className="flex flex-col pr-2" style={{ paddingLeft: level * TREE_INDENT_PX + TREE_ROW_INSET_PX }}>
-      <div className="flex h-6 items-center gap-1">
-        {disclosure ?? <span aria-hidden="true" className="w-3 flex-none" />}
+      <div className="flex h-7 items-center gap-2">
         {icon}
         <input
           ref={inputRef}
@@ -98,7 +91,7 @@ export function TreeEntryNameInput({
           aria-label="Entry name"
           aria-invalid={error !== null}
           aria-describedby={error !== null ? errorId : undefined}
-          className="ipt h-5 min-h-0 min-w-0 flex-1 px-1 py-0 text-[13px]"
+          className="ipt h-6 min-h-0 min-w-0 flex-1 px-1 py-0 text-[13px]"
         />
       </div>
       {error && (

@@ -151,7 +151,7 @@ export function Menu({ label, items, x, y, onClose, returnFocusTo, onNavigate, i
       onKeyDown={handleKeyDown}
       onContextMenu={(event) => event.preventDefault()}
       style={{ top: position.top, left: position.left }}
-      className="card soft floating fixed z-50 flex max-h-[calc(100vh-16px)] min-w-48 flex-col overflow-y-auto p-1 text-[13px]"
+      className="card soft floating fixed z-50 flex max-h-[calc(100vh-16px)] min-w-48 flex-col overflow-y-auto p-1 text-[13px] [--ui-radius-surface:8px]"
     >
       {items.map((item, index) =>
         item === MENU_SEPARATOR ? (
@@ -168,7 +168,7 @@ export function Menu({ label, items, x, y, onClose, returnFocusTo, onNavigate, i
 
 function MenuSeparator() {
   // oxlint-disable-next-line jsx-a11y/control-has-associated-label, jsx-a11y/prefer-tag-over-role -- a styled divider with no label, not a control; `divider` styles a div, and a native hr would bring browser styling the class does not reset
-  return <div role="separator" className="divider my-1 [--divider-color:var(--intent-border)]" />;
+  return <div role="separator" className="divider my-1 [--divider-color:var(--color-surface)]" />;
 }
 
 interface MenuItemButtonProps {
@@ -196,7 +196,7 @@ function MenuItemButton({ item, hasIconColumn, onChoose }: MenuItemButtonProps) 
           event.currentTarget.focus();
         }
       }}
-      className={`btn ghost sm w-full justify-start gap-2 ${item.destructive ? "destructive" : ""} ${
+      className={`btn ghost sm min-h-7! w-full justify-start gap-2 px-2! py-0! font-normal outline-none! [--ui-radius:4px] focus:[--ui-fill:12%] ${item.destructive ? "destructive" : ""} ${
         item.disabled ? "pointer-events-none opacity-40" : ""
       }`}
     >

@@ -98,7 +98,7 @@ export function UnsavedChangesDialog({ fileNames, onChoose }: UnsavedChangesDial
           <button type="button" onClick={() => onChoose("discard")} className="btn sm">
             Don&apos;t Save
           </button>
-          <button ref={saveButtonRef} type="button" onClick={() => onChoose("save")} className="btn primary sm">
+          <button ref={saveButtonRef} type="button" onClick={() => onChoose("save")} className="btn primary solid sm">
             {isSingle ? "Save" : "Save All"}
           </button>
         </div>

@@ -15,6 +15,9 @@ interface MenuBarProps {
   commands: readonly Command[];
 }
 
+/** Space between a menu bar button and the menu it opens, in pixels. */
+const MENU_GAP_PX = 4;
+
 interface OpenMenu {
   index: number;
   x: number;
@@ -24,7 +27,7 @@ interface OpenMenu {
 }
 
 /**
- * The application menu bar. It is one Tab stop: ArrowLeft and ArrowRight move between menus, and
+ * The application menu bar, laid out inline for the title bar that hosts it. It is one Tab stop: ArrowLeft and ArrowRight move between menus, and
  * Enter, Space, or ArrowDown opens one. A click opens a menu without moving focus first, so Edit
  * and Selection actions apply to the editor the user was typing in.
  */
@@ -38,7 +41,7 @@ export function MenuBar({ menus, commands }: MenuBarProps) {
   const openMenu = (index: number, returnFocusTo: Element | null) => {
     const rect = getButton(index)?.getBoundingClientRect();
     setFocusIndex(index);
-    setOpen({ index, x: rect?.left ?? 0, y: rect?.bottom ?? 0, returnFocusTo });
+    setOpen({ index, x: rect?.left ?? 0, y: (rect?.bottom ?? 0) + MENU_GAP_PX, returnFocusTo });
   };
 
   const closeMenu = (restoreFocus: boolean) => {
@@ -75,7 +78,7 @@ export function MenuBar({ menus, commands }: MenuBarProps) {
       ref={barRef}
       role="menubar"
       aria-label="Application menu"
-      className="border-border bg-foreground flex h-7 flex-none items-center gap-0.5 border-b px-1 text-xs"
+      className="flex min-w-0 [scrollbar-width:none] items-center overflow-x-auto text-xs md:gap-0.5 md:text-[13px]"
     >
       {menus.map((menu, index) => (
         <button
@@ -105,7 +108,7 @@ export function MenuBar({ menus, commands }: MenuBarProps) {
             }
           }}
           onKeyDown={(event) => handleButtonKeyDown(event, index)}
-          className={`text-text-secondary hover:bg-surface hover:text-text rounded-sm px-2 py-0.5 outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] ${
+          className={`text-text-secondary hover:bg-surface hover:text-text flex h-7 flex-none items-center rounded-md px-1.5 outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] md:px-2 ${
             open?.index === index ? "bg-surface text-text" : ""
           }`}
         >
