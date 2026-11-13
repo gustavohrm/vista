@@ -205,7 +205,6 @@ jobs:
         with:
           name: installers-${{ matrix.platform }}
           path: |
-            apps/native/src-tauri/target/release/bundle/msi/*.msi
             apps/native/src-tauri/target/release/bundle/nsis/*.exe
             apps/native/src-tauri/target/release/bundle/deb/*.deb
             apps/native/src-tauri/target/release/bundle/rpm/*.rpm
