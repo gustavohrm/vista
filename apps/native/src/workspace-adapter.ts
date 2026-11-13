@@ -284,20 +284,24 @@ export function createNativeWorkspaceAdapter(): WorkspaceCapability {
       // original intact rather than truncated. The rename replaces the file in one step on Windows,
       // Linux, and macOS.
       const { directory, name } = splitNativePath(fullPath);
-      const tempPath = `${directory}/.${name}.vista-save-${crypto.randomUUID().slice(0, 8)}`;
+      // No leading dot: on Unix, Tauri's filesystem scope does not match dotfiles inside the granted folder.
+      const tempPath = `${directory}/${name}.vista-save-${crypto.randomUUID().slice(0, 8)}`;
       // Unix permission bits only; Windows reports none.
       const mode = current?.mode === null || current?.mode === undefined ? undefined : current.mode & 0o7777;
       try {
         // Inside the try, so a write that fails partway, such as on a full disk, leaves no temporary file.
         await writeFileBytes(tempPath, bytes, { createNew: true, ...(mode === undefined ? {} : { mode }) });
+        // Stated before the rename, which keeps size and modification time, so a program that changes the
+        // file right after cannot have its version recorded as the one Vista saved.
+        const written = await statWritten(tempPath, path);
         await rename(tempPath, fullPath);
+        return written;
       } catch (err) {
         await removeEntry(tempPath).catch((cleanupErr: unknown) =>
           console.warn(`Could not remove the temporary file "${tempPath}":`, cleanupErr),
         );
         throw err;
       }
-      return statWritten(fullPath, path);
     },
 
     async createFile(workspace: Workspace, path: string): Promise<void> {

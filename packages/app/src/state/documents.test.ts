@@ -238,6 +238,7 @@ describe("findAffectedDocuments", () => {
       const state = documentsReducer(openAll("a.md"), {
         type: "reloaded",
         key: A,
+        expected: STAT,
         file: loaded("from elsewhere", { stat: NEWER_STAT }),
       });
 
@@ -250,9 +251,27 @@ describe("findAffectedDocuments", () => {
       });
     });
 
+    it("ignores a reload read before a save that finished during the read", () => {
+      let state = documentsReducer(openAll("a.md"), { type: "edit", key: A, content: "saved" });
+      state = documentsReducer(state, { type: "saved", key: A, content: "saved", stat: NEWER_STAT });
+      const reloaded = documentsReducer(state, {
+        type: "reloaded",
+        key: A,
+        expected: STAT,
+        file: loaded("older", { stat: STAT }),
+      });
+
+      expect(reloaded).toBe(state);
+    });
+
     it("keeps unsaved edits instead of reloading, and marks the tab changed on disk", () => {
       let state = documentsReducer(openAll("a.md"), { type: "edit", key: A, content: "mine" });
-      state = documentsReducer(state, { type: "reloaded", key: A, file: loaded("theirs", { stat: NEWER_STAT }) });
+      state = documentsReducer(state, {
+        type: "reloaded",
+        key: A,
+        expected: STAT,
+        file: loaded("theirs", { stat: NEWER_STAT }),
+      });
 
       expect(state.documents[0]).toMatchObject({
         content: "mine",

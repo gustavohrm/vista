@@ -50,7 +50,8 @@ export type DocumentsAction =
   | { type: "edit"; key: string; content: string }
   | { type: "saved"; key: string; content: string; stat: FileStat }
   | { type: "diskChanged"; key: string; stat: FileStat | null }
-  | { type: "reloaded"; key: string; file: LoadedFile }
+  // `expected` is the version the reload started from; a save during the read makes the result stale.
+  | { type: "reloaded"; key: string; expected: FileStat; file: LoadedFile }
   | { type: "setViewMode"; key: string; viewMode: ViewMode }
   | { type: "move"; workspaceId: string; fromPath: string; toPath: string };
 
@@ -99,8 +100,11 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
         return doc.externalChange === externalChange ? doc : { ...doc, externalChange };
       });
     case "reloaded":
-      return updateDocument(state, action.key, (doc) =>
-        doc.isDirty
+      return updateDocument(state, action.key, (doc) => {
+        if (!isSameStat(action.expected, doc.diskStat)) {
+          return doc;
+        }
+        return doc.isDirty
           ? { ...doc, externalChange: "changed" }
           : {
               ...doc,
@@ -111,8 +115,8 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
               viewMode: action.file.isReadOnly ? "raw" : doc.viewMode,
               externalChange: null,
               revision: doc.revision + 1,
-            },
-      );
+            };
+      });
     case "setViewMode":
       return updateDocument(state, action.key, (doc) => ({
         ...doc,

@@ -384,7 +384,8 @@ function AppShell({ adapter }: AppProps) {
         confirmLabel: "Install and Restart",
         cancelLabel: "Later",
       });
-      if (!accepted || isCancelled || (await confirmUnsavedChangesRef.current()) === null) {
+      // A prompt already open belongs to another flow; replacing it would leave that flow waiting forever.
+      if (!accepted || isCancelled || isPromptingRef.current || (await confirmUnsavedChangesRef.current()) === null) {
         return;
       }
       toast.show({ kind: "info", text: `Downloading Vista ${update.version}. Vista restarts when it's installed.` });
@@ -536,7 +537,9 @@ function AppShell({ adapter }: AppProps) {
     }
     try {
       const nodes = await adapter.workspace.readTree(workspace);
-      setTree(nodes);
+      if (workspaceRef.current === workspace) {
+        setTree(nodes);
+      }
     } catch (err) {
       console.error("Failed to refresh the file list:", err);
       const message = err instanceof Error ? err.message : "Failed to refresh the file list.";
@@ -645,8 +648,9 @@ function AppShell({ adapter }: AppProps) {
                 return;
               }
               if (result.kind === "loaded") {
-                // The reducer keeps the buffer if it was edited during the read, and marks it.
-                dispatchDocuments({ type: "reloaded", key: doc.key, file: result.file });
+                // The reducer keeps the buffer if it was edited during the read, and marks it, and ignores
+                // the result if a save changed the version during the read.
+                dispatchDocuments({ type: "reloaded", key: doc.key, expected: current.diskStat, file: result.file });
                 return;
               }
               dispatchDocuments({ type: "diskChanged", key: doc.key, stat: result.kind === "missing" ? null : stat });
