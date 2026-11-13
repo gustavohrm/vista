@@ -1,0 +1,148 @@
+name: Release
+
+# A release is a pushed tag named for the version every manifest carries, such as
+# `v0.2.0`. `docs/ci.md` describes the steps and the secrets they read.
+on:
+  push:
+    tags: ["v*"]
+
+# One release at a time, and never cancelled halfway: a cancelled publish could
+# leave files in the bucket that the manifest does not name.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  RELEASES_BUCKET: vista-releases
+
+jobs:
+  version:
+    name: Check the tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check every manifest carries one version
+        run: node scripts/check-versions.mjs
+
+      - name: Check the tag names that version
+        id: version
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::The tag $GITHUB_REF_NAME does not match the version $version in package.json."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+  build:
+    name: Build (${{ matrix.platform }})
+    needs: version
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        include:
+          - platform: Windows
+            runner: windows-latest
+          - platform: Linux
+            runner: ubuntu-22.04
+    env:
+      # Signs the update artifacts; the app checks them against the public key in tauri.conf.json.
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install the Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev librsvg2-dev patchelf file
+
+      - name: Set up the workspace
+        uses: ./.github/actions/setup
+
+      - name: Install Rust
+        run: rustup toolchain install
+        shell: bash
+
+      # Only here, not in CI: the signatures need the private key, which pull requests never see.
+      - name: Build the signed installers
+        run: pnpm --filter=@vista/native exec tauri build --config '{"bundle":{"createUpdaterArtifacts":true}}'
+        shell: bash
+
+      - name: Upload the installers
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-${{ matrix.platform }}
+          path: |
+            apps/native/src-tauri/target/release/bundle/nsis/*.exe
+            apps/native/src-tauri/target/release/bundle/nsis/*.exe.sig
+            apps/native/src-tauri/target/release/bundle/deb/*.deb
+            apps/native/src-tauri/target/release/bundle/rpm/*.rpm
+            apps/native/src-tauri/target/release/bundle/appimage/*.AppImage
+            apps/native/src-tauri/target/release/bundle/appimage/*.AppImage.sig
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up the workspace
+        uses: ./.github/actions/setup
+
+      - name: Download the installers
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: release
+
+      # Fails when an installer or its signature is missing, before anything is uploaded.
+      - name: Write the update manifest
+        run: node scripts/release-manifest.mjs "$VERSION" release
+
+      - name: Upload the installers
+        run: |
+          for file in release/*; do
+            name="$(basename "$file")"
+            if [ "$name" != "latest.json" ]; then
+              pnpm --filter=@vista/web exec wrangler r2 object put "$RELEASES_BUCKET/$VERSION/$name" \
+                --file "$GITHUB_WORKSPACE/$file" --content-type application/octet-stream --remote
+            fi
+          done
+        shell: bash
+
+      # Before the manifest, so the Worker that serves the new files is live when clients are told about them.
+      - name: Deploy the web app
+        run: pnpm deploy:web
+
+      # Last of the uploads: until it lands, clients keep the previous version, whose files are still there.
+      - name: Publish the update manifest
+        run: |
+          pnpm --filter=@vista/web exec wrangler r2 object put "$RELEASES_BUCKET/latest.json" \
+            --file "$GITHUB_WORKSPACE/release/latest.json" --content-type application/json --remote
+        shell: bash
+
+      - name: Delete old releases
+        run: node scripts/release-retention.mjs "$VERSION"
