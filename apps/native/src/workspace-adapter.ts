@@ -123,6 +123,21 @@ function createLimiter(limit: number) {
 }
 
 /** The version of a file, or null when nothing is there or it is not a file. */
+// Read from the directory listing, which does not follow links; `lstat` would need another permission.
+async function isSymlink(fullPath: string): Promise<boolean> {
+  const { directory, name } = splitNativePath(fullPath);
+  const entries = await readDir(directory);
+  return entries.some((entry) => entry.name === name && entry.isSymlink);
+}
+
+async function statWritten(fullPath: string, path: string): Promise<FileStat> {
+  const written = await statFile(fullPath);
+  if (!written) {
+    throw new Error(`"${path}" was not found after saving.`);
+  }
+  return { size: written.size, modifiedAt: written.modifiedAt };
+}
+
 async function statFile(fullPath: string): Promise<(FileStat & { mode: number | null }) | null> {
   // `stat` reports a missing file only as error text, so existence is checked first.
   if (!(await exists(fullPath))) {
@@ -258,6 +273,13 @@ export function createNativeWorkspaceAdapter(): WorkspaceCapability {
         throw new WorkspaceError("conflict", `"${path}" changed on disk after it was read.`);
       }
 
+      // A rename would replace a symbolic link with a regular file, and the file it points to would stop
+      // changing. So a link is written through, in place, without the temporary file's protection.
+      if (current && (await isSymlink(fullPath))) {
+        await writeFileBytes(fullPath, bytes);
+        return statWritten(fullPath, path);
+      }
+
       // Written beside the file and renamed over it, so a crash or a full disk mid-write leaves the
       // original intact rather than truncated. The rename replaces the file in one step on Windows,
       // Linux, and macOS.
@@ -265,8 +287,9 @@ export function createNativeWorkspaceAdapter(): WorkspaceCapability {
       const tempPath = `${directory}/.${name}.vista-save-${crypto.randomUUID().slice(0, 8)}`;
       // Unix permission bits only; Windows reports none.
       const mode = current?.mode === null || current?.mode === undefined ? undefined : current.mode & 0o7777;
-      await writeFileBytes(tempPath, bytes, { createNew: true, ...(mode === undefined ? {} : { mode }) });
       try {
+        // Inside the try, so a write that fails partway, such as on a full disk, leaves no temporary file.
+        await writeFileBytes(tempPath, bytes, { createNew: true, ...(mode === undefined ? {} : { mode }) });
         await rename(tempPath, fullPath);
       } catch (err) {
         await removeEntry(tempPath).catch((cleanupErr: unknown) =>
@@ -274,12 +297,7 @@ export function createNativeWorkspaceAdapter(): WorkspaceCapability {
         );
         throw err;
       }
-
-      const written = await statFile(fullPath);
-      if (!written) {
-        throw new Error(`"${path}" was not found after saving.`);
-      }
-      return { size: written.size, modifiedAt: written.modifiedAt };
+      return statWritten(fullPath, path);
     },
 
     async createFile(workspace: Workspace, path: string): Promise<void> {

@@ -34,7 +34,7 @@ The smoke test starts an isolated local Wrangler server on port 8799 with inspec
 
 The web app is a Cloudflare Worker. A release deploys it: the release workflow, which [`docs/ci.md`](../../docs/ci.md#releases) describes, runs `pnpm deploy:web` with the repository's Cloudflare secrets. A merge to `main` does not deploy.
 
-The Worker also serves the desktop releases from the R2 bucket bound as `RELEASES`: `/releases/latest.json` for the updater, `/releases/<version>/<file>` for installers, and `/download/windows` and `/download/linux` as links to the current installer. These paths are listed in `run_worker_first`, because otherwise a browser navigating to them gets the app's `index.html`. Anything else under `/releases/` is a 404, never the app. Locally, `wrangler dev --local` simulates the bucket, empty until objects are put into it with `wrangler r2 object put --local`.
+The Worker also serves the desktop releases from the R2 bucket bound as `RELEASES`: `/releases/latest.json` for the updater, `/releases/<version>/<file>` for installers, and `/download/windows`, `/download/linux` (the AppImage), `/download/deb`, and `/download/rpm` as links to the current installer. These paths are listed in `run_worker_first`, because otherwise a browser navigating to them gets the app's `index.html`. Anything else under `/releases/` is a 404, never the app. Locally, `wrangler dev --local` simulates the bucket, empty until objects are put into it with `wrangler r2 object put --local`.
 
 `pnpm deploy:web` builds fresh frontend assets before invoking Wrangler. Deployment targets the Worker name in `wrangler.json`, currently `vista`, in the authenticated Cloudflare account.
 

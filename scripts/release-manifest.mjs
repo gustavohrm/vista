@@ -13,14 +13,22 @@ import { fileURLToPath } from "node:url";
 
 /** @typedef {{ url: string, signature: string }} PlatformEntry */
 
-// Tauri's updater only installs these formats: NSIS on Windows, AppImage on Linux.
+// The updater looks up `{os}-{arch}-{bundle type}` first, so each kind of install gets its own package: an
+// AppImage install must never be handed a .deb. No `{os}-{arch}` fallback is written, so a build of a kind
+// listed nowhere finds no update instead of a package it cannot install.
 const PLATFORMS = [
   {
-    key: "windows-x86_64",
+    key: "windows-x86_64-nsis",
     label: "Windows installer",
     matches: (/** @type {string} */ name) => /setup.*\.exe$/.test(name),
   },
-  { key: "linux-x86_64", label: "Linux AppImage", matches: (/** @type {string} */ name) => name.endsWith(".AppImage") },
+  {
+    key: "linux-x86_64-appimage",
+    label: "Linux AppImage",
+    matches: (/** @type {string} */ name) => name.endsWith(".AppImage"),
+  },
+  { key: "linux-x86_64-deb", label: "Debian package", matches: (/** @type {string} */ name) => name.endsWith(".deb") },
+  { key: "linux-x86_64-rpm", label: "RPM package", matches: (/** @type {string} */ name) => name.endsWith(".rpm") },
 ];
 
 /**
@@ -33,11 +41,12 @@ const PLATFORMS = [
  * @throws {Error} When a platform has no installer, more than one, or one without its `.sig` file.
  */
 export function buildManifest({ version, pubDate, names, read }) {
-  const prefix = `Vista_${version}_`;
+  // Tauri names the RPM `Vista-{version}-1.x86_64.rpm` and every other bundle `Vista_{version}_…`.
+  const prefixes = [`Vista_${version}_`, `Vista-${version}-`];
   /** @type {Record<string, PlatformEntry>} */
   const platforms = {};
   for (const platform of PLATFORMS) {
-    const found = names.filter((name) => name.startsWith(prefix) && platform.matches(name));
+    const found = names.filter((name) => prefixes.some((prefix) => name.startsWith(prefix)) && platform.matches(name));
     if (found.length === 0) {
       throw new Error(`No ${platform.label} for ${version}.`);
     }

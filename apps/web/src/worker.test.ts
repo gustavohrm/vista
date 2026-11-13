@@ -6,8 +6,10 @@ const MANIFEST = {
   version: "0.2.0",
   pub_date: "2026-11-13T00:00:00.000Z",
   platforms: {
-    "windows-x86_64": { url: "0.2.0/Vista_0.2.0_x64-setup.exe", signature: "sig-w" },
-    "linux-x86_64": { url: "0.2.0/Vista_0.2.0_amd64.AppImage", signature: "sig-l" },
+    "windows-x86_64-nsis": { url: "0.2.0/Vista_0.2.0_x64-setup.exe", signature: "sig-w" },
+    "linux-x86_64-appimage": { url: "0.2.0/Vista_0.2.0_amd64.AppImage", signature: "sig-l" },
+    "linux-x86_64-deb": { url: "0.2.0/Vista_0.2.0_amd64.deb", signature: "sig-d" },
+    "linux-x86_64-rpm": { url: "0.2.0/Vista-0.2.0-1.x86_64.rpm", signature: "sig-r" },
   },
 };
 
@@ -58,8 +60,10 @@ describe("worker", () => {
     expect(await response.json()).toEqual({
       ...MANIFEST,
       platforms: {
-        "windows-x86_64": { url: `${ORIGIN}/releases/0.2.0/Vista_0.2.0_x64-setup.exe`, signature: "sig-w" },
-        "linux-x86_64": { url: `${ORIGIN}/releases/0.2.0/Vista_0.2.0_amd64.AppImage`, signature: "sig-l" },
+        "windows-x86_64-nsis": { url: `${ORIGIN}/releases/0.2.0/Vista_0.2.0_x64-setup.exe`, signature: "sig-w" },
+        "linux-x86_64-appimage": { url: `${ORIGIN}/releases/0.2.0/Vista_0.2.0_amd64.AppImage`, signature: "sig-l" },
+        "linux-x86_64-deb": { url: `${ORIGIN}/releases/0.2.0/Vista_0.2.0_amd64.deb`, signature: "sig-d" },
+        "linux-x86_64-rpm": { url: `${ORIGIN}/releases/0.2.0/Vista-0.2.0-1.x86_64.rpm`, signature: "sig-r" },
       },
     });
   });
@@ -113,6 +117,8 @@ describe("worker", () => {
   it.each([
     ["windows", "Vista_0.2.0_x64-setup.exe"],
     ["linux", "Vista_0.2.0_amd64.AppImage"],
+    ["deb", "Vista_0.2.0_amd64.deb"],
+    ["rpm", "Vista-0.2.0-1.x86_64.rpm"],
   ])("redirects /download/%s to the current installer", async (platform, file) => {
     const response = await worker.fetch(
       request(`/download/${platform}`),

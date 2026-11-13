@@ -25,9 +25,12 @@ const MANIFEST_KEY = "latest.json";
 const ALLOWED_METHODS = "GET, HEAD";
 // Matches the version folders `scripts/release-manifest.mjs` writes and the file names Tauri gives installers.
 const RELEASE_FILE_PATH = /^\/releases\/(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\/([A-Za-z0-9][A-Za-z0-9._-]*)$/;
+// Each link names the manifest entry for that kind of install, as `scripts/release-manifest.mjs` writes it.
 const DOWNLOAD_PLATFORMS: Record<string, string> = {
-  windows: "windows-x86_64",
-  linux: "linux-x86_64",
+  windows: "windows-x86_64-nsis",
+  linux: "linux-x86_64-appimage",
+  deb: "linux-x86_64-deb",
+  rpm: "linux-x86_64-rpm",
 };
 
 const notFound = (text = "Not found.") => new Response(text, { status: 404 });
