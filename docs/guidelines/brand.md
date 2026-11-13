@@ -156,7 +156,7 @@ Rejected marks:
 
 **Daylight is Vista's colour.** It is the light seen through the opening, and a highlighter's colour, the one colour people add to plain text. It also sets Vista apart in a category of purple, blue, teal, green, red, and black and white, and from Haku and Coden, which are monochrome.
 
-Vista will offer several interface themes. Daylight is Vista's own theme and identity; a monochrome theme and others will sit beside it. Today the interface has one appearance, taken from `@codenhub/styles`, and no theme uses Daylight yet. Brand surfaces, which are the logo, the app icon, a website, and release notes, always use Daylight.
+Vista will offer several interface themes. Daylight is Vista's own theme and identity; a monochrome theme and others will sit beside it. Today the interface has a light and a dark appearance, set through `@codenhub/theme` with the `@codenhub/styles` palette, and neither uses Daylight yet; the logo and loader the interface shows are the one exception, as [Motion](#motion) describes. Brand surfaces, which are the logo, the app icon, a website, and release notes, always use Daylight.
 
 The neutrals are the `@codenhub/styles` palette's, so the brand and the interface share them. OKLCH values are the source; hex and RGB are their sRGB conversions.
 
@@ -224,8 +224,34 @@ Rejected brand typefaces:
 
 **The horizon.** One Daylight bar with the mark's slanted ends, three times as wide as it is tall or wider, placed once in a layout at the thing to look at: above a headline, or at the top edge. It is the mark's bar let out of the V, and it makes a layout recognizable without the logo. Use it once per layout, never as a divider or a list bullet, and never beside the logo at the same size.
 
+## Motion
+
+The logo moves the way the brand idea reads: the opening appears, then the view through it. Motion is short, plays once except in the loader, and never stands between a person and what they asked for.
+
+### Entrance
+
+The entrance plays once, where the logo first appears: the start screen, a website's first view, or the opening of a video.
+
+| Part     | Movement                                | Start  | Duration |
+| -------- | --------------------------------------- | ------ | -------- |
+| V        | Fades in and rises 4 units into place   | 0 ms   | 360 ms   |
+| Bar      | Fades in and opens out from its centre  | 200 ms | 440 ms   |
+| Wordmark | Fades in and moves 8 units to the right | 320 ms | 420 ms   |
+
+The entrance ends at 740 ms with the full logo, and the mark's alone at 640 ms. Every part eases out on `cubic-bezier(0.2, 0, 0, 1)`: it starts fast and settles. The bar opens from its centre because a horizon widens as an opening clears; it never slides in from a side, which would read as a progress bar.
+
+### Loop
+
+The loader is the mark with its bar sweeping through the opening: the bar fills from the left edge, holds, and empties to the right, every 1.6 s on `cubic-bezier(0.65, 0, 0.35, 1)`. The V never moves, so the mark stays recognizable at any frame. It is for a wait that fills an area, such as opening a folder; a wait inside a control or a list row keeps the interface's spinner. It shows nothing for its first 300 ms, then fades in, so a short wait does not flash.
+
+### Rules
+
+- **Reduced motion.** When the person has asked for reduced motion, the entrance shows its last frame at once, and the loader's bar pulses between full and 35% opacity in place instead of sweeping, since it still has to show that something is happening.
+- **One at a time.** One animated logo per view. The logo does not move again once it has entered.
+- **No new movements.** No bounce, spin, flip, or 3D, and nothing that separates the bar from the V or recolours it.
+- **Colour.** Animated files follow the same versions as the still ones, and the in-app logo and loader take Daylight deep on bright grounds and Daylight on dark ones.
+
 ## Not decided
 
 - **Voice, tagline, and messaging.** Interface text follows the [documentation guidelines](documentation.md); there is no marketing voice yet.
-- **Motion.** There is no animated logo or loader.
 - **Themes.** How Daylight becomes an interface theme, and which tokens it sets, belongs to a specification that does not exist yet.

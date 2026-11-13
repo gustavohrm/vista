@@ -1,7 +1,7 @@
 ---
 status: IMPLEMENTED
 last_updated: 2026-11-13
-scope: Brand artwork and the brand font under root `assets/`, and the app icons generated from them in `apps/native/src-tauri/icons/`.
+scope: Brand artwork, animated logos, and the brand font under root `assets/`, and the app icons generated from them in `apps/native/src-tauri/icons/`.
 ---
 
 # Assets
@@ -44,15 +44,15 @@ The URL assumes the consumer serves the file at that path; where it goes is the 
 
 ## App icon and favicons
 
-| File                             | Content                                                             | Use                                           |
-| -------------------------------- | ------------------------------------------------------------------- | --------------------------------------------- |
-| `assets/icon/app-icon.svg`       | Bright mark on the ink plate, 1024 × 1024                           | Source artwork for the app icon, above 32 px. |
-| `assets/icon/app-icon-small.svg` | The [small version](guidelines/brand.md#small-version) on the plate | Source artwork at 32 px and below.            |
-| `assets/icon/app-icon.png`       | `app-icon.svg` rendered at 1024 px                                  | Input to `tauri icon`.                        |
-| `assets/favicon/favicon.svg`     | Same artwork as `app-icon-small.svg`                                | Favicon for browsers that take SVG.           |
-| `assets/favicon/favicon.ico`     | 16, 24, 32 from the small version; 48, 64, 256 from the regular one | Default favicon and the Windows app icon.     |
+| File                             | Content                                                             | Use                                                                  |
+| -------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `assets/icon/app-icon.svg`       | Bright mark on the ink plate, 1024 × 1024                           | Source artwork for the app icon, above 32 px.                        |
+| `assets/icon/app-icon-small.svg` | The [small version](guidelines/brand.md#small-version) on the plate | Source artwork at 32 px and below.                                   |
+| `assets/icon/app-icon.png`       | `app-icon.svg` rendered at 1024 px                                  | Input to `tauri icon`.                                               |
+| `assets/favicon/favicon.svg`     | Same artwork as `app-icon-small.svg`                                | Favicon for browsers that take SVG.                                  |
+| `assets/favicon/favicon.ico`     | 16, 24, 32 from the small version; 48, 64, 256 from the regular one | Favicon for browsers without SVG favicons, and the Windows app icon. |
 
-The web host links the SVG favicon from `apps/web/src/index.html`, and Vite copies it into the build.
+The web host links both favicons from `apps/web/src/index.html`, the ICO with `sizes="any"` before the SVG, so a browser that takes SVG uses it and any other falls back to the ICO. Vite copies both into the build.
 
 ### Regenerating the app icons
 
@@ -63,6 +63,23 @@ The web host links the SVG favicon from `apps/web/src/index.html`, and Vite copi
 3. Rebuild `assets/favicon/favicon.ico` with each size rendered from its source SVG at that size, not scaled down from one large image, and copy it over `apps/native/src-tauri/icons/icon.ico`. Replace `apps/native/src-tauri/icons/32x32.png` with `app-icon-small.svg` rendered at 32 px.
 
 Step 3 exists because `tauri icon` scales one 1024 px image down, which blurs the bar away at the sizes a taskbar and a title bar show.
+
+## Animated logos
+
+Animated versions of the logo, as [Motion](guidelines/brand.md#motion) describes. Each is the still file of the same name with its paths unchanged and a `<style>` block that animates them, so it plays in an `<img>` tag, a browser, and most design tools, with no script. Each honours `prefers-reduced-motion`. Naming follows [Image naming](#image-naming).
+
+| File                                 | Animation                                      | Use                                                |
+| ------------------------------------ | ---------------------------------------------- | -------------------------------------------------- |
+| `assets/motion/logo-enter-light.svg` | Full logo entrance, once, 740 ms               | A first view on a dark background.                 |
+| `assets/motion/logo-enter-dark.svg`  | As above, dark artwork                         | A first view on a bright background.               |
+| `assets/motion/mark-enter-light.svg` | Mark entrance, once, 640 ms                    | Where only the mark fits, on a dark background.    |
+| `assets/motion/mark-enter-dark.svg`  | As above, dark artwork                         | Where only the mark fits, on a bright background.  |
+| `assets/motion/mark-loop-light.svg`  | Loader: the bar sweeps the opening, 1.6 s loop | A wait that fills an area, on a dark background.   |
+| `assets/motion/mark-loop-dark.svg`   | As above, dark artwork                         | A wait that fills an area, on a bright background. |
+
+An entrance plays when the image loads; to replay it, load the image again. Rebuild a file from its still version when the still one changes: keep the paths identical, so the last frame of an entrance is the still logo.
+
+The application does not load these files. It draws the same logo and loader inline in `packages/app/src/components/brand/vista-logo.tsx`, with the motion in `packages/app/src/style.css`, so they take the theme's colours.
 
 ## Social
 

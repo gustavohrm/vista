@@ -84,7 +84,7 @@ The gear button in the document header opens a menu of four check items: line nu
 
 With no file open, the editor area shows a start screen instead of staying empty, so the next step is always on screen.
 
-- **No folder open.** It names the app, says what it does in one sentence, and offers **Open Folder**. When a folder is remembered, **Reopen {name}** comes first as the primary action, as [Reopening the last folder](#reopening-the-last-folder) describes. Nothing is offered while a folder is still being opened or restored.
+- **No folder open.** It shows Vista's logo, says what Vista does in one sentence, and offers **Open Folder**. When a folder is remembered, **Reopen {name}** comes first as the primary action, as [Reopening the last folder](#reopening-the-last-folder) describes. Nothing is offered while a folder is still being opened or restored; the [loader](../guidelines/brand.md#loop) shows instead. The logo above the sentence plays its [entrance](../guidelines/brand.md#entrance) when the screen appears.
 - **Folder open.** It shows the folder's name and four next steps, each with its shortcut: Search files, Create a new file, Show all commands, and Keyboard shortcuts.
 
 ### Document header

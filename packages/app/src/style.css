@@ -173,3 +173,111 @@ body,
 [data-find-match="current"] {
   background-color: var(--color-primary-subtle);
 }
+
+/* Vista's logo and loader (`components/brand/vista-logo.tsx`). The bar takes Daylight on dark grounds
+   and Daylight deep on bright ones, as the brand guideline's colour versions do, through the same
+   `light-dark()` switch as the theme's tokens. Hand-written CSS because the motion is keyframes on
+   SVG paths. */
+.vista-logo {
+  --vista-ease-enter: cubic-bezier(0.2, 0, 0, 1);
+  --vista-ease-sweep: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.vista-logo-v,
+.vista-logo-word {
+  fill: var(--color-text-strong);
+}
+
+.vista-logo-bar {
+  fill: light-dark(#637b09, #c5f03b);
+  transform-box: fill-box;
+}
+
+/* Entrance: the V rises into place, the bar opens out from its centre, then the wordmark follows. */
+.vista-logo[data-motion="enter"] .vista-logo-v {
+  animation: vista-rise 360ms var(--vista-ease-enter) both;
+}
+
+.vista-logo[data-motion="enter"] .vista-logo-bar {
+  transform-origin: center;
+  animation: vista-open 440ms var(--vista-ease-enter) 200ms both;
+}
+
+.vista-logo[data-motion="enter"] .vista-logo-word {
+  animation: vista-follow 420ms var(--vista-ease-enter) 320ms both;
+}
+
+/* Loop: the bar fills the opening from the left and empties to the right. */
+.vista-logo[data-motion="loop"] .vista-logo-bar {
+  animation: vista-sweep 1600ms var(--vista-ease-sweep) infinite;
+}
+
+.vista-loader {
+  animation: vista-appear 200ms ease-out 300ms both;
+}
+
+@keyframes vista-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@keyframes vista-open {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+}
+
+@keyframes vista-follow {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+}
+
+@keyframes vista-sweep {
+  0% {
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+  45% {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+  55% {
+    transform: scaleX(1);
+    transform-origin: right;
+  }
+  100% {
+    transform: scaleX(0);
+    transform-origin: right;
+  }
+}
+
+@keyframes vista-appear {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes vista-pulse {
+  to {
+    opacity: 0.35;
+  }
+}
+
+/* Reduced motion: the entrance shows its last frame at once, and the loader pulses in place, since
+   it still has to show that something is happening. */
+@media (prefers-reduced-motion: reduce) {
+  .vista-logo[data-motion="enter"] .vista-logo-v,
+  .vista-logo[data-motion="enter"] .vista-logo-bar,
+  .vista-logo[data-motion="enter"] .vista-logo-word {
+    animation: none;
+  }
+
+  .vista-logo[data-motion="loop"] .vista-logo-bar {
+    animation: vista-pulse 800ms ease-in-out infinite alternate;
+  }
+}
