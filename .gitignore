@@ -42,3 +42,7 @@ playwright-report
 
 # Short-lived plans (docs/guidelines/documentation.md, "What belongs here").
 docs/plans
+
+# Tauri updater signing keys. The private key belongs only in the release environment secrets.
+*.key
+*.key.pub
