@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Vista",
-  "version": "0.0.1",
+  "version": "../package.json",
   "identifier": "com.coden.vista",
   "build": {
     "beforeDevCommand": "pnpm dev",
