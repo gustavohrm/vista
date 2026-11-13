@@ -1,12 +1,12 @@
 # @vista/native
 
-Tauri host for the shared Vista app. Windows is the verified development target; Android and iOS are prepared through this same project, with device validation still required.
+Tauri host for the shared Vista app. Windows is the primary platform and Linux the second; CI builds both installers on every change. macOS is not built or tested. Android and iOS are prepared through this same project, with device validation still required.
 
 ## Setup
 
 Run every command below from the repository root. The root README says where the pinned Node and pnpm versions are declared. Install them, then run `pnpm install --frozen-lockfile`.
 
-Install [Tauri's platform prerequisites](https://v2.tauri.app/start/prerequisites/) and Rust through rustup. The root `rust-toolchain.toml` selects the Rust version and includes rustfmt and Clippy. On Windows, install Microsoft C++ Build Tools with the Desktop development with C++ workload and WebView2.
+Install [Tauri's platform prerequisites](https://v2.tauri.app/start/prerequisites/) and Rust through rustup. The root `rust-toolchain.toml` selects the Rust version and includes rustfmt and Clippy. On Windows, install Microsoft C++ Build Tools with the Desktop development with C++ workload and WebView2. On Debian or Ubuntu, install `libwebkit2gtk-4.1-dev libxdo-dev libssl-dev librsvg2-dev patchelf file` and a C toolchain such as `build-essential`; this is the list the `Desktop (Linux)` CI job installs.
 
 ```sh
 pnpm --filter=@vista/native tauri info
@@ -14,7 +14,7 @@ pnpm dev:native
 pnpm --filter=@vista/native build:desktop
 ```
 
-`pnpm build:native` builds only the shared frontend. `build:desktop` compiles Rust and creates native bundles. For a local executable without installers, use `pnpm --filter=@vista/native build:desktop --no-bundle`.
+`pnpm build:native` builds only the shared frontend. `build:desktop` compiles Rust and creates native bundles: MSI and NSIS installers on Windows, and `.deb`, `.rpm`, and AppImage on Linux, under `src-tauri/target/release/bundle/`. The app's version comes from `apps/native/package.json`, which `tauri.conf.json` names, and `pnpm versions:check` keeps it equal to the other manifests and `Cargo.toml`. For a local executable without installers, use `pnpm --filter=@vista/native build:desktop --no-bundle`.
 
 Native checks are separate from the frontend checks:
 
@@ -47,7 +47,7 @@ Mobile folder access is not supported yet. `@tauri-apps/plugin-dialog` has no fo
 
 ## Host boundary and security
 
-Tauri integrations belong in this host. The workspace capability uses `@tauri-apps/plugin-dialog` for folder selection and `@tauri-apps/plugin-fs` for file access. `tauri-plugin-persisted-scope` keeps the folder scope granted by the picker across restarts, so the last folder can be reopened. Grant permissions only for implemented capabilities. The default capability (`src-tauri/capabilities/default.json`) grants Tauri core operations, dialog, and the filesystem operations the workspace uses (read directory, read and write text files, exists, mkdir, remove, and rename) to the main window.
+Tauri integrations belong in this host. The workspace capability uses `@tauri-apps/plugin-dialog` for folder selection and `@tauri-apps/plugin-fs` for file access. `tauri-plugin-persisted-scope` keeps the folder scope granted by the picker across restarts, so the last folder can be reopened. Grant permissions only for implemented capabilities. The default capability (`src-tauri/capabilities/default.json`) grants Tauri core operations, dialog, the filesystem operations the workspace uses (read directory, read and write files as bytes, stat, exists, mkdir, remove, and rename), and destroying the window, which closes it once unsaved edits are answered for, to the main window.
 
 The production content security policy allows bundled scripts and styles, inline styles, local/data images, and Tauri IPC. The development policy additionally allows Vite's inline React bootstrap and WebSocket hot reload. Expand policies only alongside the feature that requires the new source; keep development exceptions out of production.
 

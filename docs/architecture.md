@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-11
+last_updated: 2026-11-13
 scope: Boundaries between shared app code, platform hosts, and workspace packages.
 ---
 
@@ -16,7 +16,7 @@ Platform hosts MUST keep browser- or Tauri-specific implementations outside `pac
 
 ## Platform adapters
 
-The shared app owns capability interfaces; each host constructs and injects its implementations at startup. `AppAdapter` supplies host identity and capability interfaces such as `WorkspaceCapability` and `ThemeCapability`. Add capability contracts alongside their first product consumer, rather than building a generic adapter framework in advance.
+The shared app owns capability interfaces; each host constructs and injects its implementations at startup. `AppAdapter` supplies host identity and capability interfaces such as `WorkspaceCapability`, `ThemeCapability`, and the desktop host's `WindowCapability`, which lets the app hold a window close until unsaved edits are answered for. Add capability contracts alongside their first product consumer, rather than building a generic adapter framework in advance.
 
 - Group operations by a specific capability, such as workspace access (`WorkspaceCapability`). Do not grow one flat interface containing unrelated host operations.
 - Keep browser file handles, Tauri imports, native paths, and host permission APIs inside the hosts. Shared code consumes domain values and opaque identifiers defined by its contracts.
@@ -27,7 +27,7 @@ The shared app owns capability interfaces; each host constructs and injects its 
 
 ## Initial platform scope
 
-The immediate development targets are the web app in current desktop Chrome and Edge, and the Windows native app. The web MVP operates on user-selected existing folders via the File System Access API, rather than substituting browser-private storage. Folder access requires a secure context, supported File System Access APIs, and user-granted permissions. The native host uses Tauri's dialog and filesystem plugins.
+The immediate development targets are the web app in current desktop Chrome and Edge, and the Windows native app. Linux is the second desktop platform: CI builds its installers and lints its Rust on every change, as [CI](ci.md#jobs) describes. macOS is not built or tested. The web MVP operates on user-selected existing folders via the File System Access API, rather than substituting browser-private storage. Folder access requires a secure context, supported File System Access APIs, and user-granted permissions. The native host uses Tauri's dialog and filesystem plugins.
 
 Android and iOS remain planned targets of the same Tauri host. Their project initialization and toolchain prerequisites are documented by the native host; mobile builds and folder-access semantics require validation on those platforms before support is claimed. A shared web UI does not imply identical filesystem access across platforms.
 

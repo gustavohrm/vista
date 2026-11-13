@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-12
+last_updated: 2026-11-13
 scope: Continuous integration, the pinned toolchain, action pinning, dependency updates, and the checks that report on pull requests.
 ---
 
@@ -20,18 +20,22 @@ CI reads those same files rather than repeating a version: `pnpm/action-setup` t
 
 ## Jobs
 
-| Job    | Runner           | Runs                                                                                                                                                        |
-| ------ | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Web`  | `ubuntu-latest`  | `pnpm format:check`, `pnpm lint:check`, `pnpm typecheck`, `pnpm test`, `pnpm build:web`, `pnpm build:native`, `pnpm test:e2e`, then `Working tree is clean` |
-| `Rust` | `windows-latest` | `pnpm --filter=@vista/native` `format:rust:check`, `lint:rust:check`, then `Working tree is clean`                                                          |
+| Job                 | Runner           | Runs                                                                                                                                                                               |
+| ------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Web`               | `ubuntu-latest`  | `pnpm versions:check`, `pnpm format:check`, `pnpm lint:check`, `pnpm typecheck`, `pnpm test`, `pnpm build:web`, `pnpm build:native`, `pnpm test:e2e`, then `Working tree is clean` |
+| `Rust`              | `windows-latest` | `pnpm --filter=@vista/native` `format:rust:check`, `lint:rust:check`, then `Working tree is clean`                                                                                 |
+| `Desktop (Windows)` | `windows-latest` | `pnpm --filter=@vista/native build:desktop`, then `Working tree is clean`, then uploads the MSI and NSIS installers                                                                |
+| `Desktop (Linux)`   | `ubuntu-22.04`   | `pnpm --filter=@vista/native lint:rust:check`, `build:desktop`, then `Working tree is clean`, then uploads the `.deb`, `.rpm`, and AppImage                                        |
 
-Both jobs run on every pull request, every merge-queue check, and every push to `main`, in parallel. There is no change-based selection: the repository is one application, and a check that skips half of it on a pull request is a check that lets the other half reach `main` unverified.
+Every job runs on every pull request, every merge-queue check, and every push to `main`, in parallel. There is no change-based selection: the repository is one application, and a check that skips half of it on a pull request is a check that lets the other half reach `main` unverified.
 
 The `Web` job covers the shared interface in `packages/app` and the web host in `apps/web`, along with the repository-wide format, lint, typecheck, and test scripts. Those parts are platform-independent, so they run on the fastest, cheapest runner. End-to-end tests run Chromium only, through the Playwright configuration in `apps/web`, which builds the web app and starts a local Cloudflare Worker before the tests run.
 
 The `Rust` job runs on Windows because Windows is the platform the native layer is built and used on. It runs the Rust scripts in `apps/native` without building the frontend first, so the `frontendDist` directory is not produced before the Rust checks.
 
 The `Rust` job also sets up Node and the dependencies, because the Rust scripts are run through `pnpm --filter`, which needs the workspace installed.
+
+The `Desktop` jobs build the installers a release ships, with `tauri build` in the release profile, so a change that breaks bundling fails its pull request instead of a release. They are the slowest jobs, and run beside the others rather than after them. Windows is the primary desktop platform and Linux the second; macOS is not built. The Linux job runs on the oldest supported Ubuntu, because an AppImage runs only on systems whose glibc is at least as new as the one it was built against, and installs WebKitGTK 4.1 and the libraries Tauri's Linux bundles need. It also runs Clippy, which the `Rust` job runs only on Windows, so code that compiles only there is caught. Each job uploads its installers as a workflow artifact kept for seven days, so a change can be tried before it merges; they are unsigned, and are not releases.
 
 `Working tree is clean`, the last step of each job, fails when a check has left a tracked or untracked file changed. A check that writes has changed what it was checking, so it is reported rather than passing. On the Windows runner the step runs under `bash`, so both jobs run the same command.
 
@@ -41,7 +45,7 @@ Runs for the same pull request cancel each other, because only the newest push i
 
 Prefer adding a script to `package.json` over adding a step to the workflow. A step only CI can run is a step nobody can reproduce before pushing, and that is how CI turns into a second build system.
 
-Workspace setup — pnpm, Node, and a frozen-lockfile install — lives in `.github/actions/setup`, so the two jobs cannot drift apart. `--locked` on the Rust scripts is the Rust half of the same rule: a `Cargo.lock` that disagrees with `Cargo.toml` fails rather than being rewritten in CI.
+Workspace setup — pnpm, Node, and a frozen-lockfile install — lives in `.github/actions/setup`, so the jobs cannot drift apart. `--locked` on the Rust scripts is the Rust half of the same rule: a `Cargo.lock` that disagrees with `Cargo.toml` fails rather than being rewritten in CI.
 
 ### Pinning third-party actions
 
@@ -90,7 +94,7 @@ The workflow reports; it does not block on its own. What blocks is the `main` ru
 | Enforced for admins    | Yes, with no bypass actors                                                                                          |
 | Force pushes, deletion | Refused                                                                                                             |
 
-The check names are the job `name:` values in `ci.yml`. If a job is renamed, the required check must be updated to match, or the renamed check will never report as required.
+`Desktop (Windows)` and `Desktop (Linux)` are not required yet: adding them to the ruleset is a change in the repository settings. The check names are the job `name:` values in `ci.yml`. If a job is renamed, the required check must be updated to match, or the renamed check will never report as required.
 
 Admin enforcement is what makes the rest hold: without it, a maintainer's direct push to `main` is stopped only by the `pre-push` hook, which `--no-verify` skips.
 
@@ -110,6 +114,5 @@ These are repository settings, not files, and are on for this repository:
 
 ## Not covered yet
 
-- **Releases.** Nothing builds, signs, or publishes native installers in CI.
-- **Native builds on macOS, Linux, and mobile.** The `Rust` job checks only Windows. `pnpm --filter=@vista/native build:desktop`, `build:android`, and `build:ios` run from a developer's machine.
-- **Native frontend release bundle.** The `Rust` job does not run `tauri build` or a release-profile compile.
+- **Releases.** CI builds the Windows and Linux installers but does not sign or publish them, and the desktop app has no updater yet.
+- **Native builds on macOS and mobile.** `build:desktop` on macOS, `build:android`, and `build:ios` run from a developer's machine.

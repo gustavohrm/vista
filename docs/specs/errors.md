@@ -1,6 +1,6 @@
 ---
 status: DRAFT
-last_updated: 2026-10-15
+last_updated: 2026-11-13
 scope: How workspace failures are classified, presented to the user, and logged across the shared app and the web and native hosts.
 ---
 
@@ -14,8 +14,9 @@ This document describes how failures move from the platform to the interface tod
 
 Failures are thrown from the host adapters, `apps/web/src/workspace-adapter.ts` and `apps/native/src/workspace-adapter.ts`. Two kinds of error reach the interface:
 
-- **Vista-authored `Error`s** with fixed text, for example `"${name}" already exists.`, `File not found: ${path}`, `No native workspace root folder selected`, and the web permission message `Permission to write to this folder was not granted. Re-open the folder to try again.`
+- **Vista-authored `Error`s** with fixed text, for example `"${name}" already exists.`, `"${path}" was not found.`, `"{workspace}" is no longer open. Open the folder again.`, and the web permission message `Permission to write to this folder was not granted. Re-open the folder to try again.`
 - **Platform errors passed through unchanged**, for example from `createWritable()` and `write()` on the web, and from the Tauri filesystem and dialog plugins on native. Nothing in the adapters wraps them.
+- **`WorkspaceError`** (`packages/app/src/ports.ts`), a classified error carrying a `kind`. Its one kind so far is `conflict`: `writeFile` was given the version the app last read, and the file on disk no longer matches it or is gone.
 
 The Rust host (`apps/native/src-tauri/src/lib.rs`) defines no commands and no error type. It only registers plugins, so every native file operation fails in TypeScript.
 
@@ -26,7 +27,7 @@ The Rust host (`apps/native/src-tauri/src/lib.rs`) defines no commands and no er
 1. calls `console.error("Failed to <action>:", err)`, and
 2. shows `toast.show({ kind: "error", text })`, where `text` is `err.message` whenever `err instanceof Error`, and otherwise a fixed fallback such as `Failed to save ${name}.`.
 
-So platform error text is shown to the user verbatim when the platform throws an `Error`. Nothing branches on the failure kind; no code matches on message text either.
+So platform error text is shown to the user verbatim when the platform throws an `Error`. The one branch on a failure kind is the save conflict: `app.tsx` checks `err instanceof WorkspaceError && err.kind === "conflict"` and asks whether to overwrite, as [Changes on disk](workspaces.md#changes-on-disk) describes. No code matches on message text.
 
 Toasts use `@codenhub/toaster` through `ToastProvider` (`packages/app/src/components/feedback/toast.tsx`). The kinds in use are `error` and `info`.
 
@@ -34,6 +35,7 @@ Toasts use `@codenhub/toaster` through `ToastProvider` (`packages/app/src/compon
 
 - **Cancellation.** The web picker returns `null` on `AbortError`. The native `open()` resolves to `null` on cancel, and the native adapter returns `null` for it. Callers treat `null` as "nothing happened" with no toast.
 - **Folder restore.** `restoreFolder` reports `restored`, `needs-permission`, `unavailable`, or `none` as values. `unavailable` shows the info toast `Couldn't reopen "{name}". It may have been moved or deleted.` (`app.tsx`).
+- **Opening a file.** `loadFile` (`packages/app/src/state/load-file.ts`) reports a file that is missing, over the size limit, or binary as a value, and each shows its own toast, as [Opening a file](workspaces.md#opening-a-file) describes. A file that isn't UTF-8 opens read-only with an info toast.
 - **Unsaved changes.** `saveActiveFile` returns `false` on failure, and the caller decides whether to continue.
 
 ### Deliberately swallowed failures
@@ -41,7 +43,9 @@ Toasts use `@codenhub/toaster` through `ToastProvider` (`packages/app/src/compon
 These are best-effort and log a warning instead of throwing:
 
 - Reading, writing, and forgetting the last-opened folder, in both hosts (`localStorage` on native, IndexedDB on web). The write and forget functions' doc comments say "Failures are logged only"; the read functions log and treat a failure as nothing remembered.
-- Skipping an unreadable subdirectory during the web tree scan (`console.warn`).
+- An unreadable subfolder during a tree scan, in both hosts: it is logged with `console.warn` and shown in the tree marked as unreadable, so the user still sees it.
+- Removing the native save's temporary file after a failed rename: the cleanup failure is logged with `console.warn`, and the rename's own error is what the user sees.
+- Checking the tree and open tabs against the disk when the window regains focus: a failure is logged with `console.error` and shows no toast, because the user did not ask for the check and what is on screen is still usable. The next focus checks again.
 - Falling back from `showDirectoryPicker` to the directory input after a non-cancel failure.
 - Native restore, which probes the folder with `readDir` and forgets it on failure.
 - Markdown editor create and destroy failures, which are logged with `console.error`.
