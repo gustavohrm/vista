@@ -24,6 +24,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@tauri-apps/api": "catalog:",
     "@tauri-apps/plugin-dialog": "catalog:",
     "@tauri-apps/plugin-fs": "catalog:",
     "@vista/app": "workspace:*",

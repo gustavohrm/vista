@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { EditorSettings } from "../../domain/settings";
 import { getViewer } from "../../domain/viewers";
-import type { FileDocument, ViewMode } from "../../ports";
+import type { ViewMode } from "../../ports";
 import type { OpenDocument } from "../../state/documents";
 import { Tooltip } from "../feedback/tooltip";
 import { Menu, type MenuEntry } from "../menu/menu";
@@ -101,7 +101,7 @@ export function EditorPane({
   }
 
   const viewer = getViewer(doc.extension);
-  const canToggleView = viewer.hasRaw && viewer.enriched !== undefined;
+  const canToggleView = !doc.isReadOnly && viewer.hasRaw && viewer.enriched !== undefined;
 
   return (
     <main role="main" data-platform={platform} className="bg-background text-text flex flex-1 flex-col overflow-hidden">
@@ -161,6 +161,7 @@ export function EditorPane({
             documentKey={doc.key}
             content={doc.content}
             fileName={doc.name}
+            readOnly={doc.isReadOnly}
             onChange={onContentChange}
             onCursorChange={(cursor) => onCursorChange(doc.key, cursor)}
             onVimModeChange={(mode) => onVimModeChange(doc.key, mode)}
@@ -173,9 +174,9 @@ export function EditorPane({
         ) : (
           <div ref={renderedViewRef} className="h-full">
             {enriched === "markdown" ? (
-              // The editor owns its document once mounted, so each tab gets its own instance.
+              // The editor owns its document once mounted, so each tab, and each reload from disk, gets its own instance.
               <MarkdownEditor
-                key={doc.key}
+                key={`${doc.key}:${doc.revision}`}
                 content={doc.content}
                 onChange={onContentChange}
                 onReady={() => setMarkdownRenders((count) => count + 1)}
@@ -202,7 +203,7 @@ export function EditorPane({
 
 interface DocumentBreadcrumbProps {
   /** Document whose path is shown. */
-  file: FileDocument;
+  file: OpenDocument;
 }
 
 /**
@@ -243,8 +244,31 @@ function DocumentBreadcrumb({ file }: DocumentBreadcrumbProps) {
             </>
           )}
         </li>
+        {file.isReadOnly && (
+          <DocumentNote text="Read-only" title="This file isn't UTF-8 text, so Vista won't save it." />
+        )}
+        {file.externalChange === "changed" && (
+          <DocumentNote
+            text="Changed on disk"
+            title="Another program changed this file. Saving asks before overwriting it."
+          />
+        )}
+        {file.externalChange === "deleted" && (
+          <DocumentNote
+            text="Deleted on disk"
+            title="Another program deleted this file. Saving asks before creating it again."
+          />
+        )}
       </ol>
     </nav>
+  );
+}
+
+function DocumentNote({ text, title }: { text: string; title: string }) {
+  return (
+    <li className="text-text-secondary flex-none text-xs" title={title}>
+      {text}
+    </li>
   );
 }
 

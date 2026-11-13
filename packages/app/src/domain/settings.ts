@@ -6,10 +6,17 @@ export interface EditorSettings {
   wordWrap: boolean;
 }
 
+/** Limits on the files Vista opens. */
+export interface FileSettings {
+  /** Largest file Vista opens, in megabytes (1 MB = 1,048,576 bytes). A whole number in range. */
+  maxOpenSizeMb: number;
+}
+
 /** User preferences, stored by the browser or webview under `SETTINGS_STORAGE_KEY`. */
 export interface Settings {
   version: 1;
   editor: EditorSettings;
+  files: FileSettings;
 }
 
 export const SETTINGS_STORAGE_KEY = "vista.settings";
@@ -22,7 +29,27 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   wordWrap: true,
 };
 
-export const DEFAULT_SETTINGS: Settings = { version: 1, editor: DEFAULT_EDITOR_SETTINGS };
+export const MIN_OPEN_SIZE_MB = 1;
+/** A file read whole into memory past this point risks the tab's memory limit in Chromium. */
+export const MAX_OPEN_SIZE_MB_LIMIT = 512;
+
+/** Far above a note or a spreadsheet export, and below where the editors stop responding. */
+export const DEFAULT_FILE_SETTINGS: FileSettings = { maxOpenSizeMb: 10 };
+
+export const DEFAULT_SETTINGS: Settings = {
+  version: 1,
+  editor: DEFAULT_EDITOR_SETTINGS,
+  files: DEFAULT_FILE_SETTINGS,
+};
+
+export const BYTES_PER_MB = 1024 * 1024;
+
+/** Whether a value can be stored as the file size limit. */
+export function isValidOpenSizeMb(value: unknown): value is number {
+  return (
+    Number.isInteger(value) && (value as number) >= MIN_OPEN_SIZE_MB && (value as number) <= MAX_OPEN_SIZE_MB_LIMIT
+  );
+}
 
 /**
  * Reads stored settings. Anything unreadable falls back to the defaults, field by field, so a
@@ -41,21 +68,31 @@ export function parseSettings(stored: string | null): Settings {
   } catch {
     return DEFAULT_SETTINGS;
   }
-  if (!isRecord(value) || value.version !== 1 || !isRecord(value.editor)) {
+  if (!isRecord(value) || value.version !== 1) {
     return DEFAULT_SETTINGS;
   }
-  const editor = value.editor;
+  return { version: 1, editor: parseEditorSettings(value.editor), files: parseFileSettings(value.files) };
+}
+
+function parseEditorSettings(value: unknown): EditorSettings {
+  if (!isRecord(value)) {
+    return DEFAULT_EDITOR_SETTINGS;
+  }
   const pick = (name: keyof EditorSettings) =>
-    typeof editor[name] === "boolean" ? editor[name] : DEFAULT_EDITOR_SETTINGS[name];
+    typeof value[name] === "boolean" ? value[name] : DEFAULT_EDITOR_SETTINGS[name];
   return {
-    version: 1,
-    editor: {
-      lineNumbers: pick("lineNumbers"),
-      minimap: pick("minimap"),
-      vim: pick("vim"),
-      wordWrap: pick("wordWrap"),
-    },
+    lineNumbers: pick("lineNumbers"),
+    minimap: pick("minimap"),
+    vim: pick("vim"),
+    wordWrap: pick("wordWrap"),
   };
+}
+
+function parseFileSettings(value: unknown): FileSettings {
+  if (!isRecord(value) || !isValidOpenSizeMb(value.maxOpenSizeMb)) {
+    return DEFAULT_FILE_SETTINGS;
+  }
+  return { maxOpenSizeMb: value.maxOpenSizeMb };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

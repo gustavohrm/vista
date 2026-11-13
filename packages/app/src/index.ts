@@ -3,12 +3,17 @@ export { getFileKind, normalizeExtension, supportsEnrichedView } from "./domain/
 export type {
   AppAdapter,
   AppPlatform,
+  FileContents,
   FileDocument,
+  FileStat,
   RestoreFolderResult,
   ThemeCapability,
   ViewMode,
+  WindowCapability,
   Workspace,
   WorkspaceCapability,
+  WorkspaceErrorKind,
   WorkspaceNode,
 } from "./ports";
+export { WorkspaceError } from "./ports";
 export { getThemeInstance, useTheme } from "./theme/theme-manager";

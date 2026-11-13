@@ -62,6 +62,8 @@ interface RawEditorProps {
   content: string;
   /** File name, used in the editor's accessible name. */
   fileName: string;
+  /** Shows the text without letting the user change it. */
+  readOnly?: boolean;
   /** Called with the full text after each edit the user makes. */
   onChange: (value: string) => void;
   /** Called when the cursor or selection moves, and when a tab is shown. */
@@ -133,7 +135,7 @@ export function RawEditor(props: RawEditorProps) {
   binding.props = props;
   useImperativeHandle(props.ref, () => createRawFindTarget(() => viewRef.current), []);
 
-  const { documentKey, content, fileName, stateCache } = props;
+  const { documentKey, content, fileName, readOnly, stateCache } = props;
   const options = props.options ?? DEFAULT_RAW_EDITOR_OPTIONS;
 
   // A layout effect, so that on unmount the scroll position is saved while the editor is still in the DOM.
@@ -187,7 +189,7 @@ export function RawEditor(props: RawEditorProps) {
   const { lineNumbers: showLineNumbers, minimap, vim: isVimEnabled, wordWrap } = options;
   useEffect(() => {
     viewRef.current?.dispatch({ effects: reconfigure(binding) });
-  }, [binding, fileName, showLineNumbers, minimap, isVimEnabled, wordWrap]);
+  }, [binding, fileName, readOnly, showLineNumbers, minimap, isVimEnabled, wordWrap]);
 
   const { pendingJump } = props;
   useEffect(() => {
@@ -236,6 +238,7 @@ const compartments = {
   label: new Compartment(),
   lineNumbers: new Compartment(),
   minimap: new Compartment(),
+  readOnly: new Compartment(),
   vim: new Compartment(),
   wordWrap: new Compartment(),
 };
@@ -253,6 +256,7 @@ function createEditorState(content: string): EditorState {
       compartments.lineNumbers.of([]),
       compartments.wordWrap.of([]),
       compartments.minimap.of([]),
+      compartments.readOnly.of([]),
       history(),
       drawSelection(),
       highlightActiveLine(),
@@ -280,6 +284,7 @@ function reconfigure(binding: EditorBinding): StateEffect<unknown>[] {
     ),
     compartments.lineNumbers.reconfigure(options.lineNumbers ? [lineNumbers(), highlightActiveLineGutter()] : []),
     compartments.wordWrap.reconfigure(options.wordWrap ? EditorView.lineWrapping : []),
+    compartments.readOnly.reconfigure(props.readOnly ? EditorState.readOnly.of(true) : []),
     compartments.minimap.reconfigure(
       options.minimap
         ? showMinimap.of({ create: () => ({ dom: document.createElement("div") }), displayText: "blocks" })

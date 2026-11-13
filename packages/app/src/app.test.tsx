@@ -5,7 +5,8 @@ import { StrictMode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { App } from "./app";
-import type { AppAdapter, RestoreFolderResult, WorkspaceCapability, WorkspaceNode } from "./ports";
+import type { AppAdapter, FileStat, WorkspaceCapability, WorkspaceNode } from "./ports";
+import { createMemoryWorkspace, writtenTexts, type MemoryWorkspace } from "./test-support/memory-workspace";
 
 const README_CONTENT = "# Hello Vista\nThis is notes.";
 const EDITED_README_CONTENT = `${README_CONTENT}\nNew line`;
@@ -28,33 +29,19 @@ const ROOT_TREE: WorkspaceNode[] = [
   },
 ];
 
-function createMockWorkspaceCapability(overrides?: Partial<WorkspaceCapability>): WorkspaceCapability {
-  return {
-    isSupported: true,
-    openFolder: vi.fn().mockResolvedValue({
-      id: "workspace-1",
-      name: "My Notes",
-      rootPath: "/notes",
-    }),
-    readTree: vi.fn().mockResolvedValue(ROOT_TREE),
-    readFile: vi.fn().mockImplementation((path: string) => {
-      if (path === "readme.md") {
-        return Promise.resolve(README_CONTENT);
-      }
-      if (path === "data.csv") {
-        return Promise.resolve(CSV_CONTENT);
-      }
-      return Promise.resolve("Plain text");
-    }),
-    readBinary: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
-    writeFile: vi.fn().mockResolvedValue(undefined),
-    createFile: vi.fn().mockResolvedValue(undefined),
-    createDirectory: vi.fn().mockResolvedValue(undefined),
-    move: vi.fn().mockResolvedValue(undefined),
-    remove: vi.fn().mockResolvedValue(undefined),
-    restoreFolder: vi.fn().mockResolvedValue({ status: "none" } satisfies RestoreFolderResult),
-    ...overrides,
-  };
+const PLAIN_TEXT = "Plain text";
+
+function createMockWorkspaceCapability(overrides?: Partial<WorkspaceCapability>): MemoryWorkspace {
+  return createMemoryWorkspace(
+    {
+      "readme.md": README_CONTENT,
+      "data.csv": CSV_CONTENT,
+      "docs/a.txt": PLAIN_TEXT,
+      "docs/b.txt": PLAIN_TEXT,
+      "docs/guide.md": PLAIN_TEXT,
+    },
+    { tree: ROOT_TREE, overrides },
+  );
 }
 
 /**
@@ -182,7 +169,7 @@ describe("App", () => {
     await appendToRawEditor(user, editor, "\nNew line");
 
     await user.keyboard("{Control>}s{/Control}");
-    expect(mockWorkspace.writeFile).toHaveBeenCalledWith("readme.md", EDITED_README_CONTENT);
+    expect(writtenTexts(mockWorkspace, "readme.md")).toEqual([EDITED_README_CONTENT]);
   });
 
   it("loads and edits CSV file in enriched table view", async () => {
@@ -218,7 +205,7 @@ describe("App", () => {
     await user.keyboard("{Control>}s{/Control}");
 
     // The file's LF line breaks survive the table's rewrite.
-    expect(mockWorkspace.writeFile).toHaveBeenCalledWith("data.csv", "Name,Age\nAlicia,30\nBob,25");
+    expect(writtenTexts(mockWorkspace, "data.csv")).toEqual(["Name,Age\nAlicia,30\nBob,25"]);
   });
 
   it("shows an error toast when opening a folder fails for a reason other than user cancellation", async () => {
@@ -337,7 +324,7 @@ describe("App", () => {
     await user.click(screen.getByRole("menuitem", { name: "New File" }));
     await user.type(screen.getByRole("textbox", { name: "Entry name" }), "todo.md{Enter}");
 
-    expect(mockWorkspace.createFile).toHaveBeenCalledWith("todo.md");
+    expect(mockWorkspace.createFile).toHaveBeenCalledWith(expect.objectContaining({ id: "workspace-1" }), "todo.md");
     await waitFor(() => expect(mockWorkspace.readTree).toHaveBeenCalledTimes(2));
   });
 
@@ -376,7 +363,11 @@ describe("App", () => {
     await user.clear(input);
     await user.type(input, "guide.md{Enter}");
 
-    expect(mockWorkspace.move).toHaveBeenCalledWith("readme.md", "guide.md");
+    expect(mockWorkspace.move).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "workspace-1" }),
+      "readme.md",
+      "guide.md",
+    );
     // The mocked readTree always returns the same static list, so this verifies the
     // in-place document path update rather than a refreshed tree from disk.
     const editor = screen.getByRole("main");
@@ -403,7 +394,7 @@ describe("App", () => {
 
     await user.click(within(dialog).getByRole("button", { name: "Delete" }));
 
-    expect(mockWorkspace.remove).toHaveBeenCalledWith("readme.md");
+    expect(mockWorkspace.remove).toHaveBeenCalledWith(expect.objectContaining({ id: "workspace-1" }), "readme.md");
     await waitFor(() => expect(screen.queryByRole("heading", { name: "Hello Vista" })).not.toBeInTheDocument());
     expect(await screen.findByText('"readme.md" was deleted.')).toBeInTheDocument();
   });
@@ -1006,7 +997,7 @@ describe("App", () => {
       await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
       await waitFor(() => expect(screen.queryByRole("tab")).not.toBeInTheDocument());
-      expect(mockWorkspace.writeFile).toHaveBeenCalledWith("readme.md", EDITED_README_CONTENT);
+      expect(writtenTexts(mockWorkspace, "readme.md")).toEqual([EDITED_README_CONTENT]);
     });
 
     it("keeps a dirty tab open when saving fails during close", async () => {
@@ -1035,7 +1026,7 @@ describe("App", () => {
 
       await user.keyboard("{Control>}s{/Control}");
 
-      expect(mockWorkspace.writeFile).toHaveBeenCalledWith("readme.md", EDITED_README_CONTENT);
+      expect(writtenTexts(mockWorkspace, "readme.md")).toEqual([EDITED_README_CONTENT]);
       await waitFor(() => expect(getTab("readme.md")).not.toHaveTextContent("(unsaved)"));
     });
 
@@ -1043,12 +1034,10 @@ describe("App", () => {
       const user = userEvent.setup();
       let finishWrite: () => void = () => {};
       const mockWorkspace = createMockWorkspaceCapability({
-        writeFile: vi.fn().mockImplementation(
-          () =>
-            new Promise<void>((resolve) => {
-              finishWrite = resolve;
-            }),
-        ),
+        writeFile: () =>
+          new Promise<FileStat>((resolve) => {
+            finishWrite = () => resolve({ size: 1, modifiedAt: 99_000 });
+          }),
       });
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
       const editor = await makeReadmeDirty(user);
@@ -1065,12 +1054,10 @@ describe("App", () => {
       const user = userEvent.setup();
       let finishWrite: () => void = () => {};
       const mockWorkspace = createMockWorkspaceCapability({
-        writeFile: vi.fn().mockImplementation(
-          () =>
-            new Promise<void>((resolve) => {
-              finishWrite = resolve;
-            }),
-        ),
+        writeFile: () =>
+          new Promise<FileStat>((resolve) => {
+            finishWrite = () => resolve({ size: 1, modifiedAt: 99_000 });
+          }),
       });
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
       const editor = await makeReadmeDirty(user);
@@ -1276,8 +1263,8 @@ describe("App", () => {
       await user.click(screen.getByRole("menuitem", { name: "Save All" }));
 
       await waitFor(() => expect(mockWorkspace.writeFile).toHaveBeenCalledTimes(2));
-      expect(mockWorkspace.writeFile).toHaveBeenCalledWith("readme.md", EDITED_README_CONTENT);
-      expect(mockWorkspace.writeFile).toHaveBeenCalledWith("data.csv", `${CSV_CONTENT}!`);
+      expect(writtenTexts(mockWorkspace, "readme.md")).toEqual([EDITED_README_CONTENT]);
+      expect(writtenTexts(mockWorkspace, "data.csv")).toEqual([`${CSV_CONTENT}!`]);
     });
 
     it("starts naming a new file at the root from File > New File", async () => {
@@ -1290,7 +1277,7 @@ describe("App", () => {
       await user.click(screen.getByRole("menuitem", { name: "New File" }));
       await user.type(await screen.findByRole("textbox", { name: "Entry name" }), "todo.md{Enter}");
 
-      expect(mockWorkspace.createFile).toHaveBeenCalledWith("todo.md");
+      expect(mockWorkspace.createFile).toHaveBeenCalledWith(expect.objectContaining({ id: "workspace-1" }), "todo.md");
     });
 
     it("toggles word wrap from the View menu and with Alt+Z", async () => {
@@ -1476,12 +1463,11 @@ describe("App", () => {
         .fn()
         .mockResolvedValueOnce({ id: "workspace-1", name: "My Notes", rootPath: "/notes" })
         .mockResolvedValueOnce({ id: "workspace-1", name: "My Notes", rootPath: "/notes" }),
-      readFile: vi.fn().mockImplementation(
-        () =>
-          new Promise<string>((resolve) => {
-            finishRead = resolve;
-          }),
-      ),
+      readFile: () =>
+        new Promise((resolve) => {
+          finishRead = (content) =>
+            resolve({ bytes: new TextEncoder().encode(content), stat: { size: content.length, modifiedAt: 1 } });
+        }),
     });
     render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
     await openFolderFromWelcome(user);
@@ -1492,5 +1478,260 @@ describe("App", () => {
     await act(async () => finishRead(README_CONTENT));
 
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+  });
+  describe("files on disk", () => {
+    const MB = 1024 * 1024;
+
+    function fileNode(path: string): WorkspaceNode {
+      return { id: path, name: path, path, kind: "file", extension: path.split(".").pop() ?? "" };
+    }
+
+    it("asks before overwriting a file another program changed, and overwrites when confirmed", async () => {
+      const user = userEvent.setup();
+      const mockWorkspace = createMockWorkspaceCapability();
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      await makeReadmeDirty(user);
+      mockWorkspace.changeExternally("readme.md", "Their version");
+
+      await user.keyboard("{Control>}s{/Control}");
+      const dialog = await screen.findByRole("dialog", { name: '"readme.md" changed on disk' });
+      await user.click(within(dialog).getByRole("button", { name: "Overwrite" }));
+
+      await waitFor(() => expect(mockWorkspace.textOf("readme.md")).toBe(EDITED_README_CONTENT));
+      expect(getTab("readme.md")).not.toHaveTextContent("(unsaved)");
+    });
+
+    it("keeps the other program's version and the unsaved edits when overwriting is cancelled", async () => {
+      const user = userEvent.setup();
+      const mockWorkspace = createMockWorkspaceCapability();
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      await makeReadmeDirty(user);
+      mockWorkspace.changeExternally("readme.md", "Their version");
+
+      await user.keyboard("{Control>}s{/Control}");
+      const dialog = await screen.findByRole("dialog", { name: '"readme.md" changed on disk' });
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(mockWorkspace.textOf("readme.md")).toBe("Their version");
+      expect(getTab("readme.md")).toHaveTextContent("(unsaved)");
+    });
+
+    it("reloads a clean tab whose file changed on disk when the window regains focus", async () => {
+      const user = userEvent.setup();
+      const mockWorkspace = createMockWorkspaceCapability();
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      await openFolderFromWelcome(user);
+      await user.click(screen.getByText("readme.md"));
+      await waitFor(() => expect(screen.getByRole("heading", { name: "Hello Vista" })).toBeVisible());
+      mockWorkspace.changeExternally("readme.md", "# Changed elsewhere");
+
+      fireEvent.focus(window);
+
+      expect(await screen.findByRole("heading", { name: "Changed elsewhere" })).toBeVisible();
+      expect(getTab("readme.md")).not.toHaveTextContent("(unsaved)");
+    });
+
+    it("keeps unsaved edits and marks the tab when its file changed on disk", async () => {
+      const user = userEvent.setup();
+      const mockWorkspace = createMockWorkspaceCapability();
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      const editor = await makeReadmeDirty(user);
+      mockWorkspace.changeExternally("readme.md", "Their version");
+
+      fireEvent.focus(window);
+
+      expect(
+        await findToast('"readme.md" changed on disk. Saving it will ask before overwriting the other version.'),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Changed on disk")).toBeInTheDocument();
+      expect(rawEditorText(editor)).toBe(EDITED_README_CONTENT);
+    });
+
+    it("marks a tab whose file was deleted on disk", async () => {
+      const user = userEvent.setup();
+      const mockWorkspace = createMockWorkspaceCapability();
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      await openFolderFromWelcome(user);
+      await user.click(screen.getByText("readme.md"));
+      await screen.findByRole("heading", { name: "Hello Vista" });
+      mockWorkspace.deleteExternally("readme.md");
+
+      fireEvent.focus(window);
+
+      expect(await screen.findByText("Deleted on disk")).toBeInTheDocument();
+      expect(getTab("readme.md")).toBeInTheDocument();
+    });
+
+    it("refuses a file over the size limit without reading it", async () => {
+      const user = userEvent.setup();
+      const mockWorkspace = createMockWorkspaceCapability({
+        stat: async () => ({ size: 20 * MB, modifiedAt: 1 }),
+      });
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      await openFolderFromWelcome(user);
+
+      await user.click(screen.getByText("readme.md"));
+
+      expect(
+        await findToast('"readme.md" is 20.0 MB, over the 10 MB limit. You can raise the limit in Settings.'),
+      ).toBeInTheDocument();
+      expect(mockWorkspace.readFile).not.toHaveBeenCalled();
+      expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    });
+
+    it("opens a larger file once the limit is raised in Settings", async () => {
+      const user = userEvent.setup();
+      const mockWorkspace = createMockWorkspaceCapability({
+        stat: async () => ({ size: 20 * MB, modifiedAt: 1 }),
+      });
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      await openFolderFromWelcome(user);
+
+      await user.keyboard("{Control>},{/Control}");
+      const dialog = await screen.findByRole("dialog", { name: "Settings" });
+      const limit = within(dialog).getByRole("spinbutton", { name: "Largest file to open (MB)" });
+      await user.clear(limit);
+      await user.type(limit, "0");
+      expect(within(dialog).getByRole("alert")).toHaveTextContent("Enter a whole number from 1 to 512.");
+      await user.clear(limit);
+      await user.type(limit, "30");
+      await user.click(within(dialog).getByRole("button", { name: "Close" }));
+      await user.click(screen.getByText("readme.md"));
+
+      expect(await screen.findByRole("tab", { name: /readme\.md/ })).toBeInTheDocument();
+    });
+
+    it("lists a folder it couldn't read, and says so", async () => {
+      const user = userEvent.setup();
+      const mockWorkspace = createMemoryWorkspace(
+        {},
+        {
+          tree: [
+            { id: "private", name: "private", path: "private", kind: "directory", children: [], isUnreadable: true },
+          ],
+        },
+      );
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+
+      await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+
+      // jsdom's name computation drops the space a browser keeps before the hidden hint.
+      expect(
+        await screen.findByRole("button", {
+          name: /^private ?\(Vista can't read this folder, so its files aren't listed\)$/,
+        }),
+      ).toBeInTheDocument();
+    });
+
+    it("refuses a binary file", async () => {
+      const user = userEvent.setup();
+      const mockWorkspace = createMemoryWorkspace({ "photo.bin": new Uint8Array([0x89, 0x00, 0x01]) });
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+
+      await user.click(await screen.findByText("photo.bin"));
+
+      expect(await findToast("Vista can't open \"photo.bin\" because it isn't a text file.")).toBeInTheDocument();
+      expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    });
+
+    it("opens a file that isn't UTF-8 read-only, so its characters are never rewritten", async () => {
+      const user = userEvent.setup();
+      // "café" in Windows-1252, which is not valid UTF-8.
+      const mockWorkspace = createMemoryWorkspace(
+        { "legacy.txt": new Uint8Array([0x63, 0x61, 0x66, 0xe9]) },
+        { tree: [fileNode("legacy.txt")] },
+      );
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+
+      await user.click(await screen.findByText("legacy.txt"));
+      const editor = await screen.findByRole("textbox", { name: /Raw text content of legacy\.txt/i });
+      await appendToRawEditor(user, editor, "!");
+
+      expect(
+        await findToast('"legacy.txt" isn\'t UTF-8 text, so it opened read-only to keep its characters intact.'),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Read-only")).toBeInTheDocument();
+      expect(rawEditorText(editor)).toBe("caf�");
+      expect(getTab("legacy.txt")).not.toHaveTextContent("(unsaved)");
+    });
+
+    it("keeps a UTF-8 byte order mark when saving", async () => {
+      const user = userEvent.setup();
+      const bom = [0xef, 0xbb, 0xbf];
+      const mockWorkspace = createMemoryWorkspace(
+        { "notes.txt": new Uint8Array([...bom, ...new TextEncoder().encode("Hi")]) },
+        { tree: [fileNode("notes.txt")] },
+      );
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+      await user.click(await screen.findByText("notes.txt"));
+      const editor = await screen.findByRole("textbox", { name: /Raw text content of notes\.txt/i });
+
+      await appendToRawEditor(user, editor, "!");
+      await user.keyboard("{Control>}s{/Control}");
+
+      await waitFor(() => expect(mockWorkspace.writeFile).toHaveBeenCalledTimes(1));
+      const [, , bytes] = mockWorkspace.writeFile.mock.calls[0] ?? [];
+      expect([...(bytes ?? [])]).toEqual([...bom, ...new TextEncoder().encode("Hi!")]);
+    });
+  });
+
+  describe("closing the desktop window", () => {
+    function createWindow() {
+      let check: () => Promise<boolean> = async () => true;
+      const window = {
+        onCloseRequested: vi.fn((next: () => Promise<boolean>) => {
+          check = next;
+          return () => {};
+        }),
+      };
+      return { window, requestClose: () => check() };
+    }
+
+    it("closes at once when nothing is unsaved", async () => {
+      const { window, requestClose } = createWindow();
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), window }} />);
+      await screen.findByRole("button", { name: "Open Folder" });
+
+      await expect(requestClose()).resolves.toBe(true);
+    });
+
+    it("asks about unsaved edits, and stays open when the user cancels", async () => {
+      const user = userEvent.setup();
+      const { window, requestClose } = createWindow();
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), window }} />);
+      await makeReadmeDirty(user);
+
+      let closing: Promise<boolean> = Promise.resolve(true);
+      act(() => {
+        closing = requestClose();
+      });
+      const dialog = await screen.findByRole("dialog", { name: "Save changes to readme.md?" });
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+      await expect(closing).resolves.toBe(false);
+      expect(getTab("readme.md")).toHaveTextContent("(unsaved)");
+    });
+
+    it("closes after the user saves", async () => {
+      const user = userEvent.setup();
+      const mockWorkspace = createMockWorkspaceCapability();
+      const { window, requestClose } = createWindow();
+      render(<App adapter={{ platform: "native", workspace: mockWorkspace, window }} />);
+      await makeReadmeDirty(user);
+
+      let closing: Promise<boolean> = Promise.resolve(false);
+      act(() => {
+        closing = requestClose();
+      });
+      const dialog = await screen.findByRole("dialog", { name: "Save changes to readme.md?" });
+      await user.click(within(dialog).getByRole("button", { name: "Save" }));
+
+      await expect(closing).resolves.toBe(true);
+      expect(mockWorkspace.textOf("readme.md")).toBe(EDITED_README_CONTENT);
+    });
   });
 });

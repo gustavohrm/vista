@@ -1,18 +1,16 @@
-import type { RestoreFolderResult, Workspace, WorkspaceCapability, WorkspaceNode } from "@vista/app";
+import {
+  WorkspaceError,
+  type FileContents,
+  type FileStat,
+  type RestoreFolderResult,
+  type Workspace,
+  type WorkspaceCapability,
+  type WorkspaceNode,
+} from "@vista/app";
 
-const IGNORED_NAMES = new Set([
-  ".git",
-  "node_modules",
-  ".svn",
-  ".hg",
-  ".DS_Store",
-  "Thumbs.db",
-  ".idea",
-  ".vscode",
-  "dist",
-  "build",
-  "coverage",
-]);
+// Version-control internals, installed dependencies, and OS metadata: never notes, and large
+// enough to slow every scan. A folder such as `build` or `.vscode` is shown, since notes can live there.
+const IGNORED_NAMES = new Set([".git", ".svn", ".hg", "node_modules", ".DS_Store", "Thumbs.db"]);
 
 interface DirectoryInputResult {
   rootName: string;
@@ -206,14 +204,14 @@ function pickDirectoryViaInput(): Promise<DirectoryInputResult | null> {
  * Downloads a file to disk as a web fallback when the File System Access API is not available.
  *
  * @param path - File path.
- * @param content - File text content.
+ * @param bytes - File contents, written as they are.
  */
-function downloadFallbackFile(path: string, content: string): void {
+function downloadFallbackFile(path: string, bytes: Uint8Array<ArrayBuffer>): void {
   if (typeof document === "undefined") {
     return;
   }
   const fileName = path.split("/").pop() || "file";
-  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const blob = new Blob([bytes], { type: "application/octet-stream" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -250,15 +248,11 @@ async function scanDirectoryHandle(
     if (handle.kind === "directory") {
       try {
         const children = await scanDirectoryHandle(handle, relativePath, fileHandles);
-        nodes.push({
-          id: relativePath,
-          name,
-          path: relativePath,
-          kind: "directory",
-          children,
-        });
+        nodes.push({ id: relativePath, name, path: relativePath, kind: "directory", children });
       } catch (err) {
-        console.warn(`Skipping inaccessible directory "${relativePath}":`, err);
+        // Shown, not skipped, so the user knows the folder exists and why its files are missing.
+        console.warn(`Could not read the folder "${relativePath}":`, err);
+        nodes.push({ id: relativePath, name, path: relativePath, kind: "directory", children: [], isUnreadable: true });
       }
     } else if (handle.kind === "file") {
       const ext = name.includes(".") ? name.split(".").pop()?.toLowerCase() : "";
@@ -503,6 +497,34 @@ async function forgetLastFolderHandle(): Promise<void> {
   }
 }
 
+/** A folder opened with the File System Access API, read and written in place. */
+interface DirectSession {
+  kind: "direct";
+  root: FileSystemDirectoryHandle;
+  fileHandles: Map<string, FileSystemFileHandle>;
+}
+
+/**
+ * A folder picked through a directory input: a read-only snapshot. Saved files are kept in
+ * memory and downloaded, since this browser cannot write to the folder.
+ */
+interface FallbackSession {
+  kind: "fallback";
+  tree: WorkspaceNode[];
+  files: Map<string, File>;
+  saved: Map<string, FileContents>;
+}
+
+type Session = DirectSession | FallbackSession;
+
+function isMissingEntryError(err: unknown): boolean {
+  return err instanceof DOMException && (err.name === "NotFoundError" || err.name === "TypeMismatchError");
+}
+
+function statOfFile(file: File): FileStat {
+  return { size: file.size, modifiedAt: file.lastModified };
+}
+
 /**
  * Creates a WorkspaceCapability adapter for the Web platform.
  * Supports direct disk read/write via the File System Access API (Chromium) and
@@ -511,19 +533,23 @@ async function forgetLastFolderHandle(): Promise<void> {
  * @returns Configured web workspace capability.
  */
 export function createWebWorkspaceAdapter(): WorkspaceCapability {
-  let rootDirectoryHandle: FileSystemDirectoryHandle | null = null;
-  const fileHandles = new Map<string, FileSystemFileHandle>();
+  // Each open workspace keeps its own handles, so an operation always acts on the folder its
+  // workspace names, even after another folder was opened.
+  const sessions = new WeakMap<Workspace, Session>();
 
-  // Fallback in-memory state
-  let fallbackTree: WorkspaceNode[] = [];
-  const fallbackFiles = new Map<string, File>();
-  const fallbackOverrides = new Map<string, string>();
-
-  async function resolveDirectoryHandleChain(segments: string[]): Promise<FileSystemDirectoryHandle> {
-    if (!rootDirectoryHandle) {
-      throw new Error("No root directory handle available");
+  function sessionOf(workspace: Workspace): Session {
+    const session = sessions.get(workspace);
+    if (!session) {
+      throw new Error(`"${workspace.name}" is no longer open. Open the folder again.`);
     }
-    let current = rootDirectoryHandle;
+    return session;
+  }
+
+  async function resolveDirectoryHandleChain(
+    session: DirectSession,
+    segments: string[],
+  ): Promise<FileSystemDirectoryHandle> {
+    let current = session.root;
     for (const segment of segments) {
       // oxlint-disable-next-line eslint/no-await-in-loop -- Directory handles must be resolved sequentially from parent to child
       current = await current.getDirectoryHandle(segment);
@@ -532,30 +558,48 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
   }
 
   async function resolveParentDirectoryHandle(
+    session: DirectSession,
     path: string,
   ): Promise<{ parent: FileSystemDirectoryHandle; name: string }> {
     const { parentPath, name } = splitPath(path);
     const segments = parentPath === "" ? [] : parentPath.split("/");
-    const parent = await resolveDirectoryHandleChain(segments);
+    const parent = await resolveDirectoryHandleChain(session, segments);
     return { parent, name };
   }
 
-  async function resolveFileHandle(path: string): Promise<FileSystemFileHandle> {
-    const cached = fileHandles.get(path);
+  async function resolveFileHandle(
+    session: DirectSession,
+    path: string,
+    { create = false }: { create?: boolean } = {},
+  ): Promise<FileSystemFileHandle> {
+    const cached = session.fileHandles.get(path);
     if (cached) {
       return cached;
     }
-
-    const { parent, name } = await resolveParentDirectoryHandle(path);
-    const handle = await parent.getFileHandle(name);
-    fileHandles.set(path, handle);
+    const { parent, name } = await resolveParentDirectoryHandle(session, path);
+    const handle = await parent.getFileHandle(name, { create });
+    session.fileHandles.set(path, handle);
     return handle;
   }
 
-  function forgetCachedHandlesUnder(path: string): void {
-    for (const cachedPath of Array.from(fileHandles.keys())) {
+  /** The file at a path as it is on disk now, or null when there is none. */
+  async function currentFile(session: DirectSession, path: string): Promise<File | null> {
+    try {
+      const handle = await resolveFileHandle(session, path);
+      return await handle.getFile();
+    } catch (err) {
+      if (isMissingEntryError(err)) {
+        session.fileHandles.delete(path);
+        return null;
+      }
+      throw err;
+    }
+  }
+
+  function forgetCachedHandlesUnder(session: DirectSession, path: string): void {
+    for (const cachedPath of Array.from(session.fileHandles.keys())) {
       if (cachedPath === path || cachedPath.startsWith(`${path}/`)) {
-        fileHandles.delete(cachedPath);
+        session.fileHandles.delete(cachedPath);
       }
     }
   }
@@ -587,6 +631,8 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
     await writable.close();
   }
 
+  // Copies every entry, ignored names included: the source is deleted afterwards, so anything
+  // skipped here, such as a `.git` folder, would be lost.
   async function copyDirectoryEntryRecursive(
     sourceHandle: FileSystemDirectoryHandle,
     destParent: FileSystemDirectoryHandle,
@@ -594,9 +640,6 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
   ): Promise<void> {
     const destHandle = await destParent.getDirectoryHandle(destName, { create: true });
     for await (const [name, handle] of sourceHandle) {
-      if (IGNORED_NAMES.has(name)) {
-        continue;
-      }
       if (handle.kind === "directory") {
         // oxlint-disable-next-line eslint/no-await-in-loop -- entries must be copied sequentially so a mid-copy failure leaves a consistent partial result
         await copyDirectoryEntryRecursive(handle, destHandle, name);
@@ -607,26 +650,22 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
     }
   }
 
-  /**
-   * Makes a directory handle the active root for direct reads and writes, discarding any
-   * fallback (in-memory) state from a previously opened folder.
-   *
-   * @param dirHandle - Directory handle to adopt as the workspace root.
-   * @returns The direct-access workspace descriptor for the handle.
-   */
   function adoptDirectoryHandle(dirHandle: FileSystemDirectoryHandle): Workspace {
-    rootDirectoryHandle = dirHandle;
-    fileHandles.clear();
-    fallbackTree = [];
-    fallbackFiles.clear();
-    fallbackOverrides.clear();
+    const workspace: Workspace = { id: dirHandle.name, name: dirHandle.name, rootPath: "/", accessMode: "direct" };
+    sessions.set(workspace, { kind: "direct", root: dirHandle, fileHandles: new Map() });
+    return workspace;
+  }
 
-    return {
-      id: dirHandle.name,
-      name: dirHandle.name,
-      rootPath: "/",
-      accessMode: "direct",
-    };
+  async function readFallbackFile(session: FallbackSession, path: string): Promise<FileContents | null> {
+    const saved = session.saved.get(path);
+    if (saved) {
+      return { bytes: new Uint8Array(saved.bytes), stat: { ...saved.stat } };
+    }
+    const file = session.files.get(path);
+    if (!file) {
+      return null;
+    }
+    return { bytes: new Uint8Array(await file.arrayBuffer()), stat: statOfFile(file) };
   }
 
   return {
@@ -669,24 +708,22 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
       if (!inputResult) {
         return null;
       }
-
-      rootDirectoryHandle = null;
-      fileHandles.clear();
-      fallbackTree = inputResult.nodes;
-      fallbackFiles.clear();
-      for (const [p, f] of inputResult.fileMap.entries()) {
-        fallbackFiles.set(p, f);
-      }
-      fallbackOverrides.clear();
       // This folder cannot be reopened without a picker, so drop the previously remembered one.
       await forgetLastFolderHandle();
 
-      return {
+      const workspace: Workspace = {
         id: inputResult.rootName,
         name: inputResult.rootName,
         rootPath: "/",
         accessMode: "fallback",
       };
+      sessions.set(workspace, {
+        kind: "fallback",
+        tree: inputResult.nodes,
+        files: new Map(inputResult.fileMap),
+        saved: new Map(),
+      });
+      return workspace;
     },
 
     async restoreFolder({ interactive }: { interactive: boolean }): Promise<RestoreFolderResult> {
@@ -721,106 +758,122 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
       return { status: "restored", workspace: adoptDirectoryHandle(handle) };
     },
 
-    async readTree(): Promise<WorkspaceNode[]> {
-      if (rootDirectoryHandle) {
-        await ensurePermission(rootDirectoryHandle, "read");
-        fileHandles.clear();
-        return scanDirectoryHandle(rootDirectoryHandle, "", fileHandles);
+    async readTree(workspace: Workspace): Promise<WorkspaceNode[]> {
+      const session = sessionOf(workspace);
+      if (session.kind === "direct") {
+        await ensurePermission(session.root, "read");
+        session.fileHandles.clear();
+        return scanDirectoryHandle(session.root, "", session.fileHandles);
       }
       // A copy, so callers get a new reference after in-place mutations such as `remove()` splicing
       // this array; returning the same array would let React skip the re-render.
-      return structuredClone(fallbackTree);
+      return structuredClone(session.tree);
     },
 
-    async readFile(path: string): Promise<string> {
-      if (rootDirectoryHandle) {
-        await ensurePermission(rootDirectoryHandle, "read");
-        const handle = await resolveFileHandle(path);
-        const file = await handle.getFile();
-        return file.text();
+    async stat(workspace: Workspace, path: string): Promise<FileStat | null> {
+      const session = sessionOf(workspace);
+      if (session.kind === "direct") {
+        await ensurePermission(session.root, "read");
+        const file = await currentFile(session, path);
+        return file ? statOfFile(file) : null;
       }
-
-      if (fallbackOverrides.has(path)) {
-        return fallbackOverrides.get(path)!;
+      const saved = session.saved.get(path);
+      if (saved) {
+        return { ...saved.stat };
       }
-
-      const file = fallbackFiles.get(path);
-      if (file) {
-        return file.text();
-      }
-
-      throw new Error(`File not found: ${path}`);
+      const file = session.files.get(path);
+      return file ? statOfFile(file) : null;
     },
 
-    async readBinary(path: string): Promise<Uint8Array<ArrayBuffer>> {
-      if (rootDirectoryHandle) {
-        await ensurePermission(rootDirectoryHandle, "read");
-        const handle = await resolveFileHandle(path);
-        const file = await handle.getFile();
-        return new Uint8Array(await file.arrayBuffer());
+    async readFile(workspace: Workspace, path: string): Promise<FileContents> {
+      const session = sessionOf(workspace);
+      if (session.kind === "direct") {
+        await ensurePermission(session.root, "read");
+        const file = await currentFile(session, path);
+        if (!file) {
+          throw new Error(`"${path}" was not found.`);
+        }
+        return { bytes: new Uint8Array(await file.arrayBuffer()), stat: statOfFile(file) };
       }
-
-      if (fallbackOverrides.has(path)) {
-        return new TextEncoder().encode(fallbackOverrides.get(path)!);
+      const contents = await readFallbackFile(session, path);
+      if (!contents) {
+        throw new Error(`"${path}" was not found.`);
       }
-
-      const file = fallbackFiles.get(path);
-      if (file) {
-        return new Uint8Array(await file.arrayBuffer());
-      }
-
-      throw new Error(`File not found: ${path}`);
+      return contents;
     },
 
-    async writeFile(path: string, content: string): Promise<void> {
-      if (rootDirectoryHandle) {
-        await ensurePermission(rootDirectoryHandle, "readwrite");
-        const handle = await resolveFileHandle(path);
+    async writeFile(
+      workspace: Workspace,
+      path: string,
+      bytes: Uint8Array<ArrayBuffer>,
+      options?: { expected?: FileStat },
+    ): Promise<FileStat> {
+      const session = sessionOf(workspace);
+      if (session.kind === "direct") {
+        await ensurePermission(session.root, "readwrite");
+        const expected = options?.expected;
+        if (expected) {
+          const current = await currentFile(session, path);
+          if (!current || current.size !== expected.size || current.lastModified !== expected.modifiedAt) {
+            throw new WorkspaceError("conflict", `"${path}" changed on disk after it was read.`);
+          }
+        }
+        const handle = await resolveFileHandle(session, path, { create: true });
+        // The browser writes to a swap file and replaces the original on close, so a failed write
+        // leaves the file as it was.
         const writable = await handle.createWritable();
-        await writable.write(content);
-        await writable.close();
-        return;
+        try {
+          await writable.write(bytes);
+          await writable.close();
+        } catch (err) {
+          await writable.abort().catch(() => {});
+          throw err;
+        }
+        return statOfFile(await handle.getFile());
       }
 
-      // Fallback mode: this browser has no direct-write API. Update the in-memory
-      // cache and download a copy instead of silently doing nothing.
-      fallbackOverrides.set(path, content);
-      downloadFallbackFile(path, content);
+      // Nothing else can change this in-memory snapshot, so there is no version to compare.
+      const stat: FileStat = { size: bytes.length, modifiedAt: Date.now() };
+      session.saved.set(path, { bytes: new Uint8Array(bytes), stat });
+      downloadFallbackFile(path, bytes);
+      return { ...stat };
     },
 
-    async createFile(path: string): Promise<void> {
+    async createFile(workspace: Workspace, path: string): Promise<void> {
+      const session = sessionOf(workspace);
       const { parentPath, name } = splitPath(path);
 
-      if (rootDirectoryHandle) {
-        await ensurePermission(rootDirectoryHandle, "readwrite");
-        const { parent } = await resolveParentDirectoryHandle(path);
+      if (session.kind === "direct") {
+        await ensurePermission(session.root, "readwrite");
+        const { parent } = await resolveParentDirectoryHandle(session, path);
         if (await entryExistsInDirectory(parent, name)) {
           throw new Error(`"${name}" already exists.`);
         }
         const handle = await parent.getFileHandle(name, { create: true });
-        fileHandles.set(path, handle);
+        session.fileHandles.set(path, handle);
         return;
       }
 
-      if (nodeExistsAtPath(fallbackTree, path)) {
+      if (nodeExistsAtPath(session.tree, path)) {
         throw new Error(`"${name}" already exists.`);
       }
-      const siblings = findChildrenArray(fallbackTree, parentPath);
+      const siblings = findChildrenArray(session.tree, parentPath);
       if (!siblings) {
         throw new Error(`Folder "${parentPath}" was not found.`);
       }
       const extension = name.includes(".") ? name.split(".").pop()?.toLowerCase() : "";
       siblings.push({ id: path, name, path, kind: "file", extension });
       sortNodes(siblings);
-      fallbackOverrides.set(path, "");
+      session.saved.set(path, { bytes: new Uint8Array(), stat: { size: 0, modifiedAt: Date.now() } });
     },
 
-    async createDirectory(path: string): Promise<void> {
+    async createDirectory(workspace: Workspace, path: string): Promise<void> {
+      const session = sessionOf(workspace);
       const { parentPath, name } = splitPath(path);
 
-      if (rootDirectoryHandle) {
-        await ensurePermission(rootDirectoryHandle, "readwrite");
-        const { parent } = await resolveParentDirectoryHandle(path);
+      if (session.kind === "direct") {
+        await ensurePermission(session.root, "readwrite");
+        const { parent } = await resolveParentDirectoryHandle(session, path);
         if (await entryExistsInDirectory(parent, name)) {
           throw new Error(`"${name}" already exists.`);
         }
@@ -828,10 +881,10 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
         return;
       }
 
-      if (nodeExistsAtPath(fallbackTree, path)) {
+      if (nodeExistsAtPath(session.tree, path)) {
         throw new Error(`"${name}" already exists.`);
       }
-      const siblings = findChildrenArray(fallbackTree, parentPath);
+      const siblings = findChildrenArray(session.tree, parentPath);
       if (!siblings) {
         throw new Error(`Folder "${parentPath}" was not found.`);
       }
@@ -839,11 +892,12 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
       sortNodes(siblings);
     },
 
-    async move(fromPath: string, toPath: string): Promise<void> {
-      if (rootDirectoryHandle) {
-        await ensurePermission(rootDirectoryHandle, "readwrite");
-        const { parent: sourceParent, name: sourceName } = await resolveParentDirectoryHandle(fromPath);
-        const { parent: destParent, name: destName } = await resolveParentDirectoryHandle(toPath);
+    async move(workspace: Workspace, fromPath: string, toPath: string): Promise<void> {
+      const session = sessionOf(workspace);
+      if (session.kind === "direct") {
+        await ensurePermission(session.root, "readwrite");
+        const { parent: sourceParent, name: sourceName } = await resolveParentDirectoryHandle(session, fromPath);
+        const { parent: destParent, name: destName } = await resolveParentDirectoryHandle(session, toPath);
         if (await entryExistsInDirectory(destParent, destName)) {
           throw new Error(`An entry already exists at "${toPath}".`);
         }
@@ -865,14 +919,14 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
         // Only remove the source once the copy has fully succeeded, so a failure above
         // never destroys data (see the contract's non-atomicity note for the web host).
         await sourceParent.removeEntry(sourceName, { recursive: true });
-        forgetCachedHandlesUnder(fromPath);
+        forgetCachedHandlesUnder(session, fromPath);
         return;
       }
 
-      if (nodeExistsAtPath(fallbackTree, toPath)) {
+      if (nodeExistsAtPath(session.tree, toPath)) {
         throw new Error(`An entry already exists at "${toPath}".`);
       }
-      const removed = removeNodeAtPath(fallbackTree, fromPath);
+      const removed = removeNodeAtPath(session.tree, fromPath);
       if (!removed) {
         throw new Error(`"${fromPath}" was not found.`);
       }
@@ -880,7 +934,7 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
       relocateSubtree(removed, toPath);
       const newPaths = collectSubtreePaths(removed);
 
-      const destSiblings = findChildrenArray(fallbackTree, splitPath(toPath).parentPath);
+      const destSiblings = findChildrenArray(session.tree, splitPath(toPath).parentPath);
       if (!destSiblings) {
         throw new Error(`Folder "${splitPath(toPath).parentPath}" was not found.`);
       }
@@ -892,35 +946,36 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
         if (newPath === undefined) {
           continue;
         }
-        const file = fallbackFiles.get(oldPath);
+        const file = session.files.get(oldPath);
         if (file) {
-          fallbackFiles.delete(oldPath);
-          fallbackFiles.set(newPath, file);
+          session.files.delete(oldPath);
+          session.files.set(newPath, file);
         }
-        const override = fallbackOverrides.get(oldPath);
-        if (override !== undefined) {
-          fallbackOverrides.delete(oldPath);
-          fallbackOverrides.set(newPath, override);
+        const saved = session.saved.get(oldPath);
+        if (saved !== undefined) {
+          session.saved.delete(oldPath);
+          session.saved.set(newPath, saved);
         }
       }
     },
 
-    async remove(path: string): Promise<void> {
-      if (rootDirectoryHandle) {
-        await ensurePermission(rootDirectoryHandle, "readwrite");
-        const { parent, name } = await resolveParentDirectoryHandle(path);
+    async remove(workspace: Workspace, path: string): Promise<void> {
+      const session = sessionOf(workspace);
+      if (session.kind === "direct") {
+        await ensurePermission(session.root, "readwrite");
+        const { parent, name } = await resolveParentDirectoryHandle(session, path);
         await parent.removeEntry(name, { recursive: true });
-        forgetCachedHandlesUnder(path);
+        forgetCachedHandlesUnder(session, path);
         return;
       }
 
-      const removed = removeNodeAtPath(fallbackTree, path);
+      const removed = removeNodeAtPath(session.tree, path);
       if (!removed) {
         throw new Error(`"${path}" was not found.`);
       }
       for (const subPath of collectSubtreePaths(removed)) {
-        fallbackFiles.delete(subPath);
-        fallbackOverrides.delete(subPath);
+        session.files.delete(subPath);
+        session.saved.delete(subPath);
       }
     },
   };
