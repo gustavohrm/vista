@@ -205,6 +205,30 @@ export interface WindowCapability {
   onCloseRequested(check: () => Promise<boolean>): () => void;
 }
 
+/** A newer version of the desktop app, ready to install. */
+export interface AvailableUpdate {
+  /** The new version, such as `0.3.0`. */
+  version: string;
+  /**
+   * Downloads, verifies, and installs the update, then restarts the app. It may not return: on
+   * Windows the installer ends the running app itself.
+   *
+   * @throws When the download, the signature check, or the installation fails.
+   */
+  install(): Promise<void>;
+}
+
+/** Updates for hosts that ship as installed apps. */
+export interface UpdaterCapability {
+  /**
+   * Asks the release source whether a newer version exists.
+   *
+   * @returns The update, or null when the app is up to date.
+   * @throws When the release source cannot be reached or its answer is invalid.
+   */
+  check(): Promise<AvailableUpdate | null>;
+}
+
 /** Host or shared capability for managing application theme preferences. */
 export interface ThemeCapability {
   /** Current active theme scheme. */
@@ -232,4 +256,6 @@ export interface AppAdapter {
    * uses the page's unload warning there instead.
    */
   window?: WindowCapability;
+  /** Updates for an installed app. The web app has none: a reload loads the current version. */
+  updater?: UpdaterCapability;
 }

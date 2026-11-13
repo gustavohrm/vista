@@ -3,11 +3,13 @@ export { getFileKind, normalizeExtension, supportsEnrichedView } from "./domain/
 export type {
   AppAdapter,
   AppPlatform,
+  AvailableUpdate,
   FileContents,
   FileDocument,
   FileStat,
   RestoreFolderResult,
   ThemeCapability,
+  UpdaterCapability,
   ViewMode,
   WindowCapability,
   Workspace,

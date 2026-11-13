@@ -357,6 +357,53 @@ function AppShell({ adapter }: AppProps) {
     [adapter.window, confirmUnsavedChangesInAllDocuments],
   );
 
+  const confirmUnsavedChangesRef = useRef(confirmUnsavedChangesInAllDocuments);
+  confirmUnsavedChangesRef.current = confirmUnsavedChangesInAllDocuments;
+
+  // Checked once per launch. A failed check is quiet: being offline is not something to interrupt the user about.
+  useEffect(() => {
+    const updater = adapter.updater;
+    if (!updater) {
+      return;
+    }
+    let isCancelled = false;
+    const offerUpdate = async () => {
+      let update;
+      try {
+        update = await updater.check();
+      } catch (err) {
+        console.warn("Could not check for updates:", err);
+        return;
+      }
+      if (!update || isCancelled) {
+        return;
+      }
+      const accepted = await toast.confirm({
+        title: `Vista ${update.version} is available`,
+        message: "Install it now? Vista restarts to finish, and asks about unsaved changes first.",
+        confirmLabel: "Install and Restart",
+        cancelLabel: "Later",
+      });
+      if (!accepted || isCancelled || (await confirmUnsavedChangesRef.current()) === null) {
+        return;
+      }
+      toast.show({ kind: "info", text: `Downloading Vista ${update.version}. Vista restarts when it's installed.` });
+      try {
+        await update.install();
+      } catch (err) {
+        console.error("Failed to install the update:", err);
+        toast.show({
+          kind: "error",
+          text: `Couldn't install Vista ${update.version}. Vista will offer it again the next time it starts.`,
+        });
+      }
+    };
+    void offerUpdate();
+    return () => {
+      isCancelled = true;
+    };
+  }, [adapter.updater, toast]);
+
   /**
    * Makes a workspace the active root by reading its tree first, so a failed read leaves the
    * previous state intact rather than showing a root with no contents.

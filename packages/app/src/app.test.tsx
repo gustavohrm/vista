@@ -1734,4 +1734,97 @@ describe("App", () => {
       expect(mockWorkspace.textOf("readme.md")).toBe(EDITED_README_CONTENT);
     });
   });
+
+  describe("updating the desktop app", () => {
+    function createUpdater(options: { check?: () => Promise<unknown>; install?: () => Promise<void> } = {}) {
+      const install = vi.fn(options.install ?? (async () => {}));
+      const updater = {
+        check: vi.fn(options.check ?? (async () => ({ version: "0.3.0", install }))),
+      } as unknown as NonNullable<AppAdapter["updater"]>;
+      return { updater, install };
+    }
+
+    it("offers a new version and installs it when accepted", async () => {
+      const user = userEvent.setup();
+      const { updater, install } = createUpdater();
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), updater }} />);
+
+      const dialog = await screen.findByRole("dialog", { name: "Vista 0.3.0 is available" });
+      await user.click(within(dialog).getByRole("button", { name: "Install and Restart" }));
+
+      await waitFor(() => expect(install).toHaveBeenCalledTimes(1));
+      expect(await findToast("Downloading Vista 0.3.0. Vista restarts when it's installed.")).toBeInTheDocument();
+    });
+
+    it("installs nothing when the user declines", async () => {
+      const user = userEvent.setup();
+      const { updater, install } = createUpdater();
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), updater }} />);
+
+      const dialog = await screen.findByRole("dialog", { name: "Vista 0.3.0 is available" });
+      await user.click(within(dialog).getByRole("button", { name: "Later" }));
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(install).not.toHaveBeenCalled();
+    });
+
+    it("asks about unsaved edits before restarting, and stays when the user cancels", async () => {
+      const user = userEvent.setup();
+      let release: () => void = () => {};
+      const ready = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const { updater, install } = createUpdater({
+        check: async () => {
+          await ready;
+          return { version: "0.3.0", install };
+        },
+      });
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), updater }} />);
+      await makeReadmeDirty(user);
+      release();
+
+      const offer = await screen.findByRole("dialog", { name: "Vista 0.3.0 is available" });
+      await user.click(within(offer).getByRole("button", { name: "Install and Restart" }));
+      const unsaved = await screen.findByRole("dialog", { name: "Save changes to readme.md?" });
+      await user.click(within(unsaved).getByRole("button", { name: "Cancel" }));
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(install).not.toHaveBeenCalled();
+      expect(getTab("readme.md")).toHaveTextContent("(unsaved)");
+    });
+
+    it("stays quiet when the check fails, such as offline", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const { updater } = createUpdater({ check: async () => Promise.reject(new Error("offline")) });
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), updater }} />);
+
+      await waitFor(() => expect(warn).toHaveBeenCalledWith("Could not check for updates:", expect.any(Error)));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      warn.mockRestore();
+    });
+
+    it("says so when the update fails to install", async () => {
+      const user = userEvent.setup();
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const { updater } = createUpdater({ install: async () => Promise.reject(new Error("signature mismatch")) });
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), updater }} />);
+
+      const dialog = await screen.findByRole("dialog", { name: "Vista 0.3.0 is available" });
+      await user.click(within(dialog).getByRole("button", { name: "Install and Restart" }));
+
+      expect(
+        await findToast("Couldn't install Vista 0.3.0. Vista will offer it again the next time it starts."),
+      ).toBeInTheDocument();
+      error.mockRestore();
+    });
+
+    it("offers nothing when Vista is up to date", async () => {
+      const { updater } = createUpdater({ check: async () => null });
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), updater }} />);
+
+      await waitFor(() => expect(updater.check).toHaveBeenCalledTimes(1));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+  });
 });
