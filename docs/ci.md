@@ -55,7 +55,7 @@ The updater installs the NSIS installer on Windows and the AppImage on Linux. A 
 
 **Retention.** The bucket stays inside the R2 free tier by keeping few releases. Before 1.0, only the version just published is kept. From 1.0 on, every release of the newest major is kept and older majors are deleted. A version newer than the one published is never deleted, and a folder whose name is not a version is left alone. Retention runs after `latest.json` points at the new version, so an updater that started downloading the previous version a moment before can get a 404; it offers the update again on the next start.
 
-**Secrets**, set in the repository's Actions secrets:
+**Secrets** live in the `release` environment, not in repository secrets, so only the release jobs can read them. The environment allows deployments from tags matching `v*` only, so a workflow on a branch cannot reach them either. Create it under Settings, Environments, set Deployment branches and tags to "Selected branches and tags" with the tag rule `v*`, and add:
 
 | Secret                               | Holds                                                                         |
 | ------------------------------------ | ----------------------------------------------------------------------------- |

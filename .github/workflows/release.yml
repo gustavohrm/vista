@@ -47,6 +47,8 @@ jobs:
     name: Build (${{ matrix.platform }})
     needs: version
     runs-on: ${{ matrix.runner }}
+    # The secrets live in this environment, which only tags named v* can deploy to.
+    environment: release
     timeout-minutes: 60
     strategy:
       matrix:
@@ -99,6 +101,7 @@ jobs:
     name: Publish
     needs: [version, build]
     runs-on: ubuntu-latest
+    environment: release
     timeout-minutes: 20
     env:
       VERSION: ${{ needs.version.outputs.version }}
