@@ -22,22 +22,23 @@ nvm for Windows does not read `.nvmrc`, and `nvm install` and `nvm use` without 
 
 ## Scripts
 
-| Script               | Runs                                                                                        |
-| -------------------- | ------------------------------------------------------------------------------------------- |
-| `pnpm format:check`  | `oxfmt --check`, then `prettier --check` over `**/*.md`.                                    |
-| `pnpm format:fix`    | The same two formatters, rewriting files, then `cargo fmt` for Rust.                        |
-| `pnpm lint:check`    | `oxlint --deny-warnings`.                                                                   |
-| `pnpm lint:fix`      | `oxlint --fix`.                                                                             |
-| `pnpm typecheck`     | `tsc -b` over the solution in `tsconfig.json`: the root files and every referenced package. |
-| `pnpm test`          | `vitest run`: every package's and app's Vitest project, in one run.                         |
-| `pnpm test:watch`    | `vitest`, in watch mode.                                                                    |
-| `pnpm test:coverage` | `vitest run --coverage`, with a V8 coverage report in `coverage/`.                          |
-| `pnpm test:e2e`      | `playwright test` in `@vista/web`.                                                          |
-| `pnpm build`         | `build:web`, then `build:native`, each `vite build` in its host.                            |
-| `pnpm deploy:web`    | `build:web`, then `wrangler deploy`, in `@vista/web`.                                       |
-| `pnpm verify`        | `verify:web`, then `verify:rust`, in the order [below](#verification).                      |
-| `pnpm labels`        | `node scripts/sync-labels.mjs`, which needs an authenticated `gh`.                          |
-| `pnpm prepare`       | `git config core.hooksPath .githooks`, reporting rather than failing when git cannot.       |
+| Script                | Runs                                                                                        |
+| --------------------- | ------------------------------------------------------------------------------------------- |
+| `pnpm format:check`   | `oxfmt --check`, then `prettier --check` over `**/*.md`.                                    |
+| `pnpm format:fix`     | The same two formatters, rewriting files, then `cargo fmt` for Rust.                        |
+| `pnpm lint:check`     | `oxlint --deny-warnings`.                                                                   |
+| `pnpm lint:fix`       | `oxlint --fix`.                                                                             |
+| `pnpm typecheck`      | `tsc -b` over the solution in `tsconfig.json`: the root files and every referenced package. |
+| `pnpm versions:check` | `node scripts/check-versions.mjs`: every manifest carries the root `package.json` version.  |
+| `pnpm test`           | `vitest run`: every package's and app's Vitest project, in one run.                         |
+| `pnpm test:watch`     | `vitest`, in watch mode.                                                                    |
+| `pnpm test:coverage`  | `vitest run --coverage`, with a V8 coverage report in `coverage/`.                          |
+| `pnpm test:e2e`       | `playwright test` in `@vista/web`.                                                          |
+| `pnpm build`          | `build:web`, then `build:native`, each `vite build` in its host.                            |
+| `pnpm deploy:web`     | `build:web`, then `wrangler deploy`, in `@vista/web`.                                       |
+| `pnpm verify`         | `verify:web`, then `verify:rust`, in the order [below](#verification).                      |
+| `pnpm labels`         | `node scripts/sync-labels.mjs`, which needs an authenticated `gh`.                          |
+| `pnpm prepare`        | `git config core.hooksPath .githooks`, reporting rather than failing when git cannot.       |
 
 `lint:check` and `lint:fix` accept a root-relative path, such as `pnpm lint:fix packages/app/src`, to narrow oxlint to it.
 
@@ -61,12 +62,13 @@ The hosts import `@vista/app` as source, so `tsc -b` checks its files in each pr
 
 `verify:web`:
 
+1. `versions:check`: the four `package.json` files and `Cargo.toml` carry one version, and `tauri.conf.json` reads it from `apps/native/package.json` rather than repeating it. A release bumps them together.
 1. `format:check`: oxfmt over code, CSS, HTML, JSON, and YAML, then Prettier over Markdown.
-2. `lint:check`: oxlint with `--deny-warnings`.
-3. `typecheck`: `tsc -b` over the solution.
-4. `test`: Vitest, over every project.
-5. `build:web`: the web host's production bundle, where a missing import or a broken virtual module shows up.
-6. `build:native`: the native host's frontend bundle, which the Tauri build packages.
+1. `lint:check`: oxlint with `--deny-warnings`.
+1. `typecheck`: `tsc -b` over the solution.
+1. `test`: Vitest, over every project.
+1. `build:web`: the web host's production bundle, where a missing import or a broken virtual module shows up.
+1. `build:native`: the native host's frontend bundle, which the Tauri build packages.
 
 `verify:rust`:
 
@@ -75,7 +77,7 @@ The hosts import `@vista/app` as source, so `tsc -b` checks its files in each pr
 
 The order is by cost. Within the web half, the checks that report in seconds run first, and each bundle runs after the tests that would catch the same mistake sooner. The workspace packages are consumed as source, not built output, so type checking and tests need no build first. The web half runs before the Rust half because it reports in seconds, while the Rust half may compile for minutes.
 
-`verify` does not run `test:e2e`, `build:desktop`, `build:android`, or `build:ios`. The end-to-end tests need a browser and a local Worker, and the native installers need a platform toolchain. CI runs the end-to-end tests on every pull request.
+`verify` does not run `test:e2e`, `build:desktop`, `build:android`, or `build:ios`. The end-to-end tests need a browser and a local Worker, and the native installers need a platform toolchain. CI runs the end-to-end tests and builds the Windows and Linux installers on every pull request.
 
 ## Narrowing a run
 

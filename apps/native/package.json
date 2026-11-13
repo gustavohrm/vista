@@ -24,8 +24,11 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@tauri-apps/api": "catalog:",
     "@tauri-apps/plugin-dialog": "catalog:",
     "@tauri-apps/plugin-fs": "catalog:",
+    "@tauri-apps/plugin-process": "catalog:",
+    "@tauri-apps/plugin-updater": "catalog:",
     "@vista/app": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:"

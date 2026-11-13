@@ -1,6 +1,6 @@
 ---
 status: DRAFT
-last_updated: 2026-10-15
+last_updated: 2026-11-13
 scope: Repo-wide direction for Vista, limited to work already stated in the repository's docs and READMEs.
 ---
 
@@ -12,14 +12,13 @@ Durable direction for Vista: what is planned, what is possible later, and what h
 
 ## Current Focus
 
-None recorded.
+- **Releasing the web and desktop apps.** Windows is the primary desktop platform and Linux the second. CI builds the Windows and Linux installers on every change, and a release tag signs and publishes them with the web app, which the desktop updater checks. Source: `docs/ci.md`, "Releases".
 
 ## Planned
 
 - **Mobile folder access (Android and iOS).** Mobile targets remain planned for the Tauri host, but opening, remembering, and restoring folders is desktop-only until mobile folder access and platform permissions are designed and tested. Support is not claimed before validation on those platforms. Sources: `apps/native/README.md` ("Mobile folder access is not supported yet"); `docs/architecture.md` ("remain planned targets").
 - **Backlinks, folder search, and data export.** Listed as planned capabilities. Source: `README.md` ("Planned capabilities include ... backlinks, folder search, and data export").
-- **Beta preparation for the native app.** App-store distribution, signing, and automatic updates belong to beta preparation. Source: `apps/native/README.md`.
-- **Cloudflare Workers publication and automatic deployment.** Deferred until there is an app ready to publish. The local Worker scaffold and dry-run checks exist for development. Sources: `docs/architecture.md` ("Cloudflare Workers is APPROVED, with publishing and automatic deployment not implemented"); `apps/web/README.md`; `README.md`; `CONTRIBUTING.md`.
+- **App-store distribution and operating-system code signing for the native app.** Installers are signed for the updater, not by a code-signing certificate, and are not in any app store. Source: `apps/native/README.md`.
 - **Additional file formats.** Future versions will expand to `.json`, `.yaml`, canvas representations, and embedded graph links. Source: `docs/specs/workspaces.md` ("Future versions will expand to ...").
 
 ## Later / Possible

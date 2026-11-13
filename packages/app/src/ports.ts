@@ -36,6 +36,8 @@ export interface WorkspaceNode {
   extension?: string;
   /** Child nodes if kind is 'directory'. */
   children?: WorkspaceNode[];
+  /** True for a directory the host could not list, such as one the user has no permission to read. */
+  isUnreadable?: boolean;
 }
 
 /** In-memory document buffer representing an open file. */
@@ -68,7 +70,45 @@ export type RestoreFolderResult =
   | { status: "unavailable"; name: string }
   | { status: "none" };
 
-/** Host capabilities for accessing, reading, and persisting local files and folders. */
+/**
+ * What identifies one version of a file on disk. Two stats are the same version when both fields
+ * match; hosts never compare them any other way.
+ */
+export interface FileStat {
+  /** Size in bytes. */
+  size: number;
+  /** Last modification time, in milliseconds since the Unix epoch. */
+  modifiedAt: number;
+}
+
+/** A file's bytes and the version they were read from. */
+export interface FileContents {
+  bytes: Uint8Array<ArrayBuffer>;
+  stat: FileStat;
+}
+
+/** Why a workspace operation failed, for failures the application handles rather than reports. */
+export type WorkspaceErrorKind = "conflict";
+
+/**
+ * A failure the application branches on. `"conflict"`: the file on disk is not the version the
+ * caller expected, because something else changed, created, or deleted it.
+ */
+export class WorkspaceError extends Error {
+  readonly kind: WorkspaceErrorKind;
+
+  constructor(kind: WorkspaceErrorKind, message: string) {
+    super(message);
+    this.name = "WorkspaceError";
+    this.kind = kind;
+  }
+}
+
+/**
+ * Host capabilities for accessing, reading, and persisting local files and folders. Every
+ * operation after `openFolder` and `restoreFolder` names the workspace it acts on, and paths are
+ * relative to that workspace's root, with `/` separators.
+ */
 export interface WorkspaceCapability {
   /** Whether workspace filesystem access is supported in the current environment. */
   readonly isSupported: boolean;
@@ -96,43 +136,45 @@ export interface WorkspaceCapability {
    */
   readTree(workspace: Workspace): Promise<WorkspaceNode[]>;
   /**
-   * Reads the content of a file from disk as UTF-8 text.
+   * Reads a file's current version without reading its bytes.
    *
-   * @param path - Relative path of the file to read.
-   * @returns A promise resolving to the string contents of the file.
+   * @returns The file's stat, or null when no file exists at path.
    */
-  readFile(path: string): Promise<string>;
+  stat(workspace: Workspace, path: string): Promise<FileStat | null>;
   /**
-   * Reads a file's raw bytes, such as an image a Markdown document shows.
+   * Reads a file's bytes and the version they belong to.
    *
-   * @param path - Relative path of the file to read.
-   * @returns A promise resolving to the file's bytes.
+   * @throws If no file exists at path or it cannot be read.
    */
-  readBinary(path: string): Promise<Uint8Array<ArrayBuffer>>;
+  readFile(workspace: Workspace, path: string): Promise<FileContents>;
   /**
-   * Writes the provided UTF-8 text content to the specified file on disk.
+   * Replaces a file's bytes. A reader never sees a partly written file: the host writes the new
+   * bytes beside the file and swaps them in, or uses a platform write with the same guarantee.
    *
-   * @param path - Relative path of the file to write.
-   * @param content - String content to persist.
-   * @returns A promise that resolves when writing is complete.
+   * @param options - `expected`: the version the caller last read or wrote. When the file on disk
+   *   is a different version or no longer exists, the write does not happen and the promise rejects
+   *   with a `WorkspaceError` of kind `"conflict"`. Omit it to overwrite whatever is there.
+   * @returns The version just written.
+   * @throws `WorkspaceError` `"conflict"` as described above; otherwise, if the file cannot be written.
    */
-  writeFile(path: string, content: string): Promise<void>;
+  writeFile(
+    workspace: Workspace,
+    path: string,
+    bytes: Uint8Array<ArrayBuffer>,
+    options?: { expected?: FileStat },
+  ): Promise<FileStat>;
   /**
    * Creates a new, empty file at the given path.
    *
-   * @param path - Relative path of the file to create, including its extension.
-   * @returns A promise that resolves when the file has been created.
    * @throws If an entry already exists at path, or an intermediate segment is not a directory.
    */
-  createFile(path: string): Promise<void>;
+  createFile(workspace: Workspace, path: string): Promise<void>;
   /**
    * Creates a new, empty directory at the given path.
    *
-   * @param path - Relative path of the directory to create.
-   * @returns A promise that resolves when the directory has been created.
    * @throws If an entry already exists at path, or an intermediate segment is not a directory.
    */
-  createDirectory(path: string): Promise<void>;
+  createDirectory(workspace: Workspace, path: string): Promise<void>;
   /**
    * Moves or renames a file or directory. A rename is a move within the same parent directory.
    * Directory moves are recursive. On the web host this is implemented as a copy followed by a
@@ -140,20 +182,51 @@ export interface WorkspaceCapability {
    * partway through leaves the source in place rather than risking data loss, and the error
    * propagates for the caller to handle. The native host performs an atomic rename.
    *
-   * @param fromPath - Current relative path of the entry.
-   * @param toPath - Destination relative path of the entry.
-   * @returns A promise that resolves when the move completes.
    * @throws If fromPath does not exist, or an entry already exists at toPath.
    */
-  move(fromPath: string, toPath: string): Promise<void>;
+  move(workspace: Workspace, fromPath: string, toPath: string): Promise<void>;
   /**
    * Permanently deletes a file or directory. Directory deletion is recursive. This cannot be undone.
    *
-   * @param path - Relative path of the entry to delete.
-   * @returns A promise that resolves when deletion completes.
    * @throws If path does not exist.
    */
-  remove(path: string): Promise<void>;
+  remove(workspace: Workspace, path: string): Promise<void>;
+}
+
+/** Host window behavior the application takes part in. */
+export interface WindowCapability {
+  /**
+   * Registers a check that runs when the user asks to close the window. The window closes only
+   * when the check resolves true; a check that rejects lets the window close, so a fault never
+   * traps the user.
+   *
+   * @returns A function that removes the check.
+   */
+  onCloseRequested(check: () => Promise<boolean>): () => void;
+}
+
+/** A newer version of the desktop app, ready to install. */
+export interface AvailableUpdate {
+  /** The new version, such as `0.3.0`. */
+  version: string;
+  /**
+   * Downloads, verifies, and installs the update, then restarts the app. It may not return: on
+   * Windows the installer ends the running app itself.
+   *
+   * @throws When the download, the signature check, or the installation fails.
+   */
+  install(): Promise<void>;
+}
+
+/** Updates for hosts that ship as installed apps. */
+export interface UpdaterCapability {
+  /**
+   * Asks the release source whether a newer version exists.
+   *
+   * @returns The update, or null when the app is up to date.
+   * @throws When the release source cannot be reached or its answer is invalid.
+   */
+  check(): Promise<AvailableUpdate | null>;
 }
 
 /** Host or shared capability for managing application theme preferences. */
@@ -178,4 +251,11 @@ export interface AppAdapter {
   workspace: WorkspaceCapability;
   /** Optional theme management provided by or synchronized with the host. */
   theme?: ThemeCapability;
+  /**
+   * Window behavior, for hosts that own their window. A browser tab has none: the application
+   * uses the page's unload warning there instead.
+   */
+  window?: WindowCapability;
+  /** Updates for an installed app. The web app has none: a reload loads the current version. */
+  updater?: UpdaterCapability;
 }

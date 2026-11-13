@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-11
+last_updated: 2026-11-13
 scope: Boundaries between shared app code, platform hosts, and workspace packages.
 ---
 
@@ -9,14 +9,14 @@ scope: Boundaries between shared app code, platform hosts, and workspace package
 Vista separates shared product code from platform hosts:
 
 - `packages/app` is the home for shared React UI, features, state, domain behavior, and platform capability contracts. It provides the application shell, workspace file explorer, document viewers/editors, and platform contracts.
-- `apps/web` boots the shared app at the browser boundary using the File System Access API for local workspace access and contains a local Cloudflare Worker scaffold for testing the approved hosting target.
+- `apps/web` boots the shared app at the browser boundary using the File System Access API for local workspace access and is deployed as a Cloudflare Worker that also serves the desktop releases.
 - `apps/native` boots the shared app at the Tauri boundary, using Tauri plugins (`@tauri-apps/plugin-dialog` and `@tauri-apps/plugin-fs`) for local filesystem access, plus `tauri-plugin-persisted-scope` so the granted folder scope survives restarts. Its single Tauri project targets desktop, Android, and iOS.
 
 Platform hosts MUST keep browser- or Tauri-specific implementations outside `packages/app`. Shared code MUST consume future platform capabilities through narrow contracts. Add more workspace packages only when code has a proven independent responsibility or consumer.
 
 ## Platform adapters
 
-The shared app owns capability interfaces; each host constructs and injects its implementations at startup. `AppAdapter` supplies host identity and capability interfaces such as `WorkspaceCapability` and `ThemeCapability`. Add capability contracts alongside their first product consumer, rather than building a generic adapter framework in advance.
+The shared app owns capability interfaces; each host constructs and injects its implementations at startup. `AppAdapter` supplies host identity and capability interfaces such as `WorkspaceCapability`, `ThemeCapability`, and the desktop host's `WindowCapability`, which lets the app hold a window close until unsaved edits are answered for. Add capability contracts alongside their first product consumer, rather than building a generic adapter framework in advance.
 
 - Group operations by a specific capability, such as workspace access (`WorkspaceCapability`). Do not grow one flat interface containing unrelated host operations.
 - Keep browser file handles, Tauri imports, native paths, and host permission APIs inside the hosts. Shared code consumes domain values and opaque identifiers defined by its contracts.
@@ -27,7 +27,7 @@ The shared app owns capability interfaces; each host constructs and injects its 
 
 ## Initial platform scope
 
-The immediate development targets are the web app in current desktop Chrome and Edge, and the Windows native app. The web MVP operates on user-selected existing folders via the File System Access API, rather than substituting browser-private storage. Folder access requires a secure context, supported File System Access APIs, and user-granted permissions. The native host uses Tauri's dialog and filesystem plugins.
+The immediate development targets are the web app in current desktop Chrome and Edge, and the Windows native app. Linux is the second desktop platform: CI builds its installers and lints its Rust on every change, as [CI](ci.md#jobs) describes. macOS is not built or tested. The web MVP operates on user-selected existing folders via the File System Access API, rather than substituting browser-private storage. Folder access requires a secure context, supported File System Access APIs, and user-granted permissions. The native host uses Tauri's dialog and filesystem plugins.
 
 Android and iOS remain planned targets of the same Tauri host. Their project initialization and toolchain prerequisites are documented by the native host; mobile builds and folder-access semantics require validation on those platforms before support is claimed. A shared web UI does not imply identical filesystem access across platforms.
 
@@ -81,4 +81,4 @@ Theming is managed via `@codenhub/theme`, supporting light and dark color scheme
 
 ## Hosting decision
 
-Cloudflare Workers is **APPROVED**, with publishing and automatic deployment **not implemented**. Keep the existing local Worker scaffold and preview checks for development. Configure production accounts, credentials, deployment automation, and publication only when there is an actual app ready to publish. Their absence is intentional and does not block MVP development.
+The web app is hosted as a Cloudflare Worker, and the same Worker serves the desktop installers and the updater manifest from an R2 bucket. Clients download and update from that Worker rather than from GitHub Releases, so wherever the web app is hosted, the downloads are too. GitHub Actions still builds, signs, and publishes each release, so releases depend on GitHub as well as on the web app's host. A release deploys both together. [`docs/ci.md`](ci.md#releases) describes the workflow, the routes, and how long releases are kept.

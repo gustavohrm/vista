@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-12
+last_updated: 2026-11-13
 scope: Continuous integration, the pinned toolchain, action pinning, dependency updates, and the checks that report on pull requests.
 ---
 
@@ -20,12 +20,14 @@ CI reads those same files rather than repeating a version: `pnpm/action-setup` t
 
 ## Jobs
 
-| Job    | Runner           | Runs                                                                                                                                                        |
-| ------ | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Web`  | `ubuntu-latest`  | `pnpm format:check`, `pnpm lint:check`, `pnpm typecheck`, `pnpm test`, `pnpm build:web`, `pnpm build:native`, `pnpm test:e2e`, then `Working tree is clean` |
-| `Rust` | `windows-latest` | `pnpm --filter=@vista/native` `format:rust:check`, `lint:rust:check`, then `Working tree is clean`                                                          |
+| Job                 | Runner           | Runs                                                                                                                                                                               |
+| ------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Web`               | `ubuntu-latest`  | `pnpm versions:check`, `pnpm format:check`, `pnpm lint:check`, `pnpm typecheck`, `pnpm test`, `pnpm build:web`, `pnpm build:native`, `pnpm test:e2e`, then `Working tree is clean` |
+| `Rust`              | `windows-latest` | `pnpm --filter=@vista/native` `format:rust:check`, `lint:rust:check`, then `Working tree is clean`                                                                                 |
+| `Desktop (Windows)` | `windows-latest` | `pnpm --filter=@vista/native build:desktop`, then `Working tree is clean`, then uploads the NSIS installer                                                                         |
+| `Desktop (Linux)`   | `ubuntu-22.04`   | `pnpm --filter=@vista/native lint:rust:check`, `build:desktop`, then `Working tree is clean`, then uploads the `.deb`, `.rpm`, and AppImage                                        |
 
-Both jobs run on every pull request, every merge-queue check, and every push to `main`, in parallel. There is no change-based selection: the repository is one application, and a check that skips half of it on a pull request is a check that lets the other half reach `main` unverified.
+Every job runs on every pull request, every merge-queue check, and every push to `main`, in parallel. There is no change-based selection: the repository is one application, and a check that skips half of it on a pull request is a check that lets the other half reach `main` unverified.
 
 The `Web` job covers the shared interface in `packages/app` and the web host in `apps/web`, along with the repository-wide format, lint, typecheck, and test scripts. Those parts are platform-independent, so they run on the fastest, cheapest runner. End-to-end tests run Chromium only, through the Playwright configuration in `apps/web`, which builds the web app and starts a local Cloudflare Worker before the tests run.
 
@@ -33,15 +35,42 @@ The `Rust` job runs on Windows because Windows is the platform the native layer 
 
 The `Rust` job also sets up Node and the dependencies, because the Rust scripts are run through `pnpm --filter`, which needs the workspace installed.
 
+The `Desktop` jobs build the installers a release ships, with `tauri build` in the release profile, so a change that breaks bundling fails its pull request instead of a release. They are the slowest jobs, and run beside the others rather than after them. Windows is the primary desktop platform and Linux the second; macOS is not built. The Linux job runs on the oldest supported Ubuntu, because an AppImage runs only on systems whose glibc is at least as new as the one it was built against, and installs WebKitGTK 4.1 and the libraries Tauri's Linux bundles need. It also runs Clippy, which the `Rust` job runs only on Windows, so code that compiles only there is caught. Each job uploads its installers as a workflow artifact kept for seven days, so a change can be tried before it merges; they are unsigned, and are not releases.
+
 `Working tree is clean`, the last step of each job, fails when a check has left a tracked or untracked file changed. A check that writes has changed what it was checking, so it is reported rather than passing. On the Windows runner the step runs under `bash`, so both jobs run the same command.
 
 Runs for the same pull request cancel each other, because only the newest push is worth a verdict. A merge-queue run or a push to `main` is never cancelled to make way for a newer one: each is the authoritative check of a commit, so each is grouped by its commit rather than its branch. Grouping by branch would not hold that: a concurrency group holds one running and one pending run, and GitHub cancels the pending one when a third arrives, whatever `cancel-in-progress` says, so three quick pushes to `main` would leave the second without a verdict. The cost is that runs on `main` can run in parallel. The `merge_group` trigger never fires while the repository has no merge queue. Requiring one would make the `push` trigger redundant: the queue lands the exact commit it checked, so a push run would only repeat a passed check. The workflow's token is read-only (`permissions: contents: read`); a job that needs more asks for it on that job alone.
+
+## Releases
+
+`.github/workflows/release.yml` publishes a release when a tag named `v` and the version, such as `v0.2.0`, is pushed. It runs one release at a time and never cancels one halfway.
+
+1. `Check the tag` runs `scripts/check-versions.mjs` and fails unless the tag names the version in `package.json`.
+2. `Build (Windows)` and `Build (Linux)` run `tauri build` with `createUpdaterArtifacts`, signing each installer with the private key, which only that step can read. Windows ships the NSIS installer only; Linux ships the `.deb`, `.rpm`, and AppImage.
+3. `Publish` flattens the downloaded bundle folders, refuses a version that is already published, since its files are served as never changing, and writes `latest.json` with `scripts/release-manifest.mjs`, which fails before anything is uploaded when an installer or its `.sig` is missing. It uploads the installers to the R2 bucket under the version's folder, deploys the web app, and only then uploads `latest.json`, so a client is never told about files the Worker cannot serve. Last, `scripts/release-retention.mjs` deletes old releases.
+
+The Worker in `apps/web` serves the bucket: `/releases/latest.json` for the updater, `/releases/<version>/<file>` for the files, and `/download/windows`, `/download/linux` (the AppImage), `/download/deb`, and `/download/rpm` as links to the current installer. The web app and the desktop releases therefore move together: the Worker is deployed by a release, not by a merge to `main`.
+
+The manifest has one entry per kind of install, `windows-x86_64-nsis`, `linux-x86_64-appimage`, `linux-x86_64-deb`, and `linux-x86_64-rpm`, because the updater looks up `{os}-{arch}-{bundle type}` first: each install is updated with a package of its own kind. A `.deb` or `.rpm` update asks for the administrator password, through `pkexec` or a graphical sudo prompt. No `{os}-{arch}` fallback entry is written, so an install of a kind the manifest does not list finds no update rather than a package it cannot install. MSI is not built: WiX fails where VBScript is unavailable, which Windows 11 is removing. If MSI is added later, it is an extra download only; the updater keeps serving NSIS, because NSIS installs per user and MSI per machine, and switching an install from one to the other would leave two copies.
+
+**Retention.** The bucket stays inside the R2 free tier by keeping few releases. Before 1.0, only the version just published is kept. From 1.0 on, every release of the newest major is kept and older majors are deleted. A version newer than the one published is never deleted, and a folder whose name is not a version is left alone. Retention runs after `latest.json` points at the new version, so an updater that started downloading the previous version a moment before can get a 404; it offers the update again on the next start.
+
+**Secrets** live in the `release` environment, not in repository secrets, so only the release jobs can read them. The environment allows deployments from tags matching `v*` only, so a workflow on a branch cannot reach them either. Create it under Settings, Environments, set Deployment branches and tags to "Selected branches and tags" with the tag rule `v*`, and add:
+
+| Secret                               | Holds                                                                         |
+| ------------------------------------ | ----------------------------------------------------------------------------- |
+| `TAURI_SIGNING_PRIVATE_KEY`          | The updater's private signing key; the public key is in `tauri.conf.json`     |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Its password                                                                  |
+| `CLOUDFLARE_API_TOKEN`               | A token with Workers Scripts Edit and Workers R2 Storage Write on the account |
+| `CLOUDFLARE_ACCOUNT_ID`              | The Cloudflare account the Worker and bucket belong to                        |
+
+The bucket name, `vista-releases`, is in `release.yml` and `apps/web/wrangler.json`; change both together. Losing the private key means installed apps can never be updated again, only reinstalled, so keep a copy outside GitHub.
 
 ## Changing the workflow
 
 Prefer adding a script to `package.json` over adding a step to the workflow. A step only CI can run is a step nobody can reproduce before pushing, and that is how CI turns into a second build system.
 
-Workspace setup — pnpm, Node, and a frozen-lockfile install — lives in `.github/actions/setup`, so the two jobs cannot drift apart. `--locked` on the Rust scripts is the Rust half of the same rule: a `Cargo.lock` that disagrees with `Cargo.toml` fails rather than being rewritten in CI.
+Workspace setup — pnpm, Node, and a frozen-lockfile install — lives in `.github/actions/setup`, so the jobs cannot drift apart. `--locked` on the Rust scripts is the Rust half of the same rule: a `Cargo.lock` that disagrees with `Cargo.toml` fails rather than being rewritten in CI.
 
 ### Pinning third-party actions
 
@@ -90,7 +119,7 @@ The workflow reports; it does not block on its own. What blocks is the `main` ru
 | Enforced for admins    | Yes, with no bypass actors                                                                                          |
 | Force pushes, deletion | Refused                                                                                                             |
 
-The check names are the job `name:` values in `ci.yml`. If a job is renamed, the required check must be updated to match, or the renamed check will never report as required.
+`Desktop (Windows)` and `Desktop (Linux)` are not required yet: adding them to the ruleset is a change in the repository settings. The check names are the job `name:` values in `ci.yml`. If a job is renamed, the required check must be updated to match, or the renamed check will never report as required.
 
 Admin enforcement is what makes the rest hold: without it, a maintainer's direct push to `main` is stopped only by the `pre-push` hook, which `--no-verify` skips.
 
@@ -110,6 +139,4 @@ These are repository settings, not files, and are on for this repository:
 
 ## Not covered yet
 
-- **Releases.** Nothing builds, signs, or publishes native installers in CI.
-- **Native builds on macOS, Linux, and mobile.** The `Rust` job checks only Windows. `pnpm --filter=@vista/native build:desktop`, `build:android`, and `build:ios` run from a developer's machine.
-- **Native frontend release bundle.** The `Rust` job does not run `tauri build` or a release-profile compile.
+- **Native builds on macOS and mobile.** `build:desktop` on macOS, `build:android`, and `build:ios` run from a developer's machine.

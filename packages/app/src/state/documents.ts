@@ -1,6 +1,20 @@
 import { normalizeExtension } from "../domain/file-types";
 import { getViewer, resolveViewMode } from "../domain/viewers";
-import type { FileDocument, ViewMode } from "../ports";
+import type { FileDocument, FileStat, ViewMode } from "../ports";
+
+/** A file as read from disk and decoded, ready to show in a tab. */
+export interface LoadedFile {
+  content: string;
+  /** The version on disk that `content` came from. */
+  stat: FileStat;
+  /** Whether the file starts with a UTF-8 byte-order mark, which saving writes back. */
+  hasBom: boolean;
+  /** True when the text could not be decoded as UTF-8, so saving it would change characters. */
+  isReadOnly: boolean;
+}
+
+/** What another program did to an open file since Vista last read or wrote it. */
+export type ExternalChange = "changed" | "deleted";
 
 /** An open tab: a document buffer plus which workspace it belongs to and how it is shown. */
 export interface OpenDocument extends FileDocument {
@@ -8,6 +22,13 @@ export interface OpenDocument extends FileDocument {
   key: string;
   workspaceId: string;
   viewMode: ViewMode;
+  /** The version on disk the buffer was last read from or written to. Saving expects it. */
+  diskStat: FileStat;
+  hasBom: boolean;
+  isReadOnly: boolean;
+  externalChange: ExternalChange | null;
+  /** Counts reloads from disk, so views that own their copy of the text start over. */
+  revision: number;
 }
 
 export interface DocumentsState {
@@ -23,11 +44,14 @@ export interface WorkspaceEntryRef {
 }
 
 export type DocumentsAction =
-  | { type: "open"; workspaceId: string; path: string; content: string }
+  | { type: "open"; workspaceId: string; path: string; file: LoadedFile }
   | { type: "activate"; key: string }
   | { type: "close"; keys: string[] }
   | { type: "edit"; key: string; content: string }
-  | { type: "saved"; key: string; content: string }
+  | { type: "saved"; key: string; content: string; stat: FileStat }
+  | { type: "diskChanged"; key: string; stat: FileStat | null }
+  // `expected` is the version the reload started from; a save during the read makes the result stale.
+  | { type: "reloaded"; key: string; expected: FileStat; file: LoadedFile }
   | { type: "setViewMode"; key: string; viewMode: ViewMode }
   | { type: "move"; workspaceId: string; fromPath: string; toPath: string };
 
@@ -56,24 +80,60 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
       return closeDocuments(state, new Set(action.keys));
     case "edit":
       return updateDocument(state, action.key, (doc) =>
-        doc.content === action.content ? doc : { ...doc, content: action.content, isDirty: true },
+        doc.content === action.content || doc.isReadOnly ? doc : { ...doc, content: action.content, isDirty: true },
       );
     case "saved":
       // The buffer may have changed while the write was in flight; only what was written is clean.
-      return updateDocument(state, action.key, (doc) => ({ ...doc, isDirty: doc.content !== action.content }));
+      return updateDocument(state, action.key, (doc) => ({
+        ...doc,
+        isDirty: doc.content !== action.content,
+        diskStat: action.stat,
+        externalChange: null,
+      }));
+    case "diskChanged":
+      return updateDocument(state, action.key, (doc) => {
+        // A check can finish after a save already recorded the version it saw.
+        if (action.stat !== null && isSameStat(action.stat, doc.diskStat)) {
+          return doc;
+        }
+        const externalChange = action.stat === null ? "deleted" : "changed";
+        return doc.externalChange === externalChange ? doc : { ...doc, externalChange };
+      });
+    case "reloaded":
+      return updateDocument(state, action.key, (doc) => {
+        if (!isSameStat(action.expected, doc.diskStat)) {
+          return doc;
+        }
+        return doc.isDirty
+          ? { ...doc, externalChange: "changed" }
+          : {
+              ...doc,
+              content: action.file.content,
+              diskStat: action.file.stat,
+              hasBom: action.file.hasBom,
+              isReadOnly: action.file.isReadOnly,
+              viewMode: action.file.isReadOnly ? "raw" : doc.viewMode,
+              externalChange: null,
+              revision: doc.revision + 1,
+            };
+      });
     case "setViewMode":
       return updateDocument(state, action.key, (doc) => ({
         ...doc,
-        viewMode: resolveViewMode(doc.extension, action.viewMode),
+        viewMode: doc.isReadOnly ? "raw" : resolveViewMode(doc.extension, action.viewMode),
       }));
     case "move":
       return moveDocuments(state, action);
   }
 }
 
+export function isSameStat(a: FileStat, b: FileStat): boolean {
+  return a.size === b.size && a.modifiedAt === b.modifiedAt;
+}
+
 function openDocument(
   state: DocumentsState,
-  { workspaceId, path, content }: { workspaceId: string; path: string; content: string },
+  { workspaceId, path, file }: { workspaceId: string; path: string; file: LoadedFile },
 ): DocumentsState {
   const key = documentKey(workspaceId, path);
   if (state.documents.some((doc) => doc.key === key)) {
@@ -87,9 +147,15 @@ function openDocument(
     path,
     name,
     extension,
-    content,
+    content: file.content,
     isDirty: false,
-    viewMode: getViewer(extension).defaultMode,
+    // Only the raw editor can show a read-only buffer.
+    viewMode: file.isReadOnly ? "raw" : getViewer(extension).defaultMode,
+    diskStat: file.stat,
+    hasBom: file.hasBom,
+    isReadOnly: file.isReadOnly,
+    externalChange: null,
+    revision: 0,
   };
   const activeIndex = state.documents.findIndex((doc) => doc.key === state.activeKey);
   const insertAt = activeIndex === -1 ? state.documents.length : activeIndex + 1;

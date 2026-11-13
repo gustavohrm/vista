@@ -178,7 +178,7 @@ Releasing is a maintainer action, and it is separate from merging. Merging chang
 
 Vista is an end-user application, not a set of published npm packages, and it has no releases yet.
 
-- **Web App**: Cloudflare Workers hosting is approved for the web app (`apps/web`), but production deployment is not set up yet: no account, credentials, or deployment workflow exist. `pnpm deploy:web` builds the web host and runs `wrangler deploy`, and is there for when publication is enabled; `pnpm --filter=@vista/web deploy:check` runs the same build with `--dry-run`.
+- **Web App**: the web app (`apps/web`) is a Cloudflare Worker, deployed by the release workflow when a version tag is pushed, as [CI](docs/ci.md#releases) describes. `pnpm deploy:web` builds the web host and runs `wrangler deploy`; `pnpm --filter=@vista/web deploy:check` runs the same build with `--dry-run`.
 - **Desktop and Mobile App**: The native app (`apps/native`) produces desktop executables and mobile packages via Tauri (`build:desktop`, `build:android`, `build:ios`). App store distribution, code signing, and release packaging are handled at release milestones.
 
 Pushing a release tag, deploying, and publishing a release are outward-facing actions. An agent asks first and never does any of them on its own initiative.

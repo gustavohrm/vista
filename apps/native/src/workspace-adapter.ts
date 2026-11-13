@@ -3,15 +3,31 @@ import {
   exists,
   mkdir,
   readDir,
-  readFile as readBinaryFile,
-  readTextFile,
+  readFile as readFileBytes,
   remove as removeEntry,
   rename,
-  writeTextFile,
+  stat as statEntry,
+  writeFile as writeFileBytes,
 } from "@tauri-apps/plugin-fs";
-import type { RestoreFolderResult, Workspace, WorkspaceCapability, WorkspaceNode } from "@vista/app";
+import {
+  WorkspaceError,
+  type FileContents,
+  type FileStat,
+  type RestoreFolderResult,
+  type Workspace,
+  type WorkspaceCapability,
+  type WorkspaceNode,
+} from "@vista/app";
 
 const LAST_FOLDER_STORAGE_KEY = "vista.lastFolder";
+
+// Version-control internals, installed dependencies, and OS metadata: never notes, and large
+// enough to slow every scan. A folder such as `build` or `.vscode` is shown, since notes can live there.
+const IGNORED_NAMES = new Set([".git", ".svn", ".hg", "node_modules", ".DS_Store", "Thumbs.db"]);
+
+// Each `readDir` is an IPC call and an open directory handle; past a few dozen at once a large
+// tree only queues them in the backend and risks the per-process handle limit on Linux.
+const MAX_CONCURRENT_DIRECTORY_READS = 16;
 
 /**
  * Derives a human-readable folder name from a native path.
@@ -67,95 +83,121 @@ function forgetLastFolderPath(): void {
   }
 }
 
+function joinPath(base: string, part: string): string {
+  const cleanBase = base.replace(/[\\/]+$/, "");
+  const cleanPart = part.replace(/^[\\/]+/, "");
+  return `${cleanBase}/${cleanPart}`;
+}
+
+function sortNodes(nodes: WorkspaceNode[]): WorkspaceNode[] {
+  return nodes.sort((a, b) => {
+    if (a.kind !== b.kind) {
+      return a.kind === "directory" ? -1 : 1;
+    }
+    return a.name.localeCompare(b.name);
+  });
+}
+
+/** Runs at most `limit` tasks at a time; the rest wait in call order. */
+function createLimiter(limit: number) {
+  let active = 0;
+  const waiting: (() => void)[] = [];
+  return async function run<T>(task: () => Promise<T>): Promise<T> {
+    if (active < limit) {
+      active += 1;
+    } else {
+      // The finishing task hands its slot over, so `active` never passes the limit.
+      await new Promise<void>((resolve) => waiting.push(resolve));
+    }
+    try {
+      return await task();
+    } finally {
+      const next = waiting.shift();
+      if (next) {
+        next();
+      } else {
+        active -= 1;
+      }
+    }
+  };
+}
+
+/** The version of a file, or null when nothing is there or it is not a file. */
+// Read from the directory listing, which does not follow links; `lstat` would need another permission.
+async function isSymlink(fullPath: string): Promise<boolean> {
+  const { directory, name } = splitNativePath(fullPath);
+  const entries = await readDir(directory);
+  return entries.some((entry) => entry.name === name && entry.isSymlink);
+}
+
+async function statWritten(fullPath: string, path: string): Promise<FileStat> {
+  const written = await statFile(fullPath);
+  if (!written) {
+    throw new Error(`"${path}" was not found after saving.`);
+  }
+  return { size: written.size, modifiedAt: written.modifiedAt };
+}
+
+async function statFile(fullPath: string): Promise<(FileStat & { mode: number | null }) | null> {
+  // `stat` reports a missing file only as error text, so existence is checked first.
+  if (!(await exists(fullPath))) {
+    return null;
+  }
+  const info = await statEntry(fullPath);
+  if (!info.isFile) {
+    return null;
+  }
+  return { size: info.size, modifiedAt: info.mtime?.getTime() ?? 0, mode: info.mode };
+}
+
+function splitNativePath(fullPath: string): { directory: string; name: string } {
+  const index = fullPath.lastIndexOf("/");
+  return { directory: fullPath.slice(0, index), name: fullPath.slice(index + 1) };
+}
+
 /**
- * Creates a WorkspaceCapability adapter for the Native (Tauri) platform.
+ * Creates a WorkspaceCapability adapter for the Native (Tauri) platform. A workspace's id and
+ * root path are its folder's absolute path, so every operation acts on the folder it names.
  *
  * @returns Configured native workspace capability.
  */
 export function createNativeWorkspaceAdapter(): WorkspaceCapability {
   const isSupported = typeof window !== "undefined" && ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
-
-  let currentRootPath: string | null = null;
-
-  function joinPath(base: string, part: string): string {
-    const cleanBase = base.replace(/[\\/]+$/, "");
-    const cleanPart = part.replace(/^[\\/]+/, "");
-    return `${cleanBase}/${cleanPart}`;
-  }
-
-  const IGNORED_NAMES = new Set([
-    ".git",
-    "node_modules",
-    ".svn",
-    ".hg",
-    ".DS_Store",
-    "Thumbs.db",
-    ".idea",
-    ".vscode",
-    "dist",
-    "build",
-    "coverage",
-  ]);
+  const limitDirectoryRead = createLimiter(MAX_CONCURRENT_DIRECTORY_READS);
 
   async function scanDirectory(fullPath: string, relativePath: string): Promise<WorkspaceNode[]> {
-    let entries: Awaited<ReturnType<typeof readDir>> = [];
-    try {
-      entries = await readDir(fullPath);
-    } catch (err) {
-      console.warn(`Could not read native directory "${fullPath}":`, err);
-      return [];
-    }
-
-    const filtered = entries.filter((e) => !IGNORED_NAMES.has(e.name));
-
+    const entries = await limitDirectoryRead(() => readDir(fullPath));
     const nodes = await Promise.all(
-      filtered.map(async (entry): Promise<WorkspaceNode> => {
-        const childRelativePath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
-        const childFullPath = joinPath(fullPath, entry.name);
-
-        if (entry.isDirectory) {
-          const children = await scanDirectory(childFullPath, childRelativePath);
-          return {
-            id: childRelativePath,
-            name: entry.name,
-            path: childRelativePath,
-            kind: "directory",
-            children,
-          };
-        }
-
-        const ext = entry.name.includes(".") ? entry.name.split(".").pop()?.toLowerCase() : "";
-        return {
-          id: childRelativePath,
-          name: entry.name,
-          path: childRelativePath,
-          kind: "file",
-          extension: ext,
-        };
-      }),
+      entries
+        .filter((entry) => !IGNORED_NAMES.has(entry.name))
+        .map(async (entry): Promise<WorkspaceNode> => {
+          const childRelativePath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
+          if (entry.isDirectory) {
+            try {
+              const children = await scanDirectory(joinPath(fullPath, entry.name), childRelativePath);
+              return { id: childRelativePath, name: entry.name, path: childRelativePath, kind: "directory", children };
+            } catch (err) {
+              // Shown, not skipped, so the user knows the folder exists and why its files are missing.
+              console.warn(`Could not read the folder "${childRelativePath}":`, err);
+              return {
+                id: childRelativePath,
+                name: entry.name,
+                path: childRelativePath,
+                kind: "directory",
+                children: [],
+                isUnreadable: true,
+              };
+            }
+          }
+          const ext = entry.name.includes(".") ? entry.name.split(".").pop()?.toLowerCase() : "";
+          return { id: childRelativePath, name: entry.name, path: childRelativePath, kind: "file", extension: ext };
+        }),
     );
-
-    return nodes.sort((a, b) => {
-      if (a.kind !== b.kind) {
-        return a.kind === "directory" ? -1 : 1;
-      }
-      return a.name.localeCompare(b.name);
-    });
+    return sortNodes(nodes);
   }
 
-  /**
-   * Makes a folder path the active workspace root.
-   *
-   * @param folderPath - Absolute path of the folder to adopt.
-   * @returns The workspace descriptor for the folder.
-   */
-  function adoptFolderPath(folderPath: string): Workspace {
-    currentRootPath = folderPath;
-    return {
-      id: folderPath,
-      name: folderNameFromPath(folderPath),
-      rootPath: folderPath,
-    };
+  function workspaceForFolder(folderPath: string): Workspace {
+    return { id: folderPath, name: folderNameFromPath(folderPath), rootPath: folderPath };
   }
 
   return {
@@ -177,7 +219,7 @@ export function createNativeWorkspaceAdapter(): WorkspaceCapability {
         return { status: "unavailable", name };
       }
 
-      return { status: "restored", workspace: adoptFolderPath(savedPath) };
+      return { status: "restored", workspace: workspaceForFolder(savedPath) };
     },
 
     async openFolder(): Promise<Workspace | null> {
@@ -194,71 +236,95 @@ export function createNativeWorkspaceAdapter(): WorkspaceCapability {
         return null;
       }
 
-      const workspace = adoptFolderPath(selected);
       saveLastFolderPath(selected);
-      return workspace;
+      return workspaceForFolder(selected);
     },
 
-    async readTree(): Promise<WorkspaceNode[]> {
-      if (!currentRootPath) {
-        return [];
-      }
-      return scanDirectory(currentRootPath, "");
+    // A root that cannot be read fails the whole call, so a vanished folder never shows as empty.
+    readTree: (workspace) => scanDirectory(workspace.rootPath, ""),
+
+    async stat(workspace: Workspace, path: string): Promise<FileStat | null> {
+      const current = await statFile(joinPath(workspace.rootPath, path));
+      return current ? { size: current.size, modifiedAt: current.modifiedAt } : null;
     },
 
-    async readFile(path: string): Promise<string> {
-      if (!currentRootPath) {
-        throw new Error("No native workspace root folder selected");
+    async readFile(workspace: Workspace, path: string): Promise<FileContents> {
+      const fullPath = joinPath(workspace.rootPath, path);
+      // Stated before reading: a change in between then reads as newer than this version and is
+      // noticed on the next check, rather than hidden behind a version that matches it.
+      const current = await statFile(fullPath);
+      if (!current) {
+        throw new Error(`"${path}" was not found.`);
       }
-      const fullPath = joinPath(currentRootPath, path);
-      return readTextFile(fullPath);
+      const bytes = await readFileBytes(fullPath);
+      return { bytes, stat: { size: current.size, modifiedAt: current.modifiedAt } };
     },
 
-    async readBinary(path: string): Promise<Uint8Array<ArrayBuffer>> {
-      if (!currentRootPath) {
-        throw new Error("No native workspace root folder selected");
+    async writeFile(
+      workspace: Workspace,
+      path: string,
+      bytes: Uint8Array<ArrayBuffer>,
+      options?: { expected?: FileStat },
+    ): Promise<FileStat> {
+      const fullPath = joinPath(workspace.rootPath, path);
+      const current = await statFile(fullPath);
+      const expected = options?.expected;
+      if (expected && (!current || current.size !== expected.size || current.modifiedAt !== expected.modifiedAt)) {
+        throw new WorkspaceError("conflict", `"${path}" changed on disk after it was read.`);
       }
-      return readBinaryFile(joinPath(currentRootPath, path));
+
+      // A rename would replace a symbolic link with a regular file, and the file it points to would stop
+      // changing. So a link is written through, in place, without the temporary file's protection.
+      if (current && (await isSymlink(fullPath))) {
+        await writeFileBytes(fullPath, bytes);
+        return statWritten(fullPath, path);
+      }
+
+      // Written beside the file and renamed over it, so a crash or a full disk mid-write leaves the
+      // original intact rather than truncated. The rename replaces the file in one step on Windows,
+      // Linux, and macOS.
+      const { directory, name } = splitNativePath(fullPath);
+      // No leading dot: on Unix, Tauri's filesystem scope does not match dotfiles inside the granted folder.
+      const tempPath = `${directory}/${name}.vista-save-${crypto.randomUUID().slice(0, 8)}`;
+      // Unix permission bits only; Windows reports none.
+      const mode = current?.mode === null || current?.mode === undefined ? undefined : current.mode & 0o7777;
+      try {
+        // Inside the try, so a write that fails partway, such as on a full disk, leaves no temporary file.
+        await writeFileBytes(tempPath, bytes, { createNew: true, ...(mode === undefined ? {} : { mode }) });
+        // Stated before the rename, which keeps size and modification time, so a program that changes the
+        // file right after cannot have its version recorded as the one Vista saved.
+        const written = await statWritten(tempPath, path);
+        await rename(tempPath, fullPath);
+        return written;
+      } catch (err) {
+        await removeEntry(tempPath).catch((cleanupErr: unknown) =>
+          console.warn(`Could not remove the temporary file "${tempPath}":`, cleanupErr),
+        );
+        throw err;
+      }
     },
 
-    async writeFile(path: string, content: string): Promise<void> {
-      if (!currentRootPath) {
-        throw new Error("No native workspace root folder selected");
-      }
-      const fullPath = joinPath(currentRootPath, path);
-      return writeTextFile(fullPath, content);
-    },
-
-    async createFile(path: string): Promise<void> {
-      if (!currentRootPath) {
-        throw new Error("No native workspace root folder selected");
-      }
-      const fullPath = joinPath(currentRootPath, path);
+    async createFile(workspace: Workspace, path: string): Promise<void> {
+      const fullPath = joinPath(workspace.rootPath, path);
       if (await exists(fullPath)) {
         throw new Error(`"${path.split("/").pop()}" already exists.`);
       }
       // `createNew` fails atomically if the file was created by something else between
       // the `exists` check above and this call, rather than silently overwriting it.
-      await writeTextFile(fullPath, "", { createNew: true });
+      await writeFileBytes(fullPath, new Uint8Array(), { createNew: true });
     },
 
-    async createDirectory(path: string): Promise<void> {
-      if (!currentRootPath) {
-        throw new Error("No native workspace root folder selected");
-      }
-      const fullPath = joinPath(currentRootPath, path);
+    async createDirectory(workspace: Workspace, path: string): Promise<void> {
+      const fullPath = joinPath(workspace.rootPath, path);
       if (await exists(fullPath)) {
         throw new Error(`"${path.split("/").pop()}" already exists.`);
       }
       await mkdir(fullPath);
     },
 
-    async move(fromPath: string, toPath: string): Promise<void> {
-      if (!currentRootPath) {
-        throw new Error("No native workspace root folder selected");
-      }
-      const fullFromPath = joinPath(currentRootPath, fromPath);
-      const fullToPath = joinPath(currentRootPath, toPath);
+    async move(workspace: Workspace, fromPath: string, toPath: string): Promise<void> {
+      const fullFromPath = joinPath(workspace.rootPath, fromPath);
+      const fullToPath = joinPath(workspace.rootPath, toPath);
       // `rename` silently replaces an existing destination rather than failing, so the
       // collision check has to happen explicitly here to honor the contract.
       if (await exists(fullToPath)) {
@@ -267,12 +333,8 @@ export function createNativeWorkspaceAdapter(): WorkspaceCapability {
       await rename(fullFromPath, fullToPath);
     },
 
-    async remove(path: string): Promise<void> {
-      if (!currentRootPath) {
-        throw new Error("No native workspace root folder selected");
-      }
-      const fullPath = joinPath(currentRootPath, path);
-      await removeEntry(fullPath, { recursive: true });
+    async remove(workspace: Workspace, path: string): Promise<void> {
+      await removeEntry(joinPath(workspace.rootPath, path), { recursive: true });
     },
   };
 }

@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-11
+last_updated: 2026-11-13
 scope: Local folder workspaces, file tree representation, document view modes, and persistence across hosts.
 ---
 
@@ -22,7 +22,7 @@ In v1, Vista operates on **one active open folder** at a time:
 
 - Users open a directory using the platform's native file picker (`window.showDirectoryPicker` on web; `@tauri-apps/plugin-dialog` on native).
 - Opening a directory yields a `Workspace` entity (`id`, `name`, `rootPath`, and an optional `accessMode` distinguishing direct disk access from a more limited fallback, which [Platform-specific implementations](#platform-specific-implementations) details).
-- The directory tree is scanned and mapped into hierarchical `WorkspaceNode` models (`file` and `directory` nodes). Directories start collapsed, and empty folders show no children.
+- The directory tree is scanned and mapped into hierarchical `WorkspaceNode` models (`file` and `directory` nodes). Directories start collapsed, and empty folders show no children. A folder the host cannot list, such as one the user has no permission to read, is still shown, with an alert icon and the tooltip and accessible name `Vista can't read this folder, so its files aren't listed`, so its files are never missing without a reason. A root folder that cannot be read fails the whole scan instead of showing as empty.
 - While only one folder is active at a time in v1, the capability contract and state models are designed with opaque identifiers and collection structures to prevent painting future multi-root workspace support into a corner.
 
 ### Reopening the last folder
@@ -52,7 +52,7 @@ Future versions will expand to `.json`, `.yaml`, canvas representations, and emb
 
 The Enriched view for `.md`/`.markdown` files (`packages/app/src/components/editor/markdown-editor.tsx`) is a WYSIWYG editor built on [Milkdown](https://milkdown.dev/), using its CommonMark and GFM presets (headings, emphasis, lists, links, code blocks, blockquotes, tables, task lists, strikethrough) with a minimal custom theme styled directly against `@codenhub/styles` tokens rather than Milkdown's bundled Nord theme. Editing in this view mutates the same `FileDocument` buffer as every other view ([Document buffer and dirty state](#document-buffer-and-dirty-state) describes it); each tab gets its own editor instance, and switching tabs remounts it rather than live-syncing content into an existing document, since the editor owns its document once mounted. Task list items render as real design-system checkboxes that toggle the item's checked state when clicked.
 
-**Images.** An image's source resolves from the Markdown file's folder, or from the workspace root when it starts with `/`. Percent escapes such as `%20` are decoded, and a query or fragment is dropped. The file is read through the platform's `readBinary` capability and shown through a `blob:` URL, typed by its extension so SVG works; the URLs are revoked when the editor closes. The Markdown text is never rewritten. A path that climbs out of the workspace with `..`, a Windows drive path, and any scheme other than `http`, `https`, and `data:image/` are not loaded. Web images load in the browser, but the desktop app's content security policy blocks them. An image that is missing, unreadable, or blocked shows a placeholder with its alt text, or its path when it has none. Pasting or dropping images, an image viewer for image files, and a size limit are not built.
+**Images.** An image's source resolves from the Markdown file's folder, or from the workspace root when it starts with `/`. Percent escapes such as `%20` are decoded, and a query or fragment is dropped. The file's bytes are read through the platform's `readFile` capability and shown through a `blob:` URL, typed by its extension so SVG works; the URLs are revoked when the editor closes. The Markdown text is never rewritten. A path that climbs out of the workspace with `..`, a Windows drive path, and any scheme other than `http`, `https`, and `data:image/` are not loaded. Web images load in the browser, but the desktop app's content security policy blocks them. An image that is missing, unreadable, or blocked shows a placeholder with its alt text, or its path when it has none. Pasting or dropping images, an image viewer for image files, and a size limit are not built.
 
 **Known limitation**: no WYSIWYG Markdown editor guarantees byte-for-byte round-trip on arbitrary existing Markdown. Parsing and re-serializing content the user never touched can still normalize source-level formatting that doesn't affect meaning, such as list bullet markers (`-`/`+` normalizing to `*`). This is intentional normalization, not data loss, and the accepted cases are enumerated and asserted in `packages/app/src/components/editor/markdown-round-trip.test.ts` rather than left undocumented.
 
@@ -67,7 +67,11 @@ The raw view (`packages/app/src/components/editor/raw-editor.tsx`) is a [CodeMir
 
 ### Editor settings
 
-The gear button in the document header opens a menu of four check items: line numbers, word wrap, minimap, and vim mode. It is the same menu component as the menu bar and the right-click menus. The View menu toggles the same four, and `Alt+Z` toggles word wrap. They apply to the raw editor at once and are remembered in the browser's `localStorage` under `vista.settings`, as `{ "version": 1, "editor": { "lineNumbers": true, "minimap": false, "vim": false, "wordWrap": true } }`. A stored value that is missing or of the wrong type falls back to its default, field by field, so one bad field does not reset the others. When the store can't be read, the editor starts with the defaults. When it can't be written, a changed setting still applies for the rest of the session but is lost on reload.
+The gear button in the document header opens a menu of four check items: line numbers, word wrap, minimap, and vim mode. It is the same menu component as the menu bar and the right-click menus. The View menu toggles the same four, and `Alt+Z` toggles word wrap. They apply to the raw editor at once and are remembered in the browser's `localStorage` under `vista.settings`, as `{ "version": 1, "editor": { "lineNumbers": true, "minimap": false, "vim": false, "wordWrap": true }, "files": { "maxOpenSizeMb": 10 } }`. A stored value that is missing, of the wrong type, or outside its allowed range (a whole number from 1 to 512 for `maxOpenSizeMb`) falls back to its default, field by field, so one bad field does not reset the others. When the store can't be read, the editor starts with the defaults. When it can't be written, a changed setting still applies for the rest of the session but is lost on reload.
+
+### Settings
+
+**File > Settings…** (`Ctrl+,`) opens the Settings dialog. Its Editor section holds the same four editor toggles, and its Files section holds **Largest file to open (MB)**, the size limit [Opening a file](#opening-a-file) applies. The limit defaults to 10 MB and takes a whole number from 1 to 512; while the field holds anything else, the hint below it says `Enter a whole number from 1 to 512. The limit stays at {n} MB.` and the old limit stays in force. Every change applies at once and is stored with the editor settings. A different limit for each user is the point: a folder of large logs or exports needs a higher one, and a low one keeps a slow machine responsive.
 
 ### Find and replace
 
@@ -103,7 +107,7 @@ With a file open, the status bar shows the cursor and vim mode (raw view only; s
 
 A menu bar in the title bar offers File, Edit, Selection, View, Go, and Help. Every item is a command, as defined in [Commands and shortcuts](../architecture.md#commands-and-shortcuts), so an item shows its shortcut and is greyed out when it can't run.
 
-- **File**: Open Folder, New File, New Folder (at the workspace root, opening the explorer), Save, Save All, Close Tab, Close All Tabs.
+- **File**: Open Folder, New File, New Folder (at the workspace root, opening the explorer), Save, Save All, Close Tab, Close All Tabs, Settings.
 - **Edit**: Undo, Redo, Cut, Copy, Paste, Find, Replace.
 - **Selection**: Select All, Select Line, Add Next Occurrence, Select All Occurrences, Add Cursor Above, Add Cursor Below. All but Select All need the raw view's multiple selections, so they are disabled in the rendered views.
 - **View**: Show All Commands, Explorer, Raw Text, Word Wrap, Line Numbers, Minimap, Vim Mode, and the light or dark theme.
@@ -134,13 +138,37 @@ Opening a file loads its contents into an in-memory `FileDocument` buffer, one p
 - `content`: current in-memory string representation.
 - `isDirty`: boolean indicating whether unsaved edits exist in the buffer.
 
+Beside the buffer, each tab keeps the file's version on disk as it last read or wrote it (size and modification time), whether the file began with a UTF-8 byte order mark, whether it is read-only, and any change made on disk since, as [Changes on disk](#changes-on-disk) describes.
+
+### Opening a file
+
+Opening a file reads its size first. A file over the limit set in [Settings](#settings) is not read, and an error toast says `"{name}" is {size} MB, over the {limit} MB limit. You can raise the limit in Settings.` The size is checked again after reading, so a file that grew in between is refused too. A file that no longer exists shows `"{name}" no longer exists. It may have been moved or deleted.` and the tree is scanned again.
+
+The bytes are then decoded:
+
+- **UTF-8 text** opens for editing. A leading byte order mark is removed from the buffer and written back on save, so saving never adds or drops one.
+- **A file with a NUL byte in its first 8,000 bytes**, the window Git uses, is treated as binary and not opened: `Vista can't open "{name}" because it isn't a text file.`
+- **A file that starts with a UTF-16 byte order mark** opens read-only, decoded as UTF-16, for the same reason as the next case. Its NUL bytes are part of the encoding, so it is never called binary.
+- **Any other file that isn't valid UTF-8**, such as Latin-1 or Windows-1252 text, opens read-only, decoded with replacement characters, and an info toast says `"{name}" isn't UTF-8 text, so it opened read-only to keep its characters intact.` The document header shows **Read-only**. Saving it would replace every unreadable character with U+FFFD, so editing it is not offered. Converting from other encodings is not built.
+
 Edits made in either the Raw view or the rendered view (such as editing a CSV cell, or typing in the Markdown WYSIWYG editor) update that tab's buffer and set `isDirty: true`. A dot in the tab and next to the file name in the document header breadcrumb marks unsaved edits. Save (`Ctrl+S` or `Cmd+S`, or **File > Save**) writes the active tab's buffer to disk via the platform's `writeFile` capability. The tab becomes clean only if its buffer still matches what was written, so edits typed while a save is in flight stay marked unsaved.
+
+### Changes on disk
+
+Vista is not the only program that edits a folder: a sync client, a git checkout, or another editor can change a file while its tab is open. A save never overwrites such a change without asking.
+
+- **Saving checks the version.** Save passes the version the tab last read or wrote, and the host refuses the write when the file on disk no longer matches, or is gone, with a `conflict` error. Vista then asks `"{name}" changed on disk` with **Overwrite** and **Cancel**. Overwrite writes again without the check; Cancel keeps the buffer and its edits as they are.
+- **Returning to Vista checks every open tab.** When the window gains focus or becomes visible, Vista scans the tree again, quietly, and compares each open tab with the file on disk. A tab without unsaved edits whose file changed is reloaded in place. A tab with unsaved edits keeps them, and the header shows **Changed on disk**; a tab whose file was deleted shows **Deleted on disk** and keeps its buffer; saving it asks the same question, and Overwrite recreates the file. An info toast names the changed file, or counts them, and says that saving will ask before overwriting.
+- **The check and the write are separate calls**, so a change landing in the instant between them can still be overwritten. Neither host offers a compare-and-write on a file, so this window cannot be closed; it is milliseconds wide, against the minutes or hours an open tab otherwise covers.
+- **Fallback mode** has no disk to compare against: a save downloads a copy, so nothing on disk is overwritten.
 
 ### Unsaved changes
 
 Unsaved edits are never discarded silently. Switching tabs or opening another file keeps every buffer as it is. Closing a tab with unsaved edits, or opening another folder while any tab has them, shows a modal titled "Save changes to {file}?" with **Save**, **Don't Save**, and **Cancel**. When several tabs have unsaved edits, one modal titled "Save changes to {n} files?" lists them and offers **Save All**. The list shows paths, so two files with the same name stay distinguishable. Edits made after the user answers, such as typing while a save is in flight, are asked about again before the action continues. Cancel, Escape, and a backdrop click keep everything open with its edits intact, and the requested action does not happen. A failed save also stops the action and shows an error toast.
 
 Closing or reloading the browser tab while any tab has unsaved edits triggers the browser's own unload warning. Vista cannot customize that prompt's text.
+
+Closing the desktop window asks the same question as opening another folder, through the host's `window.onCloseRequested`, because a webview window gets no unload warning. The window closes after Save All or Don't Save, and stays open after Cancel or a failed save. A second close request while the question is showing is ignored, and a check that fails lets the window close rather than trapping the user in it.
 
 ## Platform capability contract
 
@@ -152,19 +180,38 @@ export interface WorkspaceCapability {
   openFolder(): Promise<Workspace | null>;
   restoreFolder(options: { interactive: boolean }): Promise<RestoreFolderResult>;
   readTree(workspace: Workspace): Promise<WorkspaceNode[]>;
-  readFile(path: string): Promise<string>;
-  readBinary(path: string): Promise<Uint8Array<ArrayBuffer>>;
-  writeFile(path: string, content: string): Promise<void>;
-  createFile(path: string): Promise<void>;
-  createDirectory(path: string): Promise<void>;
-  move(fromPath: string, toPath: string): Promise<void>;
-  remove(path: string): Promise<void>;
+  stat(workspace: Workspace, path: string): Promise<FileStat | null>;
+  readFile(workspace: Workspace, path: string): Promise<FileContents>;
+  writeFile(workspace: Workspace, path: string, bytes: Uint8Array<ArrayBuffer>, options?: { expected?: FileStat }): Promise<FileStat>;
+  createFile(workspace: Workspace, path: string): Promise<void>;
+  createDirectory(workspace: Workspace, path: string): Promise<void>;
+  move(workspace: Workspace, fromPath: string, toPath: string): Promise<void>;
+  remove(workspace: Workspace, path: string): Promise<void>;
+}
+
+export interface WindowCapability {
+  onCloseRequested(check: () => Promise<boolean>): () => void;
+}
+
+export interface FileStat {
+  size: number; // bytes
+  modifiedAt: number; // milliseconds since the epoch
+}
+
+export interface FileContents {
+  bytes: Uint8Array<ArrayBuffer>;
+  stat: FileStat;
 }
 
 export type RestoreFolderResult = { status: "restored"; workspace: Workspace } | { status: "needs-permission"; name: string } | { status: "unavailable"; name: string } | { status: "none" };
 ```
 
-`readBinary` returns a file's bytes, for images shown in Markdown. The web host reads the file handle, or the picked file in fallback mode; the native host uses `readFile` from `@tauri-apps/plugin-fs`, allowed by the `fs:allow-read-file` permission.
+Every operation names the workspace it acts on, so a host keeps no "current folder" of its own and a later multi-root workspace needs no contract change.
+
+- `stat` returns a file's version, or `null` when nothing is there or the entry is not a file.
+- `readFile` returns the bytes and the version they were read at. Text decoding is the shared app's job (`packages/app/src/domain/text-codec.ts`), so both hosts handle encodings the same way. A host stats before it reads, so a change made between the two reads as newer than the version returned and is noticed on the next check instead of hidden.
+- `writeFile` with `expected` throws `WorkspaceError` with kind `conflict` when the file on disk is missing or its version differs. It returns the version written.
+- `WindowCapability` is optional and only the desktop host provides it. Its `check` resolves `true` when the window may close.
 
 `restoreFolder({ interactive: true })` MUST only be called from a user gesture such as a click handler. With `interactive: false` the host never prompts. [Reopening the last folder](#reopening-the-last-folder) describes each host's behavior.
 
@@ -173,11 +220,13 @@ export type RestoreFolderResult = { status: "restored"; workspace: Workspace } |
 1. **Web (`apps/web`)**:
    - **Primary direct-disk mode**: Uses the File System Access API (`window.showDirectoryPicker({ mode: "read" })`) in Chromium-based browsers (Chrome, Edge, Opera) for live in-place read access to local folders. Requesting read-only access up front keeps folder-open to a single native picker interaction. Write access is requested lazily, the first time a file is saved (`FileSystemDirectoryHandle.requestPermission({ mode: "readwrite" })`), so the second, easy-to-miss permission prompt fires in direct response to the user's own Save action instead of immediately after the folder picker. Every subsequent read or write re-checks the handle's current permission (`queryPermission`) and re-requests it if it was revoked, rather than assuming a previously granted handle stays valid for the life of the session.
    - **Universal directory fallback**: In browsers that do not support the File System Access API (such as Firefox and Safari) or restricted environments (such as non-secure origins or cross-origin iframes), automatically falls back to `<input type="file" webkitdirectory />`. This allows any browser to select local folders and explore/edit their file tree in-memory with file export capabilities. A workspace opened this way reports `accessMode: "fallback"` on its `Workspace` entity (as [Workspace lifecycle](#workspace-lifecycle) describes); the application surfaces a one-time notice that saves will download a file instead of writing in place.
-   - **Performance filtering**: Automatically excludes heavy dependency and version-control folders (`.git`, `node_modules`, `.DS_Store`, etc.) from tree traversal to maintain instantaneous loading.
+   - **Hidden entries**: the tree leaves out version-control internals (`.git`, `.svn`, `.hg`), installed dependencies (`node_modules`), and OS metadata files (`.DS_Store`, `Thumbs.db`). Nothing else is hidden, because notes can live in a `build` or `.vscode` folder. Moving a folder still copies every entry inside it, hidden ones included, so a moved project keeps its `.git`.
+   - **Saving**: `createWritable` writes to a swap file the browser moves into place when the stream closes, so a failed write leaves the original intact. The version is the file's `lastModified` and `size`.
    - **Remembered folder**: the directory handle is stored in IndexedDB (database `vista`, store `workspace`, key `lastFolder`). Fallback-mode folders are never stored, as [Reopening the last folder](#reopening-the-last-folder) describes.
 2. **Native (`apps/native`)**:
    - Uses Tauri's dialog plugin (`@tauri-apps/plugin-dialog`) for native directory selection.
-   - Uses Tauri's filesystem plugin (`@tauri-apps/plugin-fs`) for directory enumeration and file I/O, filtering heavy folders identically.
+   - Uses Tauri's filesystem plugin (`@tauri-apps/plugin-fs`) for directory enumeration and file I/O, hiding the same entries as the web host. A scan reads at most 16 folders at once, because each read is an IPC call and an open directory handle.
+   - **Saving**: the bytes are written to a new temporary file beside the target, `{name}.vista-save-{id}`, which is then renamed over it, so a crash or a full disk mid-save leaves the original intact rather than truncated. On Unix the temporary file is created with the original's permission bits, less any the process umask clears, so a group-writable file can lose group write. The rename replaces the file in one step on Windows, Linux, and macOS, but the file is a new one: on Windows, permissions set on the file itself rather than inherited from its folder, and alternate data streams, are not carried over. The temporary file is removed if the rename fails.
    - Persists the granted folder scope with `tauri-plugin-persisted-scope` so a remembered folder can be reopened after restart. The root path is stored in `localStorage` under `vista.lastFolder`.
    - Always direct-disk (`accessMode` is omitted, meaning `"direct"`); there is no fallback mode on native hosts.
 

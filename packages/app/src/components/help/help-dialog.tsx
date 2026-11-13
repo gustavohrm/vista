@@ -13,7 +13,7 @@ interface HelpDialogProps {
  * `showModal()`, so the browser contains focus and inerts the page behind it. Escape and a click
  * on the backdrop close it.
  */
-function HelpDialog({ title, onClose, children }: HelpDialogProps) {
+export function HelpDialog({ title, onClose, children }: HelpDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();

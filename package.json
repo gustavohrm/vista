@@ -22,9 +22,10 @@
     "test:e2e": "pnpm --filter=@vista/web test:e2e",
     "test:watch": "vitest",
     "typecheck": "tsc -b",
+    "versions:check": "node scripts/check-versions.mjs",
     "verify": "pnpm verify:web && pnpm verify:rust",
     "verify:rust": "pnpm --filter=@vista/native format:rust:check && pnpm --filter=@vista/native lint:rust:check",
-    "verify:web": "pnpm format:check && pnpm lint:check && pnpm typecheck && pnpm test && pnpm build:web && pnpm build:native"
+    "verify:web": "pnpm versions:check && pnpm format:check && pnpm lint:check && pnpm typecheck && pnpm test && pnpm build:web && pnpm build:native"
   },
   "devDependencies": {
     "@types/node": "catalog:",

@@ -25,19 +25,32 @@ import {
   type GoToRequest,
   type PaletteCommand,
 } from "./components/navigation/go-to-dialog";
+import { SettingsDialog } from "./components/settings/settings-dialog";
 import { imageMimeType, resolveImageSource } from "./domain/image-source";
 import { joinWorkspacePath } from "./domain/path-validation";
+import { BYTES_PER_MB, type EditorSettings } from "./domain/settings";
+import { encodeText } from "./domain/text-codec";
 import { getViewer } from "./domain/viewers";
 import { isDesktopViewport } from "./domain/viewport";
-import type { AppAdapter, RestoreFolderResult, ViewMode, Workspace, WorkspaceNode } from "./ports";
+import {
+  WorkspaceError,
+  type AppAdapter,
+  type FileStat,
+  type RestoreFolderResult,
+  type ViewMode,
+  type Workspace,
+  type WorkspaceNode,
+} from "./ports";
 import {
   documentKey,
   documentsReducer,
   findAffectedDocuments,
   getActiveDocument,
   INITIAL_DOCUMENTS_STATE,
+  isSameStat,
   type OpenDocument,
 } from "./state/documents";
+import { loadFile } from "./state/load-file";
 import { useSettings } from "./state/settings";
 import { useTheme } from "./theme/theme-manager";
 
@@ -65,6 +78,8 @@ const MENUS: readonly MenuBarMenu[] = [
       MENU_SEPARATOR,
       "file.save",
       "file.saveAll",
+      MENU_SEPARATOR,
+      "file.settings",
       MENU_SEPARATOR,
       "tabs.close",
       "tabs.closeAll",
@@ -160,7 +175,7 @@ function AppShell({ adapter }: AppProps) {
   // Tagged with its tab so a position from another tab is never shown.
   const [cursor, setCursor] = useState<{ key: string; position: CursorInfo } | null>(null);
   const [vimMode, setVimMode] = useState<{ key: string; mode: string | null } | null>(null);
-  const [settings, updateEditorSettings] = useSettings();
+  const [settings, updateSettings] = useSettings();
   const [find, setFind] = useState<FindRequest | null>(null);
   // The text the go-to picker opens with, or null while it is closed.
   const [goToQuery, setGoToQuery] = useState<string | null>(null);
@@ -168,7 +183,7 @@ function AppShell({ adapter }: AppProps) {
   const [pendingJump, setPendingJump] = useState<{ key: string; position: EditorPosition } | null>(null);
   // A File menu request to name a new entry at the workspace root.
   const [newEntryRequest, setNewEntryRequest] = useState<NewEntryRequest | null>(null);
-  const [helpDialog, setHelpDialog] = useState<"shortcuts" | "about" | null>(null);
+  const [helpDialog, setHelpDialog] = useState<"shortcuts" | "about" | "settings" | null>(null);
   // Raw editor state of each open tab: selection, scroll position, and undo history.
   const rawEditorStatesRef = useRef<RawEditorStateCache>(new Map());
   // Holds the startup restore so StrictMode's second effect run reuses it instead of restoring
@@ -198,16 +213,38 @@ function AppShell({ adapter }: AppProps) {
   const activeDocumentKey = activeDocument?.key ?? null;
   const hasDirtyDocuments = documentsState.documents.some((doc) => doc.isDirty);
   const isPromptingForUnsavedChanges = unsavedRequest !== null;
+  const isPromptingRef = useRef(isPromptingForUnsavedChanges);
+  isPromptingRef.current = isPromptingForUnsavedChanges;
 
   const saveDocument = useCallback(
     async (key: string): Promise<boolean> => {
       const doc = documentsRef.current.documents.find((candidate) => candidate.key === key);
-      if (!doc) {
+      const target = workspaceRef.current;
+      if (!doc || !target) {
         return false;
       }
+      const bytes = encodeText(doc.content, doc.hasBom);
       try {
-        await adapter.workspace.writeFile(doc.path, doc.content);
-        dispatchDocuments({ type: "saved", key, content: doc.content });
+        let stat: FileStat;
+        try {
+          stat = await adapter.workspace.writeFile(target, doc.path, bytes, { expected: doc.diskStat });
+        } catch (err) {
+          if (!(err instanceof WorkspaceError && err.kind === "conflict")) {
+            throw err;
+          }
+          const overwrite = await toast.confirm({
+            title: `"${doc.name}" changed on disk`,
+            message:
+              "Another program changed or deleted this file after Vista read it. Overwrite it with your version?",
+            confirmLabel: "Overwrite",
+            destructive: true,
+          });
+          if (!overwrite) {
+            return false;
+          }
+          stat = await adapter.workspace.writeFile(target, doc.path, bytes);
+        }
+        dispatchDocuments({ type: "saved", key, content: doc.content, stat });
         return true;
       } catch (err) {
         console.error("Failed to save file:", err);
@@ -306,6 +343,67 @@ function AppShell({ adapter }: AppProps) {
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [hasDirtyDocuments]);
+
+  // A desktop window closes without `beforeunload`, so the host asks before it closes instead.
+  useEffect(
+    () =>
+      adapter.window?.onCloseRequested(async () => {
+        // A second prompt over a pending one would leave the first flow waiting forever.
+        if (isPromptingRef.current) {
+          return false;
+        }
+        return (await confirmUnsavedChangesInAllDocuments()) !== null;
+      }),
+    [adapter.window, confirmUnsavedChangesInAllDocuments],
+  );
+
+  const confirmUnsavedChangesRef = useRef(confirmUnsavedChangesInAllDocuments);
+  confirmUnsavedChangesRef.current = confirmUnsavedChangesInAllDocuments;
+
+  // Checked once per launch. A failed check is quiet: being offline is not something to interrupt the user about.
+  useEffect(() => {
+    const updater = adapter.updater;
+    if (!updater) {
+      return;
+    }
+    let isCancelled = false;
+    const offerUpdate = async () => {
+      let update;
+      try {
+        update = await updater.check();
+      } catch (err) {
+        console.warn("Could not check for updates:", err);
+        return;
+      }
+      if (!update || isCancelled) {
+        return;
+      }
+      const accepted = await toast.confirm({
+        title: `Vista ${update.version} is available`,
+        message: "Install it now? Vista restarts to finish, and asks about unsaved changes first.",
+        confirmLabel: "Install and Restart",
+        cancelLabel: "Later",
+      });
+      // A prompt already open belongs to another flow; replacing it would leave that flow waiting forever.
+      if (!accepted || isCancelled || isPromptingRef.current || (await confirmUnsavedChangesRef.current()) === null) {
+        return;
+      }
+      toast.show({ kind: "info", text: `Downloading Vista ${update.version}. Vista restarts when it's installed.` });
+      try {
+        await update.install();
+      } catch (err) {
+        console.error("Failed to install the update:", err);
+        toast.show({
+          kind: "error",
+          text: `Couldn't install Vista ${update.version}. Vista will offer it again the next time it starts.`,
+        });
+      }
+    };
+    void offerUpdate();
+    return () => {
+      isCancelled = true;
+    };
+  }, [adapter.updater, toast]);
 
   /**
    * Makes a workspace the active root by reading its tree first, so a failed read leaves the
@@ -433,6 +531,22 @@ function AppShell({ adapter }: AppProps) {
     }
   }, [adapter.workspace, applyRestoreResult, confirmUnsavedChangesInAllDocuments, toast]);
 
+  const refreshTree = useCallback(async () => {
+    if (!workspace) {
+      return;
+    }
+    try {
+      const nodes = await adapter.workspace.readTree(workspace);
+      if (workspaceRef.current === workspace) {
+        setTree(nodes);
+      }
+    } catch (err) {
+      console.error("Failed to refresh the file list:", err);
+      const message = err instanceof Error ? err.message : "Failed to refresh the file list.";
+      toast.show({ kind: "error", text: message });
+    }
+  }, [workspace, adapter.workspace, toast]);
+
   /** Opens a file in a tab, or switches to its tab; resolves to whether it is now the active tab. */
   const handleSelectFile = useCallback(
     async (path: string): Promise<boolean> => {
@@ -445,14 +559,42 @@ function AppShell({ adapter }: AppProps) {
         dispatchDocuments({ type: "activate", key });
         return true;
       }
+      const name = path.split("/").pop() ?? path;
       try {
-        const content = await adapter.workspace.readFile(path);
+        const result = await loadFile(adapter.workspace, {
+          workspace,
+          path,
+          maxBytes: settings.files.maxOpenSizeMb * BYTES_PER_MB,
+        });
         // A folder opened during the read makes this path meaningless, and saving it would write
         // into the new folder. Hosts may reuse ids for same-named folders, so compare identity.
         if (workspaceRef.current !== workspace) {
           return false;
         }
-        dispatchDocuments({ type: "open", workspaceId: workspace.id, path, content });
+        switch (result.kind) {
+          case "missing":
+            toast.show({ kind: "error", text: `"${name}" no longer exists. It may have been moved or deleted.` });
+            void refreshTree();
+            return false;
+          case "too-large":
+            toast.show({
+              kind: "error",
+              text: `"${name}" is ${formatMegabytes(result.size)} MB, over the ${settings.files.maxOpenSizeMb} MB limit. You can raise the limit in Settings.`,
+            });
+            return false;
+          case "binary":
+            toast.show({ kind: "error", text: `Vista can't open "${name}" because it isn't a text file.` });
+            return false;
+          case "loaded":
+            break;
+        }
+        dispatchDocuments({ type: "open", workspaceId: workspace.id, path, file: result.file });
+        if (result.file.isReadOnly) {
+          toast.show({
+            kind: "info",
+            text: `"${name}" isn't UTF-8 text, so it opened read-only to keep its characters intact.`,
+          });
+        }
         return true;
       } catch (err) {
         console.error("Failed to read file:", err);
@@ -461,8 +603,90 @@ function AppShell({ adapter }: AppProps) {
         return false;
       }
     },
-    [adapter.workspace, toast, workspace],
+    [adapter.workspace, refreshTree, settings.files.maxOpenSizeMb, toast, workspace],
   );
+
+  const isRecheckingRef = useRef(false);
+
+  /**
+   * Compares the tree and each open tab with the disk, since other programs change files while
+   * Vista is in the background. A clean tab reloads; a tab with unsaved edits, or whose file is
+   * gone, is marked, and saving it later asks before overwriting.
+   */
+  const recheckDisk = useCallback(async () => {
+    const target = workspaceRef.current;
+    if (!target || isRecheckingRef.current) {
+      return;
+    }
+    isRecheckingRef.current = true;
+    try {
+      try {
+        const nodes = await adapter.workspace.readTree(target);
+        if (workspaceRef.current === target) {
+          setTree(nodes);
+        }
+      } catch (err) {
+        // Quiet: the user did not ask for this refresh, and the tree on screen is still usable.
+        console.error("Failed to refresh the file list:", err);
+      }
+      const maxBytes = settings.files.maxOpenSizeMb * BYTES_PER_MB;
+      const marked: OpenDocument[] = [];
+      await Promise.all(
+        documentsRef.current.documents.map(async (doc) => {
+          try {
+            const stat = await adapter.workspace.stat(target, doc.path);
+            if (workspaceRef.current !== target || (stat !== null && isSameStat(stat, doc.diskStat))) {
+              return;
+            }
+            const current = documentsRef.current.documents.find((candidate) => candidate.key === doc.key);
+            if (!current) {
+              return;
+            }
+            if (stat !== null && !current.isDirty) {
+              const result = await loadFile(adapter.workspace, { workspace: target, path: doc.path, maxBytes });
+              if (workspaceRef.current !== target) {
+                return;
+              }
+              if (result.kind === "loaded") {
+                // The reducer keeps the buffer if it was edited during the read, and marks it, and ignores
+                // the result if a save changed the version during the read.
+                dispatchDocuments({ type: "reloaded", key: doc.key, expected: current.diskStat, file: result.file });
+                return;
+              }
+              dispatchDocuments({ type: "diskChanged", key: doc.key, stat: result.kind === "missing" ? null : stat });
+            } else {
+              dispatchDocuments({ type: "diskChanged", key: doc.key, stat });
+            }
+            if (current.externalChange === null) {
+              marked.push(current);
+            }
+          } catch (err) {
+            console.error("Failed to check a file on disk:", err);
+          }
+        }),
+      );
+      if (marked.length > 0) {
+        toast.show({ kind: "info", text: describeExternalChanges(marked) });
+      }
+    } finally {
+      isRecheckingRef.current = false;
+    }
+  }, [adapter.workspace, settings.files.maxOpenSizeMb, toast]);
+
+  useEffect(() => {
+    const handleFocus = () => void recheckDisk();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void recheckDisk();
+      }
+    };
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [recheckDisk]);
 
   const handleContentChange = useCallback(
     (content: string) => {
@@ -494,24 +718,13 @@ function AppShell({ adapter }: AppProps) {
     }
   }, [activeDocumentKey, closeDocuments]);
 
-  const refreshTree = useCallback(async () => {
-    if (!workspace) {
-      return;
-    }
-    try {
-      const nodes = await adapter.workspace.readTree(workspace);
-      setTree(nodes);
-    } catch (err) {
-      console.error("Failed to refresh the file list:", err);
-      const message = err instanceof Error ? err.message : "Failed to refresh the file list.";
-      toast.show({ kind: "error", text: message });
-    }
-  }, [workspace, adapter.workspace, toast]);
-
   const handleCreateFile = useCallback(
     async (parentPath: string, name: string) => {
+      if (!workspace) {
+        return;
+      }
       try {
-        await adapter.workspace.createFile(joinWorkspacePath(parentPath, name));
+        await adapter.workspace.createFile(workspace, joinWorkspacePath(parentPath, name));
         await refreshTree();
       } catch (err) {
         console.error("Failed to create file:", err);
@@ -519,13 +732,16 @@ function AppShell({ adapter }: AppProps) {
         toast.show({ kind: "error", text: message });
       }
     },
-    [adapter.workspace, refreshTree, toast],
+    [adapter.workspace, refreshTree, toast, workspace],
   );
 
   const handleCreateDirectory = useCallback(
     async (parentPath: string, name: string) => {
+      if (!workspace) {
+        return;
+      }
       try {
-        await adapter.workspace.createDirectory(joinWorkspacePath(parentPath, name));
+        await adapter.workspace.createDirectory(workspace, joinWorkspacePath(parentPath, name));
         await refreshTree();
       } catch (err) {
         console.error("Failed to create folder:", err);
@@ -533,16 +749,17 @@ function AppShell({ adapter }: AppProps) {
         toast.show({ kind: "error", text: message });
       }
     },
-    [adapter.workspace, refreshTree, toast],
+    [adapter.workspace, refreshTree, toast, workspace],
   );
 
   const handleRename = useCallback(
     async (fromPath: string, toPath: string) => {
+      if (!workspace) {
+        return;
+      }
       try {
-        await adapter.workspace.move(fromPath, toPath);
-        if (workspace) {
-          dispatchDocuments({ type: "move", workspaceId: workspace.id, fromPath, toPath });
-        }
+        await adapter.workspace.move(workspace, fromPath, toPath);
+        dispatchDocuments({ type: "move", workspaceId: workspace.id, fromPath, toPath });
         await refreshTree();
       } catch (err) {
         console.error("Failed to rename entry:", err);
@@ -555,12 +772,15 @@ function AppShell({ adapter }: AppProps) {
 
   const handleDelete = useCallback(
     async (path: string) => {
+      if (!workspace) {
+        return;
+      }
       const node = findTreeNode(tree, path);
       const name = node?.name ?? path;
       const isDirectory = node?.kind === "directory";
-      const dirtyDocuments = workspace
-        ? findAffectedDocuments(documentsRef.current, { workspaceId: workspace.id, path }).filter((doc) => doc.isDirty)
-        : [];
+      const dirtyDocuments = findAffectedDocuments(documentsRef.current, { workspaceId: workspace.id, path }).filter(
+        (doc) => doc.isDirty,
+      );
       const deletionMessage = isDirectory
         ? "This folder and everything in it will be permanently deleted."
         : "This file will be permanently deleted.";
@@ -574,10 +794,8 @@ function AppShell({ adapter }: AppProps) {
         if (!confirmed) {
           return;
         }
-        await adapter.workspace.remove(path);
-        const deletedDocuments = workspace
-          ? findAffectedDocuments(documentsRef.current, { workspaceId: workspace.id, path })
-          : [];
+        await adapter.workspace.remove(workspace, path);
+        const deletedDocuments = findAffectedDocuments(documentsRef.current, { workspaceId: workspace.id, path });
         if (deletedDocuments.length > 0) {
           toast.show({ kind: "info", text: describeDeletedDocuments(deletedDocuments) });
           dispatchDocuments({ type: "close", keys: deletedDocuments.map((doc) => doc.key) });
@@ -684,7 +902,7 @@ function AppShell({ adapter }: AppProps) {
 
   const loadImage = useCallback(
     async (src: string): Promise<string | Blob | null> => {
-      if (!activeDocument) {
+      if (!activeDocument || !workspace) {
         return null;
       }
       const source = resolveImageSource(src, activeDocument.path);
@@ -694,10 +912,10 @@ function AppShell({ adapter }: AppProps) {
       if (source.kind === "none") {
         return null;
       }
-      const bytes = await adapter.workspace.readBinary(source.path);
+      const { bytes } = await adapter.workspace.readFile(workspace, source.path);
       return new Blob([bytes], { type: imageMimeType(source.path) });
     },
-    [activeDocument, adapter.workspace],
+    [activeDocument, adapter.workspace, workspace],
   );
 
   const activeViewer = activeDocument ? getViewer(activeDocument.extension) : null;
@@ -705,6 +923,10 @@ function AppShell({ adapter }: AppProps) {
   const isRawShown =
     activeDocument !== null && (activeDocument.viewMode !== "enriched" || activeViewer?.enriched === undefined);
   const editorSettings = settings.editor;
+  const handleEditorSettingsChange = useCallback(
+    (changes: Partial<EditorSettings>) => updateSettings({ editor: changes }),
+    [updateSettings],
+  );
 
   const commands = useMemo<Command[]>(
     () => [
@@ -739,6 +961,13 @@ function AppShell({ adapter }: AppProps) {
         label: "Save All",
         isEnabled: !isPromptingForUnsavedChanges && hasDirtyDocuments,
         run: saveAllDocuments,
+      },
+      {
+        id: "file.settings",
+        label: "Settings…",
+        shortcut: "Mod+,",
+        isEnabled: !isPromptingForUnsavedChanges,
+        run: () => setHelpDialog("settings"),
       },
       {
         id: "tabs.close",
@@ -836,25 +1065,25 @@ function AppShell({ adapter }: AppProps) {
         label: "Word Wrap",
         shortcut: "Alt+Z",
         isChecked: editorSettings.wordWrap,
-        run: () => updateEditorSettings({ wordWrap: !editorSettings.wordWrap }),
+        run: () => updateSettings({ editor: { wordWrap: !editorSettings.wordWrap } }),
       },
       {
         id: "view.lineNumbers",
         label: "Line Numbers",
         isChecked: editorSettings.lineNumbers,
-        run: () => updateEditorSettings({ lineNumbers: !editorSettings.lineNumbers }),
+        run: () => updateSettings({ editor: { lineNumbers: !editorSettings.lineNumbers } }),
       },
       {
         id: "view.minimap",
         label: "Minimap",
         isChecked: editorSettings.minimap,
-        run: () => updateEditorSettings({ minimap: !editorSettings.minimap }),
+        run: () => updateSettings({ editor: { minimap: !editorSettings.minimap } }),
       },
       {
         id: "view.vim",
         label: "Vim Mode",
         isChecked: editorSettings.vim,
-        run: () => updateEditorSettings({ vim: !editorSettings.vim }),
+        run: () => updateSettings({ editor: { vim: !editorSettings.vim } }),
       },
       {
         id: "view.theme",
@@ -912,7 +1141,7 @@ function AppShell({ adapter }: AppProps) {
       saveActiveDocument,
       saveAllDocuments,
       theme,
-      updateEditorSettings,
+      updateSettings,
       workspace,
     ],
   );
@@ -1050,7 +1279,7 @@ function AppShell({ adapter }: AppProps) {
             rawEditorStates={rawEditorStatesRef.current}
             reservedShortcuts={reservedShortcuts}
             editorSettings={settings.editor}
-            onEditorSettingsChange={updateEditorSettings}
+            onEditorSettingsChange={handleEditorSettingsChange}
             find={find}
             onFind={() => openFind("find")}
             onFindClose={() => setFind(null)}
@@ -1095,6 +1324,9 @@ function AppShell({ adapter }: AppProps) {
         <KeyboardShortcutsDialog commands={commands} groups={MENUS} onClose={() => setHelpDialog(null)} />
       )}
       {helpDialog === "about" && <AboutDialog platform={adapter.platform} onClose={() => setHelpDialog(null)} />}
+      {helpDialog === "settings" && (
+        <SettingsDialog settings={settings} onChange={updateSettings} onClose={() => setHelpDialog(null)} />
+      )}
       {unsavedRequest && <UnsavedChangesDialog fileNames={unsavedRequest.fileNames} onChoose={handleUnsavedChoice} />}
     </div>
   );
@@ -1125,6 +1357,18 @@ function describeDeletedDocuments(documents: readonly OpenDocument[]): string {
   return documents.length === 1 && first
     ? `"${first.name}" was deleted.`
     : `${documents.length} open files were deleted.`;
+}
+
+function describeExternalChanges(documents: readonly OpenDocument[]): string {
+  const [first] = documents;
+  return documents.length === 1 && first
+    ? `"${first.name}" changed on disk. Saving it will ask before overwriting the other version.`
+    : `${documents.length} open files changed on disk. Saving them will ask before overwriting the other versions.`;
+}
+
+// One decimal, rounded up, so a file just over the limit never reads as equal to it.
+function formatMegabytes(bytes: number): string {
+  return (Math.ceil((bytes / BYTES_PER_MB) * 10) / 10).toFixed(1);
 }
 
 /** Joins a workspace-relative path onto a native root path, with the separator the root uses. */
