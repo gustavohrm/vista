@@ -25,6 +25,12 @@
       "devCsp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ipc: http://ipc.localhost ws:; object-src 'none'; base-uri 'self'; frame-src 'none'"
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUwRjdCQUY1MENBMzVEOUEKUldTYVhhTU05YnIzVUZBNEFvZTJpNzAvYmdpcVZKMUFpSjN4eW1ZbmN0bHB4Y0lETHkwQjFUSXIK",
+      "endpoints": ["https://vista.coden.dev/releases/latest.json"]
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
