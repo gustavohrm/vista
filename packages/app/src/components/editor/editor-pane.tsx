@@ -149,7 +149,7 @@ export function EditorPane({
             getTarget={getFindTarget}
             targetKey={`${doc.key}:${isRawShown ? "raw" : `rendered:${markdownRenders}`}`}
             content={doc.content}
-            canReplace={isRawShown}
+            canReplace={isRawShown && !doc.isReadOnly}
             mode={find.mode}
             focusRequest={find.focusRequest}
             onClose={onFindClose}

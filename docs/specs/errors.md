@@ -12,7 +12,7 @@ This document describes how failures move from the platform to the interface tod
 
 ### Where failures originate
 
-Failures are thrown from the host adapters, `apps/web/src/workspace-adapter.ts` and `apps/native/src/workspace-adapter.ts`. Two kinds of error reach the interface:
+Failures are thrown from the host adapters, `apps/web/src/workspace-adapter.ts` and `apps/native/src/workspace-adapter.ts`. Three kinds of error reach the interface:
 
 - **Vista-authored `Error`s** with fixed text, for example `"${name}" already exists.`, `"${path}" was not found.`, `"{workspace}" is no longer open. Open the folder again.`, and the web permission message `Permission to write to this folder was not granted. Re-open the folder to try again.`
 - **Platform errors passed through unchanged**, for example from `createWritable()` and `write()` on the web, and from the Tauri filesystem and dialog plugins on native. Nothing in the adapters wraps them.

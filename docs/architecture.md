@@ -81,4 +81,4 @@ Theming is managed via `@codenhub/theme`, supporting light and dark color scheme
 
 ## Hosting decision
 
-The web app is hosted as a Cloudflare Worker, and the same Worker serves the desktop installers and the updater manifest from an R2 bucket. Wherever the web app is hosted, the desktop releases are too, so releases do not depend on GitHub; the cost is that they depend on the web app's host. A release deploys both together. [`docs/ci.md`](ci.md#releases) describes the workflow, the routes, and how long releases are kept.
+The web app is hosted as a Cloudflare Worker, and the same Worker serves the desktop installers and the updater manifest from an R2 bucket. Clients download and update from that Worker rather than from GitHub Releases, so wherever the web app is hosted, the downloads are too. GitHub Actions still builds, signs, and publishes each release, so releases depend on GitHub as well as on the web app's host. A release deploys both together. [`docs/ci.md`](ci.md#releases) describes the workflow, the routes, and how long releases are kept.

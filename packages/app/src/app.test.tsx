@@ -1616,12 +1616,9 @@ describe("App", () => {
 
       await user.click(await screen.findByRole("button", { name: "Open Folder" }));
 
-      // jsdom's name computation drops the space a browser keeps before the hidden hint.
-      expect(
-        await screen.findByRole("button", {
-          name: /^private ?\(Vista can't read this folder, so its files aren't listed\)$/,
-        }),
-      ).toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: "private" })).toHaveAccessibleDescription(
+        "Vista can't read this folder, so its files aren't listed",
+      );
     });
 
     it("refuses a binary file", async () => {
@@ -1656,6 +1653,25 @@ describe("App", () => {
       expect(screen.getByText("Read-only")).toBeInTheDocument();
       expect(rawEditorText(editor)).toBe("caf�");
       expect(getTab("legacy.txt")).not.toHaveTextContent("(unsaved)");
+    });
+
+    it("finds in a read-only file without offering replace", async () => {
+      const user = userEvent.setup();
+      const mockWorkspace = createMemoryWorkspace(
+        { "legacy.txt": new Uint8Array([0x63, 0x61, 0x66, 0xe9]) },
+        { tree: [fileNode("legacy.txt")] },
+      );
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+      await user.click(await screen.findByText("legacy.txt"));
+      await screen.findByRole("textbox", { name: /Raw text content of legacy\.txt/i });
+
+      await user.keyboard("{Control>}h{/Control}");
+      await user.keyboard("caf");
+
+      const findBar = screen.getByLabelText("Find in file");
+      expect(within(findBar).getByRole("status")).toHaveTextContent("1 of 1");
+      expect(within(findBar).queryByRole("textbox", { name: "Replace" })).not.toBeInTheDocument();
     });
 
     it("keeps a UTF-8 byte order mark when saving", async () => {

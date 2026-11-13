@@ -45,7 +45,7 @@ pnpm --filter=@vista/native dev:ios
 pnpm --filter=@vista/native build:ios
 ```
 
-Mobile folder access is not supported yet. `@tauri-apps/plugin-dialog` has no folder picker on Android or iOS, so opening, remembering, and restoring folders is desktop-only until mobile folder access and platform permissions are designed and tested. Desktop paths and browser folder handles are not a cross-platform storage contract. App-store distribution, signing and automatic updates belong to beta preparation.
+Mobile folder access is not supported yet. `@tauri-apps/plugin-dialog` has no folder picker on Android or iOS, so opening, remembering, and restoring folders is desktop-only until mobile folder access and platform permissions are designed and tested. Desktop paths and browser folder handles are not a cross-platform storage contract. App-store distribution and operating-system code signing are not set up: installers are signed for the updater only, so Windows SmartScreen may warn on first install.
 
 ## Host boundary and security
 

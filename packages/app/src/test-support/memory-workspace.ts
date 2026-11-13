@@ -17,6 +17,8 @@ export interface MemoryWorkspace extends MockedCapability {
   deleteExternally(path: string): void;
 }
 
+const WORKSPACE_ID = "workspace-1";
+
 interface StoredFile {
   bytes: Uint8Array<ArrayBuffer>;
   stat: FileStat;
@@ -50,6 +52,10 @@ export function createMemoryWorkspace(
       kind: "file",
       extension: path.includes(".") ? (path.split(".").pop() ?? "") : "",
     }));
+  const directories = new Set<string>();
+  const isAtOrInside = (candidate: string, path: string) => candidate === path || candidate.startsWith(`${path}/`);
+  const hasEntry = (path: string) =>
+    [...stored.keys(), ...directories].some((candidate) => isAtOrInside(candidate, path));
   const require = (path: string) => {
     const file = stored.get(path);
     if (!file) {
@@ -60,7 +66,7 @@ export function createMemoryWorkspace(
 
   const capability: MockedCapability = {
     isSupported: true,
-    openFolder: vi.fn(async () => ({ id: "workspace-1", name: "My Notes", rootPath: "/notes" })),
+    openFolder: vi.fn(async () => ({ id: WORKSPACE_ID, name: "My Notes", rootPath: "/notes" })),
     restoreFolder: vi.fn(async () => ({ status: "none" as const })),
     readTree: vi.fn(async () => structuredClone(tree ?? flatTree())),
     stat: vi.fn(async (_workspace, path) => {
@@ -88,20 +94,45 @@ export function createMemoryWorkspace(
       }
       put(path, "");
     }),
-    createDirectory: vi.fn(async () => {}),
+    createDirectory: vi.fn(async (_workspace, path) => {
+      if (hasEntry(path)) {
+        throw new Error(`"${path}" already exists.`);
+      }
+      directories.add(path);
+    }),
     move: vi.fn(async (_workspace, fromPath, toPath) => {
-      // Copied first, because the loop changes the map it would otherwise be walking.
+      if (!hasEntry(fromPath)) {
+        throw new Error(`"${fromPath}" was not found.`);
+      }
+      if (hasEntry(toPath)) {
+        throw new Error(`An entry already exists at "${toPath}".`);
+      }
+      // Copied first, because the loops change the collections they would otherwise be walking.
       for (const [path, file] of Array.from(stored)) {
-        if (path === fromPath || path.startsWith(`${fromPath}/`)) {
+        if (isAtOrInside(path, fromPath)) {
           stored.delete(path);
           stored.set(toPath + path.slice(fromPath.length), file);
         }
       }
+      for (const path of Array.from(directories)) {
+        if (isAtOrInside(path, fromPath)) {
+          directories.delete(path);
+          directories.add(toPath + path.slice(fromPath.length));
+        }
+      }
     }),
     remove: vi.fn(async (_workspace, path) => {
+      if (!hasEntry(path)) {
+        throw new Error(`"${path}" was not found.`);
+      }
       for (const candidate of Array.from(stored.keys())) {
-        if (candidate === path || candidate.startsWith(`${path}/`)) {
+        if (isAtOrInside(candidate, path)) {
           stored.delete(candidate);
+        }
+      }
+      for (const candidate of Array.from(directories)) {
+        if (isAtOrInside(candidate, path)) {
+          directories.delete(candidate);
         }
       }
     }),
@@ -129,6 +160,6 @@ export function createMemoryWorkspace(
 /** The text passed to each `writeFile` call for a path, in call order. */
 export function writtenTexts(workspace: MemoryWorkspace, path: string): string[] {
   return workspace.writeFile.mock.calls
-    .filter(([, writtenPath]) => writtenPath === path)
+    .filter(([target, writtenPath]) => target.id === WORKSPACE_ID && writtenPath === path)
     .map(([, , bytes]) => new TextDecoder().decode(bytes));
 }

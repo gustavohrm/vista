@@ -589,14 +589,12 @@ function TreeNode({
             onContextMenu(node.path, "directory", event.clientX, event.clientY);
           }}
           style={{ paddingLeft: rowPaddingLeft }}
+          // The title is also the button's accessible description, so the hint is announced once.
           title={node.isUnreadable ? UNREADABLE_FOLDER_HINT : undefined}
           className={`${TREE_ROW_CLASS} ${TREE_ROW_IDLE_CLASS}`}
         >
           <EntryIcon kind="directory" isCollapsed={isCollapsed} />
-          <span className="min-w-0 flex-1 truncate">
-            {node.name}
-            {node.isUnreadable && <span className="sr-only"> ({UNREADABLE_FOLDER_HINT})</span>}
-          </span>
+          <span className="min-w-0 flex-1 truncate">{node.name}</span>
           {node.isUnreadable && (
             <i className="ic-circle-alert text-text-secondary flex-none text-xs" aria-hidden="true" />
           )}

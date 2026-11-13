@@ -67,7 +67,7 @@ The raw view (`packages/app/src/components/editor/raw-editor.tsx`) is a [CodeMir
 
 ### Editor settings
 
-The gear button in the document header opens a menu of four check items: line numbers, word wrap, minimap, and vim mode. It is the same menu component as the menu bar and the right-click menus. The View menu toggles the same four, and `Alt+Z` toggles word wrap. They apply to the raw editor at once and are remembered in the browser's `localStorage` under `vista.settings`, as `{ "version": 1, "editor": { "lineNumbers": true, "minimap": false, "vim": false, "wordWrap": true }, "files": { "maxOpenSizeMb": 10 } }`. A stored value that is missing or of the wrong type falls back to its default, field by field, so one bad field does not reset the others. When the store can't be read, the editor starts with the defaults. When it can't be written, a changed setting still applies for the rest of the session but is lost on reload.
+The gear button in the document header opens a menu of four check items: line numbers, word wrap, minimap, and vim mode. It is the same menu component as the menu bar and the right-click menus. The View menu toggles the same four, and `Alt+Z` toggles word wrap. They apply to the raw editor at once and are remembered in the browser's `localStorage` under `vista.settings`, as `{ "version": 1, "editor": { "lineNumbers": true, "minimap": false, "vim": false, "wordWrap": true }, "files": { "maxOpenSizeMb": 10 } }`. A stored value that is missing, of the wrong type, or outside its allowed range (a whole number from 1 to 512 for `maxOpenSizeMb`) falls back to its default, field by field, so one bad field does not reset the others. When the store can't be read, the editor starts with the defaults. When it can't be written, a changed setting still applies for the rest of the session but is lost on reload.
 
 ### Settings
 
@@ -144,10 +144,11 @@ Beside the buffer, each tab keeps the file's version on disk as it last read or 
 
 Opening a file reads its size first. A file over the limit set in [Settings](#settings) is not read, and an error toast says `"{name}" is {size} MB, over the {limit} MB limit. You can raise the limit in Settings.` The size is checked again after reading, so a file that grew in between is refused too. A file that no longer exists shows `"{name}" no longer exists. It may have been moved or deleted.` and the tree is scanned again.
 
-The bytes are then decoded as strict UTF-8:
+The bytes are then decoded:
 
 - **UTF-8 text** opens for editing. A leading byte order mark is removed from the buffer and written back on save, so saving never adds or drops one.
-- **A file with a NUL byte** is treated as binary and not opened: `Vista can't open "{name}" because it isn't a text file.`
+- **A file with a NUL byte in its first 8,000 bytes**, the window Git uses, is treated as binary and not opened: `Vista can't open "{name}" because it isn't a text file.`
+- **A file that starts with a UTF-16 byte order mark** opens read-only, decoded as UTF-16, for the same reason as the next case. Its NUL bytes are part of the encoding, so it is never called binary.
 - **Any other file that isn't valid UTF-8**, such as Latin-1 or Windows-1252 text, opens read-only, decoded with replacement characters, and an info toast says `"{name}" isn't UTF-8 text, so it opened read-only to keep its characters intact.` The document header shows **Read-only**. Saving it would replace every unreadable character with U+FFFD, so editing it is not offered. Converting from other encodings is not built.
 
 Edits made in either the Raw view or the rendered view (such as editing a CSV cell, or typing in the Markdown WYSIWYG editor) update that tab's buffer and set `isDirty: true`. A dot in the tab and next to the file name in the document header breadcrumb marks unsaved edits. Save (`Ctrl+S` or `Cmd+S`, or **File > Save**) writes the active tab's buffer to disk via the platform's `writeFile` capability. The tab becomes clean only if its buffer still matches what was written, so edits typed while a save is in flight stay marked unsaved.

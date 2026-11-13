@@ -9,7 +9,7 @@ The current implementation opens a local folder as a workspace, shows its file t
 A pnpm workspace of one shared application package and the platform hosts that run it:
 
 - `packages/app`: shared React product code and the platform capability contracts the hosts implement.
-- `apps/web`: browser host, with folder access through browser APIs, a Vite build, and a Cloudflare Workers scaffold whose publication is deferred.
+- `apps/web`: browser host, with folder access through browser APIs, a Vite build, and the Cloudflare Worker that serves it and the desktop releases.
 - `apps/native`: Tauri host for desktop, Android, and iOS, with Rust in `apps/native/src-tauri`.
 - `docs/`: architecture, guidelines, specifications, and repository references.
 
