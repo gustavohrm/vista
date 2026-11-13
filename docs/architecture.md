@@ -9,7 +9,7 @@ scope: Boundaries between shared app code, platform hosts, and workspace package
 Vista separates shared product code from platform hosts:
 
 - `packages/app` is the home for shared React UI, features, state, domain behavior, and platform capability contracts. It provides the application shell, workspace file explorer, document viewers/editors, and platform contracts.
-- `apps/web` boots the shared app at the browser boundary using the File System Access API for local workspace access and contains a local Cloudflare Worker scaffold for testing the approved hosting target.
+- `apps/web` boots the shared app at the browser boundary using the File System Access API for local workspace access and is deployed as a Cloudflare Worker that also serves the desktop releases.
 - `apps/native` boots the shared app at the Tauri boundary, using Tauri plugins (`@tauri-apps/plugin-dialog` and `@tauri-apps/plugin-fs`) for local filesystem access, plus `tauri-plugin-persisted-scope` so the granted folder scope survives restarts. Its single Tauri project targets desktop, Android, and iOS.
 
 Platform hosts MUST keep browser- or Tauri-specific implementations outside `packages/app`. Shared code MUST consume future platform capabilities through narrow contracts. Add more workspace packages only when code has a proven independent responsibility or consumer.
@@ -81,4 +81,4 @@ Theming is managed via `@codenhub/theme`, supporting light and dark color scheme
 
 ## Hosting decision
 
-Cloudflare Workers is **APPROVED**, with publishing and automatic deployment **not implemented**. Keep the existing local Worker scaffold and preview checks for development. Configure production accounts, credentials, deployment automation, and publication only when there is an actual app ready to publish. Their absence is intentional and does not block MVP development.
+The web app is hosted as a Cloudflare Worker, and the same Worker serves the desktop installers and the updater manifest from an R2 bucket. Wherever the web app is hosted, the desktop releases are too, so releases do not depend on GitHub; the cost is that they depend on the web app's host. A release deploys both together. [`docs/ci.md`](ci.md#releases) describes the workflow, the routes, and how long releases are kept.

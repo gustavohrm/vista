@@ -14,7 +14,9 @@ pnpm dev:native
 pnpm --filter=@vista/native build:desktop
 ```
 
-`pnpm build:native` builds only the shared frontend. `build:desktop` compiles Rust and creates native bundles: MSI and NSIS installers on Windows, and `.deb`, `.rpm`, and AppImage on Linux, under `src-tauri/target/release/bundle/`. The app's version comes from `apps/native/package.json`, which `tauri.conf.json` names, and `pnpm versions:check` keeps it equal to the other manifests and `Cargo.toml`. For a local executable without installers, use `pnpm --filter=@vista/native build:desktop --no-bundle`.
+`pnpm build:native` builds only the shared frontend. `build:desktop` compiles Rust and creates native bundles: the NSIS installer on Windows, and `.deb`, `.rpm`, and AppImage on Linux, under `src-tauri/target/release/bundle/`. The app's version comes from `apps/native/package.json`, which `tauri.conf.json` names, and `pnpm versions:check` keeps it equal to the other manifests and `Cargo.toml`. For a local executable without installers, use `pnpm --filter=@vista/native build:desktop --no-bundle`.
+
+Releases are built and published by the release workflow, which [`docs/ci.md`](../../docs/ci.md#releases) describes. The updater checks `/releases/latest.json` on the web app's origin at startup and verifies each download against the public key in `tauri.conf.json`. To create the key pair, run `pnpm --filter=@vista/native tauri signer generate -w ~/.tauri/vista.key`, put the public key in `tauri.conf.json`, and store the private key and its password as the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` secrets. Never commit the private key.
 
 Native checks are separate from the frontend checks:
 

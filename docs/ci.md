@@ -24,7 +24,7 @@ CI reads those same files rather than repeating a version: `pnpm/action-setup` t
 | ------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Web`               | `ubuntu-latest`  | `pnpm versions:check`, `pnpm format:check`, `pnpm lint:check`, `pnpm typecheck`, `pnpm test`, `pnpm build:web`, `pnpm build:native`, `pnpm test:e2e`, then `Working tree is clean` |
 | `Rust`              | `windows-latest` | `pnpm --filter=@vista/native` `format:rust:check`, `lint:rust:check`, then `Working tree is clean`                                                                                 |
-| `Desktop (Windows)` | `windows-latest` | `pnpm --filter=@vista/native build:desktop`, then `Working tree is clean`, then uploads the MSI and NSIS installers                                                                |
+| `Desktop (Windows)` | `windows-latest` | `pnpm --filter=@vista/native build:desktop`, then `Working tree is clean`, then uploads the NSIS installer                                                                         |
 | `Desktop (Linux)`   | `ubuntu-22.04`   | `pnpm --filter=@vista/native lint:rust:check`, `build:desktop`, then `Working tree is clean`, then uploads the `.deb`, `.rpm`, and AppImage                                        |
 
 Every job runs on every pull request, every merge-queue check, and every push to `main`, in parallel. There is no change-based selection: the repository is one application, and a check that skips half of it on a pull request is a check that lets the other half reach `main` unverified.
@@ -40,6 +40,31 @@ The `Desktop` jobs build the installers a release ships, with `tauri build` in t
 `Working tree is clean`, the last step of each job, fails when a check has left a tracked or untracked file changed. A check that writes has changed what it was checking, so it is reported rather than passing. On the Windows runner the step runs under `bash`, so both jobs run the same command.
 
 Runs for the same pull request cancel each other, because only the newest push is worth a verdict. A merge-queue run or a push to `main` is never cancelled to make way for a newer one: each is the authoritative check of a commit, so each is grouped by its commit rather than its branch. Grouping by branch would not hold that: a concurrency group holds one running and one pending run, and GitHub cancels the pending one when a third arrives, whatever `cancel-in-progress` says, so three quick pushes to `main` would leave the second without a verdict. The cost is that runs on `main` can run in parallel. The `merge_group` trigger never fires while the repository has no merge queue. Requiring one would make the `push` trigger redundant: the queue lands the exact commit it checked, so a push run would only repeat a passed check. The workflow's token is read-only (`permissions: contents: read`); a job that needs more asks for it on that job alone.
+
+## Releases
+
+`.github/workflows/release.yml` publishes a release when a tag named `v` and the version, such as `v0.2.0`, is pushed. It runs one release at a time and never cancels one halfway.
+
+1. `Check the tag` runs `scripts/check-versions.mjs` and fails unless the tag names the version in `package.json`.
+2. `Build (Windows)` and `Build (Linux)` run `tauri build` with `createUpdaterArtifacts`, signing each updater artifact with the private key. Windows ships the NSIS installer only; Linux ships the `.deb`, `.rpm`, and AppImage.
+3. `Publish` writes `latest.json` with `scripts/release-manifest.mjs`, which fails before anything is uploaded when an installer or its `.sig` is missing. It uploads the installers to the R2 bucket under the version's folder, deploys the web app, and only then uploads `latest.json`, so a client is never told about files the Worker cannot serve. Last, `scripts/release-retention.mjs` deletes old releases.
+
+The Worker in `apps/web` serves the bucket: `/releases/latest.json` for the updater, `/releases/<version>/<file>` for the files, and `/download/windows` and `/download/linux` as links to the current installer. The web app and the desktop releases therefore move together: the Worker is deployed by a release, not by a merge to `main`.
+
+The updater installs the NSIS installer on Windows and the AppImage on Linux. A `.deb` or `.rpm` install is updated by downloading the new package. MSI is not built: WiX fails where VBScript is unavailable, which Windows 11 is removing. If MSI is added later, it is an extra download only; the updater keeps serving NSIS, because NSIS installs per user and MSI per machine, and switching an install from one to the other would leave two copies.
+
+**Retention.** The bucket stays inside the R2 free tier by keeping few releases. Before 1.0, only the version just published is kept. From 1.0 on, every release of the newest major is kept and older majors are deleted. A version newer than the one published is never deleted, and a folder whose name is not a version is left alone. Retention runs after `latest.json` points at the new version, so an updater that started downloading the previous version a moment before can get a 404; it offers the update again on the next start.
+
+**Secrets**, set in the repository's Actions secrets:
+
+| Secret                               | Holds                                                                         |
+| ------------------------------------ | ----------------------------------------------------------------------------- |
+| `TAURI_SIGNING_PRIVATE_KEY`          | The updater's private signing key; the public key is in `tauri.conf.json`     |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Its password                                                                  |
+| `CLOUDFLARE_API_TOKEN`               | A token with Workers Scripts Edit and Workers R2 Storage Write on the account |
+| `CLOUDFLARE_ACCOUNT_ID`              | The Cloudflare account the Worker and bucket belong to                        |
+
+The bucket name, `vista-releases`, is in `release.yml` and `apps/web/wrangler.json`; change both together. Losing the private key means installed apps can never be updated again, only reinstalled, so keep a copy outside GitHub.
 
 ## Changing the workflow
 
@@ -114,5 +139,4 @@ These are repository settings, not files, and are on for this repository:
 
 ## Not covered yet
 
-- **Releases.** CI builds the Windows and Linux installers but does not sign or publish them, and the desktop app has no updater yet.
 - **Native builds on macOS and mobile.** `build:desktop` on macOS, `build:android`, and `build:ios` run from a developer's machine.

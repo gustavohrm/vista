@@ -32,11 +32,13 @@ The smoke test starts an isolated local Wrangler server on port 8799 with inspec
 
 ## Deployment
 
-Cloudflare Workers hosting is **APPROVED**. Publication and automatic deployment are **not implemented** and are deferred until there is an actual app to publish. The existing Wrangler configuration, local preview, and dry-run commands are development scaffolding; no publishing workflow is enabled.
+The web app is a Cloudflare Worker. A release deploys it: the release workflow, which [`docs/ci.md`](../../docs/ci.md#releases) describes, runs `pnpm deploy:web` with the repository's Cloudflare secrets. A merge to `main` does not deploy.
+
+The Worker also serves the desktop releases from the R2 bucket bound as `RELEASES`: `/releases/latest.json` for the updater, `/releases/<version>/<file>` for installers, and `/download/windows` and `/download/linux` as links to the current installer. These paths are listed in `run_worker_first`, because otherwise a browser navigating to them gets the app's `index.html`. Anything else under `/releases/` is a 404, never the app. Locally, `wrangler dev --local` simulates the bucket, empty until objects are put into it with `wrangler r2 object put --local`.
 
 `pnpm deploy:web` builds fresh frontend assets before invoking Wrangler. Deployment targets the Worker name in `wrangler.json`, currently `vista`, in the authenticated Cloudflare account.
 
-When publishing becomes in scope, select the Cloudflare account and deployment trigger explicitly. For manual deployment at that time, authenticate with `pnpm --filter=@vista/web exec wrangler login` before running the deploy command. Confirm any existing Cloudflare Git integration before configuring another publisher.
+For a manual deployment, authenticate with `pnpm --filter=@vista/web exec wrangler login` before running the deploy command. Confirm any existing Cloudflare Git integration before configuring another publisher.
 
 Never put API tokens into source files or `VITE_*` environment variables. Keep local Worker secrets in ignored `.dev.vars` files and browser development configuration in ignored `.env` files. Client environment variables are public once bundled.
 

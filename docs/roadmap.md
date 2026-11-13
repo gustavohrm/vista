@@ -12,7 +12,7 @@ Durable direction for Vista: what is planned, what is possible later, and what h
 
 ## Current Focus
 
-- **Open beta on the web and the desktop app.** Windows is the primary desktop platform and Linux the second. CI builds the Windows and Linux installers on every change; signing, an updater, and publishing are not built yet. Source: `docs/ci.md`, "Not covered yet".
+- **Open beta on the web and the desktop app.** Windows is the primary desktop platform and Linux the second. CI builds the Windows and Linux installers on every change, and a release tag signs and publishes them with the web app, which the desktop updater checks. Source: `docs/ci.md`, "Releases".
 
 ## Planned
 
