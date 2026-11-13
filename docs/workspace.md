@@ -33,14 +33,14 @@ Keep these names as they are: CI, the git hooks and the agent instructions call 
 
 Vista's own root scripts:
 
-| Script              | Does                                                                            |
-| ------------------- | ------------------------------------------------------------------------------- |
-| `pnpm dev:web`      | The web host's Vite dev server.                                                 |
-| `pnpm dev:native`   | `tauri dev`, the native app with the interface served by Vite.                  |
-| `pnpm build:web`    | The web host's production bundle.                                               |
-| `pnpm build:native` | The native host's frontend bundle, which the Tauri build packages.              |
-| `pnpm deploy:web`   | `build:web`, then `wrangler deploy` for the web host. Production is not set up. |
-| `pnpm labels`       | Creates or updates the GitHub labels in `.github/labels.json`.                  |
+| Script              | Does                                                                                |
+| ------------------- | ----------------------------------------------------------------------------------- |
+| `pnpm dev:web`      | The web host's Vite dev server.                                                     |
+| `pnpm dev:native`   | `tauri dev`, the native app with the interface served by Vite.                      |
+| `pnpm build:web`    | The web host's production bundle.                                                   |
+| `pnpm build:native` | The native host's frontend bundle, which the Tauri build packages.                  |
+| `pnpm deploy:web`   | `build:web`, then `wrangler deploy` for the web host. The release workflow runs it. |
+| `pnpm labels`       | Creates or updates the GitHub labels in `.github/labels.json`.                      |
 
 There is no `pnpm format` script. When a name matches no pnpm script, pnpm runs the executable of that name from `PATH` instead, and on Windows `format` is the system disk formatter. The explicit `format:check` and `format:fix` names avoid that.
 
