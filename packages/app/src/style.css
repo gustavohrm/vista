@@ -192,12 +192,12 @@ body,
   fill: light-dark(#637b09, #c5f03b);
 }
 
-/* Mask strokes along the arms; 80.82 is each stroke's length. */
+/* Mask strokes down the middle of each arm, wider than the arm; 79.01 is each stroke's length. */
 .vista-logo-arm {
   fill: none;
   stroke: #fff;
-  stroke-width: 26;
-  stroke-dasharray: 80.82 80.82;
+  stroke-width: 20;
+  stroke-dasharray: 79.01 79.01;
 }
 
 /* Entrance, 1.4 s: the arms draw down to the point, the bar rises into the opening, and the letters
@@ -241,7 +241,7 @@ body,
 
 @keyframes vista-draw {
   from {
-    stroke-dashoffset: 80.82;
+    stroke-dashoffset: 79.01;
   }
   to {
     stroke-dashoffset: 0;

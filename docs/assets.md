@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-13
+last_updated: 2026-11-14
 scope: Brand artwork, animated logos, and the brand font under root `assets/`, and the app icons generated from them in `apps/native/src-tauri/icons/`.
 ---
 
@@ -77,7 +77,23 @@ Animated versions of the logo, as [Motion](guidelines/brand.md#motion) describes
 | `assets/motion/mark-loop-light.svg`  | Sunrise loader, 1.8 s loop         | A wait that fills an area, on a dark background.      |
 | `assets/motion/mark-loop-dark.svg`   | As above, dark artwork             | A wait that fills an area, on a bright background.    |
 
-An entrance plays when the image loads; to replay it, load the image again. When a still file changes, rebuild the animated files from it, so the last frame of an entrance is still the still logo. In Single stroke, the stroke's dash lengths are the measured length of its path, so they change with it.
+An entrance plays when the image loads; to replay it, load the image again.
+
+Each animated file has the proportions of the still file it ends on, except the Single stroke files, which are 262.93 × 90.32. They draw the logo at the same scale with a margin of 6 units on every side, because the V rises into place and dips with the bar, and the stroke turns just past the last letter. Without the margin the image's edge would cut those movements off. Where a Single stroke file stands in for a still logo of width `w`, give it a width of `w × 262.93 / 250.93`, so the logo inside is the same size.
+
+When a still file changes, rebuild the animated files from it, so the last frame of an entrance is still the still logo.
+
+The Single stroke files are built by a script, not edited by hand:
+
+```sh
+node scripts/build-logo-write.mjs
+```
+
+It reads `assets/logo/logo-dark.svg` and `logo-light.svg` and writes the two `logo-write` files. The stroke's path, the times, and the margin are constants at the top of the script; change them there and run it again. A test in `pnpm test` fails when the checked-in files are not what the script builds, which is how a changed still logo or a hand edit is caught.
+
+In Single stroke, each letter has its own mask, revealed by the part of the stroke's path that runs from where the stroke sets off toward that letter to where it leaves it. A letter therefore never shows before the stroke reaches it, even where the path passes close to the next one. The reveal is twice as wide as the stroke, so where the stroke passes close to, or across, a piece of its own letter that it writes later, the letter is two parts, and the first is clipped to leave that piece out: the `t`'s first part leaves out the ends of its crossbar, and the `a`'s leaves out its bowl. The script measures the stroke's path and those parts, and derives the dash lengths and each part's keyframes from the lengths, so they change with the path.
+
+The other animated files are written by hand. After changing any animated file, or the script, look at the result frame by frame in a browser: the script and its test check the numbers, not how a frame looks.
 
 The application does not load these files. It draws the same logo and loader inline in `packages/app/src/components/brand/vista-logo.tsx`, with the motion in `packages/app/src/style.css`, so they take the theme's colours.
 
