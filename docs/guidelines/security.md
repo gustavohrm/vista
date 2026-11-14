@@ -32,6 +32,7 @@ Vista issues and stores no secrets: it has no accounts, sessions, or server-side
 - Files in the user's folder are untrusted input: the user or another program can edit them. So is state Vista stores, such as the settings in `localStorage`, which `packages/app/src/domain/settings.ts` reads field by field and replaces with the default where a field does not parse. A value read from either is checked as if it came from outside.
 - A file or folder name the user types is checked against what the file system accepts, as `packages/app/src/domain/path-validation.ts` does, before any adapter sees it.
 - Do not build a path by concatenating input. Resolve it through the adapter, which keeps it inside the granted folder.
+- Do not build URLs or redirects from values a client controls, such as the `Host` or `X-Forwarded-*` headers. The Worker builds its release URLs and download redirects from `PUBLIC_ORIGIN`, set in `apps/web/wrangler.json`.
 - Do not build a command by concatenating input. Pass its arguments as an array to a call that runs no shell: with `shell: true`, Node.js joins the array into a shell command line, so a metacharacter in an argument runs as a command. `scripts/` runs `gh` this way, through `spawnSync` with `shell: false`.
 - Do not build HTML from input. Rendered Markdown and document content go through the editor's own rendering, never through `innerHTML` or `dangerouslySetInnerHTML`.
 

@@ -29,6 +29,7 @@ function objectOf(text: string) {
 
 function envWith(objects: Record<string, string>) {
   return {
+    PUBLIC_ORIGIN: ORIGIN,
     ASSETS: { fetch: vi.fn(async () => new Response("app shell")) },
     RELEASES: {
       get: vi.fn(async (key: string) => {
@@ -51,7 +52,7 @@ describe("worker", () => {
     expect(env.RELEASES.get).not.toHaveBeenCalled();
   });
 
-  it("serves the manifest with installer URLs on its own origin", async () => {
+  it("serves the manifest with installer URLs on the configured origin", async () => {
     const response = await worker.fetch(
       request("/releases/latest.json"),
       envWith({ "latest.json": JSON.stringify(MANIFEST) }),
@@ -68,6 +69,17 @@ describe("worker", () => {
         "linux-x86_64-rpm": { url: `${ORIGIN}/releases/0.2.0/Vista-0.2.0-1.x86_64.rpm`, signature: "sig-r" },
       },
     });
+  });
+
+  it("points release URLs at the configured origin, whatever host the request names", async () => {
+    const env = envWith({ "latest.json": JSON.stringify(MANIFEST) });
+    const elsewhere = (path: string) => new Request(`https://attacker.example${path}`);
+
+    const manifest = await (await worker.fetch(elsewhere("/releases/latest.json"), env)).json();
+    const redirect = await worker.fetch(elsewhere("/download/windows"), env);
+
+    expect(manifest.platforms["windows-x86_64-nsis"].url).toBe(`${ORIGIN}/releases/0.2.0/Vista_0.2.0_x64-setup.exe`);
+    expect(redirect.headers.get("location")).toBe(`${ORIGIN}/releases/0.2.0/Vista_0.2.0_x64-setup.exe`);
   });
 
   it("says there is no update when nothing is published", async () => {

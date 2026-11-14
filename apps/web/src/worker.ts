@@ -11,6 +11,9 @@ interface ReleaseObject {
 }
 
 interface Env {
+  // The origin the release URLs point at, from `vars` in `wrangler.json`, never from the request: a URL or
+  // redirect built from the `Host` header would point wherever the client said.
+  PUBLIC_ORIGIN: string;
   ASSETS: {
     fetch(request: Request): Promise<Response>;
   };
@@ -37,21 +40,22 @@ const DOWNLOAD_PLATFORMS: Record<string, string> = {
 
 const notFound = (text = "Not found.") => new Response(text, { status: 404 });
 
-// The manifest is stored with URLs relative to the releases folder and served with absolute ones on this origin.
-async function readManifest(env: Env, origin: string): Promise<Manifest | null> {
+// The manifest is stored with URLs relative to the releases folder and served with absolute ones on the
+// configured origin.
+async function readManifest(env: Env): Promise<Manifest | null> {
   const object = await env.RELEASES.get(MANIFEST_KEY);
   if (!object) {
     return null;
   }
   const manifest = JSON.parse(await object.text()) as Manifest;
   for (const entry of Object.values(manifest.platforms ?? {})) {
-    entry.url = new URL(`/releases/${entry.url}`, origin).href;
+    entry.url = new URL(`/releases/${entry.url}`, env.PUBLIC_ORIGIN).href;
   }
   return manifest;
 }
 
-async function serveManifest(env: Env, url: URL, isHead: boolean): Promise<Response> {
-  const manifest = await readManifest(env, url.origin);
+async function serveManifest(env: Env, isHead: boolean): Promise<Response> {
+  const manifest = await readManifest(env);
   if (!manifest) {
     // Tauri's updater reads 204 as "no update available".
     return new Response(null, { status: 204 });
@@ -78,12 +82,12 @@ async function serveReleaseFile(env: Env, version: string, file: string, isHead:
   });
 }
 
-async function redirectToInstaller(env: Env, url: URL, platform: string): Promise<Response> {
+async function redirectToInstaller(env: Env, platform: string): Promise<Response> {
   const key = DOWNLOAD_PLATFORMS[platform];
   if (!key) {
     return notFound();
   }
-  const installer = (await readManifest(env, url.origin))?.platforms?.[key];
+  const installer = (await readManifest(env))?.platforms?.[key];
   if (!installer) {
     return notFound("No desktop release has been published yet.");
   }
@@ -96,10 +100,10 @@ async function serveReleases(request: Request, env: Env, url: URL): Promise<Resp
   }
   const isHead = request.method === "HEAD";
   if (url.pathname === `/releases/${MANIFEST_KEY}`) {
-    return serveManifest(env, url, isHead);
+    return serveManifest(env, isHead);
   }
   if (url.pathname.startsWith("/download/")) {
-    return redirectToInstaller(env, url, url.pathname.slice("/download/".length));
+    return redirectToInstaller(env, url.pathname.slice("/download/".length));
   }
   const [, version, file] = RELEASE_FILE_PATH.exec(url.pathname) ?? [];
   // Anything else under /releases/ is a 404, never the app's HTML, so a wrong updater URL fails visibly.
