@@ -36,19 +36,30 @@ describe("buildLogoWrite", () => {
   });
 
   it("reveals each letter with its own parts of the stroke, in writing order", () => {
-    const svg = buildLogoWrite(read("assets/logo/logo-dark.svg"));
+    const still = read("assets/logo/logo-dark.svg");
+    const svg = buildLogoWrite(still);
     const masks = [...svg.matchAll(/<mask id="(\w)"[^>]*>(.*?)<\/mask>/g)];
     expect(masks.map((mask) => mask[1])).toEqual(["i", "s", "t", "a"]);
-    for (const [, letter] of masks) {
-      expect(svg).toContain(`<g mask="url(#${letter})">`);
-    }
+
+    // Each mask covers its own letter: the i's stem and dot, the s, the t, and the a's body and bowl.
+    const shapes = [...still.matchAll(/<path fill="[^"]+" d="([^"]+)"/g)][2]?.[1]?.match(/M[^M]*/g) ?? [];
+    const glyphs = { i: shapes.slice(0, 2), s: shapes.slice(2, 3), t: shapes.slice(3, 4), a: shapes.slice(4, 6) };
+    const masked = Object.fromEntries(
+      [...svg.matchAll(/<g mask="url\(#(\w)\)"><path fill="[^"]+" d="([^"]+)"/g)].map((group) => [group[1], group[2]]),
+    );
+    expect(masked).toEqual(Object.fromEntries(Object.entries(glyphs).map(([letter, d]) => [letter, d.join("")])));
+
     const parts = masks.flatMap(([, letter, body]) =>
       [...`${body}`.matchAll(/<path class="r\d+" d="([^"]+)"[^>]*>/g)].map((part) => [part[0], letter, part[1]]),
     );
     // The t and the a are written in two parts each, the first clipped so it never uncovers the piece
     // the second writes: the t's crossbar ends, and the a's bowl.
     expect(parts.map((part) => part[1])).toEqual(["i", "s", "t", "t", "a", "a"]);
-    expect(parts.map((part) => part[0]?.includes("clip-path"))).toEqual([false, false, true, false, true, true]);
+    const clips = parts.map((part) => part[0]?.match(/clip-path="url\(#(\w+)\)"/)?.[1]);
+    expect(clips).toEqual([undefined, undefined, "c2", undefined, "c4", "c5"]);
+    for (const clip of clips.filter(Boolean)) {
+      expect(svg).toMatch(new RegExp(`<clipPath id="${clip}"><path d="M[^"]+"/></clipPath>`));
+    }
 
     // Joined end to start, the parts are the stroke up to where it turns back.
     const written = parts.map((part, index) => (index === 0 ? part[2] : part[2]?.replace(/^M[^LC]*/, ""))).join("");
