@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-12
+last_updated: 2026-11-14
 scope: The root script names and what each guarantees, the shared tool configurations, the pinned toolchain, install rules, how dependency versions are declared, and how the git hooks are wired.
 ---
 
@@ -79,6 +79,8 @@ clippy runs with warnings denied over every target. A lint that is wrong for one
 
 Every third-party dependency version is declared once, in the catalog in `pnpm-workspace.yaml`, and referred to as `catalog:` in each `package.json`. The workspace therefore cannot hold two versions of one dependency by accident, and an upgrade is a one-line change that Dependabot can propose ([CI](ci.md#dependency-updates)). A workspace package depends on another as `workspace:*`, so it is not a catalog entry.
 
+`@types/node` never takes a major update from Dependabot. Node's types follow the Node.js release in `engines` and `.nvmrc`, and types for a newer Node accept APIs the pinned runtime does not have; they move by hand, with `.nvmrc`.
+
 Rust dependencies are declared in `apps/native/src-tauri/Cargo.toml` and locked in its `Cargo.lock`.
 
 ## Toolchain
@@ -94,6 +96,8 @@ Local and CI runs resolve the same versions, each declared once:
 | `rust-toolchain.toml`                | The exact Rust version and its `clippy` and `rustfmt` |
 
 [CI](ci.md#toolchain) describes how the workflow reads the same files rather than repeating a version, and why `engineStrict` is set where it is.
+
+`.nvmrc` pins a release of the Node.js line in Active LTS: the line with the longest support ahead of it, and the one the Node.js website offers by default, so a new contributor's install meets `engines`. When a new line enters Active LTS each October, `.nvmrc`, `engines`, and `@types/node` move to it together, in one change.
 
 ### Dependency installs
 
