@@ -67,10 +67,10 @@ const REVEAL_WIDTH = 19;
 // How far a letter's reveal trails the stroke's front, so ink appears under the stroke, not ahead of it.
 const REVEAL_LAG = 9.5;
 
-// Room around the still logo, in its units: the V rises 6 units into place and dips with the bar, and
-// the stroke turns just past the `a`, so the still's own box would cut them off.
-const MARGIN_X = 3;
-const MARGIN_Y = 6;
+// Room around the still logo, in its units, on every side: the V rises 6 units into place and dips
+// with the bar, and the stroke's round turn past the `a` reaches 5.49 units beyond it, so the still's
+// own box would cut them off.
+const MARGIN = 6;
 // The masks' region, which holds the logo and the whole stroke.
 const MASK_BOX = 'x="-120" y="-120" width="400" height="240"';
 
@@ -225,7 +225,7 @@ export function buildLogoWrite(still) {
     `.comet{animation:comet ${DURATION}ms both}@keyframes comet{0%{opacity:1}${percent(DOCKS)}{opacity:1}${percent(DOCKS + 80)}{opacity:0}100%{opacity:0}}` +
     `@media (prefers-reduced-motion:reduce){*{animation:none!important}}`;
 
-  const viewBox = [box[0] - MARGIN_X, box[1] - MARGIN_Y, box[2] + 2 * MARGIN_X, box[3] + 2 * MARGIN_Y];
+  const viewBox = [box[0] - MARGIN, box[1] - MARGIN, box[2] + 2 * MARGIN, box[3] + 2 * MARGIN];
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox.map(round).join(" ")}"><style>${style}</style><defs>${masks}</defs>` +
     `<g class="v"><g class="dip"><path fill="${ink}" d="${v}"/></g></g>${letters}` +

@@ -79,7 +79,7 @@ Animated versions of the logo, as [Motion](guidelines/brand.md#motion) describes
 
 An entrance plays when the image loads; to replay it, load the image again.
 
-Each animated file has the proportions of the still file it ends on, except the Single stroke files, which are 256.93 × 90.32. They draw the logo at the same scale with a margin around it, 3 units at each side and 6 above and below, because the V rises into place and dips with the bar, and the stroke turns just past the last letter. Without the margin the image's edge would cut those movements off. Where a Single stroke file stands in for a still logo of width `w`, give it a width of `w × 256.93 / 250.93`, so the logo inside is the same size.
+Each animated file has the proportions of the still file it ends on, except the Single stroke files, which are 262.93 × 90.32. They draw the logo at the same scale with a margin of 6 units on every side, because the V rises into place and dips with the bar, and the stroke turns just past the last letter. Without the margin the image's edge would cut those movements off. Where a Single stroke file stands in for a still logo of width `w`, give it a width of `w × 262.93 / 250.93`, so the logo inside is the same size.
 
 When a still file changes, rebuild the animated files from it, so the last frame of an entrance is still the still logo.
 
