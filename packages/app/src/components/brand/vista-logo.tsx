@@ -19,15 +19,22 @@ const LETTERS = [
 
 /** Places the mark, drawn in its own space, as the logo's V. */
 const MARK_T = "translate(-105.635 -67) scale(1.056)";
-/** Strokes along the arms, drawn down to the point to reveal the V. Mark space. */
-const ARMS = ["M9.47 -8L42 66", "M69.77 -8L37.2 66"];
+/**
+ * Strokes down the middle of each arm, drawn to the point to reveal the V. Each is parallel to its
+ * arm and wider than it, so the drawing front is square to the arm and the whole V is uncovered at
+ * the end. Mark space.
+ */
+const ARMS = ["M5.79 -2.96L47.32 64.25", "M73.45 -2.96L31.92 64.25"];
 /**
  * The opening, inset to the bar's gap with its sides parallel to the arms. The bar moves inside it
  * and is never scaled, so its ends keep the arms' angle on every frame. Mark space.
  */
 const OPENING = "M12.24 -20L67 -20L39.62 24.3Z";
-/** Everything right of the V's right arm, which the letters slide out from behind. Logo space. */
-const BEHIND = "M-22.42 -110L400 -110L400 20L-73.2 20L-22.42 -62.17Z";
+/**
+ * Where a letter shows while it slides out from behind the V's right arm: everything right of the
+ * arm, and everything above the V's top, where there is no arm to hide the dot of the i. Logo space.
+ */
+const BEHIND = "M-400 -110L400 -110L400 20L-73.2 20L-22.42 -62.17L-25.12 -67L-400 -67Z";
 
 /** Turns a React id into one that is safe inside `url(#…)`. */
 function useSvgId() {
