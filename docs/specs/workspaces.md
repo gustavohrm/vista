@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-13
+last_updated: 2026-11-14
 scope: Local folder workspaces, file tree representation, document view modes, and persistence across hosts.
 ---
 
@@ -226,7 +226,7 @@ Every operation names the workspace it acts on, so a host keeps no "current fold
 2. **Native (`apps/native`)**:
    - Uses Tauri's dialog plugin (`@tauri-apps/plugin-dialog`) for native directory selection.
    - Uses Tauri's filesystem plugin (`@tauri-apps/plugin-fs`) for directory enumeration and file I/O, hiding the same entries as the web host. A scan reads at most 16 folders at once, because each read is an IPC call and an open directory handle.
-   - **Saving**: the bytes are written to a new temporary file beside the target, `{name}.vista-save-{id}`, which is then renamed over it, so a crash or a full disk mid-save leaves the original intact rather than truncated. On Unix the temporary file is created with the original's permission bits, less any the process umask clears, so a group-writable file can lose group write. The rename replaces the file in one step on Windows, Linux, and macOS, but the file is a new one: on Windows, permissions set on the file itself rather than inherited from its folder, and alternate data streams, are not carried over. The temporary file is removed if the rename fails.
+   - **Saving**: the bytes are written to a new temporary file beside the target, `{name}.vista-save-{id}`, which is then renamed over it, so a crash or a full disk mid-save leaves the original intact rather than truncated. On Unix the temporary file is created with the original's permission bits, less any the process umask clears, so a group-writable file can lose group write. The rename replaces the file in one step on Windows, Linux, and macOS, but the file is a new one: on Windows, permissions set on the file itself rather than inherited from its folder, and alternate data streams, are not carried over. The temporary file is removed if the rename fails. A symbolic link is written through, in place, without a temporary file: a rename would replace the link with a regular file, and the file it points to would stop changing.
    - Persists the granted folder scope with `tauri-plugin-persisted-scope` so a remembered folder can be reopened after restart. The root path is stored in `localStorage` under `vista.lastFolder`.
    - Always direct-disk (`accessMode` is omitted, meaning `"direct"`); there is no fallback mode on native hosts.
 
