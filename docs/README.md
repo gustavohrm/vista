@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-12
+last_updated: 2026-11-13
 scope: Index of the project documentation.
 ---
 
@@ -24,6 +24,7 @@ Every document in `docs/` is listed here. Adding, moving, or deleting one update
 | [Workspace](workspace.md) | The root scripts and what each guarantees, the shared tool configurations, the pinned toolchain, installs, dependency versions, and the git hooks. |
 | [Tooling](tooling.md)     | Setup, how the scripts are implemented, the order of `pnpm verify`, narrowing a run, adding a package, and generated output.                       |
 | [CI](ci.md)               | Pinned toolchain, the `Web` and `Rust` jobs, action pinning, dependency updates, and branch protection.                                            |
+| [Assets](assets.md)       | The logo, icon, favicon, and brand font files under `assets/`, how to choose one, and how the app icons are regenerated.                           |
 
 ## Guidelines
 
@@ -33,6 +34,7 @@ Every document in `docs/` is listed here. Adding, moving, or deleting one update
 | [Stack](guidelines/stack.md)                 | TypeScript, React, and Rust conventions, TSDoc, and the tools that check them.                                        |
 | [Security](guidelines/security.md)           | Secrets, untrusted input, folder access and host permissions, what stays out of logs, and reviewing a change.         |
 | [Documentation](guidelines/documentation.md) | Required header, status and authority, recording decisions, exceptions, document roles, layout, and writing.          |
+| [Brand](guidelines/brand.md)                 | The name, brand idea, logo, colours, and typefaces, and why each was chosen.                                          |
 
 ## Specifications
 

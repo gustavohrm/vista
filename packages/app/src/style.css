@@ -173,3 +173,152 @@ body,
 [data-find-match="current"] {
   background-color: var(--color-primary-subtle);
 }
+
+/* Vista's logo and loader (`components/brand/vista-logo.tsx`). The bar takes Daylight on dark grounds
+   and Daylight deep on bright ones, as the brand guideline's colour versions do, through the same
+   `light-dark()` switch as the theme's tokens. Hand-written CSS because the motion is keyframes on
+   SVG elements. The bar only ever moves inside the opening's clip and is never scaled, so its ends
+   keep the arms' angle on every frame. Each element's resting style is its last frame, so with the
+   animation off the logo is simply drawn. */
+.vista-logo {
+  --vista-ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+.vista-logo-ink {
+  fill: var(--color-text-strong);
+}
+
+.vista-logo-bar {
+  fill: light-dark(#637b09, #c5f03b);
+}
+
+/* Mask strokes along the arms; 80.82 is each stroke's length. */
+.vista-logo-arm {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 26;
+  stroke-dasharray: 80.82 80.82;
+}
+
+/* Entrance, 1.4 s: the arms draw down to the point, the bar rises into the opening, and the letters
+   slide out from behind the right arm. */
+.vista-logo[data-motion="enter"] .vista-logo-arm {
+  animation: vista-draw 520ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.vista-logo[data-motion="enter"] .vista-logo-arm + .vista-logo-arm {
+  animation-delay: 60ms;
+}
+
+.vista-logo[data-motion="enter"] .vista-logo-rise {
+  animation: vista-rise 620ms var(--vista-ease) 380ms both;
+}
+
+.vista-logo[data-motion="enter"] .vista-logo-letter {
+  animation: vista-slide 560ms var(--vista-ease) 640ms both;
+}
+
+.vista-logo[data-motion="enter"] .vista-logo-letter:nth-child(2) {
+  animation-delay: 695ms;
+}
+
+.vista-logo[data-motion="enter"] .vista-logo-letter:nth-child(3) {
+  animation-delay: 750ms;
+}
+
+.vista-logo[data-motion="enter"] .vista-logo-letter:nth-child(4) {
+  animation-delay: 805ms;
+}
+
+/* Loop, 1.8 s: light rises from the point and widens with the opening into the bar, holds, fades. */
+.vista-logo[data-motion="loop"] .vista-logo-sun {
+  animation: vista-sun 1800ms infinite;
+}
+
+.vista-loader {
+  animation: vista-appear 200ms ease-out 300ms both;
+}
+
+@keyframes vista-draw {
+  from {
+    stroke-dashoffset: 80.82;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes vista-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes vista-slide {
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+}
+
+@keyframes vista-sun {
+  0% {
+    opacity: 0;
+    transform: translateY(24px);
+    animation-timing-function: linear;
+  }
+  10% {
+    opacity: 1;
+    transform: translateY(19px);
+    animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+  55% {
+    opacity: 1;
+    transform: none;
+    animation-timing-function: linear;
+  }
+  80% {
+    opacity: 1;
+    transform: none;
+    animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
+  }
+  100% {
+    opacity: 0;
+    transform: none;
+  }
+}
+
+@keyframes vista-appear {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes vista-pulse {
+  to {
+    opacity: 0.35;
+  }
+}
+
+/* Reduced motion: the entrance shows its last frame at once, and the loader pulses in place, since
+   it still has to show that something is happening. */
+@media (prefers-reduced-motion: reduce) {
+  .vista-logo[data-motion="enter"] .vista-logo-arm,
+  .vista-logo[data-motion="enter"] .vista-logo-rise,
+  .vista-logo[data-motion="enter"] .vista-logo-letter {
+    animation: none;
+  }
+
+  .vista-logo[data-motion="loop"] .vista-logo-sun {
+    animation: vista-pulse 800ms ease-in-out infinite alternate;
+  }
+}

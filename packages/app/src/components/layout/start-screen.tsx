@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { formatShortcut } from "../../commands";
+import { VistaLoader, VistaLogo } from "../brand/vista-logo";
 
 /** One suggested next step on the start screen. */
 export interface StartAction {
@@ -26,8 +27,9 @@ interface StartScreenProps {
 }
 
 /**
- * Fills the editor area while no file is open. Without a folder it says what Vista does and offers
- * opening one, with the remembered folder first when there is one. With a folder it lists the ways
+ * Fills the editor area while no file is open. While a folder is being opened or restored it shows
+ * the loader. Without a folder it shows the logo, says what Vista does, and offers opening one, with
+ * the remembered folder first when there is one. With a folder it lists the ways
  * to get to a file, each with its shortcut.
  *
  * @param props - StartScreen properties.
@@ -42,7 +44,11 @@ export function StartScreen({
   actions,
 }: StartScreenProps) {
   if (workspaceName === null && isLoading) {
-    return null;
+    return (
+      <div className="flex min-h-0 flex-1 items-center justify-center p-6">
+        <VistaLoader label="Opening folder…" className="h-10 w-12" />
+      </div>
+    );
   }
 
   return (
@@ -50,7 +56,9 @@ export function StartScreen({
       {workspaceName === null ? (
         <div className="flex w-full max-w-sm flex-col gap-6">
           <div className="flex flex-col gap-2">
-            <h1 className="text-title text-text-strong">Vista</h1>
+            <h1 className="flex">
+              <VistaLogo className="h-8 w-auto" />
+            </h1>
             <p className="text-body text-text-secondary">
               Open a folder to read and edit its Markdown, CSV, and text files, rendered or as raw text.
             </p>
