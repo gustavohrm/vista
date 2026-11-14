@@ -81,13 +81,15 @@ At 32 px and below, the bar and its gaps fall under 2 px and blur away, so the i
 
 ### Wordmark
 
-The wordmark is lowercase **vista**, set in Schibsted Grotesk SemiBold (weight 600) and converted to outlines, so it never depends on the font being installed. Lowercase matches the Coden family's logos; the pointed, flat-topped `v` repeats the mark's shape.
+The name is lowercase **vista**, set in Schibsted Grotesk SemiBold (weight 600) and converted to outlines, so it never depends on the font being installed. Lowercase matches the Coden family's logos. The logo writes only **ista**: the mark is the `v`, so the name is read once and the mark is never a second `v` in front of it.
 
-Spacing, reviewed at heights of 150, 60, 28, and 16 px: tracking is −15/1000 em on top of the font's kerning (`vi` −9, `is` −4, `st` −4, `ta` −3), with no further pair adjustments. At 0 the word looks loose beside the heavy mark; at −25 the `s` and `t` begin to touch at 16 px.
+The letters keep the spacing they had in the full word: tracking −15/1000 em on top of the font's kerning (`is` −4, `st` −4, `ta` −3), with no further pair adjustments. At 0 the letters look loose beside the heavy mark; at −25 the `s` and `t` begin to touch at 16 px.
 
 ### Lockup
 
-In the full logo, the mark sits left of the wordmark, scaled so its flat top is level with the top of the `t` and its point reaches 1 unit below the baseline, as a pointed shape must to look as if it stands on it. The gap between them is 24 units, a little more than one arm of the V.
+The full logo is the mark followed by **ista**. The mark is scaled so its flat top is level with the top of the `t` and its point reaches 1 unit below the baseline, as a pointed shape must to look as if it stands on it. Because it stands for a capital, it is taller than the lowercase letters, which is what makes it read as the name's initial.
+
+The `i` stem starts 9.4 units right of the mark's top-right corner, and the dot 6.9 units right of it. Spacing was reviewed at heights of 120, 48, 24, and 14 px with the stem at 5, 7.4, 10.4, and 13.4 units from the corner. Closer, the dot crowds the corner at small sizes. Farther, the mark detaches and the logo reads as a symbol and a word. The chosen 9.4 sits between the two.
 
 ### Versions
 
@@ -97,8 +99,9 @@ In the full logo, the mark sits left of the wordmark, scaled so its flat top is 
 | --------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
 | Colour    | `logo-*.svg`, `mark-*.svg`           | Default wherever colour is reproduced faithfully. The bar is Daylight on dark grounds, Daylight deep on bright ones. |
 | One-color | `logo-mono-*.svg`, `mark-mono-*.svg` | Single-ink print, engraving, embroidery, and any ground that is itself Daylight.                                     |
-| Wordmark  | `wordmark-*.svg`                     | Where the mark already appears nearby.                                                                               |
 | Plate     | `icon/*`, `favicon/*`                | The mark on an ink plate, for app icons and favicons. Never placed on a page as a logo.                              |
+
+There is no wordmark without the mark: without its V, **ista** is not the name.
 
 ### Clear space and minimum size
 
@@ -109,7 +112,7 @@ In the full logo, the mark sits left of the wordmark, scaled so its flat top is 
 
 Do not:
 
-- retype the name in Schibsted Grotesk or any other font in place of a logo file;
+- retype the name in Schibsted Grotesk or any other font in place of a logo file, or set **ista** without the mark, or a full **vista** beside it;
 - draw the V without its bar, or move, widen, or recolour the bar to anything but Daylight, Daylight deep, or the mark's own colour;
 - place the colour logo on a Daylight ground, where the bar disappears: use the one-color dark version;
 - place the logo on a photograph or pattern; put it on a plain ground instead;
@@ -228,27 +231,40 @@ Rejected brand typefaces:
 
 The logo moves the way the brand idea reads: the opening appears, then the view through it. Motion is short, plays once except in the loader, and never stands between a person and what they asked for.
 
+The bar is never stretched or squeezed. It moves only inside a clip shaped like the opening, with its sides parallel to the arms, so its slanted ends keep the arms' angle and its gaps stay even on every frame. Scaling it, even for a moment, makes the angles and gaps wrong until it stops.
+
 ### Entrance
 
-The entrance plays once, where the logo first appears: the start screen, a website's first view, or the opening of a video.
+The entrance plays once, where the logo first appears. There are two, one for each kind of surface.
 
-| Part     | Movement                                | Start  | Duration |
-| -------- | --------------------------------------- | ------ | -------- |
-| V        | Fades in and rises 4 units into place   | 0 ms   | 360 ms   |
-| Bar      | Fades in and opens out from its centre  | 200 ms | 440 ms   |
-| Wordmark | Fades in and moves 8 units to the right | 320 ms | 420 ms   |
+**Single stroke**, 2.4 s, for brand surfaces: a website's first view, the opening of a video, a launch post. The V comes alone. A Daylight stroke leaves its opening and writes **ista** in one line, like a highlighter, with each letter appearing as the stroke passes over it. It sweeps back along the horizon line and docks in the V as the bar, which settles with a 1.5-unit dip that the V shares.
 
-The entrance ends at 740 ms with the full logo, and the mark's alone at 640 ms. Every part eases out on `cubic-bezier(0.2, 0, 0, 1)`: it starts fast and settles. The bar opens from its centre because a horizon widens as an opening clears; it never slides in from a side, which would read as a progress bar.
+| Part   | Movement                                                    | Start    | Ends     |
+| ------ | ----------------------------------------------------------- | -------- | -------- |
+| V      | Fades in and rises 6 units into place                       | 0 ms     | 420 ms   |
+| Stroke | Leaves the opening and writes `i`, `s`, `t`, `a`            | 320 ms   | 1,560 ms |
+| Stroke | Returns along the horizon line into the opening             | 1,560 ms | 1,960 ms |
+| Bar    | Replaces the stroke; the bar and V dip 1.5 units and return | 1,940 ms | 2,300 ms |
+
+**The opening**, 1.4 s, in the app, where a person is waiting to start work: the arms draw down to the point, the bar rises up the opening and widens with it into place, and the letters slide out from behind the right arm.
+
+| Part    | Movement                                                                    | Start  | Duration |
+| ------- | --------------------------------------------------------------------------- | ------ | -------- |
+| Arms    | Drawn from the top down to the point                                        | 0 ms   | 520 ms   |
+| Bar     | Rises 22 units into place inside the opening                                | 380 ms | 620 ms   |
+| Letters | Slide 40 units out from behind the right arm, one after another 55 ms apart | 640 ms | 560 ms   |
+
+The mark alone plays the first two rows and ends at 1 s. Movements ease out on `cubic-bezier(0.2, 0, 0, 1)`: they start fast and settle. The bar rises rather than sliding in from a side, because a horizon appears as an opening clears, and a bar moving sideways reads as a progress bar.
 
 ### Loop
 
-The loader is the mark with its bar sweeping through the opening: the bar fills from the left edge, holds, and empties to the right, every 1.6 s on `cubic-bezier(0.65, 0, 0.35, 1)`. The V never moves, so the mark stays recognizable at any frame. It is for a wait that fills an area, such as opening a folder; a wait inside a control or a list row keeps the interface's spinner. It shows nothing for its first 300 ms, then fades in, so a short wait does not flash.
+**Sunrise**, the loader: light rises from the point and widens with the opening until it is the bar, holds, and fades, every 1.8 s. The V never moves, so the mark stays recognizable at any frame. It is for a wait that fills an area, such as opening a folder; a wait inside a control or a list row keeps the interface's spinner. It shows nothing for its first 300 ms, then fades in, so a short wait does not flash.
 
 ### Rules
 
-- **Reduced motion.** When the person has asked for reduced motion, the entrance shows its last frame at once, and the loader's bar pulses between full and 35% opacity in place instead of sweeping, since it still has to show that something is happening.
+- **Reduced motion.** When the person has asked for reduced motion, the entrance shows its last frame at once, and the loader's bar pulses between full and 35% opacity in place, since it still has to show that something is happening.
 - **One at a time.** One animated logo per view. The logo does not move again once it has entered.
-- **No new movements.** No bounce, spin, flip, or 3D, and nothing that separates the bar from the V or recolours it.
+- **No new movements.** No bounce, spin, flip, or 3D. The bar leaves the V only as the stroke in Single stroke, which ends with it back in place; it is never recoloured.
 - **Colour.** Animated files follow the same versions as the still ones, and the in-app logo and loader take Daylight deep on bright grounds and Daylight on dark ones.
 
 ## Not decided

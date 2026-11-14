@@ -21,23 +21,21 @@ Choose an image by the background actually behind it, not by a theme name or the
 
 Logo files are transparent SVG artwork made of filled paths only. Keep the aspect ratio when resizing.
 
-| File                              | Artwork                                    | Proportions (w × h) | Use                                        |
-| --------------------------------- | ------------------------------------------ | ------------------- | ------------------------------------------ |
-| `assets/logo/logo-light.svg`      | Mark and wordmark, bright, Daylight bar    | 327.42 × 78.32      | Full identification on dark backgrounds.   |
-| `assets/logo/logo-dark.svg`       | Mark and wordmark, dark, Daylight deep bar | 327.42 × 78.32      | Full identification on bright backgrounds. |
-| `assets/logo/logo-mono-light.svg` | Mark and wordmark, one bright colour       | 327.42 × 78.32      | One-ink use on dark backgrounds.           |
-| `assets/logo/logo-mono-dark.svg`  | Mark and wordmark, one dark colour         | 327.42 × 78.32      | One-ink use, and on a Daylight background. |
-| `assets/logo/mark-light.svg`      | Mark, bright, Daylight bar                 | 79.24 × 64.388      | Compact placement on dark backgrounds.     |
-| `assets/logo/mark-dark.svg`       | Mark, dark, Daylight deep bar              | 79.24 × 64.388      | Compact placement on bright backgrounds.   |
-| `assets/logo/mark-mono-light.svg` | Mark, one bright colour                    | 79.24 × 64.388      | As `logo-mono-light.svg`.                  |
-| `assets/logo/mark-mono-dark.svg`  | Mark, one dark colour                      | 79.24 × 64.388      | As `logo-mono-dark.svg`.                   |
-| `assets/logo/wordmark-light.svg`  | Wordmark alone, bright                     | 219.73 × 78.32      | Where the mark already appears nearby.     |
-| `assets/logo/wordmark-dark.svg`   | Wordmark alone, dark                       | 219.73 × 78.32      | As above, on bright backgrounds.           |
+| File                              | Artwork                                | Proportions (w × h) | Use                                        |
+| --------------------------------- | -------------------------------------- | ------------------- | ------------------------------------------ |
+| `assets/logo/logo-light.svg`      | Mark and ista, bright, Daylight bar    | 250.93 × 78.32      | Full identification on dark backgrounds.   |
+| `assets/logo/logo-dark.svg`       | Mark and ista, dark, Daylight deep bar | 250.93 × 78.32      | Full identification on bright backgrounds. |
+| `assets/logo/logo-mono-light.svg` | Mark and ista, one bright colour       | 250.93 × 78.32      | One-ink use on dark backgrounds.           |
+| `assets/logo/logo-mono-dark.svg`  | Mark and ista, one dark colour         | 250.93 × 78.32      | One-ink use, and on a Daylight background. |
+| `assets/logo/mark-light.svg`      | Mark, bright, Daylight bar             | 79.24 × 64.388      | Compact placement on dark backgrounds.     |
+| `assets/logo/mark-dark.svg`       | Mark, dark, Daylight deep bar          | 79.24 × 64.388      | Compact placement on bright backgrounds.   |
+| `assets/logo/mark-mono-light.svg` | Mark, one bright colour                | 79.24 × 64.388      | As `logo-mono-light.svg`.                  |
+| `assets/logo/mark-mono-dark.svg`  | Mark, one dark colour                  | 79.24 × 64.388      | As `logo-mono-dark.svg`.                   |
 
 The files carry a `viewBox` and no `width` or `height`, so set a size where they are placed. Use the full logo when there is room and the name must be visible, and the mark when there is not:
 
 ```html
-<img src="/assets/logo/logo-light.svg" alt="Vista" width="251" height="60" />
+<img src="/assets/logo/logo-light.svg" alt="Vista" width="192" height="60" />
 ```
 
 The URL assumes the consumer serves the file at that path; where it goes is the consumer's choice.
@@ -66,18 +64,20 @@ Step 3 exists because `tauri icon` scales one 1024 px image down, which blurs th
 
 ## Animated logos
 
-Animated versions of the logo, as [Motion](guidelines/brand.md#motion) describes. Each is the still file of the same name with its paths unchanged and a `<style>` block that animates them, so it plays in an `<img>` tag, a browser, and most design tools, with no script. Each honours `prefers-reduced-motion`. Naming follows [Image naming](#image-naming).
+Animated versions of the logo, as [Motion](guidelines/brand.md#motion) describes. Each draws the same shapes as the still file it ends on, with a `<style>` block, masks, and clips that animate them, so it plays in an `<img>` tag, a browser, and most design tools, with no script. Each honours `prefers-reduced-motion`. Naming follows [Image naming](#image-naming).
 
-| File                                 | Animation                                      | Use                                                |
-| ------------------------------------ | ---------------------------------------------- | -------------------------------------------------- |
-| `assets/motion/logo-enter-light.svg` | Full logo entrance, once, 740 ms               | A first view on a dark background.                 |
-| `assets/motion/logo-enter-dark.svg`  | As above, dark artwork                         | A first view on a bright background.               |
-| `assets/motion/mark-enter-light.svg` | Mark entrance, once, 640 ms                    | Where only the mark fits, on a dark background.    |
-| `assets/motion/mark-enter-dark.svg`  | As above, dark artwork                         | Where only the mark fits, on a bright background.  |
-| `assets/motion/mark-loop-light.svg`  | Loader: the bar sweeps the opening, 1.6 s loop | A wait that fills an area, on a dark background.   |
-| `assets/motion/mark-loop-dark.svg`   | As above, dark artwork                         | A wait that fills an area, on a bright background. |
+| File                                 | Animation                          | Use                                                   |
+| ------------------------------------ | ---------------------------------- | ----------------------------------------------------- |
+| `assets/motion/logo-write-light.svg` | Single stroke, once, 2.4 s         | A brand surface's first view, on a dark background.   |
+| `assets/motion/logo-write-dark.svg`  | As above, dark artwork             | A brand surface's first view, on a bright background. |
+| `assets/motion/logo-open-light.svg`  | The opening, once, 1.4 s           | A quieter first view, on a dark background.           |
+| `assets/motion/logo-open-dark.svg`   | As above, dark artwork             | A quieter first view, on a bright background.         |
+| `assets/motion/mark-open-light.svg`  | The opening, mark alone, once, 1 s | Where only the mark fits, on a dark background.       |
+| `assets/motion/mark-open-dark.svg`   | As above, dark artwork             | Where only the mark fits, on a bright background.     |
+| `assets/motion/mark-loop-light.svg`  | Sunrise loader, 1.8 s loop         | A wait that fills an area, on a dark background.      |
+| `assets/motion/mark-loop-dark.svg`   | As above, dark artwork             | A wait that fills an area, on a bright background.    |
 
-An entrance plays when the image loads; to replay it, load the image again. Rebuild a file from its still version when the still one changes: keep the paths identical, so the last frame of an entrance is the still logo.
+An entrance plays when the image loads; to replay it, load the image again. When a still file changes, rebuild the animated files from it, so the last frame of an entrance is still the still logo. In Single stroke, the stroke's dash lengths are the measured length of its path, so they change with it.
 
 The application does not load these files. It draws the same logo and loader inline in `packages/app/src/components/brand/vista-logo.tsx`, with the motion in `packages/app/src/style.css`, so they take the theme's colours.
 
