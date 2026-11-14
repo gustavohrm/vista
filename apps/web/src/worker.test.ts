@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import staticHeaders from "./public/_headers?raw";
+import { SECURITY_HEADERS } from "./security-headers";
 import worker from "./worker";
 
 const MANIFEST = {
@@ -128,6 +130,33 @@ describe("worker", () => {
     expect(response.status).toBe(302);
     expect(response.headers.get("location")).toBe(`${ORIGIN}/releases/0.2.0/${file}`);
     expect(response.headers.get("cache-control")).toBe("no-cache");
+  });
+
+  it.each([
+    ["the manifest", "/releases/latest.json", { "latest.json": JSON.stringify(MANIFEST) }],
+    ["an installer", "/releases/0.2.0/Vista_0.2.0_x64-setup.exe", { "0.2.0/Vista_0.2.0_x64-setup.exe": "bytes" }],
+    ["a download link", "/download/windows", { "latest.json": JSON.stringify(MANIFEST) }],
+    ["a 404", "/releases/0.2.0/nothing.exe", {}],
+    ["a 405", "/releases/latest.json", {}, { method: "PUT", body: "{}" }],
+  ])("sets the security headers on %s", async (_case, path, objects, init?: RequestInit) => {
+    const response = await worker.fetch(request(path, init), envWith(objects));
+
+    for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+      expect(response.headers.get(name)).toBe(value);
+    }
+  });
+
+  it("gives the static app the same security headers as its own responses", () => {
+    const lines = staticHeaders.split("\n").filter((line) => line.trim() !== "" && !line.startsWith("#"));
+    expect(lines[0]).toBe("/*");
+    const declared = Object.fromEntries(
+      lines.slice(1).map((line) => {
+        const colon = line.indexOf(":");
+        return [line.slice(0, colon).trim().toLowerCase(), line.slice(colon + 1).trim()];
+      }),
+    );
+
+    expect(declared).toEqual(SECURITY_HEADERS);
   });
 
   it("says so when there is no desktop release to download", async () => {

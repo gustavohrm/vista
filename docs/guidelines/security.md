@@ -1,6 +1,6 @@
 ---
 status: APPROVED
-last_updated: 2026-11-12
+last_updated: 2026-11-14
 scope: How code keeps Vista's security commitments, for anyone writing or reviewing a change.
 ---
 
@@ -41,6 +41,12 @@ Vista issues and stores no secrets: it has no accounts, sessions, or server-side
 - On the web, access comes only from a folder the user picks. Code never asks for more than the folder it was given.
 - On desktop and mobile, `apps/native/src-tauri/capabilities/default.json` grants the dialog and filesystem permissions. A change that widens a capability, adds a plugin, or loosens the content security policy in `apps/native/src-tauri/tauri.conf.json` names it in its pull request.
 
+## Web host responses
+
+- Every response from the web host carries the security headers in `apps/web/src/security-headers.ts`, including the content security policy. Cloudflare serves the static app without running the Worker, so `apps/web/src/public/_headers` sets the same headers on it, and the Worker sets them on its own responses; a unit test fails when the two differ. A route never loosens them.
+- No inline script. Inline styles are allowed because the editors inject their own `<style>` elements. Images may come from any HTTPS origin, because a note's web images load in the browser, as [Workspaces](../specs/workspaces.md) records.
+- Every end-to-end test fails on a content security policy violation, so a change that needs a looser policy finds out before it ships. Loosening the policy names it in the pull request.
+
 ## Outbound calls and dependencies
 
 - Vista makes no network calls of its own. No telemetry, update checks, or third-party lookups without a recorded decision and a way for the user to turn them off.
@@ -52,5 +58,5 @@ A change that touches any of the above names it in its pull request and adds or 
 
 - Does it add a way for untrusted input, such as a file from the user's folder, to reach the code? Is that input validated and bounded at the boundary?
 - Does note content, a file name, or a path now reach a log, an error, or a snapshot?
-- Does it widen a Tauri capability or permission, loosen the content security policy, or add an outbound call? Is that named in the pull request and tested?
+- Does it widen a Tauri capability or permission, loosen either content security policy, the desktop app's or the web host's, or add an outbound call? Is that named in the pull request and tested?
 - Can it reach a file outside the folder the user granted?

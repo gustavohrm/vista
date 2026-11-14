@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test";
 
 test.describe("responsive shell at mobile width", () => {
   test.use({ viewport: { width: 375, height: 812 } });

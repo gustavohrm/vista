@@ -1,6 +1,8 @@
 // The Worker serves the web app, and the desktop releases from the R2 bucket bound as `RELEASES`, so the
 // installers and the updater are served from wherever the web app is hosted.
 
+import { SECURITY_HEADERS } from "./security-headers";
+
 interface ReleaseObject {
   readonly body: ReadableStream;
   readonly size: number;
@@ -104,12 +106,22 @@ async function serveReleases(request: Request, env: Env, url: URL): Promise<Resp
   return version && file ? serveReleaseFile(env, version, file, isHead) : notFound();
 }
 
+// Every response the Worker builds is new, so its headers can be set in place.
+function withSecurityHeaders(response: Response): Response {
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+    response.headers.set(name, value);
+  }
+  return response;
+}
+
 export default {
-  fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname.startsWith("/releases/") || url.pathname.startsWith("/download/")) {
-      return serveReleases(request, env, url);
+      return withSecurityHeaders(await serveReleases(request, env, url));
     }
+    // Only reached for a path `run_worker_first` lists, so in practice never; the asset service applies
+    // `_headers` to what it returns.
     return env.ASSETS.fetch(request);
   },
 };
