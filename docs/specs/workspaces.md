@@ -56,7 +56,7 @@ Each workspace keeps its details in exactly one place, chosen in [Workspace Sett
 `.vista/workspace.json` holds the name, icon, colour, and the other folders' locations relative to the home folder:
 
 ```json
-{ "version": 1, "name": "Research", "icon": "book", "color": "blue", "folders": [".", "../sources"] }
+{ "version": 1, "name": "Research", "icon": "book-open", "color": "indigo", "folders": [".", "../sources"] }
 ```
 
 - **The session never goes in the file.** Open tabs change constantly; writing them into a synced folder would churn the sync client or git, and two devices would overwrite each other's tabs. Sessions always stay on the device, as [Sessions](#sessions) describes.
@@ -90,7 +90,7 @@ The switcher at the top left of the title bar is the one home for workspace acti
 
 **Workspace Settings…** opens a dialog for the current workspace. Every change applies at once, as in [Settings](#settings).
 
-- **Name**, **Icon** from a fixed set, and **Colour** from the design-system palette. The icons are a fixed set because an `ic-*` class must appear literally in the code to render.
+- **Name**, **Icon** from a fixed set, and **Colour** from the design-system palette. The icons are `folder` (the default), `book-open`, `notebook-pen`, `briefcase`, `code`, `house`, `star`, `heart`, `flask-conical`, `graduation-cap`, `pen-line`, and `globe`; they are a fixed set because an `ic-*` class must appear literally in the code to render. The colours are the palette's hues: `neutral` (the default), `indigo`, `emerald`, `amber`, and `rose`. A name is trimmed, may not be empty, and is at most 80 characters.
 - **Folders**: the list, with **Add Folder…** and a remove button per folder. [Folder rules](#folder-rules) apply.
 - **Details stored**: _On this device_ or _In {home folder}/.vista_, as [Where a workspace's details live](#where-a-workspaces-details-live) describes.
 
@@ -109,7 +109,7 @@ Failure handling: a folder that no longer exists or is inaccessible stays in its
 
 The shared app stores workspaces and sessions in `localStorage`, beside `vista.settings`:
 
-- `vista.workspaces`: `{ "version": 1, "lastWorkspaceId": "…", "workspaces": [{ "id", "name", "icon", "color", "folderIds": [], "storage": "device" | "folder", "lastOpenedAt" }] }`. A workspace stored in its folder keeps only its id, folder ids, storage, and `lastOpenedAt` here; the rest is read from the file.
+- `vista.workspaces`: `{ "version": 1, "lastWorkspaceId": "…", "workspaces": [{ "id", "name", "icon", "color", "folderIds": [], "storage": "device" | "folder", "lastOpenedAt" }] }`. A workspace stored in its folder keeps a copy of its name, icon, and colour here too, so the recent list can show it while its folder still waits for permission; the file's values replace the copy each time it is read.
 - `vista.session.{workspaceId}`: `{ "version": 1, "tabs": [{ "folderId", "path", "viewMode" }], "activeIndex", "expanded": { "{folderId}": ["path"] } }`.
 
 A stored value that is missing, of the wrong type, or out of range falls back field by field, as [Editor settings](#editor-settings) describes for settings, so one bad field does not lose a workspace. When the store can't be read, Vista starts with no remembered workspaces; when it can't be written, the current session still works but is not remembered.
