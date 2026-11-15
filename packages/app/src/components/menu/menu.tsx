@@ -1,4 +1,13 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 
 import { formatShortcut } from "../../commands";
@@ -31,6 +40,16 @@ export interface MenuItem {
 
 export const MENU_SEPARATOR = "separator";
 
+/**
+ * The input the user pressed last, which tells whether a menu opening now was opened with the
+ * keyboard or the pointer. Watched on the whole document, so no caller has to pass it.
+ */
+let lastInput: "keyboard" | "pointer" = "keyboard";
+if (typeof document !== "undefined") {
+  document.addEventListener("keydown", () => (lastInput = "keyboard"), true);
+  document.addEventListener("pointerdown", () => (lastInput = "pointer"), true);
+}
+
 export type MenuEntry = MenuItem | typeof MENU_SEPARATOR;
 
 interface MenuProps {
@@ -53,9 +72,9 @@ interface MenuProps {
 }
 
 /**
- * A floating menu of actions, used by the menu bar and every right-click menu. It takes focus when
- * it opens, moves with the arrow keys, Home, and End, and closes on Escape, Tab, a choice, or a
- * pointer down outside it. Closing by keyboard or by a choice returns focus to where it was, and
+ * A floating menu of actions, used by the button menus and every right-click menu. It takes focus
+ * when it opens, highlighting its first item only when opened with the keyboard, moves with the
+ * arrow keys, Home, and End, and closes on Escape, Tab, a choice, or a pointer down outside it. Closing by keyboard or by a choice returns focus to where it was, and
  * a chosen action runs after that, so editing actions apply to the editor the user was in.
  */
 export function Menu({ label, items, x, y, onClose, returnFocusTo, onNavigate, ignorePointerDownIn }: MenuProps) {
@@ -76,10 +95,35 @@ export function Menu({ label, items, x, y, onClose, returnFocusTo, onNavigate, i
     });
   }, [x, y]);
 
+  // The highlight is the focused item. Set when the pointer gave it, so leaving the menu clears it,
+  // and dropped when the keyboard moves it, so leaving then keeps it.
+  const isPointerHighlightRef = useRef(false);
+
   useEffect(() => {
-    // With every item disabled, the menu itself takes focus so its keys still work.
-    (getEnabledItems(menuRef.current)[0] ?? menuRef.current)?.focus();
+    // Opened with the pointer, nothing is highlighted until the pointer moves over an item. With
+    // every item disabled, the menu itself takes focus too, so its keys still work.
+    const firstItem = lastInput === "keyboard" ? getEnabledItems(menuRef.current)[0] : undefined;
+    (firstItem ?? menuRef.current)?.focus();
   }, []);
+
+  const clearPointerHighlight = () => {
+    if (isPointerHighlightRef.current) {
+      isPointerHighlightRef.current = false;
+      menuRef.current?.focus();
+    }
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const item = (event.target as Element).closest<HTMLElement>(ENABLED_ITEM_SELECTOR);
+    if (!item) {
+      clearPointerHighlight();
+      return;
+    }
+    isPointerHighlightRef.current = true;
+    if (document.activeElement !== item) {
+      item.focus();
+    }
+  };
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -111,7 +155,10 @@ export function Menu({ label, items, x, y, onClose, returnFocusTo, onNavigate, i
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const enabledItems = getEnabledItems(menuRef.current);
     const index = enabledItems.indexOf(document.activeElement as HTMLElement);
-    const focusAt = (next: number) => enabledItems[(next + enabledItems.length) % enabledItems.length]?.focus();
+    const focusAt = (next: number) => {
+      isPointerHighlightRef.current = false;
+      enabledItems[(next + enabledItems.length) % enabledItems.length]?.focus();
+    };
     switch (event.key) {
       case "ArrowDown":
         focusAt(index + 1);
@@ -155,6 +202,8 @@ export function Menu({ label, items, x, y, onClose, returnFocusTo, onNavigate, i
       aria-label={label}
       tabIndex={-1}
       onKeyDown={handleKeyDown}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={clearPointerHighlight}
       onContextMenu={(event) => event.preventDefault()}
       style={{ top: position.top, left: position.left }}
       className="card soft floating fixed z-50 flex max-h-[calc(100vh-16px)] min-w-48 flex-col overflow-y-auto p-1 text-[13px] [--ui-radius-surface:8px]"
@@ -205,14 +254,11 @@ function MenuItemButton({ item, hasIconColumn, onChoose }: MenuItemButtonProps) 
       data-menu-item
       tabIndex={-1}
       onClick={onChoose}
-      onPointerMove={(event) => {
-        if (!item.disabled && document.activeElement !== event.currentTarget) {
-          event.currentTarget.focus();
-        }
-      }}
-      className={`btn ghost sm min-h-7! w-full justify-start gap-2 px-2! py-0! font-normal outline-none! [--ui-radius:4px] focus:[--ui-fill:12%] ${item.destructive ? "destructive" : ""} ${
-        item.disabled ? "pointer-events-none opacity-40" : ""
-      }`}
+      // Focus is the one highlight: the menu moves it under the pointer, and there is no separate
+      // hover fill to add to it.
+      className={`focus:bg-surface flex min-h-7 w-full flex-none cursor-pointer items-center gap-2 rounded px-2 text-left outline-none ${
+        item.destructive ? "text-destructive" : "text-text"
+      } ${item.disabled ? "pointer-events-none opacity-40" : ""}`}
     >
       {hasIconColumn && (
         <span aria-hidden="true" className="flex w-4 flex-none justify-center text-sm">
@@ -247,8 +293,10 @@ function toAriaShortcut(shortcut: string): string {
     .join("+");
 }
 
+const ENABLED_ITEM_SELECTOR = "[data-menu-item]:not([aria-disabled])";
+
 function getEnabledItems(menu: HTMLElement | null): HTMLElement[] {
-  return menu ? [...menu.querySelectorAll<HTMLElement>("[data-menu-item]:not([aria-disabled])")] : [];
+  return menu ? [...menu.querySelectorAll<HTMLElement>(ENABLED_ITEM_SELECTOR)] : [];
 }
 
 /**

@@ -2769,6 +2769,8 @@ describe("App", () => {
       await user.click(screen.getByText("data.csv"));
       getTab("data.csv").focus();
 
+      // The context menu key: a key press, then the contextmenu event.
+      fireEvent.keyDown(getTab("data.csv"), { key: "ContextMenu" });
       fireEvent.contextMenu(getTab("data.csv"));
       await user.keyboard("{Enter}");
 
@@ -2782,6 +2784,8 @@ describe("App", () => {
       await user.click(screen.getByText("data.csv"));
       await user.click(getTab("readme.md"));
       getTab("readme.md").focus();
+      // The context menu key: a key press, then the contextmenu event.
+      fireEvent.keyDown(getTab("readme.md"), { key: "ContextMenu" });
       fireEvent.contextMenu(getTab("readme.md"));
       await user.keyboard("{Enter}");
       await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Cancel" }));
