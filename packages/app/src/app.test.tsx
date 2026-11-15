@@ -1014,6 +1014,329 @@ describe("App", () => {
     });
   });
 
+  describe("opening a folder that holds workspace details", () => {
+    const DRAFTS_FOLDER: WorkspaceFolder = { id: "drafts", name: "drafts", rootPath: "/drafts" };
+    const fileText = (details: object) => JSON.stringify({ version: 1, ...details });
+
+    /** `drafts` holds the details of Thesis, whose other folder is `../sources`; Research holds `notes`. */
+    function thesisFolders(
+      text = fileText({ name: "Thesis", icon: "book-open", folders: [".", "../sources"] }),
+    ): StoredFolder[] {
+      return [
+        { folder: NOTES_FOLDER, files: { "a.txt": PLAIN_TEXT } },
+        { folder: DRAFTS_FOLDER, files: { "d.txt": PLAIN_TEXT, ".vista/workspace.json": text } },
+        { folder: SOURCES_FOLDER, files: { "plan.txt": PLAIN_TEXT } },
+      ];
+    }
+
+    function researchOnly(setup: ReturnType<typeof createFoldersCapability>) {
+      localStorage.setItem(
+        "vista.workspaces",
+        JSON.stringify({
+          version: 1,
+          lastWorkspaceId: "w1",
+          workspaces: [{ id: "w1", name: "Research", folderIds: ["notes"], lastOpenedAt: 1 }],
+        }),
+      );
+      return setup;
+    }
+
+    async function openFolderFromSwitcher(user: ReturnType<typeof userEvent.setup>, current: string) {
+      const buttons = await screen.findAllByRole("button", { name: current });
+      await user.click(buttons.find((button) => button.getAttribute("aria-haspopup") === "menu")!);
+      await user.click(screen.getByRole("menuitem", { name: "Open Folder…" }));
+    }
+
+    function switcherButton(name: string) {
+      return screen.getAllByRole("button", { name }).find((button) => button.getAttribute("aria-haspopup") === "menu");
+    }
+
+    function storedThesis() {
+      const list = JSON.parse(localStorage.getItem("vista.workspaces") ?? "null");
+      return list.workspaces.find((workspace: { name: string }) => workspace.name === "Thesis");
+    }
+
+    it("opens the workspace the file describes, finding its other folders on the desktop", async () => {
+      const user = userEvent.setup();
+      const { capability } = researchOnly(
+        createFoldersCapability(thesisFolders(), {
+          resolveRelative: vi.fn(async (_from, location: string) =>
+            location === "../sources" ? SOURCES_FOLDER : null,
+          ),
+        }),
+      );
+      vi.mocked(capability.pickFolder).mockResolvedValueOnce(DRAFTS_FOLDER);
+      render(<App adapter={{ platform: "native", workspace: capability }} />);
+      await findFileRows("a.txt");
+
+      await openFolderFromSwitcher(user, "Research");
+
+      expect(await within(explorerPanel()).findByRole("button", { name: "plan.txt" })).toBeInTheDocument();
+      expect(within(explorerPanel()).getByRole("button", { name: "d.txt" })).toBeInTheDocument();
+      expect(switcherButton("Thesis")).toBeDefined();
+      expect(storedThesis()).toMatchObject({
+        icon: "book-open",
+        folderIds: ["drafts", "sources"],
+        storage: "folder",
+        locations: { ".": "drafts", "../sources": "sources" },
+      });
+      expect(capability.writeFile).not.toHaveBeenCalled();
+    });
+
+    it("asks for a folder the browser can't find by itself, by its name", async () => {
+      const user = userEvent.setup();
+      const { capability } = researchOnly(
+        createFoldersCapability(thesisFolders(fileText({ name: "Thesis", folders: [".", "../shelf/sources"] }))),
+      );
+      vi.mocked(capability.pickFolder)
+        .mockResolvedValueOnce(DRAFTS_FOLDER)
+        .mockResolvedValueOnce(NOTES_FOLDER)
+        .mockResolvedValueOnce(SOURCES_FOLDER);
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("a.txt");
+      await openFolderFromSwitcher(user, "Research");
+      await within(explorerPanel()).findByRole("button", { name: "d.txt" });
+      expect(
+        within(explorerPanel()).getByText("This folder can't be found. It may have been moved or deleted."),
+      ).toBeInTheDocument();
+
+      await user.click(within(explorerPanel()).getByRole("button", { name: "Locate…" }));
+      expect(await screen.findByText('Pick the folder named "sources".')).toBeInTheDocument();
+      expect(capability.forgetFolder).not.toHaveBeenCalledWith("notes");
+
+      await user.click(within(explorerPanel()).getByRole("button", { name: "Locate…" }));
+
+      expect(await within(explorerPanel()).findByRole("button", { name: "plan.txt" })).toBeInTheDocument();
+      expect(storedThesis()).toMatchObject({
+        folderIds: ["drafts", "sources"],
+        locations: { ".": "drafts", "../shelf/sources": "sources" },
+      });
+      expect(capability.writeFile).not.toHaveBeenCalled();
+    });
+
+    it("drops a folder that wasn't found from the workspace and its file", async () => {
+      const user = userEvent.setup();
+      const { capability, folder } = researchOnly(createFoldersCapability(thesisFolders()));
+      vi.mocked(capability.pickFolder).mockResolvedValueOnce(DRAFTS_FOLDER);
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("a.txt");
+      await openFolderFromSwitcher(user, "Research");
+      await within(explorerPanel()).findByRole("button", { name: "Locate…" });
+
+      await user.click(within(explorerPanel()).getByRole("button", { name: "Remove Folder from Workspace" }));
+      const dialog = await screen.findByRole("dialog", { name: 'Remove "sources" from the workspace?' });
+      await user.click(within(dialog).getByRole("button", { name: "Remove" }));
+
+      await waitFor(() =>
+        expect(within(explorerPanel()).queryByRole("button", { name: "Locate…" })).not.toBeInTheDocument(),
+      );
+      await waitFor(() =>
+        expect(JSON.parse(folder("drafts").textOf(".vista/workspace.json") ?? "null")?.folders).toEqual(["."]),
+      );
+    });
+
+    it("opens a folder whose file it can't read as a plain folder, and leaves the file alone", async () => {
+      const user = userEvent.setup();
+      const text = JSON.stringify({ version: 2, name: "Thesis" });
+      const { capability, folder } = researchOnly(createFoldersCapability(thesisFolders(text)));
+      vi.mocked(capability.pickFolder).mockResolvedValueOnce(DRAFTS_FOLDER);
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("a.txt");
+
+      await openFolderFromSwitcher(user, "Research");
+
+      expect(
+        await screen.findByText(
+          '"drafts" has workspace details this version of Vista can\'t read, so it opened as a plain folder.',
+        ),
+      ).toBeInTheDocument();
+      expect(switcherButton("drafts")).toBeDefined();
+      expect(storedThesis()).toBeUndefined();
+      expect(folder("drafts").textOf(".vista/workspace.json")).toBe(text);
+    });
+
+    it("doesn't read a file over the size limit, and opens the folder as a plain folder", async () => {
+      const user = userEvent.setup();
+      const { capability, folder } = researchOnly(createFoldersCapability(thesisFolders()));
+      vi.mocked(capability.stat).mockImplementation(async (target, path) =>
+        path === ".vista/workspace.json"
+          ? { size: 20 * 1024 * 1024, modifiedAt: 1 }
+          : folder(target.id).stat(target, path),
+      );
+      vi.mocked(capability.pickFolder).mockResolvedValueOnce(DRAFTS_FOLDER);
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("a.txt");
+
+      await openFolderFromSwitcher(user, "Research");
+
+      expect(
+        await screen.findByText(
+          '"drafts" has workspace details this version of Vista can\'t read, so it opened as a plain folder.',
+        ),
+      ).toBeInTheDocument();
+      expect(capability.readFile).not.toHaveBeenCalledWith(DRAFTS_FOLDER, ".vista/workspace.json");
+      expect(storedThesis()).toBeUndefined();
+    });
+
+    it("reads the file again when the workspace reopens, so changes made elsewhere show", async () => {
+      const { capability, folder } = createFoldersCapability(thesisFolders());
+      localStorage.setItem(
+        "vista.workspaces",
+        JSON.stringify({
+          version: 1,
+          lastWorkspaceId: "w2",
+          workspaces: [
+            {
+              id: "w2",
+              name: "Thesis",
+              folderIds: ["drafts", "sources"],
+              storage: "folder",
+              locations: { ".": "drafts", "../sources": "sources" },
+              lastOpenedAt: 1,
+            },
+          ],
+        }),
+      );
+      await folder("drafts").writeFile(
+        DRAFTS_FOLDER,
+        ".vista/workspace.json",
+        new TextEncoder().encode(fileText({ name: "Dissertation", color: "amber", folders: [".", "../sources"] })),
+      );
+      vi.mocked(capability.writeFile).mockClear();
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+
+      expect(await within(explorerPanel()).findByRole("button", { name: "plan.txt" })).toBeInTheDocument();
+      expect(switcherButton("Dissertation")).toBeDefined();
+      expect(JSON.parse(localStorage.getItem("vista.workspaces") ?? "null").workspaces[0]).toMatchObject({
+        name: "Dissertation",
+        color: "amber",
+      });
+      expect(capability.writeFile).not.toHaveBeenCalled();
+    });
+
+    /** Thesis, stored in `drafts` with `sources`, opened last; `drafts` holds `text`. */
+    async function storedThesisWith(text: string) {
+      const setup = createFoldersCapability(thesisFolders());
+      localStorage.setItem(
+        "vista.workspaces",
+        JSON.stringify({
+          version: 1,
+          lastWorkspaceId: "w2",
+          workspaces: [
+            {
+              id: "w2",
+              name: "Thesis",
+              folderIds: ["drafts", "sources"],
+              storage: "folder",
+              locations: { ".": "drafts", "../sources": "sources" },
+              lastOpenedAt: 1,
+            },
+          ],
+        }),
+      );
+      await setup.folder("drafts").writeFile(DRAFTS_FOLDER, ".vista/workspace.json", new TextEncoder().encode(text));
+      vi.mocked(setup.capability.writeFile).mockClear();
+      return setup;
+    }
+
+    it("writes the file again once the details change after it was read", async () => {
+      const user = userEvent.setup();
+      const { capability, folder } = await storedThesisWith(fileText({ name: "Thesis", folders: [".", "../sources"] }));
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await within(explorerPanel()).findByRole("button", { name: "plan.txt" });
+
+      await user.click(switcherButton("Thesis")!);
+      await user.click(screen.getByRole("menuitem", { name: "Workspace Settings…" }));
+      const dialog = await screen.findByRole("dialog", { name: "Workspace Settings" });
+      await user.clear(within(dialog).getByRole("textbox", { name: "Name" }));
+      await user.type(within(dialog).getByRole("textbox", { name: "Name" }), "Dissertation");
+
+      await waitFor(() =>
+        expect(JSON.parse(folder("drafts").textOf(".vista/workspace.json") ?? "null")).toMatchObject({
+          name: "Dissertation",
+          folders: [".", "../sources"],
+        }),
+      );
+    });
+
+    it("reads the file once access to its folder is allowed, and doesn't write over it", async () => {
+      const user = userEvent.setup();
+      const { capability } = await storedThesisWith(
+        fileText({ name: "Dissertation", color: "amber", folders: [".", "../sources"] }),
+      );
+      let isAllowed = false;
+      capability.restoreFolder.mockImplementation(async (id) => {
+        if (id === "sources") {
+          return { status: "restored", folder: SOURCES_FOLDER };
+        }
+        return isAllowed
+          ? { status: "restored", folder: DRAFTS_FOLDER }
+          : { status: "needs-permission", name: "drafts" };
+      });
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await user.click(await screen.findByRole("button", { name: "Thesis" }));
+      await within(explorerPanel()).findByRole("button", { name: "plan.txt" });
+
+      isAllowed = true;
+      await user.click(within(explorerPanel()).getByRole("button", { name: "Allow access" }));
+
+      expect(await within(explorerPanel()).findByRole("button", { name: "d.txt" })).toBeInTheDocument();
+      expect(switcherButton("Dissertation")).toBeDefined();
+      expect(JSON.parse(localStorage.getItem("vista.workspaces") ?? "null").workspaces[0]).toMatchObject({
+        name: "Dissertation",
+        color: "amber",
+      });
+      expect(capability.writeFile).not.toHaveBeenCalled();
+    });
+
+    it("reopens a workspace whose file it can no longer read as a plain folder", async () => {
+      const text = JSON.stringify({ version: 2, name: "Thesis" });
+      const { capability, folder } = await storedThesisWith(text);
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+
+      expect(
+        await screen.findByText(
+          '"drafts" has workspace details this version of Vista can\'t read, so it opened as a plain folder.',
+        ),
+      ).toBeInTheDocument();
+      expect(await within(explorerPanel()).findByRole("button", { name: "d.txt" })).toBeInTheDocument();
+      expect(within(explorerPanel()).queryByRole("button", { name: "plan.txt" })).not.toBeInTheDocument();
+      expect(switcherButton("drafts")).toBeDefined();
+      expect(folder("drafts").textOf(".vista/workspace.json")).toBe(text);
+    });
+
+    it("keeps the details on the device when the file is gone from the folder", async () => {
+      const { capability } = createFoldersCapability([{ folder: DRAFTS_FOLDER, files: { "d.txt": PLAIN_TEXT } }]);
+      localStorage.setItem(
+        "vista.workspaces",
+        JSON.stringify({
+          version: 1,
+          lastWorkspaceId: "w2",
+          workspaces: [
+            {
+              id: "w2",
+              name: "Thesis",
+              folderIds: ["drafts"],
+              storage: "folder",
+              locations: { ".": "drafts" },
+              lastOpenedAt: 1,
+            },
+          ],
+        }),
+      );
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+
+      expect(
+        await screen.findByText(
+          '"drafts/.vista/workspace.json" is gone, so the workspace\'s details are kept on this device now.',
+        ),
+      ).toBeInTheDocument();
+      expect(await within(explorerPanel()).findByRole("button", { name: "d.txt" })).toBeInTheDocument();
+      expect(JSON.parse(localStorage.getItem("vista.workspaces") ?? "null").workspaces[0].storage).toBe("device");
+      expect(capability.writeFile).not.toHaveBeenCalled();
+    });
+  });
+
   describe("recent workspaces", () => {
     /** Research holds `notes`, Work holds `sources`; Research was used last unless `lastWorkspaceId` says otherwise. */
     function twoWorkspaces(lastWorkspaceId: string | null = "w1", workFolderIds = ["sources"]) {

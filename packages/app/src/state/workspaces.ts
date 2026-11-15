@@ -1,5 +1,6 @@
 import {
   HOME_FOLDER_LOCATION,
+  type WorkspaceFileDetails,
   DEFAULT_WORKSPACE_COLOR,
   DEFAULT_WORKSPACE_ICON,
   WORKSPACES_STORAGE_KEY,
@@ -47,6 +48,17 @@ export interface WorkspaceStore {
   /** Keeps the details in the home folder from now on; `locations` are the other folders', by location. */
   storeInFolder(workspaceId: string, locations: Readonly<Record<string, string>>): WorkspaceRecord | null;
   storeOnDevice(workspaceId: string): WorkspaceRecord | null;
+  /** The workspace stored in this home folder on this device, created when there is none yet. */
+  workspaceForFile(home: WorkspaceFolder): WorkspaceRecord;
+  /**
+   * Takes the details read from a workspace's file. `located` names the folder found on this device
+   * for each location; locations the file no longer lists are dropped.
+   */
+  applyWorkspaceFile(
+    workspaceId: string,
+    details: WorkspaceFileDetails,
+    located: Readonly<Record<string, string>>,
+  ): WorkspaceRecord | null;
   isFolderUsed(folderId: string): boolean;
   /**
    * Null when the folder is the workspace's only one, since a workspace is one or more folders, or
@@ -189,6 +201,45 @@ export function createWorkspaceStore(
       }
       const home = { [HOME_FOLDER_LOCATION]: workspace.folderIds[0]! };
       return replace({ ...workspace, storage: "folder", locations: { ...locations, ...home } });
+    },
+
+    workspaceForFile(home) {
+      let found: WorkspaceRecord | null = null;
+      for (const workspace of list.workspaces) {
+        const isHome = workspace.storage === "folder" && workspace.folderIds[0] === home.id;
+        if (isHome && (!found || workspace.lastOpenedAt > found.lastOpenedAt)) {
+          found = workspace;
+        }
+      }
+      if (found) {
+        return found;
+      }
+      const created: WorkspaceRecord = {
+        ...createFor(home.id, home.name),
+        storage: "folder",
+        locations: { [HOME_FOLDER_LOCATION]: home.id },
+      };
+      save({ ...list, workspaces: [...list.workspaces, created] });
+      return created;
+    },
+
+    applyWorkspaceFile(workspaceId, details, located) {
+      const workspace = list.workspaces.find((w) => w.id === workspaceId);
+      const homeId = workspace?.folderIds[0];
+      if (!workspace || homeId === undefined) {
+        return null;
+      }
+      const locations: Record<string, string> = { [HOME_FOLDER_LOCATION]: homeId };
+      const folderIds = [homeId];
+      for (const location of details.folders) {
+        const folderId = located[location];
+        if (location !== HOME_FOLDER_LOCATION && folderId !== undefined && !folderIds.includes(folderId)) {
+          locations[location] = folderId;
+          folderIds.push(folderId);
+        }
+      }
+      const { name, icon, color } = details;
+      return replace({ ...workspace, name, icon, color, folderIds, storage: "folder", locations });
     },
 
     storeOnDevice(workspaceId) {

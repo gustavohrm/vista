@@ -18,6 +18,8 @@ export interface ExplorerFolder {
   /** Whether Vista can read the folder, or why it can't. */
   status: "ready" | "needs-permission" | "unavailable";
   tree: WorkspaceNode[];
+  /** Whether the folder comes from the workspace's file and wasn't found, so the user can pick it. */
+  canLocate?: boolean;
 }
 
 /** A path within one folder of the workspace. */
@@ -93,6 +95,7 @@ interface SidebarProps {
   onRemoveFolder?: (folderId: string) => void;
   /** Asks the browser again for access to a folder that needs permission. */
   onAllowAccess: (folderId: string) => void;
+  onLocate?: (folderId: string) => void;
   /** Starts naming a new entry in the first folder. */
   newEntryRequest?: NewEntryRequest | null;
 }
@@ -152,6 +155,7 @@ export function Sidebar({
   onCopyPath,
   onRemoveFolder,
   onAllowAccess,
+  onLocate,
   newEntryRequest,
 }: SidebarProps) {
   // Root rows start expanded, so only the collapsed ones are tracked.
@@ -297,6 +301,7 @@ export function Sidebar({
                   onNewEntry={(path, kind) => handleNewEntry({ folderId: folder.id, path }, kind)}
                   onContextMenu={(path, kind, x, y) => setContextMenu({ folderId: folder.id, path, kind, x, y })}
                   onAllowAccess={() => onAllowAccess(folder.id)}
+                  onLocate={folder.canLocate && onLocate ? () => onLocate(folder.id) : undefined}
                   onRemove={onRemoveFolder ? () => onRemoveFolder(folder.id) : undefined}
                   tree={{
                     activePath: activeFolderId === folder.id ? activePath : undefined,
@@ -576,6 +581,7 @@ interface FolderRootProps {
   onNewEntry: (parentPath: string, kind: "file" | "directory") => void;
   onContextMenu: (path: string, kind: "file" | "directory", x: number, y: number) => void;
   onAllowAccess: () => void;
+  onLocate?: () => void;
   onRemove?: () => void;
   tree: FolderTree;
 }
@@ -594,6 +600,7 @@ function FolderRoot({
   onNewEntry,
   onContextMenu,
   onAllowAccess,
+  onLocate,
   onRemove,
   tree,
 }: FolderRootProps) {
@@ -644,7 +651,12 @@ function FolderRoot({
             ))}
           </div>
         ) : (
-          <UnreachableFolder status={folder.status} onAllowAccess={onAllowAccess} onRemove={onRemove} />
+          <UnreachableFolder
+            status={folder.status}
+            onAllowAccess={onAllowAccess}
+            onLocate={onLocate}
+            onRemove={onRemove}
+          />
         ))}
     </div>
   );
@@ -653,6 +665,7 @@ function FolderRoot({
 interface UnreachableFolderProps {
   status: "needs-permission" | "unavailable";
   onAllowAccess: () => void;
+  onLocate?: () => void;
   onRemove?: () => void;
 }
 
@@ -662,7 +675,7 @@ interface UnreachableFolderProps {
  * @param props - UnreachableFolder properties.
  * @returns Notice element.
  */
-function UnreachableFolder({ status, onAllowAccess, onRemove }: UnreachableFolderProps) {
+function UnreachableFolder({ status, onAllowAccess, onLocate, onRemove }: UnreachableFolderProps) {
   return (
     <div className="flex flex-col items-start gap-1.5 py-1 pr-2" style={{ paddingLeft: TREE_ROW_INSET_PX }}>
       <p className="text-text-secondary text-xs">
@@ -675,11 +688,18 @@ function UnreachableFolder({ status, onAllowAccess, onRemove }: UnreachableFolde
           Allow access
         </button>
       ) : (
-        onRemove && (
-          <button type="button" onClick={onRemove} className="btn sm">
-            Remove Folder from Workspace
-          </button>
-        )
+        <div className="flex flex-wrap gap-1.5">
+          {onLocate && (
+            <button type="button" onClick={onLocate} className="btn sm">
+              Locate…
+            </button>
+          )}
+          {onRemove && (
+            <button type="button" onClick={onRemove} className="btn sm">
+              Remove Folder from Workspace
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

@@ -138,13 +138,14 @@ function isFolderIdList(value: unknown): value is string[] {
 }
 
 /**
- * Finds the workspace that is exactly one folder, the one Open Folder reopens instead of creating
- * a duplicate. With several, the most recently opened wins.
+ * Finds the workspace on the device that is exactly one folder, the one Open Folder reopens instead
+ * of creating a duplicate. With several, the most recently opened wins.
  */
 export function findWorkspaceForFolder(list: WorkspaceList, folderId: string): WorkspaceRecord | null {
   let found: WorkspaceRecord | null = null;
   for (const workspace of list.workspaces) {
-    const isExactly = workspace.folderIds.length === 1 && workspace.folderIds[0] === folderId;
+    const isExactly =
+      workspace.storage === "device" && workspace.folderIds.length === 1 && workspace.folderIds[0] === folderId;
     if (isExactly && (!found || workspace.lastOpenedAt > found.lastOpenedAt)) {
       found = workspace;
     }

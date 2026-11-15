@@ -254,6 +254,50 @@ describe("where a workspace's details live", () => {
   });
 });
 
+describe("workspaces read from a folder", () => {
+  const details = {
+    name: "Thesis",
+    icon: "book-open",
+    color: "rose",
+    folders: [".", "../sources", "../gone"],
+  } as const;
+
+  it("creates a workspace stored in the folder the first time its file is opened, then finds it again", () => {
+    const storage = memoryStorage();
+    const store = createWorkspaceStore(storage, options());
+    store.openFolder(notes);
+
+    const created = store.workspaceForFile(notes);
+    expect(created).toMatchObject({ folderIds: ["f1"], storage: "folder", locations: { ".": "f1" } });
+    expect(createWorkspaceStore(storage, options()).workspaceForFile(notes).id).toBe(created.id);
+  });
+
+  it("takes the file's details and the folders found for its locations, in the file's order", () => {
+    const store = createWorkspaceStore(memoryStorage(), options());
+    const workspace = store.workspaceForFile(notes);
+
+    expect(
+      store.applyWorkspaceFile(workspace.id, { ...details, folders: [...details.folders] }, { "../sources": "f2" }),
+    ).toMatchObject({
+      name: "Thesis",
+      icon: "book-open",
+      color: "rose",
+      folderIds: ["f1", "f2"],
+      locations: { ".": "f1", "../sources": "f2" },
+    });
+  });
+
+  it("drops a location the file no longer lists", () => {
+    const store = createWorkspaceStore(memoryStorage(), options());
+    const workspace = store.workspaceForFile(notes);
+    store.applyWorkspaceFile(workspace.id, { ...details, folders: [".", "../sources"] }, { "../sources": "f2" });
+
+    expect(
+      store.applyWorkspaceFile(workspace.id, { ...details, folders: ["."] }, { "../sources": "f2" }),
+    ).toMatchObject({ folderIds: ["f1"], locations: { ".": "f1" } });
+  });
+});
+
 describe("recent workspaces", () => {
   function clockedStore(storage = memoryStorage()) {
     let time = 0;

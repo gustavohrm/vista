@@ -148,6 +148,13 @@ describe("findWorkspaceForFolder", () => {
     expect(findWorkspaceForFolder(list, "f1")?.id).toBe("w2");
   });
 
+  it("ignores a workspace whose details live in the folder, which its file opens instead", () => {
+    const inFolder: WorkspaceRecord = { ...single("w2", "f1", 5), storage: "folder", locations: { ".": "f1" } };
+    const list = { version: 1 as const, lastWorkspaceId: null, workspaces: [inFolder] };
+
+    expect(findWorkspaceForFolder(list, "f1")).toBeNull();
+  });
+
   it("ignores a workspace that holds the folder among others", () => {
     const list = { version: 1 as const, lastWorkspaceId: null, workspaces: [research] };
 
