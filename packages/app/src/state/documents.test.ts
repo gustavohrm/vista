@@ -77,6 +77,30 @@ describe("documentsReducer", () => {
     expect(paths(state)).toEqual(["a.md", "c.md", "b.md"]);
   });
 
+  it("moves a tab to another place, keeping the active tab", () => {
+    const state = openAll("a.md", "b.md", "c.md");
+    const active = state.activeKey;
+
+    const moved = documentsReducer(state, { type: "reorder", key: documentKey(WS, "a.md"), toIndex: 2 });
+    expect(paths(moved)).toEqual(["b.md", "c.md", "a.md"]);
+    expect(moved.activeKey).toBe(active);
+
+    const back = documentsReducer(moved, { type: "reorder", key: documentKey(WS, "a.md"), toIndex: 0 });
+    expect(paths(back)).toEqual(["a.md", "b.md", "c.md"]);
+  });
+
+  it("keeps a moved tab within the row, and ignores a move that changes nothing", () => {
+    const state = openAll("a.md", "b.md", "c.md");
+    const move = (path: string, toIndex: number) =>
+      documentsReducer(state, { type: "reorder", key: documentKey(WS, path), toIndex });
+
+    expect(paths(move("a.md", 9))).toEqual(["b.md", "c.md", "a.md"]);
+    expect(paths(move("b.md", -1))).toEqual(["b.md", "a.md", "c.md"]);
+    expect(move("a.md", -1)).toBe(state);
+    expect(move("c.md", 3)).toBe(state);
+    expect(move("x.md", 0)).toBe(state);
+  });
+
   it("marks a document dirty when edited", () => {
     let state = openAll("a.md");
     state = documentsReducer(state, { type: "edit", key: documentKey(WS, "a.md"), content: "new" });

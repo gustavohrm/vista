@@ -1,9 +1,18 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+  type PointerEvent,
+  type ReactNode,
+} from "react";
 
 import { shortenPath, type DocumentLocation } from "../../domain/document-location";
 import type { OpenDocument } from "../../state/documents";
 import { Menu, MENU_SEPARATOR, type MenuEntry } from "../menu/menu";
 import { FileIcon } from "./file-icon";
+import { useTabDrag } from "./use-tab-drag";
 
 const MIDDLE_BUTTON = 1;
 
@@ -11,6 +20,8 @@ interface TabStripProps {
   documents: readonly OpenDocument[];
   activeKey: string | null;
   onActivate: (key: string) => void;
+  /** Moves a tab to another place in the row. */
+  onReorder: (key: string, toIndex: number) => void;
   /** Closes a tab, resolving to false when the user cancelled at the unsaved-changes prompt. */
   onClose: (key: string) => Promise<boolean>;
   /** Closes several tabs at once, from the tab menu. The caller asks about unsaved changes. */
@@ -30,6 +41,7 @@ export function TabStrip({
   documents,
   activeKey,
   onActivate,
+  onReorder,
   onClose,
   onCloseMany,
   onCopyRelativePath,
@@ -42,6 +54,11 @@ export function TabStrip({
   // focused element, so focus follows the newly active tab once the close completes; a cancelled
   // close keeps it.
   const keyboardClosedKeyRef = useRef<string | null>(null);
+  // Set when a tab is moved from the keyboard, so it takes focus again once the row has its new
+  // order. Chromium keeps focus on an element React moves, so the e2e tests pass without this; the
+  // HTML focus fixup rule drops focus from a removed element, which other engines may apply to a move.
+  const movedKeyRef = useRef<string | null>(null);
+  const { drag, startDrag } = useTabDrag(listRef, onReorder);
 
   const closeTabs = async (focusedKey: string | null, close: () => Promise<boolean>) => {
     keyboardClosedKeyRef.current = focusedKey;
@@ -62,6 +79,13 @@ export function TabStrip({
     }
   });
 
+  useEffect(() => {
+    if (movedKeyRef.current !== null) {
+      focusTab(movedKeyRef.current);
+      movedKeyRef.current = null;
+    }
+  }, [documents]);
+
   const focusTab = (key: string) => {
     listRef.current?.querySelector<HTMLElement>(`[data-tab-key="${CSS.escape(key)}"]`)?.focus();
   };
@@ -73,6 +97,17 @@ export function TabStrip({
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
     if (step === 0) {
+      return;
+    }
+    if (event.shiftKey) {
+      // Moves the focused tab one place, stopping at the ends of the row.
+      const key = event.currentTarget.dataset.tabKey;
+      const index = documents.findIndex((doc) => doc.key === key);
+      event.preventDefault();
+      if (key !== undefined && index >= 0) {
+        onReorder(key, index + step);
+        movedKeyRef.current = key;
+      }
       return;
     }
     const currentIndex = documents.findIndex((doc) => doc.key === activeKey);
@@ -91,7 +126,7 @@ export function TabStrip({
         ref={listRef}
         role="tablist"
         aria-label="Open files"
-        className="flex h-full min-w-0 flex-1 [scrollbar-width:none] items-center gap-1 overflow-x-auto overflow-y-hidden pl-2"
+        className="relative flex h-full min-w-0 flex-1 [scrollbar-width:none] items-center gap-1 overflow-x-auto overflow-y-hidden pl-2"
       >
         {documents.map((doc) => (
           <Tab
@@ -99,7 +134,9 @@ export function TabStrip({
             document={doc}
             {...describeTab(doc, documents, locate)}
             isActive={doc.key === activeKey}
+            isDragged={drag?.key === doc.key}
             onActivate={() => onActivate(doc.key)}
+            onPointerDown={(event) => startDrag(doc.key, event)}
             onClose={(event) => {
               // A click with no pointer detail came from the keyboard (Enter or Space).
               void closeTabs(event.detail === 0 ? doc.key : null, () => onClose(doc.key));
@@ -111,6 +148,15 @@ export function TabStrip({
             }}
           />
         ))}
+        {drag && drag.markerLeft !== null && (
+          // Where the dragged tab will land.
+          <div
+            data-tab-drop-marker
+            aria-hidden="true"
+            className="pointer-events-none absolute top-2 bottom-2 w-0.5 rounded-full bg-[var(--focus-ring)]"
+            style={{ left: drag.markerLeft - 1 }}
+          />
+        )}
         {menu && (
           <Menu
             label="Tab actions"
@@ -189,13 +235,27 @@ interface TabProps {
   /** The tab's tooltip. */
   title: string;
   isActive: boolean;
+  /** Whether the tab is being dragged to another place. */
+  isDragged: boolean;
   onActivate: () => void;
+  onPointerDown: (event: PointerEvent) => void;
   onClose: (event: MouseEvent) => void;
   onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
   onContextMenu: (event: MouseEvent) => void;
 }
 
-function Tab({ document: doc, label, title, isActive, onActivate, onClose, onKeyDown, onContextMenu }: TabProps) {
+function Tab({
+  document: doc,
+  label,
+  title,
+  isActive,
+  isDragged,
+  onActivate,
+  onPointerDown,
+  onClose,
+  onKeyDown,
+  onContextMenu,
+}: TabProps) {
   const handleAuxClick = (event: MouseEvent) => {
     if (event.button === MIDDLE_BUTTON) {
       event.preventDefault();
@@ -216,7 +276,7 @@ function Tab({ document: doc, label, title, isActive, onActivate, onClose, onKey
       onAuxClick={handleAuxClick}
       onMouseDown={handleMouseDown}
       onContextMenu={onContextMenu}
-      className={`group flex h-7 max-w-56 flex-none items-center rounded-md ${
+      className={`group flex h-7 max-w-56 flex-none items-center rounded-md ${isDragged ? "opacity-50" : ""} ${
         isActive ? "bg-surface text-text-strong" : "text-text-secondary hover:bg-surface/60 hover:text-text"
       }`}
     >
@@ -228,6 +288,7 @@ function Tab({ document: doc, label, title, isActive, onActivate, onClose, onKey
         data-tab-key={doc.key}
         title={title}
         onClick={onActivate}
+        onPointerDown={onPointerDown}
         onKeyDown={onKeyDown}
         className="flex h-full min-w-0 items-center gap-1.5 rounded-md pr-1 pl-2.5 text-[13px] outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-inset"
       >

@@ -1641,6 +1641,14 @@ function AppShell({ adapter }: AppProps) {
     }
   }, []);
 
+  const moveActiveTab = useCallback((step: 1 | -1) => {
+    const { documents, activeKey } = documentsRef.current;
+    const index = documents.findIndex((doc) => doc.key === activeKey);
+    if (activeKey !== null && index >= 0) {
+      dispatchDocuments({ type: "reorder", key: activeKey, toIndex: index + step });
+    }
+  }, []);
+
   const requestNewEntry = useCallback((kind: NewEntryRequest["kind"]) => {
     setIsSidebarOpen(true);
     setNewEntryRequest((previous) => ({ kind, serial: (previous?.serial ?? 0) + 1 }));
@@ -1967,6 +1975,20 @@ function AppShell({ adapter }: AppProps) {
         run: () => activateNeighborTab(-1),
       },
       {
+        id: "tabs.moveLeft",
+        category: "Tabs",
+        label: "Move Tab Left",
+        isEnabled: !isPromptingForUnsavedChanges && documentsState.documents.length > 1,
+        run: () => moveActiveTab(-1),
+      },
+      {
+        id: "tabs.moveRight",
+        category: "Tabs",
+        label: "Move Tab Right",
+        isEnabled: !isPromptingForUnsavedChanges && documentsState.documents.length > 1,
+        run: () => moveActiveTab(1),
+      },
+      {
         id: "help.shortcuts",
         category: "Settings",
         label: "Keyboard Shortcuts",
@@ -1976,6 +1998,7 @@ function AppShell({ adapter }: AppProps) {
     ],
     [
       activateNeighborTab,
+      moveActiveTab,
       activeDocument,
       adapter.platform,
       canToggleView,
@@ -2154,6 +2177,7 @@ function AppShell({ adapter }: AppProps) {
             documents={documentsState.documents}
             activeKey={documentsState.activeKey}
             onActivate={(key) => dispatchDocuments({ type: "activate", key })}
+            onReorder={(key, toIndex) => dispatchDocuments({ type: "reorder", key, toIndex })}
             onClose={(key) => closeDocuments([key])}
             onCloseMany={(keys) => closeDocuments(keys)}
             onCopyRelativePath={(path) => void copyText(path)}

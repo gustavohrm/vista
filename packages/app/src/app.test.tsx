@@ -1637,6 +1637,28 @@ describe("App", () => {
       expect(await screen.findByRole("textbox", { name: "Raw text content of guide.md" })).toBeInTheDocument();
     });
 
+    it("saves a moved tab's place in the session", async () => {
+      const user = userEvent.setup();
+      storeSession(
+        [
+          { folderId: "notes", path: "a.txt", viewMode: "raw" },
+          { folderId: "sources", path: "plan.txt", viewMode: "raw" },
+        ],
+        1,
+      );
+      const { capability } = createFoldersCapability(sessionFolders());
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await screen.findByRole("textbox", { name: "Raw text content of plan.txt" });
+
+      await runFromPalette(user, "Tabs: Move Tab Left");
+
+      await waitFor(() => {
+        const session = JSON.parse(localStorage.getItem(SESSION_KEY) ?? "{}");
+        expect(session.tabs.map((tab: { path: string }) => tab.path)).toEqual(["plan.txt", "a.txt"]);
+        expect(session.activeIndex).toBe(0);
+      });
+    });
+
     it("drops a tab whose file no longer exists and names it", async () => {
       storeSession(
         [
@@ -1839,6 +1861,43 @@ describe("App", () => {
       await user.click(getTab("readme.md"));
 
       expect(await screen.findByRole("heading", { name: "Hello Vista" })).toBeVisible();
+    });
+
+    it("moves the focused tab one place with Shift+Arrow keys, keeping it focused and active", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      await user.click(screen.getByText("readme.md"));
+      await user.click(screen.getByText("data.csv"));
+      await user.click(getTab("readme.md"));
+      getTab("readme.md").focus();
+
+      await user.keyboard("{Shift>}{ArrowRight}{/Shift}");
+      expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["data.csv", "readme.md"]);
+      expect(getTab("readme.md")).toHaveFocus();
+      expect(getTab("readme.md")).toHaveAttribute("aria-selected", "true");
+
+      // It stops at the end of the row.
+      await user.keyboard("{Shift>}{ArrowRight}{/Shift}");
+      expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["data.csv", "readme.md"]);
+
+      await user.keyboard("{Shift>}{ArrowLeft}{/Shift}");
+      expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["readme.md", "data.csv"]);
+      expect(getTab("readme.md")).toHaveFocus();
+    });
+
+    it("moves the active tab with Move Tab Left and Move Tab Right in the palette", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      await user.click(screen.getByText("readme.md"));
+      await user.click(screen.getByText("data.csv"));
+
+      await runFromPalette(user, "Tabs: Move Tab Left");
+      expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["data.csv", "readme.md"]);
+
+      await runFromPalette(user, "Tabs: Move Tab Right");
+      expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["readme.md", "data.csv"]);
     });
 
     it("keeps unsaved edits in a tab while another file is opened, without asking", async () => {

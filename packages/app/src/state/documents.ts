@@ -57,6 +57,8 @@ export type DocumentsAction =
   // `activeIndex` is into `tabs`, or -1; a tab activated meanwhile stays active.
   | { type: "restore"; tabs: readonly RestoredTab[]; activeIndex: number }
   | { type: "activate"; key: string }
+  // Moves a tab to `toIndex` in the tab order, kept within the row.
+  | { type: "reorder"; key: string; toIndex: number }
   | { type: "close"; keys: string[] }
   | { type: "edit"; key: string; content: string }
   | { type: "saved"; key: string; content: string; stat: FileStat }
@@ -81,6 +83,16 @@ export function findAffectedDocuments(state: DocumentsState, entry: FolderEntryR
   return state.documents.filter((doc) => doc.folderId === entry.folderId && isSameOrInside(doc.path, entry.path));
 }
 
+function reorderDocument(state: DocumentsState, key: string, toIndex: number): DocumentsState {
+  const fromIndex = state.documents.findIndex((doc) => doc.key === key);
+  const moved = state.documents[fromIndex];
+  const target = Math.min(Math.max(toIndex, 0), state.documents.length - 1);
+  if (!moved || fromIndex === target) {
+    return state;
+  }
+  return { ...state, documents: state.documents.toSpliced(fromIndex, 1).toSpliced(target, 0, moved) };
+}
+
 export function documentsReducer(state: DocumentsState, action: DocumentsAction): DocumentsState {
   switch (action.type) {
     case "open":
@@ -89,6 +101,8 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
       return restoreDocuments(state, action);
     case "activate":
       return state.documents.some((doc) => doc.key === action.key) ? { ...state, activeKey: action.key } : state;
+    case "reorder":
+      return reorderDocument(state, action.key, action.toIndex);
     case "close":
       return closeDocuments(state, new Set(action.keys));
     case "edit":
