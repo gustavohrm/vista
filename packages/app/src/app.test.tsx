@@ -347,7 +347,9 @@ describe("App", () => {
       );
       render(<App adapter={{ platform: "web", workspace: capability }} />);
 
-      await user.click(await screen.findByRole("button", { name: /Reopen Research/ }));
+      const entry = await screen.findByRole("button", { name: "Research" });
+      expect(entry).toHaveAccessibleDescription("Click to allow access");
+      await user.click(entry);
       await user.click(await within(explorerPanel()).findByRole("button", { name: "Allow access" }));
       expect(within(explorerPanel()).queryByRole("button", { name: "plan.txt" })).not.toBeInTheDocument();
       restoreFolder.mockResolvedValueOnce({ status: "restored", folder: SOURCES_FOLDER });
@@ -717,6 +719,94 @@ describe("App", () => {
     await user.click(themeBtn);
 
     expect(document.documentElement.getAttribute("data-theme")).toBeDefined();
+  });
+
+  describe("recent workspaces", () => {
+    /** Research holds `notes`, Work holds `sources`; Research was used last unless `lastWorkspaceId` says otherwise. */
+    function twoWorkspaces(lastWorkspaceId: string | null = "w1", workFolderIds = ["sources"]) {
+      const setup = createFoldersCapability(storedFolders());
+      localStorage.setItem(
+        "vista.workspaces",
+        JSON.stringify({
+          version: 1,
+          lastWorkspaceId,
+          workspaces: [
+            { id: "w1", name: "Research", icon: "book-open", folderIds: ["notes"], lastOpenedAt: 2 },
+            { id: "w2", name: "Work", folderIds: workFolderIds, lastOpenedAt: 1 },
+          ],
+        }),
+      );
+      return setup;
+    }
+
+    it("switches workspaces from the switcher, and each keeps its own tabs", async () => {
+      const user = userEvent.setup();
+      const { capability } = twoWorkspaces();
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await user.click((await findFileRows("a.txt"))[0]!);
+      await screen.findByRole("textbox", { name: "Raw text content of a.txt" });
+
+      await user.click(screen.getByRole("button", { name: "Research" }));
+      expect(screen.getByRole("menuitemradio", { name: "Research" })).toBeChecked();
+      const work = await screen.findByRole("menuitemradio", { name: "Work" });
+      await waitFor(() => expect(work).toHaveAccessibleDescription("sources"));
+      await user.click(work);
+
+      expect(await within(explorerPanel()).findByRole("button", { name: "plan.txt" })).toBeInTheDocument();
+      expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Work" }));
+      await user.click(screen.getByRole("menuitemradio", { name: "Research" }));
+
+      expect(await screen.findByRole("textbox", { name: "Raw text content of a.txt" })).toBeInTheDocument();
+      expect(capability.restoreFolder).toHaveBeenLastCalledWith("notes", { interactive: true });
+    });
+
+    it("lists every remembered workspace on the start screen with its folders", async () => {
+      const { capability } = twoWorkspaces(null);
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+
+      expect(await screen.findByRole("heading", { name: "Recent workspaces" })).toBeInTheDocument();
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Research" })).toHaveAccessibleDescription("notes"),
+      );
+      expect(screen.getByRole("button", { name: "Work" })).toHaveAccessibleDescription("sources");
+      expect(capability.restoreFolder).not.toHaveBeenCalledWith(expect.anything(), { interactive: true });
+    });
+
+    it("removes a workspace from Recent after asking, forgetting the folders no workspace holds", async () => {
+      const user = userEvent.setup();
+      // Work shares `notes` with Research, so only `sources` is forgotten.
+      const { capability, folder } = twoWorkspaces(null, ["sources", "notes"]);
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+
+      await user.click(await screen.findByRole("button", { name: 'Remove "Work" from Recent' }));
+      const dialog = await screen.findByRole("dialog", { name: 'Remove "Work" from Recent?' });
+      expect(dialog).toHaveTextContent(
+        "Vista forgets this workspace and its tabs. Your folders and files aren't changed.",
+      );
+      await user.click(within(dialog).getByRole("button", { name: "Remove" }));
+
+      await waitFor(() => expect(screen.queryByRole("button", { name: "Work" })).not.toBeInTheDocument());
+      expect(screen.getByRole("button", { name: "Research" })).toBeInTheDocument();
+      expect(capability.forgetFolder).toHaveBeenCalledWith("sources");
+      expect(capability.forgetFolder).not.toHaveBeenCalledWith("notes");
+      expect(JSON.parse(localStorage.getItem("vista.workspaces") ?? "null").workspaces).toHaveLength(1);
+      expect(folder("sources").textOf("plan.txt")).toBe(PLAIN_TEXT);
+    });
+
+    it("keeps a workspace in Recent when removing it is cancelled", async () => {
+      const user = userEvent.setup();
+      const { capability } = twoWorkspaces(null);
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+
+      await user.click(await screen.findByRole("button", { name: 'Remove "Work" from Recent' }));
+      const dialog = await screen.findByRole("dialog", { name: 'Remove "Work" from Recent?' });
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+      expect(screen.getByRole("button", { name: "Work" })).toBeInTheDocument();
+      expect(capability.forgetFolder).not.toHaveBeenCalled();
+    });
   });
 
   describe("sessions", () => {
@@ -1567,7 +1657,7 @@ describe("App", () => {
       expect(mockWorkspace.pickFolder).not.toHaveBeenCalled();
     });
 
-    it("reopens a remembered folder that needs permission when the user clicks its button", async () => {
+    it("reopens a remembered folder that needs permission when the user clicks its recent entry", async () => {
       const user = userEvent.setup();
       const mockWorkspace = createMockWorkspaceCapability({
         restoreFolder: vi
@@ -1577,26 +1667,26 @@ describe("App", () => {
       });
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
 
-      await user.click(await screen.findByRole("button", { name: "Reopen My Notes" }));
+      await user.click(await screen.findByRole("button", { name: "My Notes" }));
 
       expect(mockWorkspace.restoreFolder).toHaveBeenLastCalledWith(LEGACY_FOLDER_ID, { interactive: true });
       expect(await screen.findByText("readme.md")).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Reopen My Notes" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Recent workspaces" })).not.toBeInTheDocument();
     });
 
-    it("keeps the reopen button and shows no message when permission is dismissed again", async () => {
+    it("keeps the recent entry and shows no message when permission is dismissed again", async () => {
       const user = userEvent.setup();
       const mockWorkspace = createMockWorkspaceCapability({
         restoreFolder: vi.fn().mockResolvedValue({ status: "needs-permission", name: "My Notes" }),
       });
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
 
-      await user.click(await screen.findByRole("button", { name: "Reopen My Notes" }));
+      await user.click(await screen.findByRole("button", { name: "My Notes" }));
 
       await waitFor(() =>
         expect(mockWorkspace.restoreFolder).toHaveBeenCalledWith(LEGACY_FOLDER_ID, { interactive: true }),
       );
-      expect(screen.getByRole("button", { name: "Reopen My Notes" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "My Notes" })).toHaveAccessibleDescription("Click to allow access");
       expect(document.querySelector(".coden-toast")).not.toBeInTheDocument();
     });
 
@@ -1609,7 +1699,7 @@ describe("App", () => {
       expect(
         await screen.findByText('Couldn\'t reopen "My Notes". It may have been moved or deleted.'),
       ).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /^Reopen/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Recent workspaces" })).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Open Folder" })).toBeInTheDocument();
     });
 
@@ -1648,7 +1738,7 @@ describe("App", () => {
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
 
       expect(await screen.findByRole("button", { name: "Open Folder" })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /^Reopen/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Recent workspaces" })).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Open explorer" })).toBeInTheDocument();
     });
 

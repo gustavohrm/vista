@@ -32,6 +32,21 @@ describe("Menu", () => {
     expect(screen.getByRole("menuitemcheckbox", { name: "Word Wrap" })).toBeChecked();
   });
 
+  it("shows a chosen option with its icon and a second line, keeping items with the same label apart", () => {
+    renderMenu({
+      items: [
+        { id: "w1", label: "Notes", description: "notes, sources", selected: true, icon: <i />, onSelect: vi.fn() },
+        { id: "w2", label: "Notes", description: "archive", selected: false, onSelect: vi.fn() },
+      ],
+    });
+
+    const [chosen, other] = screen.getAllByRole("menuitemradio", { name: "Notes" });
+    expect(chosen).toBeChecked();
+    expect(chosen).toHaveAccessibleDescription("notes, sources");
+    expect(other).not.toBeChecked();
+    expect(other).toHaveAccessibleDescription("archive");
+  });
+
   it("focuses the first item and moves with the arrow keys, skipping disabled items", async () => {
     const user = userEvent.setup();
     renderMenu();

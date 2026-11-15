@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { formatShortcut } from "../../commands";
@@ -8,7 +8,11 @@ const VIEWPORT_MARGIN_PX = 8;
 
 /** One action in a menu. */
 export interface MenuItem {
+  /** Tells items apart when two have the same label; the label otherwise. */
+  id?: string;
   label: string;
+  /** A second, quieter line under the label. */
+  description?: string;
   /**
    * Icon element, such as `<i className="ic-copy" aria-hidden="true" />`. The icon transform only sees
    * a literal `ic-*` class, so callers pass the element rather than its class name.
@@ -19,6 +23,8 @@ export interface MenuItem {
   disabled?: boolean;
   /** Makes the item a checkbox item showing this state. */
   checked?: boolean;
+  /** Makes the item one of a set of options, marked when it is the chosen one; its icon stays. */
+  selected?: boolean;
   destructive?: boolean;
   onSelect: () => void;
 }
@@ -158,7 +164,12 @@ export function Menu({ label, items, x, y, onClose, returnFocusTo, onNavigate, i
           // oxlint-disable-next-line react/no-array-index-key -- separators have no identity besides their position
           <MenuSeparator key={`separator-${index}`} />
         ) : (
-          <MenuItemButton key={item.label} item={item} hasIconColumn={hasIcons} onChoose={() => choose(item)} />
+          <MenuItemButton
+            key={item.id ?? item.label}
+            item={item}
+            hasIconColumn={hasIcons}
+            onChoose={() => choose(item)}
+          />
         ),
       )}
     </div>,
@@ -180,12 +191,15 @@ interface MenuItemButtonProps {
 
 function MenuItemButton({ item, hasIconColumn, onChoose }: MenuItemButtonProps) {
   const isCheckbox = item.checked !== undefined;
+  const isOption = item.selected !== undefined;
   const icon = isCheckbox ? item.checked && <i className="ic-check" /> : item.icon;
+  const descriptionId = useId();
   return (
     <button
       type="button"
-      role={isCheckbox ? "menuitemcheckbox" : "menuitem"}
-      aria-checked={isCheckbox ? item.checked : undefined}
+      role={isCheckbox ? "menuitemcheckbox" : isOption ? "menuitemradio" : "menuitem"}
+      aria-checked={isCheckbox ? item.checked : isOption ? item.selected : undefined}
+      aria-describedby={item.description === undefined ? undefined : descriptionId}
       aria-disabled={item.disabled || undefined}
       aria-keyshortcuts={item.shortcut ? toAriaShortcut(item.shortcut) : undefined}
       data-menu-item
@@ -205,7 +219,17 @@ function MenuItemButton({ item, hasIconColumn, onChoose }: MenuItemButtonProps) 
           {icon}
         </span>
       )}
-      <span className="flex-1 text-left whitespace-nowrap">{item.label}</span>
+      {item.description === undefined ? (
+        <span className="flex-1 text-left whitespace-nowrap">{item.label}</span>
+      ) : (
+        <span className="flex min-w-0 flex-1 flex-col py-1 text-left">
+          <span className="truncate">{item.label}</span>
+          <span id={descriptionId} aria-hidden="true" className="text-text-secondary truncate text-xs">
+            {item.description}
+          </span>
+        </span>
+      )}
+      {item.selected && <i className="ic-check ml-4 flex-none text-sm" aria-hidden="true" />}
       {item.shortcut && (
         <kbd aria-hidden="true" className="text-text-secondary ml-6 flex-none font-sans text-xs">
           {formatShortcut(item.shortcut)}

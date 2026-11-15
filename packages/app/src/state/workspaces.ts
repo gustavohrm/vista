@@ -30,6 +30,8 @@ const UNTITLED_NAME = "Untitled workspace";
 
 export interface WorkspaceStore {
   lastWorkspace(): WorkspaceRecord | null;
+  /** Every workspace, the most recently opened first. */
+  recentWorkspaces(): WorkspaceRecord[];
   workspace(workspaceId: string): WorkspaceRecord | null;
   /** The workspace Open Folder opens for a folder: the one that is exactly it, or a new one. */
   openFolder(folder: WorkspaceFolder): WorkspaceRecord;
@@ -46,6 +48,11 @@ export interface WorkspaceStore {
    * workspace. Returns the restore result it got, so the caller need not restore the folder again.
    */
   migrateLegacyFolder(capability: WorkspaceCapability): Promise<RestoreFolderResult | null>;
+  /**
+   * Forgets a workspace and its session. `unusedFolderIds` are its folders no other workspace holds,
+   * so their host may forget them.
+   */
+  removeWorkspace(workspaceId: string): { unusedFolderIds: string[] };
   loadSession(workspaceId: string): Session;
   saveSession(workspaceId: string, session: Session): void;
 }
@@ -130,17 +137,19 @@ export function createWorkspaceStore(
 
     openFolder(folder) {
       if (folder.accessMode === "fallback") {
-        const workspace = createFor(folder.id, folder.name);
+        const workspace = { ...createFor(folder.id, folder.name), lastOpenedAt: now() };
         sessionOnlyIds.add(workspace.id);
         list = { ...list, workspaces: [...list.workspaces, workspace] };
-        return { ...workspace, lastOpenedAt: now() };
+        return workspace;
       }
       return opened(findWorkspaceForFolder(list, folder.id) ?? createFor(folder.id, folder.name));
     },
 
     markOpened(workspaceId) {
       const workspace = list.workspaces.find((w) => w.id === workspaceId);
-      if (workspace && !sessionOnlyIds.has(workspaceId)) {
+      if (workspace && sessionOnlyIds.has(workspaceId)) {
+        replace({ ...workspace, lastOpenedAt: now() });
+      } else if (workspace) {
         opened(workspace);
       }
     },
@@ -178,6 +187,32 @@ export function createWorkspaceStore(
       const name = result.status === "restored" ? result.folder.name : result.name;
       opened(createFor(LEGACY_FOLDER_ID, name));
       return result;
+    },
+
+    recentWorkspaces: () =>
+      list.workspaces.toSorted((a, b) => b.lastOpenedAt - a.lastOpenedAt || a.id.localeCompare(b.id)),
+
+    removeWorkspace(workspaceId) {
+      const workspace = list.workspaces.find((w) => w.id === workspaceId);
+      if (!workspace) {
+        return { unusedFolderIds: [] };
+      }
+      const next: WorkspaceList = {
+        version: 1,
+        lastWorkspaceId: list.lastWorkspaceId === workspaceId ? null : list.lastWorkspaceId,
+        workspaces: list.workspaces.filter((w) => w.id !== workspaceId),
+      };
+      if (sessionOnlyIds.delete(workspaceId)) {
+        list = next;
+      } else {
+        save(next);
+        try {
+          storage.removeItem(sessionStorageKey(workspaceId));
+        } catch (err) {
+          console.error("Failed to forget the session:", err);
+        }
+      }
+      return { unusedFolderIds: workspace.folderIds.filter((id) => !isUsed(id)) };
     },
 
     loadSession: (workspaceId) => parseSession(read(storage, sessionStorageKey(workspaceId))),

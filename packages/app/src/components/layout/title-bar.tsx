@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { formatShortcut, type Command } from "../../commands";
 import type { ThemeCapability } from "../../ports";
 import { Tooltip } from "../feedback/tooltip";
@@ -18,6 +20,8 @@ interface TitleBarProps {
   onSearch: () => void;
   /** Shortcut that opens the picker, shown in the search field. */
   searchShortcut: string;
+  /** The workspace switcher, shown while a workspace is open. */
+  switcher?: ReactNode;
 }
 
 /**
@@ -37,6 +41,7 @@ export function TitleBar({
   onToggleSidebar,
   onSearch,
   searchShortcut,
+  switcher,
 }: TitleBarProps) {
   const explorerLabel = isSidebarOpen ? "Close explorer" : "Open explorer";
   const themeLabel = `Switch to ${theme.theme === "dark" ? "light" : "dark"} theme`;
@@ -58,6 +63,7 @@ export function TitleBar({
             </button>
           )}
         </Tooltip>
+        {switcher}
         <MenuBar menus={menus} commands={commands} />
       </div>
 

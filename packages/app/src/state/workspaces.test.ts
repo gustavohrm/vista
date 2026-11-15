@@ -179,6 +179,52 @@ describe("folders of a workspace", () => {
   });
 });
 
+describe("recent workspaces", () => {
+  function clockedStore(storage = memoryStorage()) {
+    let time = 0;
+    return createWorkspaceStore(storage, { now: () => (time += 1_000), newId: options().newId });
+  }
+
+  it("lists the workspaces most recently opened first", () => {
+    const store = clockedStore();
+    const first = store.openFolder(notes);
+    const second = store.openFolder({ id: "f2", name: "work", rootPath: "/work" });
+    store.markOpened(first.id);
+
+    expect(store.recentWorkspaces().map((w) => w.id)).toEqual([first.id, second.id]);
+  });
+
+  it("lists a session-only workspace too, since it can be switched to until Vista closes", () => {
+    const store = clockedStore();
+    const workspace = store.openFolder({ ...notes, accessMode: "fallback" });
+
+    expect(store.recentWorkspaces().map((w) => w.id)).toEqual([workspace.id]);
+  });
+
+  it("forgets a removed workspace and its session, and names the folders no workspace holds anymore", () => {
+    const storage = memoryStorage();
+    const store = clockedStore(storage);
+    const first = store.openFolder(notes);
+    store.addFolder(first.id, "f2");
+    store.openFolder({ id: "f2", name: "work", rootPath: "/work" });
+    store.saveSession(first.id, { version: 1, tabs: [], activeIndex: -1, expanded: {} });
+
+    expect(store.removeWorkspace(first.id)).toEqual({ unusedFolderIds: ["f1"] });
+    expect(store.workspace(first.id)).toBeNull();
+    expect(storage.values.has(sessionStorageKey(first.id))).toBe(false);
+    expect(createWorkspaceStore(storage, options()).workspace(first.id)).toBeNull();
+  });
+
+  it("no longer reopens a removed workspace at startup", () => {
+    const storage = memoryStorage();
+    const store = clockedStore(storage);
+    const workspace = store.openFolder(notes);
+    store.removeWorkspace(workspace.id);
+
+    expect(createWorkspaceStore(storage, options()).lastWorkspace()).toBeNull();
+  });
+});
+
 describe("migrateLegacyFolder", () => {
   it("turns the folder an earlier Vista remembered into the last workspace", async () => {
     const storage = memoryStorage();

@@ -1,7 +1,9 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
 import { formatShortcut } from "../../commands";
 import { VistaLoader, VistaLogo } from "../brand/vista-logo";
+import { WorkspaceGlyph } from "../workspace/workspace-glyph";
+import { describeRecentFolders, type RecentWorkspace } from "../workspace/workspace-switcher";
 
 /** One suggested next step on the start screen. */
 export interface StartAction {
@@ -18,19 +20,20 @@ interface StartScreenProps {
   workspaceName: string | null;
   /** Whether a folder is still being opened or restored, so nothing is offered yet. */
   isLoading: boolean;
-  /** Name of a remembered folder that can be reopened with one click, or null. */
-  restorableFolderName: string | null;
+  /** The remembered workspaces, the most recent first. */
+  recents: readonly RecentWorkspace[];
   onOpenFolder: () => void;
-  onReopenFolder: () => void;
+  onOpenRecent: (workspaceId: string) => void;
+  onRemoveRecent: (workspaceId: string) => void;
   /** Next steps offered once a folder is open. */
   actions: readonly StartAction[];
 }
 
 /**
  * Fills the editor area while no file is open. While a folder is being opened or restored it shows
- * the loader. Without a folder it shows the logo, says what Vista does, and offers opening one, with
- * the remembered folder first when there is one. With a folder it lists the ways
- * to get to a file, each with its shortcut.
+ * the loader. Without a workspace it shows the logo, says what Vista does, offers opening a folder,
+ * and lists the recent workspaces. With a workspace it lists the ways to get to a file, each with
+ * its shortcut.
  *
  * @param props - StartScreen properties.
  * @returns Start screen element.
@@ -38,9 +41,10 @@ interface StartScreenProps {
 export function StartScreen({
   workspaceName,
   isLoading,
-  restorableFolderName,
+  recents,
   onOpenFolder,
-  onReopenFolder,
+  onOpenRecent,
+  onRemoveRecent,
   actions,
 }: StartScreenProps) {
   if (workspaceName === null && isLoading) {
@@ -64,21 +68,31 @@ export function StartScreen({
             </p>
           </div>
           <div className="flex flex-col gap-2">
-            {restorableFolderName && (
-              <button type="button" onClick={onReopenFolder} className="btn primary w-full">
-                <i className="ic-history" aria-hidden="true" />
-                <span className="min-w-0 truncate">Reopen {restorableFolderName}</span>
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onOpenFolder}
-              className={restorableFolderName ? "btn w-full" : "btn primary w-full"}
-            >
+            <button type="button" onClick={onOpenFolder} className="btn primary w-full">
               <i className="ic-folder-open" aria-hidden="true" />
               Open Folder
             </button>
+            <p className="text-text-secondary text-sm">
+              A workspace is one or more folders. Vista remembers its tabs and its look; your files stay where they are.
+            </p>
           </div>
+          {recents.length > 0 && (
+            <section aria-labelledby="recent-workspaces" className="flex flex-col gap-1">
+              <h2 id="recent-workspaces" className="text-text-secondary text-xs font-medium">
+                Recent workspaces
+              </h2>
+              <ul className="-mx-2 flex flex-col gap-0.5">
+                {recents.map((workspace) => (
+                  <RecentEntry
+                    key={workspace.id}
+                    workspace={workspace}
+                    onOpen={() => onOpenRecent(workspace.id)}
+                    onRemove={() => onRemoveRecent(workspace.id)}
+                  />
+                ))}
+              </ul>
+            </section>
+          )}
         </div>
       ) : (
         <div className="flex w-full max-w-sm flex-col gap-4">
@@ -108,5 +122,46 @@ export function StartScreen({
         </div>
       )}
     </div>
+  );
+}
+
+interface RecentEntryProps {
+  workspace: RecentWorkspace;
+  onOpen: () => void;
+  onRemove: () => void;
+}
+
+function RecentEntry({ workspace, onOpen, onRemove }: RecentEntryProps) {
+  const descriptionId = useId();
+  const needsPermission = workspace.folders?.some((folder) => folder.status === "needs-permission") ?? false;
+  const description = needsPermission ? "Click to allow access" : describeRecentFolders(workspace);
+  return (
+    <li className="relative flex items-center">
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-describedby={description === undefined ? undefined : descriptionId}
+        className="btn ghost h-auto! w-full justify-start gap-3 py-1.5! pr-10! font-normal"
+      >
+        <WorkspaceGlyph icon={workspace.icon} color={workspace.color} />
+        <span className="flex min-w-0 flex-1 flex-col text-left">
+          <span className="truncate">{workspace.name}</span>
+          {description !== undefined && (
+            <span id={descriptionId} aria-hidden="true" className="text-text-secondary truncate text-xs">
+              {description}
+            </span>
+          )}
+        </span>
+      </button>
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`Remove "${workspace.name}" from Recent`}
+        title="Remove from Recent"
+        className="btn ghost icon sm text-text-secondary absolute right-1"
+      >
+        <i className="ic-x" aria-hidden="true" />
+      </button>
+    </li>
   );
 }
