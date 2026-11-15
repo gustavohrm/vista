@@ -225,19 +225,22 @@ function AppShell({ adapter }: AppProps) {
   const activeDocumentKey = activeDocument?.key ?? null;
   // The active tab once its file is read; a restored tab has no content to show before.
   const shownDocument = activeDocument?.isPending ? null : activeDocument;
-  const shownFolder = shownDocument
-    ? workspace?.folders.find((entry) => entry.id === shownDocument.folderId)
-    : undefined;
-  const activeLocation = useMemo(
-    () =>
-      shownDocument && shownFolder?.folder
+  const locateDocument = useCallback(
+    (doc: { folderId: string; path: string }) => {
+      const entry = workspace?.folders.find((candidate) => candidate.id === doc.folderId);
+      return entry?.folder
         ? documentLocation(
-            { rootPath: shownFolder.folder.rootPath, name: shownFolder.name },
-            shownDocument.path,
+            { rootPath: entry.folder.rootPath, name: entry.name },
+            doc.path,
             adapter.platform === "native",
           )
-        : null,
-    [adapter.platform, shownDocument, shownFolder],
+        : null;
+    },
+    [adapter.platform, workspace],
+  );
+  const activeLocation = useMemo(
+    () => (shownDocument ? locateDocument(shownDocument) : null),
+    [locateDocument, shownDocument],
   );
   const hasDirtyDocuments = documentsState.documents.some((doc) => doc.isDirty);
   const isPromptingForUnsavedChanges = unsavedRequest !== null;
@@ -2154,6 +2157,7 @@ function AppShell({ adapter }: AppProps) {
             onClose={(key) => closeDocuments([key])}
             onCloseMany={(keys) => closeDocuments(keys)}
             onCopyRelativePath={(path) => void copyText(path)}
+            locate={locateDocument}
             actions={
               shownDocument && (
                 <DocumentActions

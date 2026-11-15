@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 
+import { shortenPath, type DocumentLocation } from "../../domain/document-location";
 import type { OpenDocument } from "../../state/documents";
 import { Menu, MENU_SEPARATOR, type MenuEntry } from "../menu/menu";
 import { FileIcon } from "./file-icon";
@@ -17,6 +18,8 @@ interface TabStripProps {
   onCopyRelativePath: (path: string) => void;
   /** What acts on the active tab, at the row's right end. */
   actions?: ReactNode;
+  /** Where a tab's file is, as the path bar shows it. */
+  locate?: (doc: OpenDocument) => DocumentLocation | null;
 }
 
 /**
@@ -31,6 +34,7 @@ export function TabStrip({
   onCloseMany,
   onCopyRelativePath,
   actions,
+  locate,
 }: TabStripProps) {
   const [menu, setMenu] = useState<{ key: string; x: number; y: number } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -93,6 +97,7 @@ export function TabStrip({
           <Tab
             key={doc.key}
             document={doc}
+            {...describeTab(doc, documents, locate)}
             isActive={doc.key === activeKey}
             onActivate={() => onActivate(doc.key)}
             onClose={(event) => {
@@ -159,8 +164,30 @@ function buildTabMenu(
   ];
 }
 
+/**
+ * Names a tab after its file, adding the folder the file is in when another open tab has the same
+ * file name, and gives it the path bar's path as its tooltip.
+ */
+function describeTab(
+  doc: OpenDocument,
+  documents: readonly OpenDocument[],
+  locate: TabStripProps["locate"],
+): { label: string; title: string } {
+  const location = locate?.(doc) ?? null;
+  const parent = location?.segments.at(-2);
+  const isNameShared = documents.some((other) => other.key !== doc.key && other.name === doc.name);
+  return {
+    label: isNameShared && parent ? `${doc.name} · ${parent}` : doc.name,
+    title: location ? shortenPath(location, 0) : doc.path,
+  };
+}
+
 interface TabProps {
   document: OpenDocument;
+  /** The tab's name: the file name, with its folder when another tab has the same file name. */
+  label: string;
+  /** The tab's tooltip. */
+  title: string;
   isActive: boolean;
   onActivate: () => void;
   onClose: (event: MouseEvent) => void;
@@ -168,7 +195,7 @@ interface TabProps {
   onContextMenu: (event: MouseEvent) => void;
 }
 
-function Tab({ document: doc, isActive, onActivate, onClose, onKeyDown, onContextMenu }: TabProps) {
+function Tab({ document: doc, label, title, isActive, onActivate, onClose, onKeyDown, onContextMenu }: TabProps) {
   const handleAuxClick = (event: MouseEvent) => {
     if (event.button === MIDDLE_BUTTON) {
       event.preventDefault();
@@ -199,18 +226,18 @@ function Tab({ document: doc, isActive, onActivate, onClose, onKeyDown, onContex
         aria-selected={isActive}
         tabIndex={isActive ? 0 : -1}
         data-tab-key={doc.key}
-        title={doc.path}
+        title={title}
         onClick={onActivate}
         onKeyDown={onKeyDown}
         className="flex h-full min-w-0 items-center gap-1.5 rounded-md pr-1 pl-2.5 text-[13px] outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-inset"
       >
         <FileIcon extension={doc.extension} className="text-text-secondary flex flex-none text-sm" />
-        <span className="min-w-0 truncate">{doc.name}</span>
+        <span className="min-w-0 truncate">{label}</span>
         {doc.isDirty && <span className="visually-hidden">(unsaved)</span>}
       </button>
       <button
         type="button"
-        aria-label={`Close ${doc.name}`}
+        aria-label={`Close ${label}`}
         tabIndex={isActive ? 0 : -1}
         onClick={onClose}
         className="btn ghost icon sm mr-1 size-5! min-h-0! min-w-0! flex-none p-0! text-[11px] [--ui-radius:4px]"

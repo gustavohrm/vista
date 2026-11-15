@@ -1787,6 +1787,27 @@ describe("App", () => {
       expect(within(actions).queryByRole("group", { name: "Document view mode" })).not.toBeInTheDocument();
     });
 
+    it("adds each tab's folder when two tabs share a file name, and shows the path bar's path in the tooltip", async () => {
+      const user = userEvent.setup();
+      const mockWorkspace = createMemoryWorkspace({ "docs/readme.md": "# Docs", "readme.md": "# Home" });
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+      const explorer = await findExplorerPanel();
+      const [docsRow, homeRow] = await within(explorer).findAllByText("readme.md");
+      await user.click(homeRow!);
+      await screen.findByRole("heading", { name: "Home" });
+      expect(screen.getByRole("tab", { name: "readme.md" })).toHaveAttribute("title", "My Notes / readme.md");
+
+      await user.click(docsRow!);
+      await screen.findByRole("heading", { name: "Docs" });
+      expect(screen.getByRole("tab", { name: "readme.md · My Notes" })).toBeInTheDocument();
+      const docsTab = screen.getByRole("tab", { name: "readme.md · docs" });
+      expect(docsTab).toHaveAttribute("title", "My Notes / docs / readme.md");
+
+      await user.click(screen.getByRole("button", { name: "Close readme.md · My Notes" }));
+      expect(await screen.findByRole("tab", { name: "readme.md" })).toBe(docsTab);
+    });
+
     it("opens the Editor section of Settings from the editor settings menu", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
