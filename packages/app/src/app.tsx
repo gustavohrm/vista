@@ -4,7 +4,7 @@ import type { EditorView } from "@codemirror/view";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 
-import { runCommand, useCommandShortcuts, type Command } from "./commands";
+import { runCommand, sortByCategory, useCommandShortcuts, type Command } from "./commands";
 import { findCodeMirrorView, runEditingAction, type EditingAction } from "./commands/editing";
 import { EditorPane, type FindRequest } from "./components/editor/editor-pane";
 import type { FindMode } from "./components/editor/find-bar";
@@ -1739,30 +1739,42 @@ function AppShell({ adapter }: AppProps) {
     () => [
       {
         id: "file.openFolder",
+        category: "Workspace",
         label: "Open Folder…",
         isEnabled: !isPromptingForUnsavedChanges,
         run: handleOpenFolder,
       },
       {
         id: "file.addFolder",
+        category: "Workspace",
         label: "Add Folder to Workspace…",
         isEnabled: !isPromptingForUnsavedChanges && workspace !== null,
         run: handleAddFolder,
       },
       {
+        id: "workspace.settings",
+        category: "Workspace",
+        label: "Workspace Settings…",
+        isEnabled: !isPromptingForUnsavedChanges && workspace !== null,
+        run: () => setHelpDialog("workspace"),
+      },
+      {
         id: "file.newFile",
+        category: "File",
         label: "New File",
         isEnabled: !isPromptingForUnsavedChanges && hasReadyFolder,
         run: () => requestNewEntry("file"),
       },
       {
         id: "file.newFolder",
+        category: "File",
         label: "New Folder",
         isEnabled: !isPromptingForUnsavedChanges && hasReadyFolder,
         run: () => requestNewEntry("directory"),
       },
       {
         id: "file.save",
+        category: "File",
         label: "Save",
         shortcut: "Mod+S",
         // A second prompt over a pending one would leave the first flow waiting forever.
@@ -1771,12 +1783,14 @@ function AppShell({ adapter }: AppProps) {
       },
       {
         id: "file.saveAll",
+        category: "File",
         label: "Save All",
         isEnabled: !isPromptingForUnsavedChanges && hasDirtyDocuments,
         run: saveAllDocuments,
       },
       {
         id: "file.settings",
+        category: "Settings",
         label: "Settings…",
         shortcut: "Mod+,",
         isEnabled: !isPromptingForUnsavedChanges,
@@ -1784,6 +1798,7 @@ function AppShell({ adapter }: AppProps) {
       },
       {
         id: "tabs.close",
+        category: "Tabs",
         label: "Close Tab",
         // Browsers reserve Ctrl+W for closing their own tab, so the web host uses Alt+W.
         shortcut: adapter.platform === "native" ? "Mod+W" : "Alt+W",
@@ -1792,18 +1807,20 @@ function AppShell({ adapter }: AppProps) {
       },
       {
         id: "tabs.closeAll",
+        category: "Tabs",
         label: "Close All Tabs",
         isEnabled: !isPromptingForUnsavedChanges && activeDocument !== null,
         run: closeAllDocuments,
       },
       // The editors handle these keys themselves, so the menus only show them.
-      { id: "edit.undo", label: "Undo", shortcutHint: "Mod+Z", run: () => runEditing("undo") },
-      { id: "edit.redo", label: "Redo", shortcutHint: "Mod+Y", run: () => runEditing("redo") },
-      { id: "edit.cut", label: "Cut", shortcutHint: "Mod+X", run: () => runEditing("cut") },
-      { id: "edit.copy", label: "Copy", shortcutHint: "Mod+C", run: () => runEditing("copy") },
-      { id: "edit.paste", label: "Paste", shortcutHint: "Mod+V", run: () => runEditing("paste") },
+      { id: "edit.undo", category: "Edit", label: "Undo", shortcutHint: "Mod+Z", run: () => runEditing("undo") },
+      { id: "edit.redo", category: "Edit", label: "Redo", shortcutHint: "Mod+Y", run: () => runEditing("redo") },
+      { id: "edit.cut", category: "Edit", label: "Cut", shortcutHint: "Mod+X", run: () => runEditing("cut") },
+      { id: "edit.copy", category: "Edit", label: "Copy", shortcutHint: "Mod+C", run: () => runEditing("copy") },
+      { id: "edit.paste", category: "Edit", label: "Paste", shortcutHint: "Mod+V", run: () => runEditing("paste") },
       {
         id: "find.find",
+        category: "Edit",
         label: "Find",
         shortcut: "Mod+F",
         isEnabled: !isPromptingForUnsavedChanges && activeDocument !== null,
@@ -1811,15 +1828,23 @@ function AppShell({ adapter }: AppProps) {
       },
       {
         id: "find.replace",
+        category: "Edit",
         label: "Replace",
         shortcut: "Mod+H",
         isEnabled: !isPromptingForUnsavedChanges && activeDocument !== null,
         run: () => openFind("replace"),
       },
-      { id: "selection.all", label: "Select All", shortcutHint: "Mod+A", run: () => runEditing("selectAll") },
+      {
+        id: "selection.all",
+        category: "Selection",
+        label: "Select All",
+        shortcutHint: "Mod+A",
+        run: () => runEditing("selectAll"),
+      },
       // These need the raw editor's multiple selections, which the rendered views do not have.
       {
         id: "selection.line",
+        category: "Selection",
         label: "Select Line",
         shortcutHint: "Alt+L",
         isEnabled: isRawShown,
@@ -1827,6 +1852,7 @@ function AppShell({ adapter }: AppProps) {
       },
       {
         id: "selection.nextOccurrence",
+        category: "Selection",
         label: "Add Next Occurrence",
         shortcutHint: "Mod+D",
         isEnabled: isRawShown,
@@ -1834,6 +1860,7 @@ function AppShell({ adapter }: AppProps) {
       },
       {
         id: "selection.allOccurrences",
+        category: "Selection",
         label: "Select All Occurrences",
         shortcutHint: "Mod+Shift+L",
         isEnabled: isRawShown,
@@ -1841,6 +1868,7 @@ function AppShell({ adapter }: AppProps) {
       },
       {
         id: "selection.cursorAbove",
+        category: "Selection",
         label: "Add Cursor Above",
         shortcutHint: "Mod+Alt+Up",
         isEnabled: isRawShown,
@@ -1848,6 +1876,7 @@ function AppShell({ adapter }: AppProps) {
       },
       {
         id: "selection.cursorBelow",
+        category: "Selection",
         label: "Add Cursor Below",
         shortcutHint: "Mod+Alt+Down",
         isEnabled: isRawShown,
@@ -1855,6 +1884,7 @@ function AppShell({ adapter }: AppProps) {
       },
       {
         id: "palette.commands",
+        category: "View",
         label: "Show All Commands",
         shortcut: COMMANDS_SHORTCUT,
         isEnabled: !isPromptingForUnsavedChanges,
@@ -1862,12 +1892,14 @@ function AppShell({ adapter }: AppProps) {
       },
       {
         id: "view.explorer",
+        category: "View",
         label: "Explorer",
         isChecked: isSidebarOpen,
         run: () => setIsSidebarOpen((previous) => !previous),
       },
       {
         id: "view.rawText",
+        category: "View",
         label: "Raw Text",
         isChecked: isRawShown,
         isEnabled: canToggleView,
@@ -1875,6 +1907,7 @@ function AppShell({ adapter }: AppProps) {
       },
       {
         id: "view.wordWrap",
+        category: "View",
         label: "Word Wrap",
         shortcut: "Alt+Z",
         isChecked: editorSettings.wordWrap,
@@ -1882,29 +1915,34 @@ function AppShell({ adapter }: AppProps) {
       },
       {
         id: "view.lineNumbers",
+        category: "View",
         label: "Line Numbers",
         isChecked: editorSettings.lineNumbers,
         run: () => updateSettings({ editor: { lineNumbers: !editorSettings.lineNumbers } }),
       },
       {
         id: "view.minimap",
+        category: "View",
         label: "Minimap",
         isChecked: editorSettings.minimap,
         run: () => updateSettings({ editor: { minimap: !editorSettings.minimap } }),
       },
       {
         id: "view.vim",
+        category: "View",
         label: "Vim Mode",
         isChecked: editorSettings.vim,
         run: () => updateSettings({ editor: { vim: !editorSettings.vim } }),
       },
       {
         id: "view.theme",
+        category: "View",
         label: theme.theme === "dark" ? "Switch to Light Theme" : "Switch to Dark Theme",
         run: theme.toggleTheme,
       },
       {
         id: "goto.file",
+        category: "Go",
         label: "Go to File",
         shortcut: GO_TO_FILE_SHORTCUT,
         isEnabled: !isPromptingForUnsavedChanges && workspace !== null,
@@ -1912,6 +1950,7 @@ function AppShell({ adapter }: AppProps) {
       },
       {
         id: "goto.line",
+        category: "Go",
         label: "Go to Line",
         shortcut: "Mod+G",
         isEnabled: !isPromptingForUnsavedChanges && activeDocument !== null,
@@ -1919,18 +1958,25 @@ function AppShell({ adapter }: AppProps) {
       },
       {
         id: "tabs.next",
+        category: "Tabs",
         label: "Next Tab",
         isEnabled: !isPromptingForUnsavedChanges && documentsState.documents.length > 1,
         run: () => activateNeighborTab(1),
       },
       {
         id: "tabs.previous",
+        category: "Tabs",
         label: "Previous Tab",
         isEnabled: !isPromptingForUnsavedChanges && documentsState.documents.length > 1,
         run: () => activateNeighborTab(-1),
       },
-      { id: "help.shortcuts", label: "Keyboard Shortcuts", run: () => setHelpDialog("shortcuts") },
-      { id: "help.about", label: "About Vista", run: () => setHelpDialog("about") },
+      {
+        id: "help.shortcuts",
+        category: "Settings",
+        label: "Keyboard Shortcuts",
+        run: () => setHelpDialog("shortcuts"),
+      },
+      { id: "help.about", category: "Settings", label: "About Vista", run: () => setHelpDialog("about") },
     ],
     [
       activateNeighborTab,
@@ -1965,15 +2011,12 @@ function AppShell({ adapter }: AppProps) {
     [commands, isRawShown],
   );
   useCommandShortcuts(commands);
-  // Every menu command, named with its menu, except the one that opens this list.
+  // Every command, named with its category, except the one that opens this list.
   const paletteCommands = useMemo<PaletteCommand[]>(
     () =>
-      MENUS.flatMap((menu) =>
-        menu.items.flatMap((id) => {
-          const command = id === "palette.commands" ? undefined : commands.find((candidate) => candidate.id === id);
-          return command ? [{ command, title: `${menu.label}: ${command.label}` }] : [];
-        }),
-      ),
+      sortByCategory(commands)
+        .filter((command) => command.id !== "palette.commands")
+        .map((command) => ({ command, title: `${command.category}: ${command.label}` })),
     [commands],
   );
   const handleRunPaletteCommand = useCallback((command: Command) => {
@@ -2168,7 +2211,7 @@ function AppShell({ adapter }: AppProps) {
         />
       )}
       {helpDialog === "shortcuts" && (
-        <KeyboardShortcutsDialog commands={commands} groups={MENUS} onClose={() => setHelpDialog(null)} />
+        <KeyboardShortcutsDialog commands={commands} onClose={() => setHelpDialog(null)} />
       )}
       {helpDialog === "about" && <AboutDialog platform={adapter.platform} onClose={() => setHelpDialog(null)} />}
       {helpDialog === "settings" && (

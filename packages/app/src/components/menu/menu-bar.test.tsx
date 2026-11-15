@@ -13,9 +13,9 @@ const MENUS: MenuBarMenu[] = [
 
 function renderMenuBar() {
   const commands: Command[] = [
-    { id: "file.save", label: "Save", shortcut: "Mod+S", run: vi.fn() },
-    { id: "file.close", label: "Close Tab", isEnabled: false, run: vi.fn() },
-    { id: "edit.undo", label: "Undo", shortcutHint: "Mod+Z", run: vi.fn() },
+    { category: "File", id: "file.save", label: "Save", shortcut: "Mod+S", run: vi.fn() },
+    { category: "File", id: "file.close", label: "Close Tab", isEnabled: false, run: vi.fn() },
+    { category: "File", id: "edit.undo", label: "Undo", shortcutHint: "Mod+Z", run: vi.fn() },
   ];
   render(<MenuBar menus={MENUS} commands={commands} />);
   return commands;

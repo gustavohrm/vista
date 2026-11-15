@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, type MouseEvent, type ReactNode, type SyntheticEvent } from "react";
 
-import { formatShortcut, type Command } from "../../commands";
+import { COMMAND_CATEGORIES, formatShortcut, type Command } from "../../commands";
 
 interface HelpDialogProps {
   title: string;
@@ -64,33 +64,24 @@ export function HelpDialog({ title, onClose, children }: HelpDialogProps) {
   );
 }
 
-/** A named set of command ids, such as one application menu. */
-interface ShortcutGroup {
-  label: string;
-  items: readonly string[];
-}
-
 interface KeyboardShortcutsDialogProps {
   commands: readonly Command[];
-  /** Groups the commands are listed under, in order. A command in no group is listed last. */
-  groups: readonly ShortcutGroup[];
   onClose: () => void;
 }
 
 /**
- * Lists every command that has a key, including keys the editors handle themselves, under the
- * menu the command belongs to.
+ * Lists every command that has a key, including keys the editors handle themselves, under its
+ * category.
  */
-export function KeyboardShortcutsDialog({ commands, groups, onClose }: KeyboardShortcutsDialogProps) {
+export function KeyboardShortcutsDialog({ commands, onClose }: KeyboardShortcutsDialogProps) {
   const withKeys = commands.flatMap((command) => {
     const shortcut = command.shortcut ?? command.shortcutHint;
-    return shortcut ? [{ id: command.id, label: command.label, shortcut }] : [];
+    return shortcut ? [{ id: command.id, label: command.label, category: command.category, shortcut }] : [];
   });
-  const grouped = new Set(groups.flatMap((group) => group.items));
-  const sections = [
-    ...groups.map((group) => ({ label: group.label, rows: withKeys.filter((row) => group.items.includes(row.id)) })),
-    { label: "Other", rows: withKeys.filter((row) => !grouped.has(row.id)) },
-  ].filter((section) => section.rows.length > 0);
+  const sections = COMMAND_CATEGORIES.map((category) => ({
+    label: category,
+    rows: withKeys.filter((row) => row.category === category),
+  })).filter((section) => section.rows.length > 0);
 
   return (
     <HelpDialog title="Keyboard Shortcuts" onClose={onClose}>

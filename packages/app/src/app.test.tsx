@@ -1920,11 +1920,42 @@ describe("App", () => {
 
       await user.keyboard("{Control>}{Shift>}p{/Shift}{/Control}");
       expect(screen.getByRole("combobox", { name: "Run a command" })).toHaveValue(">");
-      expect(screen.getByRole("option", { name: "File: Open Folder…" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByRole("option", { name: "Workspace: Open Folder…" })).toHaveAttribute("aria-selected", "true");
       await user.keyboard("about{Enter}");
 
       expect(await screen.findByRole("dialog", { name: "About Vista" })).toBeInTheDocument();
       expect(screen.queryByRole("dialog", { name: "Commands" })).not.toBeInTheDocument();
+    });
+
+    it("lists the commands by category, in the order the spec gives", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+
+      await user.keyboard("{Control>}{Shift>}p{/Shift}{/Control}");
+      const categories = screen.getAllByRole("option").map((option) => option.textContent?.split(":")[0]);
+
+      expect([...new Set(categories)]).toEqual([
+        "Workspace",
+        "File",
+        "Tabs",
+        "Edit",
+        "Selection",
+        "View",
+        "Go",
+        "Settings",
+      ]);
+    });
+
+    it("opens Workspace Settings from the palette", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+
+      await user.keyboard("{Control>}{Shift>}p{/Shift}{/Control}");
+      await user.click(screen.getByRole("option", { name: "Workspace: Workspace Settings…" }));
+
+      expect(await screen.findByRole("dialog", { name: "Workspace Settings" })).toBeInTheDocument();
     });
 
     it("shows a command that cannot run now as disabled and does not run it", async () => {
@@ -2469,6 +2500,8 @@ describe("App", () => {
       expect(within(dialog).getByRole("row", { name: "Save Ctrl+S" })).toBeInTheDocument();
       expect(within(dialog).getByRole("row", { name: "Word Wrap Alt+Z" })).toBeInTheDocument();
       expect(within(dialog).getByRole("row", { name: "Undo Ctrl+Z" })).toBeInTheDocument();
+      const tabsSection = within(dialog).getByRole("rowheader", { name: "Tabs" }).closest("tbody")!;
+      expect(within(tabsSection).getByRole("row", { name: "Close Tab Alt+W" })).toBeInTheDocument();
     });
 
     it("closes the other tabs from a tab's menu", async () => {
