@@ -244,31 +244,8 @@ function DocumentBreadcrumb({ file }: DocumentBreadcrumbProps) {
             </>
           )}
         </li>
-        {file.isReadOnly && (
-          <DocumentNote text="Read-only" title="This file isn't UTF-8 text, so Vista won't save it." />
-        )}
-        {file.externalChange === "changed" && (
-          <DocumentNote
-            text="Changed on disk"
-            title="Another program changed this file. Saving asks before overwriting it."
-          />
-        )}
-        {file.externalChange === "deleted" && (
-          <DocumentNote
-            text="Deleted on disk"
-            title="Another program deleted this file. Saving asks before creating it again."
-          />
-        )}
       </ol>
     </nav>
-  );
-}
-
-function DocumentNote({ text, title }: { text: string; title: string }) {
-  return (
-    <li className="text-text-secondary flex-none text-xs" title={title}>
-      {text}
-    </li>
   );
 }
 

@@ -30,6 +30,7 @@ import {
 import { SettingsDialog, type SettingsSection } from "./components/settings/settings-dialog";
 import { WorkspaceSettingsDialog } from "./components/workspace/workspace-settings-dialog";
 import { WorkspaceSwitcher, type FolderStatus, type RecentWorkspace } from "./components/workspace/workspace-switcher";
+import { documentLocation } from "./domain/document-location";
 import { imageMimeType, resolveImageSource } from "./domain/image-source";
 import { joinWorkspacePath } from "./domain/path-validation";
 import { BYTES_PER_MB, type EditorSettings } from "./domain/settings";
@@ -223,6 +224,20 @@ function AppShell({ adapter }: AppProps) {
   const activeDocumentKey = activeDocument?.key ?? null;
   // The active tab once its file is read; a restored tab has no content to show before.
   const shownDocument = activeDocument?.isPending ? null : activeDocument;
+  const shownFolder = shownDocument
+    ? workspace?.folders.find((entry) => entry.id === shownDocument.folderId)
+    : undefined;
+  const activeLocation = useMemo(
+    () =>
+      shownDocument && shownFolder?.folder
+        ? documentLocation(
+            { rootPath: shownFolder.folder.rootPath, name: shownFolder.name },
+            shownDocument.path,
+            adapter.platform === "native",
+          )
+        : null,
+    [adapter.platform, shownDocument, shownFolder],
+  );
   const hasDirtyDocuments = documentsState.documents.some((doc) => doc.isDirty);
   const isPromptingForUnsavedChanges = unsavedRequest !== null;
   const isPromptingRef = useRef(isPromptingForUnsavedChanges);
@@ -1639,6 +1654,35 @@ function AppShell({ adapter }: AppProps) {
     [toast],
   );
 
+  // The desktop copies the full path on disk; the web has none, so it copies the path within the folder.
+  const copyDocumentPath = useCallback(
+    async (doc: OpenDocument) => {
+      const folder = readyFolder(doc.folderId);
+      if (adapter.platform !== "native") {
+        await copyText(doc.path);
+      } else if (folder) {
+        await copyText(joinAbsolutePath(folder.rootPath, doc.path));
+      }
+    },
+    [adapter.platform, copyText, readyFolder],
+  );
+
+  const revealDocument = useCallback(
+    async (doc: OpenDocument) => {
+      const folder = readyFolder(doc.folderId);
+      if (!folder || !adapter.workspace.reveal) {
+        return;
+      }
+      try {
+        await adapter.workspace.reveal(folder, doc.path);
+      } catch (err) {
+        console.error("Failed to reveal the file:", err);
+        toast.show({ kind: "error", text: "Couldn't show the file in the file manager." });
+      }
+    },
+    [adapter.workspace, readyFolder, toast],
+  );
+
   const runEditing = useCallback(
     async (action: EditingAction) => {
       if (!(await runEditingAction(action))) {
@@ -2147,6 +2191,10 @@ function AppShell({ adapter }: AppProps) {
       </div>
       <StatusBar
         activeFile={shownDocument}
+        location={activeLocation}
+        copyPathLabel={adapter.platform === "native" ? "Copy Path" : "Copy Relative Path"}
+        onCopyPath={shownDocument ? () => void copyDocumentPath(shownDocument) : undefined}
+        onReveal={shownDocument && adapter.workspace.reveal ? () => void revealDocument(shownDocument) : undefined}
         cursor={activeCursor}
         vimMode={activeVimMode}
         onGoToLine={() => setGoToQuery(":")}

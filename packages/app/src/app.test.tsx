@@ -181,6 +181,10 @@ function storedFolders(): StoredFolder[] {
   ];
 }
 
+function statusBar(): HTMLElement {
+  return screen.getByRole("contentinfo", { name: "Status Bar" });
+}
+
 function explorerPanel(): HTMLElement {
   return screen.getByRole("navigation", { name: "File Explorer" });
 }
@@ -2697,6 +2701,53 @@ describe("App", () => {
       expect(getTab("data.csv")).not.toHaveFocus();
     });
 
+    it("shows the active file's folder and path in the path bar, and copies its relative path", async () => {
+      const user = userEvent.setup();
+      const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      expect(within(statusBar()).queryByRole("button", { name: "Copy Relative Path" })).not.toBeInTheDocument();
+
+      await user.click(screen.getByText("data.csv"));
+
+      expect(within(statusBar()).getByText("My Notes / data.csv", { ignore: "[role=tooltip]" })).toBeInTheDocument();
+      expect(within(statusBar()).getByRole("tooltip", { name: "My Notes / data.csv" })).toBeInTheDocument();
+      expect(within(statusBar()).queryByRole("button", { name: "Copy Path" })).not.toBeInTheDocument();
+      expect(within(statusBar()).queryByRole("button", { name: /^Reveal/ })).not.toBeInTheDocument();
+      await user.click(within(statusBar()).getByRole("button", { name: "Copy Relative Path" }));
+      expect(writeText).toHaveBeenCalledWith("data.csv");
+    });
+
+    it("shows the active file's full path on desktop, copies it, and reveals the file", async () => {
+      const user = userEvent.setup();
+      const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+      const reveal = vi.fn(async () => {});
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability({ reveal }) }} />);
+      await openFolderFromWelcome(user);
+      await user.click(screen.getByText("data.csv"));
+
+      expect(within(statusBar()).getByText("/notes/data.csv", { ignore: "[role=tooltip]" })).toBeInTheDocument();
+      await user.click(within(statusBar()).getByRole("button", { name: "Copy Path" }));
+      expect(writeText).toHaveBeenCalledWith("/notes/data.csv");
+      await user.click(within(statusBar()).getByRole("button", { name: "Reveal in File Explorer" }));
+      expect(reveal).toHaveBeenCalledWith(expect.objectContaining({ rootPath: "/notes" }), "data.csv");
+    });
+
+    it("says so when the file manager can't show the file", async () => {
+      const user = userEvent.setup();
+      const reveal = vi.fn(async () => {
+        throw new Error("No file manager.");
+      });
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability({ reveal }) }} />);
+      await openFolderFromWelcome(user);
+      await user.click(screen.getByText("data.csv"));
+
+      await user.click(within(statusBar()).getByRole("button", { name: "Reveal in File Explorer" }));
+
+      expect(await findToast("Couldn't show the file in the file manager.")).toBeInTheDocument();
+    });
+
     it("copies a tree entry's relative path, and offers its full path only on desktop", async () => {
       const user = userEvent.setup();
       const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
@@ -2869,7 +2920,10 @@ describe("App", () => {
       expect(
         await findToast('"readme.md" changed on disk. Saving it will ask before overwriting the other version.'),
       ).toBeInTheDocument();
-      expect(screen.getByText("Changed on disk")).toBeInTheDocument();
+      expect(within(statusBar()).getByText("Changed on disk")).toHaveAttribute(
+        "title",
+        "Another program changed this file. Saving asks before overwriting it.",
+      );
       expect(rawEditorText(editor)).toBe(EDITED_README_CONTENT);
     });
 
@@ -2884,7 +2938,7 @@ describe("App", () => {
 
       fireEvent.focus(window);
 
-      expect(await screen.findByText("Deleted on disk")).toBeInTheDocument();
+      expect(await within(statusBar()).findByText("Deleted on disk")).toBeInTheDocument();
       expect(getTab("readme.md")).toBeInTheDocument();
     });
 
@@ -2976,7 +3030,7 @@ describe("App", () => {
       expect(
         await findToast('"legacy.txt" isn\'t UTF-8 text, so it opened read-only to keep its characters intact.'),
       ).toBeInTheDocument();
-      expect(screen.getByText("Read-only")).toBeInTheDocument();
+      expect(within(statusBar()).getByText("Read-only")).toBeInTheDocument();
       expect(rawEditorText(editor)).toBe("caf�");
       expect(getTab("legacy.txt")).not.toHaveTextContent("(unsaved)");
     });
