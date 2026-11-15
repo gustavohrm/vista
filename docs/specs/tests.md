@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-12
+last_updated: 2026-11-15
 scope: Test categories, where each lives, coverage expectations, and what no automated test reaches.
 ---
 
@@ -48,10 +48,10 @@ The coverage script writes a report, as [stack tests](stack-tests.md#coverage) d
 
 These areas have no automated test. They are verified by hand, or not verified at all, until a test for them exists.
 
-- **Native app.** `apps/native` has no automated UI or end-to-end test. Folder picking, filesystem scope, and restoring a folder after a restart are checked by running the app. Build it by hand when changing Tauri configuration or implementing native adapters.
+- **Native app.** `apps/native` has no automated UI or end-to-end test. Folder picking, filesystem scope, restoring a workspace's folders after a restart, finding the folders a `.vista/workspace.json` lists, and Reveal in File Explorer on Windows and Linux are checked by running the app. Build it by hand when changing Tauri configuration or implementing native adapters.
 - **Native executable.** The native build is not in CI, and no Rust test exists yet.
 - **Native and web folder adapters.** Neither `apps/native/src/workspace-adapter.ts` nor `apps/web/src/workspace-adapter.ts` has a Vitest suite.
-- **File System Access in the browser.** The browser suite in `apps/web/tests/e2e/workspace-crud-fallback.spec.ts` forces the `webkitdirectory` fallback, because automation cannot drive the native folder picker. The primary File System Access path, including permission prompts and reopening a remembered folder, is checked by hand.
+- **File System Access in the browser.** The browser suite in `apps/web/tests/e2e/workspace-crud-fallback.spec.ts` forces the `webkitdirectory` fallback, because automation cannot drive the native folder picker. The primary File System Access path, including permission prompts and reopening remembered folders, is checked by hand. That includes reopening a workspace of several folders, and whether one click can grant access to several of them, which [Reopening at startup](workspaces.md#reopening-at-startup) depends on.
 - **Other browsers.** The browser suite runs Chromium only. Firefox and Safari are not covered.
 - **Mobile.** Android and iOS are not supported, so nothing is tested there.
 - **Packaging.** Installers, signing, and automatic updates are not verified.
