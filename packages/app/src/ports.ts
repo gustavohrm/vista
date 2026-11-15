@@ -153,6 +153,14 @@ export interface WorkspaceCapability {
    */
   resolveRelative?(from: WorkspaceFolder, relativePath: string): Promise<WorkspaceFolder | null>;
   /**
+   * Where `to` is relative to `from`, such as `../sources` or `drafts/2024`, with `/` separators;
+   * `.` when they are the same folder.
+   *
+   * @returns The location, or null when the host can't tell, such as a browser asked about a folder
+   *   outside `from`.
+   */
+  relativeLocation?(from: WorkspaceFolder, to: WorkspaceFolder): Promise<string | null>;
+  /**
    * Opens the operating system's file manager with an entry selected. Only hosts with a file
    * manager provide it.
    *

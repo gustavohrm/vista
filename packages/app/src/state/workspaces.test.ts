@@ -205,6 +205,55 @@ describe("workspace details", () => {
   });
 });
 
+describe("where a workspace's details live", () => {
+  it("stores a workspace in its folder with each folder's location, and keeps that", () => {
+    const storage = memoryStorage();
+    const store = createWorkspaceStore(storage, options());
+    const workspace = store.openFolder(notes);
+    store.addFolder(workspace.id, "f2");
+
+    expect(store.storeInFolder(workspace.id, { "../sources": "f2" })).toMatchObject({
+      storage: "folder",
+      locations: { ".": "f1", "../sources": "f2" },
+    });
+    expect(createWorkspaceStore(storage, options()).workspace(workspace.id)).toMatchObject({
+      storage: "folder",
+      locations: { ".": "f1", "../sources": "f2" },
+    });
+  });
+
+  it("stores a workspace back on the device without its locations", () => {
+    const store = createWorkspaceStore(memoryStorage(), options());
+    const workspace = store.openFolder(notes);
+    store.storeInFolder(workspace.id, {});
+
+    expect(store.storeOnDevice(workspace.id)).toEqual({ ...workspace, storage: "device" });
+  });
+
+  it("keeps the location of a folder added to a workspace stored in its folder, and drops it on removal", () => {
+    const store = createWorkspaceStore(memoryStorage(), options());
+    const workspace = store.openFolder(notes);
+    store.storeInFolder(workspace.id, {});
+
+    expect(store.addFolder(workspace.id, "f2", "../work")).toMatchObject({
+      folderIds: ["f1", "f2"],
+      locations: { ".": "f1", "../work": "f2" },
+    });
+    store.removeFolder(workspace.id, "f2");
+    expect(store.workspace(workspace.id)).toMatchObject({ folderIds: ["f1"], locations: { ".": "f1" } });
+  });
+
+  it("never removes the home folder of a workspace stored in it", () => {
+    const store = createWorkspaceStore(memoryStorage(), options());
+    const workspace = store.openFolder(notes);
+    store.addFolder(workspace.id, "f2");
+    store.storeInFolder(workspace.id, { "../sources": "f2" });
+
+    expect(store.removeFolder(workspace.id, "f1")).toBeNull();
+    expect(store.workspace(workspace.id)?.folderIds).toEqual(["f1", "f2"]);
+  });
+});
+
 describe("recent workspaces", () => {
   function clockedStore(storage = memoryStorage()) {
     let time = 0;

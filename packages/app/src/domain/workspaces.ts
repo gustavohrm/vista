@@ -29,17 +29,29 @@ const FALLBACK_WORKSPACE_NAME = "Untitled workspace";
 /** Where a workspace's details live: Vista's own storage, or `.vista/workspace.json` in its home folder. */
 export type WorkspaceStorage = "device" | "folder";
 
-export interface WorkspaceRecord {
+interface WorkspaceRecordFields {
   id: string;
   name: string;
   icon: WorkspaceIcon;
   color: WorkspaceColor;
   /** The workspace's folders, in order; the first is the home folder. Never empty. */
   folderIds: string[];
-  storage: WorkspaceStorage;
   /** Milliseconds since the epoch, or 0 when unknown. */
   lastOpenedAt: number;
 }
+
+export type WorkspaceRecord = WorkspaceRecordFields &
+  (
+    | { storage: "device" }
+    | {
+        storage: "folder";
+        /**
+         * Which folder on this device each location in `.vista/workspace.json` is, by location.
+         * `.` is always the home folder; a location with no entry hasn't been found here yet.
+         */
+        locations: Readonly<Record<string, string>>;
+      }
+  );
 
 export interface WorkspaceList {
   version: 1;
@@ -88,18 +100,35 @@ function parseWorkspaceRecord(value: unknown): WorkspaceRecord | null {
   if (!isRecord(value) || !isNonEmptyString(value.id) || !isFolderIdList(value.folderIds)) {
     return null;
   }
-  return {
+  const fields: WorkspaceRecordFields = {
     id: value.id,
     name: parseName(value.name) ?? FALLBACK_WORKSPACE_NAME,
     icon: parseIcon(value.icon),
     color: parseColor(value.color),
     folderIds: [...value.folderIds],
-    storage: value.storage === "folder" ? "folder" : "device",
     lastOpenedAt:
       typeof value.lastOpenedAt === "number" && Number.isFinite(value.lastOpenedAt) && value.lastOpenedAt >= 0
         ? value.lastOpenedAt
         : 0,
   };
+  if (value.storage !== "folder") {
+    return { ...fields, storage: "device" };
+  }
+  return { ...fields, storage: "folder", locations: parseLocations(value.locations, fields.folderIds) };
+}
+
+// Keeps the locations that name one of the workspace's folders; the home location is always its first.
+function parseLocations(value: unknown, folderIds: readonly string[]): Record<string, string> {
+  const locations: Record<string, string> = {};
+  if (isRecord(value)) {
+    for (const [location, folderId] of Object.entries(value)) {
+      if (isRelativeLocation(location) && typeof folderId === "string" && folderIds.includes(folderId)) {
+        locations[location] = folderId;
+      }
+    }
+  }
+  locations[HOME_FOLDER_LOCATION] = folderIds[0]!;
+  return locations;
 }
 
 function isFolderIdList(value: unknown): value is string[] {

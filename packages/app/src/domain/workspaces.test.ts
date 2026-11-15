@@ -21,7 +21,7 @@ const research: WorkspaceRecord = {
   icon: "book-open",
   color: "indigo",
   folderIds: ["f1", "f2"],
-  storage: "folder",
+  storage: "device",
   lastOpenedAt: 1_700_000_000_000,
 };
 
@@ -60,6 +60,35 @@ describe("parseWorkspaceList", () => {
       list: { version: 1, lastWorkspaceId: null, workspaces: [other] },
       isDamaged: true,
     });
+  });
+
+  it("reads which folder on this device each location of a workspace stored in its folder is", () => {
+    const inFolder = {
+      ...research,
+      storage: "folder",
+      locations: { ".": "f1", "../sources": "f2", "../gone": "f9", "/abs": "f2", "../bad": 7 },
+    };
+    const stored = JSON.stringify({ version: 1, lastWorkspaceId: null, workspaces: [inFolder] });
+
+    expect(parseWorkspaceList(stored).list.workspaces[0]).toEqual({
+      ...research,
+      storage: "folder",
+      locations: { ".": "f1", "../sources": "f2" },
+    });
+  });
+
+  it("always maps the home location to the first folder", () => {
+    const inFolder = { ...research, storage: "folder", locations: { ".": "f2" } };
+    const stored = JSON.stringify({ version: 1, lastWorkspaceId: null, workspaces: [inFolder] });
+
+    expect(parseWorkspaceList(stored).list.workspaces[0]).toMatchObject({ locations: { ".": "f1" } });
+  });
+
+  it("drops locations from a workspace stored on the device", () => {
+    const onDevice = { ...research, locations: { ".": "f1" } };
+    const stored = JSON.stringify({ version: 1, lastWorkspaceId: null, workspaces: [onDevice] });
+
+    expect(parseWorkspaceList(stored).list.workspaces[0]).toEqual(research);
   });
 
   it("keeps the first of two workspaces with the same id", () => {

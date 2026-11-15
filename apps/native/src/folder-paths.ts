@@ -64,6 +64,27 @@ export function resolveRelativePath(from: string, location: string): string | nu
   return `${root}${separator}${segments.join("/")}`;
 }
 
+/** Where `to` is from `from`, such as `../sources`, or null when they are on different roots. */
+export function relativeFolderPath(from: string, to: string): string | null {
+  const source = splitRoot(comparable(from));
+  const target = splitRoot(normalizeFolderPath(to));
+  const targetKey = splitRoot(comparable(to));
+  const targetKeys = targetKey.segments;
+  if (source.root !== targetKey.root) {
+    return null;
+  }
+  let shared = 0;
+  while (
+    shared < source.segments.length &&
+    shared < targetKeys.length &&
+    source.segments[shared] === targetKeys[shared]
+  ) {
+    shared += 1;
+  }
+  const parts = [...source.segments.slice(shared).map(() => ".."), ...target.segments.slice(shared)];
+  return parts.length === 0 ? "." : parts.join("/");
+}
+
 export function folderNameFromPath(folderPath: string): string {
   return splitRoot(folderPath).segments.pop() ?? "Workspace";
 }

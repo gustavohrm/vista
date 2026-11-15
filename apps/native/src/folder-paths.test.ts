@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { folderNameFromPath, normalizeFolderPath, relateFolderPaths, resolveRelativePath } from "./folder-paths";
+import {
+  folderNameFromPath,
+  normalizeFolderPath,
+  relateFolderPaths,
+  relativeFolderPath,
+  resolveRelativePath,
+} from "./folder-paths";
 
 describe("normalizeFolderPath", () => {
   it.each([
@@ -53,6 +59,28 @@ describe("resolveRelativePath", () => {
     ["//server/share", "../x"],
   ])("finds nothing above the root from %s with %s", (from, location) => {
     expect(resolveRelativePath(from, location)).toBeNull();
+  });
+});
+
+describe("relativeFolderPath", () => {
+  it.each([
+    ["/home/me/notes", "/home/me/sources", "../sources"],
+    ["/home/me/notes", "/home/me/notes/drafts/2024", "drafts/2024"],
+    ["/home/me/notes", "/home/me/notes", "."],
+    ["/home/me/notes/a/b", "/srv/c", "../../../../../srv/c"],
+    ["C:\\Users\\Me\\notes", "c:\\users\\me\\Sources", "../Sources"],
+    ["//server/share/notes", "//server/share/work", "../work"],
+  ])("finds %s -> %s", (from, to, expected) => {
+    expect(relativeFolderPath(from, to)).toBe(expected);
+    expect(resolveRelativePath(from, expected)?.toLowerCase()).toBe(normalizeFolderPath(to).toLowerCase());
+  });
+
+  it.each([
+    ["C:/notes", "D:/sources"],
+    ["//server/share/notes", "//server/other/notes"],
+    ["C:/notes", "/home/me/notes"],
+  ])("has no location from %s to %s on another root", (from, to) => {
+    expect(relativeFolderPath(from, to)).toBeNull();
   });
 });
 

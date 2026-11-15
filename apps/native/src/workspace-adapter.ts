@@ -21,7 +21,13 @@ import {
   type WorkspaceNode,
 } from "@vista/app";
 
-import { folderNameFromPath, normalizeFolderPath, relateFolderPaths, resolveRelativePath } from "./folder-paths";
+import {
+  folderNameFromPath,
+  normalizeFolderPath,
+  relateFolderPaths,
+  relativeFolderPath,
+  resolveRelativePath,
+} from "./folder-paths";
 
 const FOLDERS_STORAGE_KEY = "vista.folders";
 // Where the Vista before workspaces kept its one remembered folder.
@@ -258,6 +264,8 @@ export function createNativeWorkspaceAdapter(): WorkspaceCapability {
       }
       return rememberFolder(target);
     },
+
+    relativeLocation: async (from, to) => relativeFolderPath(from.rootPath, to.rootPath),
 
     async reveal(folder: WorkspaceFolder, path: string): Promise<void> {
       const fullPath = path === "" ? normalizeFolderPath(folder.rootPath) : joinPath(folder.rootPath, path);

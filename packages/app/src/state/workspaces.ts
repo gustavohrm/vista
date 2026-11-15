@@ -1,4 +1,5 @@
 import {
+  HOME_FOLDER_LOCATION,
   DEFAULT_WORKSPACE_COLOR,
   DEFAULT_WORKSPACE_ICON,
   WORKSPACES_STORAGE_KEY,
@@ -41,10 +42,15 @@ export interface WorkspaceStore {
   markOpened(workspaceId: string): void;
   /** Changes a workspace's name, icon, or colour. The name must already pass `validateWorkspaceName`. */
   updateDetails(workspaceId: string, changes: WorkspaceDetails): WorkspaceRecord | null;
-  addFolder(workspaceId: string, folderId: string): WorkspaceRecord | null;
+  /** `location` is where the folder is from the home folder; only a workspace stored in its folder keeps it. */
+  addFolder(workspaceId: string, folderId: string, location?: string): WorkspaceRecord | null;
+  /** Keeps the details in the home folder from now on; `locations` are the other folders', by location. */
+  storeInFolder(workspaceId: string, locations: Readonly<Record<string, string>>): WorkspaceRecord | null;
+  storeOnDevice(workspaceId: string): WorkspaceRecord | null;
   isFolderUsed(folderId: string): boolean;
   /**
-   * Null when the folder is the workspace's only one, since a workspace is one or more folders.
+   * Null when the folder is the workspace's only one, since a workspace is one or more folders, or
+   * the home folder of a workspace stored in it, which would lose its details.
    * `isFolderUnused` says no workspace holds the folder anymore, so its host may forget it.
    */
   removeFolder(workspaceId: string, folderId: string): { isFolderUnused: boolean } | null;
@@ -164,9 +170,34 @@ export function createWorkspaceStore(
       return workspace ? replace({ ...workspace, ...changes }) : null;
     },
 
-    addFolder(workspaceId, folderId) {
+    addFolder(workspaceId, folderId, location) {
       const workspace = list.workspaces.find((w) => w.id === workspaceId);
-      return workspace ? replace({ ...workspace, folderIds: [...workspace.folderIds, folderId] }) : null;
+      if (!workspace) {
+        return null;
+      }
+      const folderIds = [...workspace.folderIds, folderId];
+      if (workspace.storage === "device" || location === undefined) {
+        return replace({ ...workspace, folderIds });
+      }
+      return replace({ ...workspace, folderIds, locations: { ...workspace.locations, [location]: folderId } });
+    },
+
+    storeInFolder(workspaceId, locations) {
+      const workspace = list.workspaces.find((w) => w.id === workspaceId);
+      if (!workspace) {
+        return null;
+      }
+      const home = { [HOME_FOLDER_LOCATION]: workspace.folderIds[0]! };
+      return replace({ ...workspace, storage: "folder", locations: { ...locations, ...home } });
+    },
+
+    storeOnDevice(workspaceId) {
+      const workspace = list.workspaces.find((w) => w.id === workspaceId);
+      if (!workspace) {
+        return null;
+      }
+      const { id, name, icon, color, folderIds, lastOpenedAt } = workspace;
+      return replace({ id, name, icon, color, folderIds, lastOpenedAt, storage: "device" });
     },
 
     removeFolder(workspaceId, folderId) {
@@ -175,7 +206,14 @@ export function createWorkspaceStore(
       if (!workspace || folderIds.length === 0 || folderIds.length === workspace.folderIds.length) {
         return null;
       }
-      replace({ ...workspace, folderIds });
+      if (workspace.storage === "device") {
+        replace({ ...workspace, folderIds });
+      } else if (workspace.folderIds[0] === folderId) {
+        return null;
+      } else {
+        const locations = Object.fromEntries(Object.entries(workspace.locations).filter(([, id]) => id !== folderId));
+        replace({ ...workspace, folderIds, locations });
+      }
       return { isFolderUnused: !isUsed(folderId) };
     },
 

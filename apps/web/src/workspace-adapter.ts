@@ -805,6 +805,20 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
       return (await right.root.resolve(left.root)) !== null ? "inside" : "separate";
     },
 
+    // A handle only knows the entries inside it, so a folder anywhere else has no location.
+    async relativeLocation(from: WorkspaceFolder, to: WorkspaceFolder): Promise<string | null> {
+      const source = sessionOf(from);
+      const target = sessionOf(to);
+      if (source.kind === "fallback" || target.kind === "fallback") {
+        return null;
+      }
+      const segments = await source.root.resolve(target.root);
+      if (segments === null) {
+        return null;
+      }
+      return segments.length === 0 ? "." : segments.join("/");
+    },
+
     async readTree(folder: WorkspaceFolder): Promise<WorkspaceNode[]> {
       const session = sessionOf(folder);
       if (session.kind === "direct") {
