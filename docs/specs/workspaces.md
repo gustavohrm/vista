@@ -85,8 +85,9 @@ The switcher at the top left of the title bar is the one home for workspace acti
 
 - The recent workspaces, each with its icon, name, and folders, the current one checked. Choosing one switches to it.
 - **Open Folder…**, as [Opening a folder](#opening-a-folder) describes.
-- **Add Folder to Workspace…**
 - **Workspace Settings…**
+
+Adding a folder to the current workspace is not in this menu: it is a change to the open workspace's contents, so it lives with them, as the **Add Folder to Workspace** button in the explorer's header, the **Add Folder…** button in [Workspace Settings](#workspace-settings), and the command palette.
 
 ### Workspace Settings
 
@@ -181,11 +182,17 @@ With no file open, the editor area shows a start screen instead of staying empty
 
 From top to bottom, the window holds:
 
-- **Title bar**: the [workspace switcher](#workspace-switcher) on the left and the go-to-file field in the middle. There is no menu bar, as [Commands and menus](#commands-and-menus) explains.
+- **Title bar**: the [workspace switcher](#workspace-switcher) on the left and the go-to-file field in the middle. There is no menu bar, as [Commands and menus](#commands-and-menus) explains. With no workspace open, both would be empty or useless, so the title bar is not shown and the start screen takes the window.
 - **Left rail**: a narrow column of icon buttons. **Explorer** shows or hides the explorer. **Search** and **Graph** are shown disabled with the tooltip `Coming soon`, so the places those features will take are already where users will look for them. The **Settings** gear sits at the bottom.
-- **Explorer**, beside the rail: the workspace's name and its folders, as [File and folder management](#file-and-folder-management) describes.
+- **Explorer**, beside the rail: the workspace's folders, as [File and folder management](#file-and-folder-management) describes.
 - **Tabs row** above the document: the tabs, then, at the right end, the view switch, **Find**, and the editor settings gear. These act on the active tab, so they sit on the row that chooses it. There is no Save button: saving is `Ctrl+S`, and the dot in the tab shows unsaved edits.
 - **Path and status bar** at the bottom, as [Path and status bar](#path-and-status-bar) describes.
+
+The tabs row and the document sit together in one frame, a lighter panel with a hairline border and rounded corners, and the title bar, rail, explorer, and status bar sit on the darker ground around it, so the document is what stands forward. Each boundary is drawn once: the frame's edge separates it from everything else, and nothing inside the shell adds a second line.
+
+Shortcuts are written with spaced plus signs, as in `Ctrl + P` and `Ctrl + Shift + S`, wherever the interface shows one: the title bar, the palette, menus, tooltips, and Settings. The spaces keep the keys apart at small sizes, where `Ctrl+Shift+S` runs together.
+
+**Motion.** The shell moves only where something changes place, so the user can see where a part came from and where it went. Opening a workspace grows the title bar down from the top and the rail and explorer in from the left while the frame shrinks to make room; closing it reverses that. Showing or hiding the explorer resizes the frame. The status bar slides up when a file opens and down when the last one closes. A folder's rows unfold from its row as it opens, and its chevron turns. These take 140 to 350 ms, ease without bouncing, and are instant with the operating system's reduced-motion setting. Typing, switching tabs, moving through a list or menu with the keyboard, and scrolling never animate, since a delay there is only a delay.
 
 The view switch is two icon buttons in one tinted group, named in their tooltips and to assistive technology: **Rich text** (eye) and **Raw** (code) for Markdown, **Table** (table) and **Raw** for CSV. The pressed one is the view shown. A format with one view shows no switch.
 
@@ -201,7 +208,7 @@ Searching inside file contents is a separate, later feature with its own view be
 
 ### Path and status bar
 
-The bar at the bottom shows, on the left, where the active file is, and on the right, facts about it. It stays empty while no file is open.
+The bar below the frame shows, on the left, where the active file is, and on the right, facts about it. It is shown only while a file is: with none open it would have nothing to say. The file's name is set in strong text after the faint folders, so it reads first.
 
 **Path.** On desktop it is the file's full path on disk, as in `C:\Users\gustavo\projects\notes\docs\example.md`. On the web, which has no path on disk, it is `{folder} / {path}`, as in `notes / docs / example.md`. When the path doesn't fit, its middle is shortened with `…` a segment at a time, keeping the start and the file name, as in `C:\Users\gustavo\…\docs\example.md`; the full path is in its tooltip. Beside it:
 
@@ -383,7 +390,7 @@ Workspace operations do not fail silently. A user-initiated cancellation of the 
 
 The explorer follows the open documents: opening a file from anywhere, such as the picker or a tab, expands the folders above it and highlights its row, and a file with unsaved edits shows a dot beside its name.
 
-The explorer's header shows the workspace's name, with **Collapse All** and **Add Folder to Workspace** beside it. Below it, every folder of the workspace is a root row, even when there is only one, so the tree looks the same with one folder or five and folder actions always have the same place. Root rows start expanded.
+The explorer's header reads **Explorer**, with **Add Folder to Workspace** and **Collapse All** beside it. It does not repeat the workspace's name, which the switcher already shows directly above. Below it, every folder of the workspace is a root row, even when there is only one, so the tree looks the same with one folder or five and folder actions always have the same place. Root rows start expanded.
 
 Users create, rename/move, and delete files and folders from the tree:
 

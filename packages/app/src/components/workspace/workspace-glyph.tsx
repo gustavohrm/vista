@@ -14,6 +14,8 @@ const COLOR_STYLES: Record<WorkspaceColor, CSSProperties | undefined> = {
 interface WorkspaceGlyphProps {
   icon: WorkspaceIcon;
   color: WorkspaceColor;
+  /** Draws the icon on a small rounded tile tinted with its colour, as the switcher shows it. */
+  isTile?: boolean;
   className?: string;
 }
 
@@ -21,11 +23,15 @@ interface WorkspaceGlyphProps {
  * A workspace's icon in its colour. Every class is written out, because the icon build step only
  * rewrites literal `ic-*` classes.
  */
-export function WorkspaceGlyph({ icon, color, className = "" }: WorkspaceGlyphProps) {
+export function WorkspaceGlyph({ icon, color, isTile = false, className = "" }: WorkspaceGlyphProps) {
   const style = COLOR_STYLES[color];
   const tone = style ? "" : "text-text-secondary";
+  // The tile's fill is the icon's own colour, faded, so each colour needs no second value.
+  const tile = isTile
+    ? "size-5 items-center justify-center rounded-[5px] bg-[color-mix(in_srgb,currentColor_18%,transparent)]"
+    : "";
   const wrap = (glyph: ReactNode) => (
-    <span aria-hidden="true" style={style} className={`flex flex-none ${tone} ${className}`}>
+    <span aria-hidden="true" style={style} className={`flex flex-none ${tone} ${tile} ${className}`}>
       {glyph}
     </span>
   );

@@ -1,7 +1,47 @@
 @import "@codenhub/styles/tw";
 @import "@codenhub/icons";
 @import "@codenhub/toaster/styles";
+@import "@fontsource-variable/inter";
 @source ".";
+
+/* Vista's shell. The chrome around the document recedes and the frame that holds the document comes
+   forward; each boundary is drawn once, by the frame's background and its hairline. `--ui-ink` is the
+   styles package's hook for its components' border colour, so buttons, inputs, and keys take the
+   same hairline instead of the package's stronger default border. */
+@theme {
+  --font-default: "Inter Variable", "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "Cascadia Code", Consolas, "DejaVu Sans Mono", monospace;
+  --color-chrome: light-dark(#f4f4f4, #0a0a0a);
+  --color-frame: light-dark(#ffffff, #161616);
+  --color-line: light-dark(#e8e8e8, #262626);
+  --color-line-strong: light-dark(#d4d4d4, #333333);
+  --color-hover: light-dark(rgb(0 0 0 / 4.5%), rgb(255 255 255 / 5.5%));
+  --color-selected: light-dark(rgb(0 0 0 / 7%), rgb(255 255 255 / 9%));
+  --color-text-muted: light-dark(#5c5c5c, #a3a3a3);
+  --color-text-faint: light-dark(#737373, #737373);
+  /* Daylight, the brand colour: text selection, find matches, and the dark primary button. */
+  --color-daylight: #c5f03b;
+  --color-highlight: light-dark(rgb(197 240 59 / 75%), rgb(197 240 59 / 35%));
+  --color-highlight-soft: light-dark(rgb(197 240 59 / 35%), rgb(197 240 59 / 16%));
+  --radius-frame: 10px;
+  --ease-enter: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 1, 1);
+  --ease-move: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:root {
+  --ui-ink: var(--color-line);
+}
+
+/* A shortcut written out beside its action, as in `Ctrl + P`. Vista's own rather than the package's
+   `kbd`, which sets keys in a bold monospace that reads louder than the label it follows. */
+@utility shortcut-key {
+  @apply border-line bg-hover text-text-muted inline-flex h-5 items-center rounded border px-1.5 font-sans text-[11px] leading-none font-medium whitespace-nowrap;
+}
+
+::selection {
+  background-color: var(--color-highlight);
+}
 
 html,
 body,
@@ -74,7 +114,7 @@ body,
 }
 
 .markdown-editor .ProseMirror h1 {
-  @apply text-title text-text-strong border-border mb-4 border-b pb-2;
+  @apply text-title text-text-strong mb-4;
 }
 
 /* No package step sits between `text-title` (text-3xl) and `text-title-sm` (text-xl), so h2 keeps
@@ -157,21 +197,22 @@ body,
 
 /* Find matches in rendered views. Text matches are painted with the CSS Custom Highlight API, so
    the rendered editors' DOM is left alone, and matching form fields such as CSV cells carry
-   `data-find-match` (see `components/editor/dom-find.ts`). Colors match the raw editor's. */
+   `data-find-match` (see `components/editor/dom-find.ts`). Colors match the raw editor's: every
+   match in soft Daylight, the current one in full. */
 ::highlight(vista-find) {
-  background-color: var(--color-warning-subtle);
+  background-color: var(--color-highlight-soft);
 }
 
 ::highlight(vista-find-current) {
-  background-color: var(--color-primary-subtle);
+  background-color: var(--color-highlight);
 }
 
 [data-find-match] {
-  background-color: var(--color-warning-subtle);
+  background-color: var(--color-highlight-soft);
 }
 
 [data-find-match="current"] {
-  background-color: var(--color-primary-subtle);
+  background-color: var(--color-highlight);
 }
 
 /* Vista's logo and loader (`components/brand/vista-logo.tsx`). The bar takes Daylight on dark grounds

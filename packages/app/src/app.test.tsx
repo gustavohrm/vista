@@ -185,6 +185,17 @@ function statusBar(): HTMLElement {
   return screen.getByRole("contentinfo", { name: "Status Bar" });
 }
 
+/** Finds the path the status bar shows, whose file name is set apart in an element of its own. */
+function shownPath(text: string): HTMLElement {
+  return within(statusBar()).getByText(
+    (_, element) =>
+      element?.tagName === "SPAN" &&
+      element.firstElementChild !== null &&
+      element.textContent === text &&
+      element.closest("[role=tooltip]") === null,
+  );
+}
+
 function explorerPanel(): HTMLElement {
   return screen.getByRole("navigation", { name: "File Explorer" });
 }
@@ -226,7 +237,7 @@ describe("App", () => {
       await appendToRawEditor(user, await screen.findByRole("textbox", { name: "Raw text content of plan.txt" }), "!");
       await user.keyboard("{Control>}s{/Control}");
 
-      expect(within(explorerPanel()).getByText("Research")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Research" })).toHaveAttribute("aria-haspopup", "menu");
       expect(within(explorerPanel()).getByRole("button", { name: "notes", expanded: true })).toBeInTheDocument();
       expect(within(explorerPanel()).getByRole("button", { name: "sources", expanded: true })).toBeInTheDocument();
       await waitFor(() => expect(folder("sources").textOf("plan.txt")).toBe(`${PLAIN_TEXT}!`));
@@ -656,7 +667,7 @@ describe("App", () => {
     // The mocked readTree always returns the same static list, so this verifies the
     // in-place document path update rather than a refreshed tree from disk.
     await waitFor(() => expect(getTab("guide.md")).toBeInTheDocument());
-    expect(within(statusBar()).getByText("My Notes / guide.md", { ignore: "[role=tooltip]" })).toBeInTheDocument();
+    expect(shownPath("My Notes / guide.md")).toBeInTheDocument();
   });
 
   it("asks for confirmation before deleting a file and deletes it when confirmed", async () => {
@@ -839,7 +850,7 @@ describe("App", () => {
 
       const dialog = await settingsDialog();
       expect(within(dialog).getByRole("tab", { name: "Keyboard Shortcuts" })).toHaveAttribute("aria-selected", "true");
-      expect(within(dialog).getByRole("row", { name: "Save Ctrl+S" })).toBeInTheDocument();
+      expect(within(dialog).getByRole("row", { name: "Save Ctrl + S" })).toBeInTheDocument();
     });
 
     it("shows the version in About, and checks for updates where the host has an updater", async () => {
@@ -2272,7 +2283,7 @@ describe("App", () => {
 
       await user.keyboard("{Control>}{Shift>}p{/Shift}{/Control}");
       await user.keyboard("file save");
-      const save = screen.getByRole("option", { name: /^File: Save\s*Ctrl\+S$/ });
+      const save = screen.getByRole("option", { name: /^File: Save\s*Ctrl \+ S$/ });
       expect(save).toHaveAttribute("aria-selected", "true");
       expect(save).toHaveAttribute("aria-disabled", "true");
       await user.keyboard("{Enter}");
@@ -2320,12 +2331,14 @@ describe("App", () => {
       expect(screen.getByRole("combobox", { name: "Go to file, or :line:column" })).toHaveValue("");
     });
 
-    it("opens on files from the title bar's field, even while no folder is open", async () => {
+    it("says to open a folder when searching files with none open, and opens on files from the title bar's field once one is", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
       await screen.findByRole("button", { name: "Open Folder" });
+      // With no workspace the title bar has nothing to show, so it is not there.
+      expect(screen.queryByRole("button", { name: "Go to file" })).not.toBeInTheDocument();
 
-      await user.click(screen.getByRole("button", { name: "Go to file" }));
+      await user.keyboard("{Control>}{Shift>}p{/Shift}{/Control}{Backspace}");
       expect(screen.getByRole("combobox", { name: "Go to file, or :line:column" })).toHaveValue("");
       expect(screen.getByText("Open a folder to find its files. Type > for commands.")).toBeInTheDocument();
       // jsdom does not turn Escape into the dialog's cancel event.
@@ -2800,11 +2813,11 @@ describe("App", () => {
       await runFromPalette(user, "Settings: Keyboard Shortcuts");
 
       const dialog = await screen.findByRole("dialog", { name: "Settings" });
-      expect(within(dialog).getByRole("row", { name: "Save Ctrl+S" })).toBeInTheDocument();
-      expect(within(dialog).getByRole("row", { name: "Word Wrap Alt+Z" })).toBeInTheDocument();
-      expect(within(dialog).getByRole("row", { name: "Undo Ctrl+Z" })).toBeInTheDocument();
+      expect(within(dialog).getByRole("row", { name: "Save Ctrl + S" })).toBeInTheDocument();
+      expect(within(dialog).getByRole("row", { name: "Word Wrap Alt + Z" })).toBeInTheDocument();
+      expect(within(dialog).getByRole("row", { name: "Undo Ctrl + Z" })).toBeInTheDocument();
       const tabsSection = within(dialog).getByRole("rowheader", { name: "Tabs" }).closest("tbody")!;
-      expect(within(tabsSection).getByRole("row", { name: "Close Tab Alt+W" })).toBeInTheDocument();
+      expect(within(tabsSection).getByRole("row", { name: "Close Tab Alt + W" })).toBeInTheDocument();
     });
 
     it("closes the other tabs from a tab's menu", async () => {
@@ -2863,11 +2876,11 @@ describe("App", () => {
       const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
       await openFolderFromWelcome(user);
-      expect(within(statusBar()).queryByRole("button", { name: "Copy Relative Path" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("contentinfo", { name: "Status Bar" })).not.toBeInTheDocument();
 
       await user.click(screen.getByText("data.csv"));
 
-      expect(within(statusBar()).getByText("My Notes / data.csv", { ignore: "[role=tooltip]" })).toBeInTheDocument();
+      expect(shownPath("My Notes / data.csv")).toBeInTheDocument();
       expect(within(statusBar()).getByRole("tooltip", { name: "My Notes / data.csv" })).toBeInTheDocument();
       expect(within(statusBar()).queryByRole("button", { name: "Copy Path" })).not.toBeInTheDocument();
       expect(within(statusBar()).queryByRole("button", { name: /^Reveal/ })).not.toBeInTheDocument();
@@ -2883,7 +2896,7 @@ describe("App", () => {
       await openFolderFromWelcome(user);
       await user.click(screen.getByText("data.csv"));
 
-      expect(within(statusBar()).getByText("/notes/data.csv", { ignore: "[role=tooltip]" })).toBeInTheDocument();
+      expect(shownPath("/notes/data.csv")).toBeInTheDocument();
       await user.click(within(statusBar()).getByRole("button", { name: "Copy Path" }));
       expect(writeText).toHaveBeenCalledWith("/notes/data.csv");
       await user.click(within(statusBar()).getByRole("button", { name: "Reveal in File Explorer" }));
@@ -3064,7 +3077,7 @@ describe("App", () => {
       fireEvent.contextMenu(editor);
       await user.click(screen.getByRole("menuitem", { name: "Paste" }));
 
-      expect(await screen.findByText("Press Ctrl+V to paste.")).toBeInTheDocument();
+      expect(await screen.findByText("Press Ctrl + V to paste.")).toBeInTheDocument();
       expect(rawEditorText(editor)).toBe(README_CONTENT);
     });
 

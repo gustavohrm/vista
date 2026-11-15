@@ -31,20 +31,19 @@ interface WorkspaceSwitcherProps {
   recents: readonly RecentWorkspace[];
   onSwitch: (workspaceId: string) => void;
   onOpenFolder: () => void;
-  onAddFolder: () => void;
   onOpenSettings: () => void;
 }
 
 /**
  * The button at the top left that shows the open workspace, and its menu: the recent workspaces to
- * switch to, then Open Folder, Add Folder to Workspace, and Workspace Settings.
+ * switch to, then Open Folder and Workspace Settings. Adding a folder to the workspace lives in the
+ * explorer's header, beside the folders it adds to.
  */
 export function WorkspaceSwitcher({
   current,
   recents,
   onSwitch,
   onOpenFolder,
-  onAddFolder,
   onOpenSettings,
 }: WorkspaceSwitcherProps) {
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -65,11 +64,6 @@ export function WorkspaceSwitcher({
     })),
     MENU_SEPARATOR,
     { label: "Open Folder…", icon: <i className="ic-folder-open" aria-hidden="true" />, onSelect: onOpenFolder },
-    {
-      label: "Add Folder to Workspace…",
-      icon: <i className="ic-folder-input" aria-hidden="true" />,
-      onSelect: onAddFolder,
-    },
     MENU_SEPARATOR,
     {
       label: "Workspace Settings…",
@@ -93,11 +87,11 @@ export function WorkspaceSwitcher({
           const bounds = event.currentTarget.getBoundingClientRect();
           setOpen({ x: bounds.left, y: bounds.bottom + MENU_OFFSET_PX });
         }}
-        className={`btn ghost sm min-w-0 flex-none gap-1.5 px-2! font-medium ${open ? "bg-surface" : ""}`}
+        className={`text-text-strong hover:bg-hover flex h-8 min-w-0 flex-none items-center gap-2 rounded-md pr-2 pl-1.5 text-[13px] font-semibold transition-colors duration-100 ${open ? "bg-selected" : ""}`}
       >
-        <WorkspaceGlyph icon={current.icon} color={current.color} className="text-sm" />
+        <WorkspaceGlyph icon={current.icon} color={current.color} isTile className="text-xs" />
         <span className="max-w-48 truncate">{current.name}</span>
-        <i className="ic-chevron-down text-text-secondary text-xs" aria-hidden="true" />
+        <i className="ic-chevrons-up-down text-text-faint text-xs" aria-hidden="true" />
       </button>
       {open && (
         <Menu

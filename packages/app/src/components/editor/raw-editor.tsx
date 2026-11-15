@@ -96,7 +96,7 @@ const SELECTION_SEARCH_KEYMAP = [
 const editorTheme = EditorView.theme({
   "&": {
     height: "100%",
-    backgroundColor: "var(--color-background)",
+    backgroundColor: "var(--color-frame)",
     color: "var(--color-text)",
     fontSize: "0.875rem",
   },
@@ -106,17 +106,17 @@ const editorTheme = EditorView.theme({
   ".cm-line": { padding: "0 1rem" },
   ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--color-text)" },
   "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
-    { backgroundColor: "var(--color-primary-subtle)" },
-  ".cm-activeLine": { backgroundColor: "color-mix(in srgb, var(--color-foreground) 50%, transparent)" },
+    { backgroundColor: "var(--color-highlight)" },
+  ".cm-activeLine": { backgroundColor: "var(--color-hover)" },
   ".cm-gutters": {
-    backgroundColor: "var(--color-background)",
-    color: "var(--color-text-secondary)",
+    backgroundColor: "var(--color-frame)",
+    color: "var(--color-text-faint)",
     border: "none",
   },
   ".cm-activeLineGutter": { backgroundColor: "transparent", color: "var(--color-text)" },
-  ".cm-selectionMatch": { backgroundColor: "var(--color-accent-subtle)" },
-  ".cm-searchMatch": { backgroundColor: "var(--color-warning-subtle)" },
-  ".cm-searchMatch.cm-searchMatch-selected": { backgroundColor: "var(--color-primary-subtle)" },
+  ".cm-selectionMatch": { backgroundColor: "var(--color-selected)" },
+  ".cm-searchMatch": { backgroundColor: "var(--color-highlight-soft)" },
+  ".cm-searchMatch.cm-searchMatch-selected": { backgroundColor: "var(--color-highlight)" },
 });
 
 /**
@@ -201,7 +201,7 @@ export function RawEditor(props: RawEditorProps) {
     binding.props.onJumpApplied?.();
   }, [binding, documentKey, pendingJump]);
 
-  return <div ref={hostRef} className="bg-background h-full w-full overflow-hidden" />;
+  return <div ref={hostRef} className="h-full w-full overflow-hidden" />;
 }
 
 /** Connects editor callbacks to the mounted component. It is mutated in place, so callbacks always see current props. */

@@ -260,7 +260,7 @@ function ShortcutsSection({ commands }: { commands: readonly Command[] }) {
             <tr key={row.id}>
               <td className="text-text py-1 pr-4">{row.label}</td>
               <td className="py-1 text-right">
-                <kbd className="kbd text-[11px]">{formatShortcut(row.shortcut)}</kbd>
+                <kbd className="shortcut-key">{formatShortcut(row.shortcut)}</kbd>
               </td>
             </tr>
           ))}

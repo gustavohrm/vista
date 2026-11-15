@@ -72,7 +72,7 @@ export function CsvTableEditor({ content, onChange }: CsvTableEditorProps) {
   }, [maxColumns]);
 
   return (
-    <div className="csv-table bg-background text-text flex h-full w-full flex-col">
+    <div className="csv-table text-text flex h-full w-full flex-col">
       <div data-find-skip className="flex items-center gap-1 px-3 pb-1">
         <button type="button" onClick={handleAddRow} className="btn ghost sm">
           <i className="ic-plus text-xs" aria-hidden="true" />

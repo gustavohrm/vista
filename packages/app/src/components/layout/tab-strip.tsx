@@ -127,12 +127,12 @@ export function TabStrip({
   };
 
   return (
-    <div className="bg-background flex h-10 flex-none items-center gap-2 pr-2">
+    <div className="flex h-10 flex-none items-center gap-2 pr-1.5">
       <div
         ref={listRef}
         role="tablist"
         aria-label="Open files"
-        className="relative flex h-full min-w-0 flex-1 [scrollbar-width:none] items-center gap-1 overflow-x-auto overflow-y-hidden pl-2"
+        className="relative flex h-full min-w-0 flex-1 [scrollbar-width:none] items-center gap-0.5 overflow-x-auto overflow-y-hidden pl-1.5"
       >
         {documents.map((doc) => (
           <Tab
@@ -250,12 +250,14 @@ function describeTab(
   doc: OpenDocument,
   documents: readonly OpenDocument[],
   locate: TabStripProps["locate"],
-): { label: string; title: string } {
+): { label: string; folderHint: string | null; title: string } {
   const location = locate?.(doc) ?? null;
   const parent = location?.segments.at(-2);
-  const isNameShared = documents.some((other) => other.key !== doc.key && other.name === doc.name);
+  const folderHint =
+    parent && documents.some((other) => other.key !== doc.key && other.name === doc.name) ? parent : null;
   return {
-    label: isNameShared && parent ? `${doc.name} · ${parent}` : doc.name,
+    label: folderHint ? `${doc.name} · ${folderHint}` : doc.name,
+    folderHint,
     title: location ? shortenPath(location, 0) : doc.path,
   };
 }
@@ -264,6 +266,8 @@ interface TabProps {
   document: OpenDocument;
   /** The tab's name: the file name, with its folder when another tab has the same file name. */
   label: string;
+  /** The folder the file is in, shown fainter after its name, when another tab has the same file name. */
+  folderHint: string | null;
   /** The tab's tooltip. */
   title: string;
   isActive: boolean;
@@ -279,6 +283,7 @@ interface TabProps {
 function Tab({
   document: doc,
   label,
+  folderHint,
   title,
   isActive,
   isDragged,
@@ -308,8 +313,8 @@ function Tab({
       onAuxClick={handleAuxClick}
       onMouseDown={handleMouseDown}
       onContextMenu={onContextMenu}
-      className={`group flex h-7 max-w-56 flex-none items-center rounded-md ${isDragged ? "opacity-50" : ""} ${
-        isActive ? "bg-surface text-text-strong" : "text-text-secondary hover:bg-surface/60 hover:text-text"
+      className={`group flex h-7 max-w-56 flex-none items-center rounded-md transition-colors duration-100 ${isDragged ? "opacity-50" : ""} ${
+        isActive ? "bg-selected text-text-strong" : "text-text-muted hover:bg-hover hover:text-text"
       }`}
     >
       <button
@@ -317,6 +322,8 @@ function Tab({
         role="tab"
         aria-selected={isActive}
         tabIndex={isActive ? 0 : -1}
+        // Named in full, so a screen reader hears the folder that tells two same-named tabs apart.
+        aria-label={doc.isDirty ? `${label} (unsaved)` : label}
         data-tab-key={doc.key}
         title={title}
         onClick={onActivate}
@@ -324,8 +331,9 @@ function Tab({
         onKeyDown={onKeyDown}
         className="flex h-full min-w-0 items-center gap-1.5 rounded-md pr-1 pl-2.5 text-[13px] outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-inset"
       >
-        <FileIcon extension={doc.extension} className="text-text-secondary flex flex-none text-sm" />
-        <span className="min-w-0 truncate">{label}</span>
+        <FileIcon extension={doc.extension} className="text-text-faint flex flex-none text-sm" />
+        <span className="min-w-0 truncate">{doc.name}</span>
+        {folderHint && <span className="text-text-faint min-w-0 truncate">{folderHint}</span>}
         {doc.isDirty && <span className="visually-hidden">(unsaved)</span>}
       </button>
       <button
@@ -337,10 +345,7 @@ function Tab({
       >
         {doc.isDirty ? (
           <>
-            <span
-              aria-hidden="true"
-              className="bg-text-secondary inline-block size-1.5 rounded-full group-hover:hidden"
-            />
+            <span aria-hidden="true" className="bg-text-muted inline-block size-1.5 rounded-full group-hover:hidden" />
             <span className="hidden group-hover:inline-flex">
               <i className="ic-x" aria-hidden="true" />
             </span>

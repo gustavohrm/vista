@@ -159,7 +159,7 @@ Rejected marks:
 
 **Daylight is Vista's colour.** It is the light seen through the opening, and a highlighter's colour, the one colour people add to plain text. It also sets Vista apart in a category of purple, blue, teal, green, red, and black and white, and from Haku and Coden, which are monochrome.
 
-Vista will offer several interface themes. Daylight is Vista's own theme and identity; a monochrome theme and others will sit beside it. Today the interface has a light and a dark appearance, set through `@codenhub/theme` with the `@codenhub/styles` palette, and neither uses Daylight yet; the logo and loader the interface shows are the one exception, as [Motion](#motion) describes. Brand surfaces, which are the logo, the app icon, a website, and release notes, always use Daylight.
+Vista will offer several interface themes. Daylight is Vista's own theme and identity; a monochrome theme and others will sit beside it. Today the interface has a light and a dark appearance, set through `@codenhub/theme` with the `@codenhub/styles` palette. Both use Daylight where a highlighter would: selected text and find matches, at 75% on light grounds and 35% on dark ones, with the current match full and the others soft. The logo and loader the interface shows also carry it, as [Motion](#motion) describes. Brand surfaces, which are the logo, the app icon, a website, and release notes, always use Daylight.
 
 The neutrals are the `@codenhub/styles` palette's, so the brand and the interface share them. OKLCH values are the source; hex and RGB are their sRGB conversions.
 
@@ -201,7 +201,7 @@ Daylight on a bright ground is invisible, which is why `daylight-deep` exists: i
 | Schibsted Grotesk | Brand: the wordmark and display lines on brand surfaces.           | SIL OFL 1.1 | Inter SemiBold.                       |
 | Inter             | Everything else on brand surfaces: body, captions, interface text. | SIL OFL 1.1 | Segoe UI, then the system sans-serif. |
 
-Schibsted Grotesk was drawn for a news publisher: sturdy at display sizes, with a pointed `v` and flat-cut terminals that match the mark. It is bundled under `assets/fonts/`. Inter is the Coden family's interface typeface. The application does not bundle either yet: its interface uses the `--font-default` of `@codenhub/styles`, which resolves to the system font. Bundling Inter is a separate decision for the interface, not made here.
+Schibsted Grotesk was drawn for a news publisher: sturdy at display sizes, with a pointed `v` and flat-cut terminals that match the mark. It is bundled under `assets/fonts/`. Inter is the Coden family's interface typeface. The application bundles Inter, the variable version from `@fontsource-variable/inter`, as its interface face, so text looks the same on every system and at the 12 to 13 px the shell is mostly set in, where Inter was drawn to stay clear. It falls back to Segoe UI, then the system sans-serif. Schibsted Grotesk stays off the interface: the wordmark there is the logo's own drawing.
 
 Type scale for brand surfaces:
 

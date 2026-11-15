@@ -1,3 +1,4 @@
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 
 import { joinWorkspacePath } from "../../domain/path-validation";
@@ -53,8 +54,6 @@ export interface NewEntryRequest {
 }
 
 interface SidebarProps {
-  /** Name of the open workspace. The explorer is shown only while one is open. */
-  workspaceName: string;
   /** The workspace's folders, in order. */
   folders: readonly ExplorerFolder[];
   /** The currently active document. */
@@ -105,12 +104,12 @@ interface SidebarProps {
 }
 
 /** Icon classes for file and folder glyphs in the tree, matching the row text color. */
-const TREE_ICON_CLASS = "flex-none text-sm text-text-secondary";
+const TREE_ICON_CLASS = "flex-none text-sm text-text-faint";
 /** Layout shared by every tree row: a full-width, fixed-height button with a visible keyboard focus ring. */
 const TREE_ROW_CLASS =
   "flex h-7 w-full items-center gap-2 rounded-md pr-2 text-left text-[13px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring)]";
-const TREE_ROW_IDLE_CLASS = "text-text-secondary hover:bg-surface/60 hover:text-text";
-const TREE_ROW_ACTIVE_CLASS = "bg-surface text-text-strong font-medium";
+const TREE_ROW_IDLE_CLASS = "text-text hover:bg-hover";
+const TREE_ROW_ACTIVE_CLASS = "bg-selected text-text-strong font-medium";
 /** The New File and New Folder buttons of a folder row, shown while the row is hovered or focused. */
 const ROW_ACTIONS_CLASS =
   "absolute top-0 right-6 flex h-7 items-center gap-0.5 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100";
@@ -122,8 +121,8 @@ const NO_KEYS: ReadonlySet<string> = new Set();
  */
 const INDENT_GUIDE_CLASS = "pointer-events-none absolute top-0 -bottom-px border-l";
 const INDENT_GUIDE_END_CLASS = "pointer-events-none absolute top-0 h-3.5 rounded-bl-md border-b border-l";
-const INDENT_GUIDE_COLOR_CLASS = "border-surface";
-const ACTIVE_INDENT_GUIDE_COLOR_CLASS = "border-border";
+const INDENT_GUIDE_COLOR_CLASS = "border-line";
+const ACTIVE_INDENT_GUIDE_COLOR_CLASS = "border-line-strong";
 /** How far the curve under the last child reaches toward that child's icon, in pixels. */
 const INDENT_GUIDE_END_WIDTH_PX = TREE_INDENT_PX - TREE_ICON_PX / 2 - 3;
 
@@ -140,7 +139,6 @@ const INDENT_GUIDE_END_WIDTH_PX = TREE_INDENT_PX - TREE_ICON_PX / 2 - 3;
  * @returns Sidebar element.
  */
 export function Sidebar({
-  workspaceName,
   folders,
   activeEntry,
   dirtyKeys = NO_KEYS,
@@ -258,73 +256,77 @@ export function Sidebar({
       {isOpen && <div aria-hidden="true" onClick={onClose} className="fixed inset-0 z-30 bg-black/40 md:hidden" />}
       <nav
         aria-label="File Explorer"
-        className={`bg-foreground text-text fixed top-10 bottom-0 left-0 z-40 flex w-[85vw] max-w-72 min-w-0 flex-none flex-col overflow-hidden transition-[width,transform] duration-200 select-none md:static md:z-auto md:max-w-none ${
-          isOpen ? "translate-x-0 md:w-60 lg:w-64" : "-translate-x-full md:w-0 md:translate-x-0"
+        // The panel's width animates open and closed while its content keeps the open width, so the
+        // rows slide in with the edge instead of rewrapping on every frame.
+        className={`bg-chrome text-text fixed top-11 bottom-0 left-0 z-40 flex w-[85vw] max-w-72 min-w-0 flex-none flex-col overflow-hidden transition-[width,transform] duration-300 ease-(--ease-move) select-none motion-reduce:transition-none md:static md:z-auto md:max-w-none ${
+          isOpen ? "translate-x-0 md:w-64" : "-translate-x-full md:w-0 md:translate-x-0"
         }`}
       >
-        {activities}
-        <div className="flex h-10 flex-none items-center justify-between gap-2 pr-1.5 pl-3">
-          <span className="text-text min-w-0 truncate text-[13px] font-semibold">{workspaceName}</span>
-          <div className="flex flex-none items-center gap-0.5">
-            <ExplorerActionButton label="Collapse All" onClick={handleCollapseAll}>
-              <i className="ic-chevrons-down-up text-sm" aria-hidden="true" />
-            </ExplorerActionButton>
-            <ExplorerActionButton label="Add Folder to Workspace" onClick={onAddFolder}>
-              <i className="ic-folder-input text-sm" aria-hidden="true" />
-            </ExplorerActionButton>
-          </div>
-        </div>
-
-        <div
-          className="flex-1 overflow-y-auto px-1.5 pb-2"
-          onContextMenu={(event) => {
-            if (firstFolderId === undefined) {
-              return;
-            }
-            event.preventDefault();
-            setContextMenu({
-              folderId: firstFolderId,
-              path: "",
-              kind: "directory",
-              x: event.clientX,
-              y: event.clientY,
-            });
-          }}
-        >
-          {isLoading ? (
-            <LoadingIndicator />
-          ) : (
-            <div className="flex flex-col gap-px">
-              {folders.map((folder) => (
-                <FolderRoot
-                  key={folder.id}
-                  folder={folder}
-                  isCollapsed={collapsedFolderIds.has(folder.id)}
-                  onToggle={() => handleToggleFolder(folder.id)}
-                  onNewEntry={(path, kind) => handleNewEntry({ folderId: folder.id, path }, kind)}
-                  onContextMenu={(path, kind, x, y) => setContextMenu({ folderId: folder.id, path, kind, x, y })}
-                  onAllowAccess={() => onAllowAccess(folder.id)}
-                  onLocate={folder.canLocate && onLocate ? () => onLocate(folder.id) : undefined}
-                  onRemove={onRemoveFolder ? () => onRemoveFolder(folder.id) : undefined}
-                  tree={{
-                    activePath: activeFolderId === folder.id ? activePath : undefined,
-                    isDirty: (path) => dirtyKeys.has(documentKey(folder.id, path)),
-                    isExpanded: (path) => expandedKeys.has(documentKey(folder.id, path)),
-                    onToggleCollapse: (path) => handleToggleCollapse(documentKey(folder.id, path)),
-                    onSelectFile: (path) => handleSelectFile({ folderId: folder.id, path }),
-                    onContextMenu: (path, kind, x, y) => setContextMenu({ folderId: folder.id, path, kind, x, y }),
-                    onNewEntry: (path, kind) => handleNewEntry({ folderId: folder.id, path }, kind),
-                    renamingPath: renaming?.folderId === folder.id ? renaming.path : null,
-                    onCommitRename: (path, name) => handleCommitRename({ folderId: folder.id, path }, name),
-                    onCancelRename: () => setRenaming(null),
-                    pendingNewEntry: pendingNewEntry?.folderId === folder.id ? pendingNewEntry : null,
-                    onCommitNewEntry: handleCommitNewEntry,
-                    onCancelNewEntry: () => setPendingNewEntry(null),
-                  }}
-                />
-              ))}
+        <div className="flex min-h-0 w-full flex-1 flex-col md:w-64 md:min-w-64">
+          {activities}
+          <div className="flex h-9 flex-none items-center justify-between gap-2 pr-2 pl-4">
+            <span className="text-text-muted min-w-0 truncate text-xs font-semibold">Explorer</span>
+            <div className="flex flex-none items-center gap-0.5">
+              <ExplorerActionButton label="Add Folder to Workspace" onClick={onAddFolder}>
+                <i className="ic-folder-input text-sm" aria-hidden="true" />
+              </ExplorerActionButton>
+              <ExplorerActionButton label="Collapse All" onClick={handleCollapseAll}>
+                <i className="ic-chevrons-down-up text-sm" aria-hidden="true" />
+              </ExplorerActionButton>
             </div>
-          )}
+          </div>
+
+          <div
+            className="flex-1 overflow-y-auto pr-2 pb-2 pl-1"
+            onContextMenu={(event) => {
+              if (firstFolderId === undefined) {
+                return;
+              }
+              event.preventDefault();
+              setContextMenu({
+                folderId: firstFolderId,
+                path: "",
+                kind: "directory",
+                x: event.clientX,
+                y: event.clientY,
+              });
+            }}
+          >
+            {isLoading ? (
+              <LoadingIndicator />
+            ) : (
+              <div className="flex flex-col gap-px">
+                {folders.map((folder) => (
+                  <FolderRoot
+                    key={folder.id}
+                    folder={folder}
+                    isCollapsed={collapsedFolderIds.has(folder.id)}
+                    onToggle={() => handleToggleFolder(folder.id)}
+                    onNewEntry={(path, kind) => handleNewEntry({ folderId: folder.id, path }, kind)}
+                    onContextMenu={(path, kind, x, y) => setContextMenu({ folderId: folder.id, path, kind, x, y })}
+                    onAllowAccess={() => onAllowAccess(folder.id)}
+                    onLocate={folder.canLocate && onLocate ? () => onLocate(folder.id) : undefined}
+                    onRemove={onRemoveFolder ? () => onRemoveFolder(folder.id) : undefined}
+                    tree={{
+                      activePath: activeFolderId === folder.id ? activePath : undefined,
+                      isDirty: (path) => dirtyKeys.has(documentKey(folder.id, path)),
+                      isExpanded: (path) => expandedKeys.has(documentKey(folder.id, path)),
+                      onToggleCollapse: (path) => handleToggleCollapse(documentKey(folder.id, path)),
+                      onSelectFile: (path) => handleSelectFile({ folderId: folder.id, path }),
+                      onContextMenu: (path, kind, x, y) => setContextMenu({ folderId: folder.id, path, kind, x, y }),
+                      onNewEntry: (path, kind) => handleNewEntry({ folderId: folder.id, path }, kind),
+                      renamingPath: renaming?.folderId === folder.id ? renaming.path : null,
+                      onCommitRename: (path, name) => handleCommitRename({ folderId: folder.id, path }, name),
+                      onCancelRename: () => setRenaming(null),
+                      pendingNewEntry: pendingNewEntry?.folderId === folder.id ? pendingNewEntry : null,
+                      onCommitNewEntry: handleCommitNewEntry,
+                      onCancelNewEntry: () => setPendingNewEntry(null),
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </nav>
 
@@ -481,7 +483,7 @@ function ExplorerActionButton({ label, onClick, children }: ExplorerActionButton
           aria-label={label}
           aria-describedby={bubbleId}
           onClick={onClick}
-          className="btn ghost icon sm"
+          className="btn ghost icon sm text-text-muted"
         >
           {children}
         </button>
@@ -526,16 +528,53 @@ function EntryIcon({ kind, extension, isCollapsed = false }: EntryIconProps) {
     return <FileIcon extension={extension ?? ""} className={TREE_ICON_CLASS} />;
   }
   return isCollapsed ? (
-    <i className="ic-folder text-text-secondary flex-none text-sm" aria-hidden="true" />
+    <i className="ic-folder text-text-faint flex-none text-sm" aria-hidden="true" />
   ) : (
-    <i className="ic-folder-open text-text-secondary flex-none text-sm" aria-hidden="true" />
+    <i className="ic-folder-open text-text-faint flex-none text-sm" aria-hidden="true" />
   );
 }
 
 const UNREADABLE_FOLDER_HINT = "Vista can't read this folder, so its files aren't listed";
 
+/** How long a folder takes to open, in seconds. Closing takes two thirds of it. */
+const FOLDER_OPEN_SECONDS = 0.2;
+const FOLDER_CLOSE_SECONDS = 0.14;
+const EASE_MOVE = [0.4, 0, 0.2, 1] as const;
+
+/**
+ * The rows inside an expanded folder. They unfold from the folder's row as it opens, pushing the rows
+ * below down, and fold back into it as it closes; with reduced motion they appear and go at once.
+ * Clipped only while moving, so focus rings and the last indent guide show once open.
+ *
+ * @param props - The folder's child rows.
+ * @returns The rows, in a box that animates its height.
+ */
+function FolderChildren({ children }: { children: ReactNode }) {
+  const isReduced = useReducedMotion() ?? false;
+  return (
+    <motion.div
+      initial={{ height: 0, opacity: 0, overflow: "hidden" }}
+      animate={{
+        height: "auto",
+        opacity: 1,
+        transition: { duration: isReduced ? 0 : FOLDER_OPEN_SECONDS, ease: EASE_MOVE },
+        transitionEnd: { overflow: "visible" },
+      }}
+      exit={{
+        height: 0,
+        opacity: 0,
+        overflow: "hidden",
+        transition: { duration: isReduced ? 0 : FOLDER_CLOSE_SECONDS, ease: EASE_MOVE },
+      }}
+      className="relative flex flex-col gap-px"
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 interface DisclosureChevronProps {
-  /** Whether the directory is collapsed, which selects a right or down chevron. */
+  /** Whether the directory is collapsed: the chevron points right, and turns down as it opens. */
   isCollapsed: boolean;
 }
 
@@ -547,12 +586,11 @@ interface DisclosureChevronProps {
  */
 function DisclosureChevron({ isCollapsed }: DisclosureChevronProps) {
   return (
-    <span aria-hidden="true" className="text-text-secondary flex flex-none items-center opacity-70">
-      {isCollapsed ? (
-        <i className="ic-chevron-right text-xs" aria-hidden="true" />
-      ) : (
-        <i className="ic-chevron-down text-xs" aria-hidden="true" />
-      )}
+    <span
+      aria-hidden="true"
+      className={`text-text-faint flex flex-none items-center transition-transform duration-150 ease-(--ease-move) motion-reduce:transition-none ${isCollapsed ? "" : "rotate-90"}`}
+    >
+      <i className="ic-chevron-right text-xs" aria-hidden="true" />
     </span>
   );
 }
@@ -621,12 +659,12 @@ function FolderRoot({
             }
           }}
           style={{ paddingLeft: TREE_ROW_INSET_PX }}
-          className={`${TREE_ROW_CLASS} ${TREE_ROW_IDLE_CLASS} text-text font-semibold`}
+          className={`${TREE_ROW_CLASS} ${TREE_ROW_IDLE_CLASS} text-text-strong! font-semibold`}
         >
           <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
             <span className="truncate">{folder.name}</span>
             {folder.location && (
-              <span className="text-text-secondary min-w-0 truncate text-xs font-normal">{folder.location}</span>
+              <span className="text-text-faint min-w-0 truncate text-xs font-normal">{folder.location}</span>
             )}
           </span>
           <DisclosureChevron isCollapsed={isCollapsed} />
@@ -803,29 +841,31 @@ function TreeNode({ node, siblings, level, tree }: TreeNodeProps) {
           </button>
           {!node.isUnreadable && <FolderRowActions onNewEntry={(kind) => tree.onNewEntry(node.path, kind)} />}
         </div>
-        {showChildren && (
-          <div className="relative flex flex-col gap-px">
-            {showPendingEntry && (
-              <div className="relative">
-                {renderGuide(children.length === 0)}
-                <TreeEntryNameInput
-                  level={level + 1}
-                  initialValue=""
-                  icon={<EntryIcon kind={pendingNewEntry.kind} isCollapsed />}
-                  siblingNames={children.map((child) => child.name)}
-                  onCommit={tree.onCommitNewEntry}
-                  onCancel={tree.onCancelNewEntry}
-                />
-              </div>
-            )}
-            {children.map((child, index) => (
-              <div key={child.id} className="relative flex flex-col gap-px">
-                {renderGuide(index === children.length - 1)}
-                <TreeNode node={child} siblings={children} level={level + 1} tree={tree} />
-              </div>
-            ))}
-          </div>
-        )}
+        <AnimatePresence initial={false}>
+          {showChildren && (
+            <FolderChildren key="children">
+              {showPendingEntry && (
+                <div className="relative">
+                  {renderGuide(children.length === 0)}
+                  <TreeEntryNameInput
+                    level={level + 1}
+                    initialValue=""
+                    icon={<EntryIcon kind={pendingNewEntry.kind} isCollapsed />}
+                    siblingNames={children.map((child) => child.name)}
+                    onCommit={tree.onCommitNewEntry}
+                    onCancel={tree.onCancelNewEntry}
+                  />
+                </div>
+              )}
+              {children.map((child, index) => (
+                <div key={child.id} className="relative flex flex-col gap-px">
+                  {renderGuide(index === children.length - 1)}
+                  <TreeNode node={child} siblings={children} level={level + 1} tree={tree} />
+                </div>
+              ))}
+            </FolderChildren>
+          )}
+        </AnimatePresence>
       </div>
     );
   }
@@ -848,7 +888,7 @@ function TreeNode({ node, siblings, level, tree }: TreeNodeProps) {
       <span className="min-w-0 flex-1 truncate">{node.name}</span>
       {tree.isDirty(node.path) && (
         <>
-          <span aria-hidden="true" className="bg-text-secondary size-1.5 flex-none rounded-full" />
+          <span aria-hidden="true" className="bg-text-muted size-1.5 flex-none rounded-full" />
           <span className="visually-hidden"> (unsaved)</span>
         </>
       )}

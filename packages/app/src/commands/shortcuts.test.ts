@@ -37,7 +37,12 @@ describe("matchesShortcut", () => {
 });
 
 describe("formatShortcut", () => {
-  it("shows Mod as Ctrl", () => {
-    expect(formatShortcut("Mod+Shift+S")).toBe("Ctrl+Shift+S");
+  it("shows Mod as Ctrl, with a space on each side of every plus", () => {
+    expect(formatShortcut("Mod+Shift+S")).toBe("Ctrl + Shift + S");
+  });
+
+  it("keeps a key that is itself a comma or plus", () => {
+    expect(formatShortcut("Mod+,")).toBe("Ctrl + ,");
+    expect(formatShortcut("Mod++")).toBe("Ctrl + +");
   });
 });

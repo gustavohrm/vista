@@ -80,18 +80,14 @@ export function EditorPane({
 
   if (!doc) {
     return (
-      <main
-        role="main"
-        data-platform={platform}
-        className="bg-background text-text flex min-h-0 flex-1 flex-col overflow-hidden"
-      >
+      <main role="main" data-platform={platform} className="text-text flex min-h-0 flex-1 flex-col overflow-hidden">
         {emptyState}
       </main>
     );
   }
 
   return (
-    <main role="main" data-platform={platform} className="bg-background text-text flex flex-1 flex-col overflow-hidden">
+    <main role="main" data-platform={platform} className="text-text flex flex-1 flex-col overflow-hidden">
       <div
         className="relative flex-1 overflow-hidden"
         onContextMenu={(event) => {

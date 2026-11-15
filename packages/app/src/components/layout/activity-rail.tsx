@@ -19,7 +19,7 @@ interface ActivityRailProps {
  */
 export function ActivityRail({ isExplorerOpen, onToggleExplorer, onOpenSettings }: ActivityRailProps) {
   return (
-    <nav aria-label="Activity bar" className="hidden w-11 flex-none flex-col items-center gap-1 pt-1 pb-2 md:flex">
+    <nav aria-label="Activity bar" className="hidden w-12 flex-none flex-col items-center gap-1 pt-1 pb-2 md:flex">
       <RailButton
         label="Explorer"
         tooltip="Explorer"
@@ -98,7 +98,9 @@ function RailButton({ label, tooltip, position, onClick, isPressed, children }: 
           aria-pressed={isPressed}
           aria-disabled={onClick ? undefined : true}
           onClick={onClick}
-          className={`btn icon ${isPressed ? "soft" : "ghost"} ${onClick ? "" : "opacity-50"}`}
+          className={`flex size-[34px] items-center justify-center rounded-lg text-lg transition-colors duration-100 focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] focus-visible:outline-none ${
+            isPressed ? "bg-selected text-text-strong" : "text-text-faint"
+          } ${onClick ? "hover:bg-hover hover:text-text" : "opacity-50"}`}
         >
           {children}
         </button>

@@ -111,7 +111,7 @@ export function StartScreen({
                   <span className="text-text-secondary flex flex-none">{action.icon}</span>
                   <span className="flex-1 text-left">{action.label}</span>
                   {action.shortcut && (
-                    <kbd aria-hidden="true" className="kbd flex-none text-[11px]">
+                    <kbd aria-hidden="true" className="shortcut-key flex-none">
                       {formatShortcut(action.shortcut)}
                     </kbd>
                   )}

@@ -8,8 +8,9 @@ import type { OpenDocument } from "../../state/documents";
 import type { CursorInfo } from "../editor/raw-editor";
 import { Tooltip } from "../feedback/tooltip";
 
-/** Icon buttons sized to fit the bar's 24px height. */
-const PATH_BUTTON_CLASS = "btn ghost icon sm size-5! min-h-0! min-w-0! p-0! text-xs [--ui-radius:4px]";
+/** Icon buttons sized to fit the bar's 30px height. */
+const PATH_BUTTON_CLASS =
+  "btn ghost icon sm size-6! min-h-0! min-w-0! p-0! text-xs text-text-faint hover:text-text [--ui-radius:6px]";
 
 interface StatusBarProps {
   /** Currently active file document, if one is open. */
@@ -34,7 +35,7 @@ interface StatusBarProps {
  * Renders the bottom path and status bar. On the left: where the active file is, with Copy, Reveal
  * where the host can, and notes such as Read-only. On the right: the raw editor's cursor position
  * and vim mode, and the document's line count, size, line endings, format, and word count for
- * Markdown. The bar stays empty when no document is open.
+ * Markdown. The shell shows the bar only while a document is.
  *
  * @param props - StatusBar properties.
  * @returns Status bar element.
@@ -52,7 +53,7 @@ export function StatusBar({
   return (
     <footer
       aria-label="Status Bar"
-      className="bg-foreground text-text-secondary flex h-6 flex-none items-center justify-between gap-4 pr-3 pl-2 text-xs select-none"
+      className="text-text-faint flex h-[30px] flex-none items-center justify-between gap-4 px-1 text-xs tabular-nums select-none"
     >
       {activeFile && location && (
         // The path comes first, so it keeps most of a narrow bar and the facts scroll instead.
@@ -73,7 +74,7 @@ export function StatusBar({
       )}
       {activeFile && (
         <div className="ml-auto flex min-w-0 [scrollbar-width:none] items-center gap-4 overflow-x-auto whitespace-nowrap">
-          {vimMode && <span className="text-text font-medium">{vimMode.toUpperCase()}</span>}
+          {vimMode && <span className="text-text-strong font-medium">{vimMode.toUpperCase()}</span>}
           {cursor &&
             (onGoToLine ? (
               <button
@@ -135,11 +136,22 @@ function PathText({ location }: { location: DocumentLocation }) {
   return (
     <Tooltip text={full} position="top" align="start" className="flex min-w-0">
       {(bubbleId) => (
-        <span ref={textRef} aria-describedby={bubbleId} className="text-text min-w-0 truncate">
-          {shortenPath(location, hidden)}
+        <span ref={textRef} aria-describedby={bubbleId} className="text-text-muted min-w-0 truncate">
+          {splitFileName(shortenPath(location, hidden), location)}
         </span>
       )}
     </Tooltip>
+  );
+}
+
+/** Sets the file name apart from the folders before it, which only say where it is. */
+function splitFileName(path: string, location: DocumentLocation): ReactNode {
+  const name = location.segments.at(-1) ?? "";
+  return (
+    <>
+      {path.slice(0, path.length - name.length)}
+      <span className="text-text-strong font-medium">{name}</span>
+    </>
   );
 }
 
@@ -184,7 +196,7 @@ function DocumentNotes({ file }: { file: OpenDocument }) {
 
 function DocumentNote({ text, title }: { text: string; title: string }) {
   return (
-    <span className="text-text-secondary ml-1 flex-none" title={title}>
+    <span className="text-text-muted ml-1 flex-none" title={title}>
       {text}
     </span>
   );

@@ -1,3 +1,4 @@
+import { formatShortcut } from "../../commands/shortcuts";
 import type { EditorSettings } from "../../domain/settings";
 import { getViewer } from "../../domain/viewers";
 import type { ViewMode } from "../../ports";
@@ -43,7 +44,7 @@ export function DocumentActions({
       {canToggleView && viewer.enriched !== undefined && (
         <ViewModeToggle viewMode={doc.viewMode} enriched={viewer.enriched} onViewModeChange={onViewModeChange} />
       )}
-      <Tooltip text="Find (Ctrl+F)" position="bottom" align="end">
+      <Tooltip text={`Find (${formatShortcut("Mod+F")})`} position="bottom" align="end">
         {(bubbleId) => (
           <button
             type="button"

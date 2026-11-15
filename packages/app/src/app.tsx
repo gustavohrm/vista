@@ -1,6 +1,7 @@
 import { addCursorAbove, addCursorBelow, selectLine } from "@codemirror/commands";
 import { selectNextOccurrence, selectSelectionMatches } from "@codemirror/search";
 import type { EditorView } from "@codemirror/view";
+import { AnimatePresence } from "motion/react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 
@@ -14,6 +15,7 @@ import type { CursorInfo, EditorPosition, RawEditorStateCache } from "./componen
 import { ToastProvider, useToast } from "./components/feedback/toast";
 import { UnsavedChangesDialog, type UnsavedChangesChoice } from "./components/feedback/unsaved-changes-dialog";
 import { ActivityRail, DrawerActivities } from "./components/layout/activity-rail";
+import { ShellReveal } from "./components/layout/shell-reveal";
 import { Sidebar, type ExplorerEntry, type ExplorerFolder, type NewEntryRequest } from "./components/layout/sidebar";
 import { StartScreen, type StartAction } from "./components/layout/start-screen";
 import { StatusBar } from "./components/layout/status-bar";
@@ -1707,7 +1709,7 @@ function AppShell({ adapter }: AppProps) {
     async (action: EditingAction) => {
       if (!(await runEditingAction(action))) {
         // Reading the clipboard needs a permission the keyboard shortcut does not.
-        toast.show({ kind: "info", text: "Press Ctrl+V to paste." });
+        toast.show({ kind: "info", text: "Press Ctrl + V to paste." });
       }
     },
     [toast],
@@ -2155,139 +2157,161 @@ function AppShell({ adapter }: AppProps) {
   return (
     <div
       data-platform={adapter.platform}
-      className="bg-foreground text-text flex h-screen w-screen flex-col overflow-hidden"
+      className="bg-chrome text-text flex h-screen w-screen flex-col overflow-hidden"
     >
-      <TitleBar
-        isSidebarOpen={isSidebarOpen}
-        hasExplorer={workspace !== null}
-        onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
-        onGoToFile={openGoToFile}
-        switcher={
-          currentWorkspace && (
-            <WorkspaceSwitcher
-              current={currentWorkspace}
-              recents={recents}
-              onSwitch={(workspaceId) => void handleOpenWorkspace(workspaceId)}
-              onOpenFolder={() => void handleOpenFolder()}
-              onAddFolder={() => void handleAddFolder()}
-              onOpenSettings={() => setOpenDialog("workspace")}
-            />
-          )
-        }
-        goToFileShortcut={GO_TO_FILE_SHORTCUT}
-      />
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        {workspace && (
-          <ActivityRail
-            isExplorerOpen={isSidebarOpen}
-            onToggleExplorer={() => setIsSidebarOpen((previous) => !previous)}
-            onOpenSettings={() => setOpenDialog("appearance")}
-          />
-        )}
-        {workspace && (
-          <Sidebar
-            workspaceName={workspace.name}
-            activities={<DrawerActivities onOpenSettings={() => setOpenDialog("appearance")} />}
-            folders={explorerFolders}
-            activeEntry={activeDocument ? { folderId: activeDocument.folderId, path: activeDocument.path } : undefined}
-            dirtyKeys={dirtyKeys}
-            expandedKeys={expandedKeys}
-            onExpandedKeysChange={setExpandedKeys}
-            onSelectFile={handleSelectFile}
-            onAddFolder={() => void handleAddFolder()}
-            isLoading={isLoading}
-            isOpen={isSidebarOpen}
-            onClose={() => setIsSidebarOpen(false)}
-            onCreateFile={handleCreateFile}
-            onCreateDirectory={handleCreateDirectory}
-            onRename={handleRename}
-            onDelete={handleDelete}
-            onCopyRelativePath={(entry) => void copyText(entry.path)}
-            onCopyPath={copyFullPath}
-            onReveal={revealEntry && ((entry) => void revealEntry(entry))}
-            onRemoveFolder={
-              workspace && workspace.folders.length > 1 ? (folderId) => void handleRemoveFolder(folderId) : undefined
-            }
-            onAllowAccess={(folderId) => void handleAllowAccess(folderId)}
-            onLocate={(folderId) => void handleLocate(folderId)}
-            newEntryRequest={newEntryRequest}
-          />
-        )}
-        {/* The document frame: a rounded panel set into the chrome on wide screens, edge to edge on narrow ones. */}
-        <div
-          className={`bg-background flex min-w-0 flex-1 flex-col overflow-hidden md:mr-1.5 md:rounded-lg ${workspace && isSidebarOpen ? "" : "md:ml-1.5"}`}
-        >
-          <TabStrip
-            documents={documentsState.documents}
-            activeKey={documentsState.activeKey}
-            onActivate={(key) => dispatchDocuments({ type: "activate", key })}
-            onReorder={(key, toIndex) => dispatchDocuments({ type: "reorder", key, toIndex })}
-            onClose={(key) => closeDocuments([key])}
-            onCloseMany={(keys) => closeDocuments(keys)}
-            onCopyRelativePath={(path) => void copyText(path)}
-            onCopyPath={copyFullPath}
-            onReveal={revealEntry && ((doc) => void revealEntry(doc))}
-            locate={locateDocument}
-            actions={
-              shownDocument && (
-                <DocumentActions
-                  document={shownDocument}
-                  onViewModeChange={handleViewModeChange}
-                  isFindOpen={find !== null}
-                  onFind={() => openFind("find")}
-                  editorSettings={settings.editor}
-                  onEditorSettingsChange={handleEditorSettingsChange}
-                  onOpenSettings={() => setOpenDialog("editor")}
-                />
-              )
-            }
-          />
-          <EditorPane
-            platform={adapter.platform}
-            document={shownDocument}
-            onContentChange={handleContentChange}
-            onCursorChange={handleCursorChange}
-            onVimModeChange={handleVimModeChange}
-            rawEditorStates={rawEditorStatesRef.current}
-            reservedShortcuts={reservedShortcuts}
-            editorSettings={settings.editor}
-            find={find}
-            onFindClose={() => setFind(null)}
-            pendingJump={pendingJump?.key === activeDocumentKey ? pendingJump.position : null}
-            onJumpApplied={handleJumpApplied}
-            contextMenuItems={editorMenuItems}
-            loadImage={loadImage}
-            emptyState={
-              // Blank while a restored tab reads its file.
-              pendingActive ? null : (
-                <StartScreen
-                  workspaceName={workspace?.name ?? null}
-                  isLoading={isLoading}
+      {/* The title bar, rail, and explorer belong to a workspace: with none open there is nothing for
+          them to show, so they are not there, and opening one brings them in around the frame. */}
+      <AnimatePresence initial={false}>
+        {currentWorkspace && (
+          <ShellReveal key="title-bar" axis="height">
+            <TitleBar
+              isSidebarOpen={isSidebarOpen}
+              hasExplorer={workspace !== null}
+              onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+              onGoToFile={openGoToFile}
+              switcher={
+                <WorkspaceSwitcher
+                  current={currentWorkspace}
                   recents={recents}
+                  onSwitch={(workspaceId) => void handleOpenWorkspace(workspaceId)}
                   onOpenFolder={() => void handleOpenFolder()}
-                  onOpenRecent={(workspaceId) => void handleOpenWorkspace(workspaceId)}
-                  onRemoveRecent={(workspaceId) => void handleRemoveRecent(workspaceId)}
-                  actions={startActions}
+                  onOpenSettings={() => setOpenDialog("workspace")}
                 />
-              )
-            }
-          />
+              }
+              goToFileShortcut={GO_TO_FILE_SHORTCUT}
+            />
+          </ShellReveal>
+        )}
+      </AnimatePresence>
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <AnimatePresence initial={false}>
+          {workspace && (
+            <ShellReveal key="rail" axis="width">
+              <ActivityRail
+                isExplorerOpen={isSidebarOpen}
+                onToggleExplorer={() => setIsSidebarOpen((previous) => !previous)}
+                onOpenSettings={() => setOpenDialog("appearance")}
+              />
+            </ShellReveal>
+          )}
+          {workspace && (
+            <ShellReveal key="explorer" axis="width">
+              <Sidebar
+                activities={<DrawerActivities onOpenSettings={() => setOpenDialog("appearance")} />}
+                folders={explorerFolders}
+                activeEntry={
+                  activeDocument ? { folderId: activeDocument.folderId, path: activeDocument.path } : undefined
+                }
+                dirtyKeys={dirtyKeys}
+                expandedKeys={expandedKeys}
+                onExpandedKeysChange={setExpandedKeys}
+                onSelectFile={handleSelectFile}
+                onAddFolder={() => void handleAddFolder()}
+                isLoading={isLoading}
+                isOpen={isSidebarOpen}
+                onClose={() => setIsSidebarOpen(false)}
+                onCreateFile={handleCreateFile}
+                onCreateDirectory={handleCreateDirectory}
+                onRename={handleRename}
+                onDelete={handleDelete}
+                onCopyRelativePath={(entry) => void copyText(entry.path)}
+                onCopyPath={copyFullPath}
+                onReveal={revealEntry && ((entry) => void revealEntry(entry))}
+                onRemoveFolder={
+                  workspace && workspace.folders.length > 1
+                    ? (folderId) => void handleRemoveFolder(folderId)
+                    : undefined
+                }
+                onAllowAccess={(folderId) => void handleAllowAccess(folderId)}
+                onLocate={(folderId) => void handleLocate(folderId)}
+                newEntryRequest={newEntryRequest}
+              />
+            </ShellReveal>
+          )}
+        </AnimatePresence>
+        {/* The document frame, a rounded panel set into the chrome on wide screens and edge to edge on
+            narrow ones, with the status bar beneath it, aligned to its edges. The chrome's margin
+            closes up on each side where a panel meets the frame. */}
+        <div
+          className={`flex min-w-0 flex-1 flex-col transition-[padding] duration-300 ease-(--ease-move) motion-reduce:transition-none md:pr-2 ${
+            workspace && isSidebarOpen ? "" : "md:pl-2"
+          } ${currentWorkspace ? "" : "md:pt-2"} ${shownDocument ? "" : "md:pb-2"}`}
+        >
+          <div className="bg-frame md:border-line md:rounded-frame flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:border">
+            <TabStrip
+              documents={documentsState.documents}
+              activeKey={documentsState.activeKey}
+              onActivate={(key) => dispatchDocuments({ type: "activate", key })}
+              onReorder={(key, toIndex) => dispatchDocuments({ type: "reorder", key, toIndex })}
+              onClose={(key) => closeDocuments([key])}
+              onCloseMany={(keys) => closeDocuments(keys)}
+              onCopyRelativePath={(path) => void copyText(path)}
+              onCopyPath={copyFullPath}
+              onReveal={revealEntry && ((doc) => void revealEntry(doc))}
+              locate={locateDocument}
+              actions={
+                shownDocument && (
+                  <DocumentActions
+                    document={shownDocument}
+                    onViewModeChange={handleViewModeChange}
+                    isFindOpen={find !== null}
+                    onFind={() => openFind("find")}
+                    editorSettings={settings.editor}
+                    onEditorSettingsChange={handleEditorSettingsChange}
+                    onOpenSettings={() => setOpenDialog("editor")}
+                  />
+                )
+              }
+            />
+            <EditorPane
+              platform={adapter.platform}
+              document={shownDocument}
+              onContentChange={handleContentChange}
+              onCursorChange={handleCursorChange}
+              onVimModeChange={handleVimModeChange}
+              rawEditorStates={rawEditorStatesRef.current}
+              reservedShortcuts={reservedShortcuts}
+              editorSettings={settings.editor}
+              find={find}
+              onFindClose={() => setFind(null)}
+              pendingJump={pendingJump?.key === activeDocumentKey ? pendingJump.position : null}
+              onJumpApplied={handleJumpApplied}
+              contextMenuItems={editorMenuItems}
+              loadImage={loadImage}
+              emptyState={
+                // Blank while a restored tab reads its file.
+                pendingActive ? null : (
+                  <StartScreen
+                    workspaceName={workspace?.name ?? null}
+                    isLoading={isLoading}
+                    recents={recents}
+                    onOpenFolder={() => void handleOpenFolder()}
+                    onOpenRecent={(workspaceId) => void handleOpenWorkspace(workspaceId)}
+                    onRemoveRecent={(workspaceId) => void handleRemoveRecent(workspaceId)}
+                    actions={startActions}
+                  />
+                )
+              }
+            />
+          </div>
+          <AnimatePresence initial={false}>
+            {shownDocument && (
+              <ShellReveal key="status-bar" axis="height">
+                <StatusBar
+                  activeFile={shownDocument}
+                  location={activeLocation}
+                  copyPathLabel={adapter.platform === "native" ? "Copy Path" : "Copy Relative Path"}
+                  onCopyPath={() => (copyFullPath ? copyFullPath(shownDocument) : void copyText(shownDocument.path))}
+                  onReveal={revealEntry ? () => void revealEntry(shownDocument) : undefined}
+                  cursor={activeCursor}
+                  vimMode={activeVimMode}
+                  onGoToLine={() => setGoToQuery(":")}
+                />
+              </ShellReveal>
+            )}
+          </AnimatePresence>
         </div>
       </div>
-      <StatusBar
-        activeFile={shownDocument}
-        location={activeLocation}
-        copyPathLabel={adapter.platform === "native" ? "Copy Path" : "Copy Relative Path"}
-        onCopyPath={
-          shownDocument
-            ? () => (copyFullPath ? copyFullPath(shownDocument) : void copyText(shownDocument.path))
-            : undefined
-        }
-        onReveal={shownDocument && revealEntry ? () => void revealEntry(shownDocument) : undefined}
-        cursor={activeCursor}
-        vimMode={activeVimMode}
-        onGoToLine={() => setGoToQuery(":")}
-      />
       {goToQuery !== null && (
         <GoToDialog
           // The field takes its starting text once, so a shortcut for another mode pressed while

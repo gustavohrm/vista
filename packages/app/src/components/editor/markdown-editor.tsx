@@ -325,5 +325,5 @@ export function MarkdownEditor({ content, onChange, onReady, loadImage }: Markdo
     // parent remounts this component (via `key`) when a different document should be shown.
   }, []);
 
-  return <div ref={rootRef} className="markdown-editor bg-background h-full w-full overflow-y-auto p-8" />;
+  return <div ref={rootRef} className="markdown-editor h-full w-full overflow-y-auto p-8" />;
 }

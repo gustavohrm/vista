@@ -242,7 +242,7 @@ export function GoToDialog({
                         <Highlighted text={title} from={0} to={title.length} positions={match.positions} />
                       </span>
                       {command.isChecked && <i className="ic-check text-text-secondary text-sm" aria-hidden="true" />}
-                      {shortcut && <kbd className="kbd flex-none text-[11px]">{formatShortcut(shortcut)}</kbd>}
+                      {shortcut && <kbd className="shortcut-key flex-none">{formatShortcut(shortcut)}</kbd>}
                     </div>
                   );
                 })
@@ -275,18 +275,18 @@ export function GoToDialog({
         )}
         <div className="text-text-secondary flex items-center gap-4 px-3.5 pt-1 pb-2.5 text-xs">
           <span className="flex items-center gap-1.5">
-            <kbd className="kbd text-[11px]">↑</kbd>
-            <kbd className="kbd text-[11px]">↓</kbd>
+            <kbd className="shortcut-key">↑</kbd>
+            <kbd className="shortcut-key">↓</kbd>
             Navigate
           </span>
           <span className="flex items-center gap-1.5">
-            <kbd className="kbd text-[11px]">Enter</kbd>
+            <kbd className="shortcut-key">Enter</kbd>
             {isCommandMode ? "Run" : "Open"}
           </span>
           <span className="ml-auto hidden items-center gap-1.5 sm:flex">
-            <kbd className="kbd text-[11px]">{COMMAND_QUERY_PREFIX}</kbd>
+            <kbd className="shortcut-key">{COMMAND_QUERY_PREFIX}</kbd>
             Commands
-            <kbd className="kbd ml-2 text-[11px]">:</kbd>
+            <kbd className="shortcut-key ml-2">:</kbd>
             Go to line
           </span>
         </div>
