@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./test";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixtureVaultPath = path.join(__dirname, "fixtures", "sample-vault");
