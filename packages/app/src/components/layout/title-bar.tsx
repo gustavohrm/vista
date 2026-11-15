@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 
 import { formatShortcut, type Command } from "../../commands";
-import type { ThemeCapability } from "../../ports";
 import { Tooltip } from "../feedback/tooltip";
 import { MenuBar, type MenuBarMenu } from "../menu/menu-bar";
 
@@ -10,8 +9,6 @@ interface TitleBarProps {
   menus: readonly MenuBarMenu[];
   /** Commands the menus name by id. */
   commands: readonly Command[];
-  /** Theme capability for toggling light/dark mode. */
-  theme: ThemeCapability;
   /** Whether the explorer panel is currently shown. */
   isSidebarOpen: boolean;
   /** Callback triggered to show or hide the explorer panel. */
@@ -26,8 +23,7 @@ interface TitleBarProps {
 
 /**
  * The bar across the top of the application shell: the explorer toggle and the menus on the left,
- * the search field that opens the picker in the middle, and the theme toggle on the right. It
- * stays above the explorer drawer on narrow screens, so the toggle that opened the drawer also
+ * and the search field that opens the picker in the middle. It stays above the explorer drawer on narrow screens, so the toggle that opened the drawer also
  * closes it.
  *
  * @param props - TitleBar properties.
@@ -36,7 +32,6 @@ interface TitleBarProps {
 export function TitleBar({
   menus,
   commands,
-  theme,
   isSidebarOpen,
   onToggleSidebar,
   onSearch,
@@ -44,7 +39,6 @@ export function TitleBar({
   switcher,
 }: TitleBarProps) {
   const explorerLabel = isSidebarOpen ? "Close explorer" : "Open explorer";
-  const themeLabel = `Switch to ${theme.theme === "dark" ? "light" : "dark"} theme`;
 
   return (
     <header className="bg-foreground relative z-50 flex h-10 flex-none items-center gap-1 px-1 select-none md:gap-2">
@@ -83,25 +77,7 @@ export function TitleBar({
         </kbd>
       </button>
 
-      <div className="flex flex-none items-center justify-end lg:flex-1">
-        <Tooltip text={themeLabel} position="bottom" align="end" className="flex flex-none">
-          {(bubbleId) => (
-            <button
-              type="button"
-              onClick={theme.toggleTheme}
-              aria-label={themeLabel}
-              aria-describedby={bubbleId}
-              className="btn ghost icon sm"
-            >
-              {theme.theme === "dark" ? (
-                <i className="ic-sun" aria-hidden="true" />
-              ) : (
-                <i className="ic-moon" aria-hidden="true" />
-              )}
-            </button>
-          )}
-        </Tooltip>
-      </div>
+      <div className="flex-none lg:flex-1" />
     </header>
   );
 }

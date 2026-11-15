@@ -1,11 +1,11 @@
 import { useEffect, useId, useRef, type MouseEvent, type ReactNode, type SyntheticEvent } from "react";
 
-import { COMMAND_CATEGORIES, formatShortcut, type Command } from "../../commands";
-
 interface HelpDialogProps {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  /** Gives the content more room, for a dialog with sections side by side. */
+  isWide?: boolean;
 }
 
 /**
@@ -13,7 +13,7 @@ interface HelpDialogProps {
  * `showModal()`, so the browser contains focus and inerts the page behind it. Escape and a click
  * on the backdrop close it.
  */
-export function HelpDialog({ title, onClose, children }: HelpDialogProps) {
+export function HelpDialog({ title, onClose, children, isWide = false }: HelpDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
@@ -47,7 +47,9 @@ export function HelpDialog({ title, onClose, children }: HelpDialogProps) {
       aria-labelledby={titleId}
       onCancel={handleCancel}
       onClick={handleBackdropClick}
-      className="card soft floating flush w-[min(28rem,calc(100vw-2rem))] backdrop:bg-black/50 backdrop:backdrop-blur-sm"
+      className={`card soft floating flush backdrop:bg-black/50 backdrop:backdrop-blur-sm ${
+        isWide ? "w-[min(44rem,calc(100vw-2rem))]" : "w-[min(28rem,calc(100vw-2rem))]"
+      }`}
     >
       <div className="flex max-h-[80vh] flex-col p-5">
         <h2 id={titleId} className="text-title-sm text-text-strong">
@@ -61,66 +63,5 @@ export function HelpDialog({ title, onClose, children }: HelpDialogProps) {
         </div>
       </div>
     </dialog>
-  );
-}
-
-interface KeyboardShortcutsDialogProps {
-  commands: readonly Command[];
-  onClose: () => void;
-}
-
-/**
- * Lists every command that has a key, including keys the editors handle themselves, under its
- * category.
- */
-export function KeyboardShortcutsDialog({ commands, onClose }: KeyboardShortcutsDialogProps) {
-  const withKeys = commands.flatMap((command) => {
-    const shortcut = command.shortcut ?? command.shortcutHint;
-    return shortcut ? [{ id: command.id, label: command.label, category: command.category, shortcut }] : [];
-  });
-  const sections = COMMAND_CATEGORIES.map((category) => ({
-    label: category,
-    rows: withKeys.filter((row) => row.category === category),
-  })).filter((section) => section.rows.length > 0);
-
-  return (
-    <HelpDialog title="Keyboard Shortcuts" onClose={onClose}>
-      <table className="text-body w-full border-separate border-spacing-0">
-        {sections.map((section) => (
-          <tbody key={section.label}>
-            <tr>
-              <th scope="rowgroup" colSpan={2} className="text-text-secondary pt-4 pb-1 text-left text-xs font-medium">
-                {section.label}
-              </th>
-            </tr>
-            {section.rows.map((row) => (
-              <tr key={row.id}>
-                <td className="text-text py-1 pr-4">{row.label}</td>
-                <td className="py-1 text-right">
-                  <kbd className="kbd text-[11px]">{formatShortcut(row.shortcut)}</kbd>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        ))}
-      </table>
-    </HelpDialog>
-  );
-}
-
-interface AboutDialogProps {
-  platform: string;
-  onClose: () => void;
-}
-
-/** Names the app and the host it runs in. */
-export function AboutDialog({ platform, onClose }: AboutDialogProps) {
-  return (
-    <HelpDialog title="About Vista" onClose={onClose}>
-      <p className="text-body text-text-secondary pt-2">
-        Vista edits a folder of Markdown, CSV, and text files, as raw text or rendered. Running in the{" "}
-        {platform === "native" ? "desktop app" : "browser"}.
-      </p>
-    </HelpDialog>
   );
 }

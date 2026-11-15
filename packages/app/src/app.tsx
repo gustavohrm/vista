@@ -4,6 +4,7 @@ import type { EditorView } from "@codemirror/view";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 
+import { version as APP_VERSION } from "../package.json";
 import { runCommand, sortByCategory, useCommandShortcuts, type Command } from "./commands";
 import { findCodeMirrorView, runEditingAction, type EditingAction } from "./commands/editing";
 import { EditorPane, type FindRequest } from "./components/editor/editor-pane";
@@ -11,7 +12,6 @@ import type { FindMode } from "./components/editor/find-bar";
 import type { CursorInfo, EditorPosition, RawEditorStateCache } from "./components/editor/raw-editor";
 import { ToastProvider, useToast } from "./components/feedback/toast";
 import { UnsavedChangesDialog, type UnsavedChangesChoice } from "./components/feedback/unsaved-changes-dialog";
-import { AboutDialog, KeyboardShortcutsDialog } from "./components/help/help-dialog";
 import { Sidebar, type ExplorerEntry, type ExplorerFolder, type NewEntryRequest } from "./components/layout/sidebar";
 import { StartScreen, type StartAction } from "./components/layout/start-screen";
 import { StatusBar } from "./components/layout/status-bar";
@@ -26,7 +26,7 @@ import {
   type GoToRequest,
   type PaletteCommand,
 } from "./components/navigation/go-to-dialog";
-import { SettingsDialog } from "./components/settings/settings-dialog";
+import { SettingsDialog, type SettingsSection } from "./components/settings/settings-dialog";
 import { WorkspaceSettingsDialog } from "./components/workspace/workspace-settings-dialog";
 import { WorkspaceSwitcher, type FolderStatus, type RecentWorkspace } from "./components/workspace/workspace-switcher";
 import { imageMimeType, resolveImageSource } from "./domain/image-source";
@@ -166,8 +166,6 @@ const MENUS: readonly MenuBarMenu[] = [
       "view.lineNumbers",
       "view.minimap",
       "view.vim",
-      MENU_SEPARATOR,
-      "view.theme",
     ],
   },
   { label: "Go", items: ["goto.file", "goto.line", MENU_SEPARATOR, "tabs.next", "tabs.previous"] },
@@ -230,7 +228,8 @@ function AppShell({ adapter }: AppProps) {
   const [pendingJump, setPendingJump] = useState<{ key: string; position: EditorPosition } | null>(null);
   // A File menu request to name a new entry at the workspace root.
   const [newEntryRequest, setNewEntryRequest] = useState<NewEntryRequest | null>(null);
-  const [helpDialog, setHelpDialog] = useState<"shortcuts" | "about" | "settings" | "workspace" | null>(null);
+  // Settings, open on one of its sections, or Workspace Settings.
+  const [openDialog, setOpenDialog] = useState<SettingsSection | "workspace" | null>(null);
   // Raw editor state of each open tab: selection, scroll position, and undo history.
   const rawEditorStatesRef = useRef<RawEditorStateCache>(new Map());
   // Holds the startup restore so StrictMode's second effect run reuses it instead of restoring
@@ -439,22 +438,34 @@ function AppShell({ adapter }: AppProps) {
   const confirmUnsavedChangesRef = useRef(confirmUnsavedChangesInAllDocuments);
   confirmUnsavedChangesRef.current = confirmUnsavedChangesInAllDocuments;
 
-  // Checked once per launch. A failed check is quiet: being offline is not something to interrupt the user about.
-  useEffect(() => {
-    const updater = adapter.updater;
-    if (!updater) {
-      return;
-    }
-    let isCancelled = false;
-    const offerUpdate = async () => {
+  /**
+   * Asks the updater for a newer version and offers to install it. At startup the check is quiet:
+   * being offline is not something to interrupt the user about. Asked for from About, it says
+   * what it found.
+   */
+  const checkForUpdates = useCallback(
+    async ({ isRequested, isCancelled = () => false }: { isRequested: boolean; isCancelled?: () => boolean }) => {
+      const updater = adapter.updater;
+      if (!updater) {
+        return;
+      }
       let update;
       try {
         update = await updater.check();
       } catch (err) {
         console.warn("Could not check for updates:", err);
+        if (isRequested) {
+          toast.show({ kind: "error", text: "Couldn't check for updates. Check your connection and try again." });
+        }
         return;
       }
-      if (!update || isCancelled) {
+      if (isCancelled()) {
+        return;
+      }
+      if (!update) {
+        if (isRequested) {
+          toast.show({ kind: "info", text: "Vista is up to date." });
+        }
         return;
       }
       const accepted = await toast.confirm({
@@ -464,7 +475,7 @@ function AppShell({ adapter }: AppProps) {
         cancelLabel: "Later",
       });
       // A prompt already open belongs to another flow; replacing it would leave that flow waiting forever.
-      if (!accepted || isCancelled || isPromptingRef.current || (await confirmUnsavedChangesRef.current()) === null) {
+      if (!accepted || isCancelled() || isPromptingRef.current || (await confirmUnsavedChangesRef.current()) === null) {
         return;
       }
       toast.show({ kind: "info", text: `Downloading Vista ${update.version}. Vista restarts when it's installed.` });
@@ -477,12 +488,18 @@ function AppShell({ adapter }: AppProps) {
           text: `Couldn't install Vista ${update.version}. Vista will offer it again the next time it starts.`,
         });
       }
-    };
-    void offerUpdate();
+    },
+    [adapter.updater, toast],
+  );
+
+  // Checked once per launch.
+  useEffect(() => {
+    let isCancelled = false;
+    void checkForUpdates({ isRequested: false, isCancelled: () => isCancelled });
     return () => {
       isCancelled = true;
     };
-  }, [adapter.updater, toast]);
+  }, [checkForUpdates]);
 
   /**
    * Reopens a session's tabs as tabs that read their file when first shown. Each file is checked
@@ -1756,7 +1773,7 @@ function AppShell({ adapter }: AppProps) {
         category: "Workspace",
         label: "Workspace Settings…",
         isEnabled: !isPromptingForUnsavedChanges && workspace !== null,
-        run: () => setHelpDialog("workspace"),
+        run: () => setOpenDialog("workspace"),
       },
       {
         id: "file.newFile",
@@ -1794,7 +1811,7 @@ function AppShell({ adapter }: AppProps) {
         label: "Settings…",
         shortcut: "Mod+,",
         isEnabled: !isPromptingForUnsavedChanges,
-        run: () => setHelpDialog("settings"),
+        run: () => setOpenDialog("appearance"),
       },
       {
         id: "tabs.close",
@@ -1935,12 +1952,6 @@ function AppShell({ adapter }: AppProps) {
         run: () => updateSettings({ editor: { vim: !editorSettings.vim } }),
       },
       {
-        id: "view.theme",
-        category: "View",
-        label: theme.theme === "dark" ? "Switch to Light Theme" : "Switch to Dark Theme",
-        run: theme.toggleTheme,
-      },
-      {
         id: "goto.file",
         category: "Go",
         label: "Go to File",
@@ -1974,9 +1985,9 @@ function AppShell({ adapter }: AppProps) {
         id: "help.shortcuts",
         category: "Settings",
         label: "Keyboard Shortcuts",
-        run: () => setHelpDialog("shortcuts"),
+        run: () => setOpenDialog("shortcuts"),
       },
-      { id: "help.about", category: "Settings", label: "About Vista", run: () => setHelpDialog("about") },
+      { id: "help.about", category: "Settings", label: "About Vista", run: () => setOpenDialog("about") },
     ],
     [
       activateNeighborTab,
@@ -2001,7 +2012,6 @@ function AppShell({ adapter }: AppProps) {
       runSelection,
       saveActiveDocument,
       saveAllDocuments,
-      theme,
       updateSettings,
       workspace,
     ],
@@ -2056,7 +2066,7 @@ function AppShell({ adapter }: AppProps) {
       {
         label: "Keyboard shortcuts",
         icon: <i className="ic-keyboard" aria-hidden="true" />,
-        onSelect: () => setHelpDialog("shortcuts"),
+        onSelect: () => setOpenDialog("shortcuts"),
       },
     ],
     [requestNewEntry],
@@ -2090,7 +2100,6 @@ function AppShell({ adapter }: AppProps) {
       <TitleBar
         menus={MENUS}
         commands={commands}
-        theme={theme}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
         onSearch={openSearch}
@@ -2102,7 +2111,7 @@ function AppShell({ adapter }: AppProps) {
               onSwitch={(workspaceId) => void handleOpenWorkspace(workspaceId)}
               onOpenFolder={() => void handleOpenFolder()}
               onAddFolder={() => void handleAddFolder()}
-              onOpenSettings={() => setHelpDialog("workspace")}
+              onOpenSettings={() => setOpenDialog("workspace")}
             />
           )
         }
@@ -2210,14 +2219,21 @@ function AppShell({ adapter }: AppProps) {
           onClose={() => setGoToQuery(null)}
         />
       )}
-      {helpDialog === "shortcuts" && (
-        <KeyboardShortcutsDialog commands={commands} onClose={() => setHelpDialog(null)} />
+      {openDialog !== null && openDialog !== "workspace" && (
+        <SettingsDialog
+          section={openDialog}
+          onSectionChange={setOpenDialog}
+          settings={settings}
+          onChange={updateSettings}
+          theme={theme}
+          commands={commands}
+          platform={adapter.platform}
+          version={APP_VERSION}
+          onCheckForUpdates={adapter.updater ? () => checkForUpdates({ isRequested: true }) : undefined}
+          onClose={() => setOpenDialog(null)}
+        />
       )}
-      {helpDialog === "about" && <AboutDialog platform={adapter.platform} onClose={() => setHelpDialog(null)} />}
-      {helpDialog === "settings" && (
-        <SettingsDialog settings={settings} onChange={updateSettings} onClose={() => setHelpDialog(null)} />
-      )}
-      {helpDialog === "workspace" && currentWorkspace && (
+      {openDialog === "workspace" && currentWorkspace && (
         <WorkspaceSettingsDialog
           // A new name draft for each workspace, should the open one change underneath.
           key={currentWorkspace.id}
@@ -2228,7 +2244,7 @@ function AppShell({ adapter }: AppProps) {
           storage={workspace?.storage ?? "device"}
           canStoreInFolder={canStoreInFolder(workspace)}
           onChangeStorage={(storage) => void handleChangeStorage(storage)}
-          onClose={() => setHelpDialog(null)}
+          onClose={() => setOpenDialog(null)}
         />
       )}
       {unsavedRequest && <UnsavedChangesDialog fileNames={unsavedRequest.fileNames} onChoose={handleUnsavedChoice} />}

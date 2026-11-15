@@ -4,6 +4,7 @@ import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
+import { version as APP_VERSION } from "../package.json";
 import { App } from "./app";
 import {
   LEGACY_FOLDER_ID,
@@ -704,21 +705,87 @@ describe("App", () => {
     ).toBeInTheDocument();
   });
 
-  it("toggles theme between dark and light", async () => {
-    const user = userEvent.setup();
-    const adapter: AppAdapter = {
-      platform: "web",
-      workspace: createMockWorkspaceCapability(),
-    };
+  describe("settings", () => {
+    function settingsDialog() {
+      return screen.findByRole("dialog", { name: "Settings" });
+    }
 
-    render(<App adapter={adapter} />);
+    it("opens with Ctrl+, on its first section, and lists every section", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await screen.findByRole("button", { name: "Open Folder" });
 
-    const themeBtn = screen.getByRole("button", { name: /switch to (light|dark) theme/i });
-    expect(themeBtn).toBeVisible();
+      await user.keyboard("{Control>},{/Control}");
+      const dialog = await settingsDialog();
 
-    await user.click(themeBtn);
+      expect(
+        within(dialog)
+          .getAllByRole("tab")
+          .map((tab) => tab.textContent),
+      ).toEqual(["Appearance", "Editor", "Files", "Keyboard Shortcuts", "About"]);
+      expect(within(dialog).getByRole("tab", { name: "Appearance" })).toHaveAttribute("aria-selected", "true");
+      await user.click(within(dialog).getByRole("tab", { name: "Editor" }));
+      expect(within(dialog).getByRole("checkbox", { name: "Word wrap" })).toBeInTheDocument();
+    });
 
-    expect(document.documentElement.getAttribute("data-theme")).toBeDefined();
+    it("sets the theme in Appearance, and has no theme button outside it", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await screen.findByRole("button", { name: "Open Folder" });
+      expect(screen.queryByRole("button", { name: /theme/i })).not.toBeInTheDocument();
+
+      await user.keyboard("{Control>},{/Control}");
+      const dialog = await settingsDialog();
+      await user.click(within(dialog).getByRole("radio", { name: "Light" }));
+      expect(document.documentElement).toHaveAttribute("data-theme", "light");
+      expect(localStorage.getItem("vista-theme")).toBe("light");
+
+      await user.click(within(dialog).getByRole("radio", { name: "System" }));
+      expect(localStorage.getItem("vista-theme")).toBeNull();
+      expect(within(dialog).getByRole("radio", { name: "System" })).toBeChecked();
+    });
+
+    it("opens on Keyboard Shortcuts from the start screen", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+
+      await user.click(screen.getByRole("button", { name: /^Keyboard shortcuts/ }));
+
+      const dialog = await settingsDialog();
+      expect(within(dialog).getByRole("tab", { name: "Keyboard Shortcuts" })).toHaveAttribute("aria-selected", "true");
+      expect(within(dialog).getByRole("row", { name: "Save Ctrl+S" })).toBeInTheDocument();
+    });
+
+    it("shows the version in About, and checks for updates where the host has an updater", async () => {
+      const user = userEvent.setup();
+      const updater = { check: vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(null) };
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), updater }} />);
+      await waitFor(() => expect(updater.check).toHaveBeenCalledTimes(1));
+
+      await user.keyboard("{Control>}{Shift>}p{/Shift}{/Control}");
+      await user.click(screen.getByRole("option", { name: "Settings: About Vista" }));
+
+      const dialog = await settingsDialog();
+      expect(within(dialog).getByRole("tab", { name: "About" })).toHaveAttribute("aria-selected", "true");
+      expect(within(dialog).getByText(`Vista ${APP_VERSION}`)).toBeInTheDocument();
+      await user.click(within(dialog).getByRole("button", { name: "Check for Updates" }));
+      expect(await findToast("Vista is up to date.")).toBeInTheDocument();
+      expect(updater.check).toHaveBeenCalledTimes(2);
+    });
+
+    it("offers no update check in About when the host has no updater", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await screen.findByRole("button", { name: "Open Folder" });
+
+      await user.keyboard("{Control>},{/Control}");
+      const dialog = await settingsDialog();
+      await user.click(within(dialog).getByRole("tab", { name: "About" }));
+
+      expect(within(dialog).getByText(`Vista ${APP_VERSION}`)).toBeInTheDocument();
+      expect(within(dialog).queryByRole("button", { name: "Check for Updates" })).not.toBeInTheDocument();
+    });
   });
 
   describe("workspace settings", () => {
@@ -1923,7 +1990,8 @@ describe("App", () => {
       expect(screen.getByRole("option", { name: "Workspace: Open Folder…" })).toHaveAttribute("aria-selected", "true");
       await user.keyboard("about{Enter}");
 
-      expect(await screen.findByRole("dialog", { name: "About Vista" })).toBeInTheDocument();
+      const settings = await screen.findByRole("dialog", { name: "Settings" });
+      expect(within(settings).getByRole("tab", { name: "About" })).toHaveAttribute("aria-selected", "true");
       expect(screen.queryByRole("dialog", { name: "Commands" })).not.toBeInTheDocument();
     });
 
@@ -2496,7 +2564,7 @@ describe("App", () => {
       await openMenu(user, "Help");
       await user.click(screen.getByRole("menuitem", { name: "Keyboard Shortcuts" }));
 
-      const dialog = await screen.findByRole("dialog", { name: "Keyboard Shortcuts" });
+      const dialog = await screen.findByRole("dialog", { name: "Settings" });
       expect(within(dialog).getByRole("row", { name: "Save Ctrl+S" })).toBeInTheDocument();
       expect(within(dialog).getByRole("row", { name: "Word Wrap Alt+Z" })).toBeInTheDocument();
       expect(within(dialog).getByRole("row", { name: "Undo Ctrl+Z" })).toBeInTheDocument();
@@ -2772,6 +2840,7 @@ describe("App", () => {
 
       await user.keyboard("{Control>},{/Control}");
       const dialog = await screen.findByRole("dialog", { name: "Settings" });
+      await user.click(within(dialog).getByRole("tab", { name: "Files" }));
       const limit = within(dialog).getByRole("spinbutton", { name: "Largest file to open (MB)" });
       await user.clear(limit);
       await user.type(limit, "0");
@@ -2999,6 +3068,7 @@ describe("App", () => {
 
       await waitFor(() => expect(warn).toHaveBeenCalledWith("Could not check for updates:", expect.any(Error)));
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(screen.queryByText(/Couldn't check for updates/)).not.toBeInTheDocument();
       warn.mockRestore();
     });
 
