@@ -190,6 +190,18 @@ async function findFileRows(name: string): Promise<HTMLElement[]> {
   return within(explorerPanel()).findAllByRole("button", { name });
 }
 
+/**
+ * Runs a command from the palette by its title, such as `File: Save All`.
+ *
+ * @param user - The user-event instance driving the interaction.
+ * @param title - The command's category and label, as the palette lists it.
+ */
+async function runFromPalette(user: UserEvent, title: string) {
+  await user.keyboard("{Control>}{Shift>}p{/Shift}{/Control}");
+  const pattern = new RegExp(`^${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`);
+  await user.click(screen.getByRole("option", { name: pattern }));
+}
+
 function getTab(name: string): HTMLElement {
   return screen.getByRole("tab", { name: new RegExp(`^${name.replaceAll(".", "\\.")}`) });
 }
@@ -253,8 +265,7 @@ describe("App", () => {
         await appendToRawEditor(user, await screen.findByRole("textbox", { name: "Raw text content of a.txt" }), "!");
       }
 
-      await user.click(screen.getByRole("menuitem", { name: "File" }));
-      await user.click(screen.getByRole("menuitem", { name: "Close All Tabs" }));
+      await runFromPalette(user, "Tabs: Close All Tabs");
 
       const dialog = await screen.findByRole("dialog", { name: "Save changes to 2 files?" });
       expect(
@@ -2054,12 +2065,12 @@ describe("App", () => {
       await waitFor(() => expect(rawEditorText(editor)).not.toBe(EDITED_README_CONTENT));
     });
 
-    it("runs an editing command in the editor when opened by clicking the search field", async () => {
+    it("runs an editing command in the editor when opened by clicking the go-to-file field", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
       const editor = await makeReadmeDirty(user);
 
-      await user.click(screen.getByRole("button", { name: "Search files and commands" }));
+      await user.click(screen.getByRole("button", { name: "Go to file" }));
       await user.keyboard(">undo{Enter}");
 
       await waitFor(() => expect(rawEditorText(editor)).not.toBe(EDITED_README_CONTENT));
@@ -2082,18 +2093,19 @@ describe("App", () => {
       expect(screen.getByRole("combobox", { name: "Go to file, or :line:column" })).toHaveValue("");
     });
 
-    it("opens from the title bar's search field, listing commands while no folder is open", async () => {
+    it("opens on files from the title bar's field, even while no folder is open", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
       await screen.findByRole("button", { name: "Open Folder" });
 
-      await user.click(screen.getByRole("button", { name: "Search files and commands" }));
-      expect(screen.getByRole("combobox", { name: "Run a command" })).toHaveValue(">");
+      await user.click(screen.getByRole("button", { name: "Go to file" }));
+      expect(screen.getByRole("combobox", { name: "Go to file, or :line:column" })).toHaveValue("");
+      expect(screen.getByText("Open a folder to find its files. Type > for commands.")).toBeInTheDocument();
       // jsdom does not turn Escape into the dialog's cancel event.
-      fireEvent(screen.getByRole("dialog", { name: "Commands" }), new Event("cancel", { cancelable: true }));
+      fireEvent(screen.getByRole("dialog", { name: "Go to file" }), new Event("cancel", { cancelable: true }));
 
       await openFolderFromWelcome(user);
-      await user.click(screen.getByRole("button", { name: "Search files and commands" }));
+      await user.click(screen.getByRole("button", { name: "Go to file" }));
       expect(screen.getByRole("combobox", { name: "Go to file, or :line:column" })).toHaveValue("");
     });
   });
@@ -2493,12 +2505,15 @@ describe("App", () => {
     });
   });
 
-  describe("menus", () => {
-    function openMenu(user: UserEvent, name: string) {
-      return user.click(screen.getByRole("menuitem", { name }));
-    }
+  describe("commands", () => {
+    it("has no menu bar", async () => {
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await screen.findByRole("button", { name: "Open Folder" });
 
-    it("saves every dirty file from File > Save All", async () => {
+      expect(screen.queryByRole("menubar")).not.toBeInTheDocument();
+    });
+
+    it("saves every dirty file with Save All", async () => {
       const user = userEvent.setup();
       const mockWorkspace = createMockWorkspaceCapability();
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
@@ -2506,52 +2521,46 @@ describe("App", () => {
       await user.click(screen.getByText("data.csv"));
       await appendToRawEditor(user, await screen.findByRole("textbox", { name: "Raw text content of data.csv" }), "!");
 
-      await openMenu(user, "File");
-      await user.click(screen.getByRole("menuitem", { name: "Save All" }));
+      await runFromPalette(user, "File: Save All");
 
       await waitFor(() => expect(mockWorkspace.writeFile).toHaveBeenCalledTimes(2));
       expect(writtenTexts(mockWorkspace, "readme.md")).toEqual([EDITED_README_CONTENT]);
       expect(writtenTexts(mockWorkspace, "data.csv")).toEqual([`${CSV_CONTENT}!`]);
     });
 
-    it("starts naming a new file at the root from File > New File", async () => {
+    it("starts naming a new file at the root with New File", async () => {
       const user = userEvent.setup();
       const mockWorkspace = createMockWorkspaceCapability();
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
       await openFolderFromWelcome(user);
 
-      await openMenu(user, "File");
-      await user.click(screen.getByRole("menuitem", { name: "New File" }));
+      await runFromPalette(user, "File: New File");
       await user.type(await screen.findByRole("textbox", { name: "Entry name" }), "todo.md{Enter}");
 
       expect(mockWorkspace.createFile).toHaveBeenCalledWith(expect.objectContaining({ id: "workspace-1" }), "todo.md");
     });
 
-    it("toggles word wrap from the View menu and with Alt+Z", async () => {
+    it("toggles word wrap from the palette and with Alt+Z", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
       await openRawReadme(user);
 
-      await openMenu(user, "View");
-      const wordWrap = screen.getByRole("menuitemcheckbox", { name: "Word Wrap" });
-      const wasChecked = wordWrap.getAttribute("aria-checked") === "true";
-      await user.click(wordWrap);
+      await runFromPalette(user, "View: Word Wrap");
+      await user.click(screen.getByRole("button", { name: "Editor settings" }));
+      expect(screen.getByRole("menuitemcheckbox", { name: "Word wrap" })).toHaveAttribute("aria-checked", "false");
+      await user.keyboard("{Escape}");
       await user.keyboard("{Alt>}z{/Alt}");
-      await openMenu(user, "View");
+      await user.click(screen.getByRole("button", { name: "Editor settings" }));
 
-      expect(screen.getByRole("menuitemcheckbox", { name: "Word Wrap" })).toHaveAttribute(
-        "aria-checked",
-        String(wasChecked),
-      );
+      expect(screen.getByRole("menuitemcheckbox", { name: "Word wrap" })).toHaveAttribute("aria-checked", "true");
     });
 
-    it("undoes in the raw editor from Edit > Undo, returning focus to it", async () => {
+    it("undoes in the raw editor with Undo, returning focus to it", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
       const editor = await makeReadmeDirty(user);
 
-      await openMenu(user, "Edit");
-      await user.click(screen.getByRole("menuitem", { name: "Undo" }));
+      await runFromPalette(user, "Edit: Undo");
 
       expect(rawEditorText(editor)).toBe(README_CONTENT);
       expect(editor).toHaveFocus();
@@ -2561,8 +2570,8 @@ describe("App", () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
 
-      await openMenu(user, "Help");
-      await user.click(screen.getByRole("menuitem", { name: "Keyboard Shortcuts" }));
+      await screen.findByRole("button", { name: "Open Folder" });
+      await runFromPalette(user, "Settings: Keyboard Shortcuts");
 
       const dialog = await screen.findByRole("dialog", { name: "Settings" });
       expect(within(dialog).getByRole("row", { name: "Save Ctrl+S" })).toBeInTheDocument();
@@ -2612,8 +2621,7 @@ describe("App", () => {
 
       // Closing the same tab another way, from the editor, leaves the tabs alone.
       await user.click(editor);
-      await openMenu(user, "File");
-      await user.click(screen.getByRole("menuitem", { name: "Close Tab" }));
+      await runFromPalette(user, "Tabs: Close Tab");
       await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Don't Save" }));
 
       await waitFor(() => expect(screen.queryByRole("tab", { name: /readme\.md/ })).not.toBeInTheDocument());
@@ -2693,8 +2701,7 @@ describe("App", () => {
     await user.click(screen.getByText("data.csv"));
     await appendToRawEditor(user, await screen.findByRole("textbox", { name: "Raw text content of data.csv" }), "!");
 
-    await user.click(screen.getByRole("menuitem", { name: "File" }));
-    await user.click(screen.getByRole("menuitem", { name: "Close All Tabs" }));
+    await runFromPalette(user, "Tabs: Close All Tabs");
 
     const dialog = await screen.findByRole("dialog", { name: "Save changes to 2 files?" });
     expect(
@@ -2722,8 +2729,7 @@ describe("App", () => {
     await openFolderFromWelcome(user);
 
     await user.click(screen.getByText("readme.md"));
-    await user.click(screen.getByRole("menuitem", { name: "File" }));
-    await user.click(screen.getByRole("menuitem", { name: "Open Folder…" }));
+    await runFromPalette(user, "Workspace: Open Folder…");
     await waitFor(() => expect(mockWorkspace.readTree).toHaveBeenCalledTimes(2));
     await act(async () => finishRead(README_CONTENT));
 

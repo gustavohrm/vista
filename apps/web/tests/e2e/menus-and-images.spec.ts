@@ -46,31 +46,34 @@ test.describe("menus and Markdown images", () => {
         const el = document.activeElement;
         return el ? `${el.tagName}:${el.getAttribute("aria-label") ?? el.textContent?.trim().slice(0, 20)}` : "none";
       });
-    const fileMenu = page.getByRole("menuitem", { name: "File" });
+    // The workspace switcher's menu, which uses the shared menu like every other.
+    const switcher = page.locator('header button[aria-haspopup="menu"]');
+    const menu = page.getByRole("menu");
 
-    await fileMenu.focus();
+    await switcher.focus();
+    const self = await describeFocus();
     await page.keyboard.press("Tab");
     const after = await describeFocus();
-    await fileMenu.focus();
+    await switcher.focus();
     await page.keyboard.press("Shift+Tab");
     const before = await describeFocus();
-    expect(new Set([after, before, "BUTTON:File"]).size).toBe(3);
+    expect(new Set([after, before, self]).size).toBe(3);
 
-    await fileMenu.focus();
+    await switcher.focus();
     await page.keyboard.press("Enter");
-    await expect(page.getByRole("menu", { name: "File" })).toBeVisible();
+    await expect(menu).toBeVisible();
     await page.keyboard.press("Tab");
-    await expect(page.getByRole("menu", { name: "File" })).toBeHidden();
+    await expect(menu).toBeHidden();
     expect(await describeFocus()).toBe(after);
 
-    await fileMenu.focus();
+    await switcher.focus();
     await page.keyboard.press("Enter");
     await page.keyboard.press("Shift+Tab");
-    await expect(page.getByRole("menu", { name: "File" })).toBeHidden();
+    await expect(menu).toBeHidden();
     expect(await describeFocus()).toBe(before);
   });
 
-  test("runs a command from the menu bar and returns focus to the editor", async ({ page }) => {
+  test("runs a command from the palette and returns focus to the editor", async ({ page }) => {
     await page.getByText("notes.md").click();
     await page.getByRole("button", { name: "Raw" }).click();
     const editor = page.getByRole("textbox", { name: "Raw text content of notes.md" });
@@ -78,8 +81,8 @@ test.describe("menus and Markdown images", () => {
     // The click can land on the empty last line, where Select Line selects nothing.
     await page.keyboard.press("Control+Home");
 
-    await page.getByRole("menuitem", { name: "Selection" }).click();
-    await page.getByRole("menuitem", { name: "Select Line" }).click();
+    await page.keyboard.press("Control+Shift+P");
+    await page.getByRole("option", { name: /^Selection: Select Line/ }).click();
 
     await expect(editor).toBeFocused();
     await expect(page.getByRole("contentinfo", { name: "Status Bar" })).toContainText("(15 selected)");

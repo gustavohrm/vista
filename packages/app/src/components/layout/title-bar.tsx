@@ -1,43 +1,30 @@
 import type { ReactNode } from "react";
 
-import { formatShortcut, type Command } from "../../commands";
+import { formatShortcut } from "../../commands";
 import { Tooltip } from "../feedback/tooltip";
-import { MenuBar, type MenuBarMenu } from "../menu/menu-bar";
 
 interface TitleBarProps {
-  /** The application menus, by command id. */
-  menus: readonly MenuBarMenu[];
-  /** Commands the menus name by id. */
-  commands: readonly Command[];
   /** Whether the explorer panel is currently shown. */
   isSidebarOpen: boolean;
   /** Callback triggered to show or hide the explorer panel. */
   onToggleSidebar: () => void;
-  /** Opens the picker that finds files and commands. */
-  onSearch: () => void;
-  /** Shortcut that opens the picker, shown in the search field. */
-  searchShortcut: string;
+  /** Opens the picker on files. */
+  onGoToFile: () => void;
+  /** Shortcut that opens the picker on files, shown in the field. */
+  goToFileShortcut: string;
   /** The workspace switcher, shown while a workspace is open. */
   switcher?: ReactNode;
 }
 
 /**
- * The bar across the top of the application shell: the explorer toggle and the menus on the left,
- * and the search field that opens the picker in the middle. It stays above the explorer drawer on narrow screens, so the toggle that opened the drawer also
- * closes it.
+ * The bar across the top of the application shell: the explorer toggle and the workspace switcher
+ * on the left, and the go-to-file field in the middle. It stays above the explorer drawer on narrow
+ * screens, so the toggle that opened the drawer also closes it.
  *
  * @param props - TitleBar properties.
  * @returns Title bar element.
  */
-export function TitleBar({
-  menus,
-  commands,
-  isSidebarOpen,
-  onToggleSidebar,
-  onSearch,
-  searchShortcut,
-  switcher,
-}: TitleBarProps) {
+export function TitleBar({ isSidebarOpen, onToggleSidebar, onGoToFile, goToFileShortcut, switcher }: TitleBarProps) {
   const explorerLabel = isSidebarOpen ? "Close explorer" : "Open explorer";
 
   return (
@@ -58,22 +45,21 @@ export function TitleBar({
           )}
         </Tooltip>
         {switcher}
-        <MenuBar menus={menus} commands={commands} />
       </div>
 
       <button
         type="button"
-        onClick={onSearch}
+        onClick={onGoToFile}
         // A click does not take focus from the editor, so the picker returns focus there and an
-        // Edit command chosen in it acts on the editor, as with the menu bar.
+        // Edit command chosen in it with `>` acts on the editor.
         onMouseDown={(event) => event.preventDefault()}
-        aria-label="Search files and commands"
+        aria-label="Go to file"
         className="btn soft sm text-text-secondary flex-none justify-start gap-2 font-normal md:w-72 lg:w-96"
       >
         <i className="ic-search" aria-hidden="true" />
-        <span className="hidden flex-1 text-left md:inline">Search files and commands</span>
+        <span className="hidden flex-1 text-left md:inline">Go to file</span>
         <kbd aria-hidden="true" className="kbd hidden text-[11px] md:inline-flex">
-          {formatShortcut(searchShortcut)}
+          {formatShortcut(goToFileShortcut)}
         </kbd>
       </button>
 

@@ -17,8 +17,8 @@ import { StartScreen, type StartAction } from "./components/layout/start-screen"
 import { StatusBar } from "./components/layout/status-bar";
 import { TabStrip } from "./components/layout/tab-strip";
 import { TitleBar } from "./components/layout/title-bar";
+import { commandMenuEntries } from "./components/menu/command-menu";
 import { MENU_SEPARATOR } from "./components/menu/menu";
-import { commandMenuEntries, type MenuBarMenu } from "./components/menu/menu-bar";
 import {
   COMMAND_QUERY_PREFIX,
   GoToDialog,
@@ -107,70 +107,6 @@ interface OpenWorkspace {
   storage: WorkspaceStorage;
   folders: OpenFolder[];
 }
-
-/** The application menus, by command id. */
-const MENUS: readonly MenuBarMenu[] = [
-  {
-    label: "File",
-    items: [
-      "file.openFolder",
-      "file.addFolder",
-      "file.newFile",
-      "file.newFolder",
-      MENU_SEPARATOR,
-      "file.save",
-      "file.saveAll",
-      MENU_SEPARATOR,
-      "file.settings",
-      MENU_SEPARATOR,
-      "tabs.close",
-      "tabs.closeAll",
-    ],
-  },
-  {
-    label: "Edit",
-    items: [
-      "edit.undo",
-      "edit.redo",
-      MENU_SEPARATOR,
-      "edit.cut",
-      "edit.copy",
-      "edit.paste",
-      MENU_SEPARATOR,
-      "find.find",
-      "find.replace",
-    ],
-  },
-  {
-    label: "Selection",
-    items: [
-      "selection.all",
-      "selection.line",
-      MENU_SEPARATOR,
-      "selection.nextOccurrence",
-      "selection.allOccurrences",
-      MENU_SEPARATOR,
-      "selection.cursorAbove",
-      "selection.cursorBelow",
-    ],
-  },
-  {
-    label: "View",
-    items: [
-      "palette.commands",
-      MENU_SEPARATOR,
-      "view.explorer",
-      "view.rawText",
-      MENU_SEPARATOR,
-      "view.wordWrap",
-      "view.lineNumbers",
-      "view.minimap",
-      "view.vim",
-    ],
-  },
-  { label: "Go", items: ["goto.file", "goto.line", MENU_SEPARATOR, "tabs.next", "tabs.previous"] },
-  { label: "Help", items: ["help.shortcuts", MENU_SEPARATOR, "help.about"] },
-];
 
 const GO_TO_FILE_SHORTCUT = "Mod+P";
 const COMMANDS_SHORTCUT = "Mod+Shift+P";
@@ -2034,8 +1970,8 @@ function AppShell({ adapter }: AppProps) {
     flushSync(() => setGoToQuery(null));
     void runCommand(command);
   }, []);
-  // Without a folder there are no files to find, so the search field lists commands instead.
-  const openSearch = useCallback(() => setGoToQuery(workspace ? "" : COMMAND_QUERY_PREFIX), [workspace]);
+  // The title bar's field always opens on files, whatever is open, so it never changes meaning.
+  const openGoToFile = useCallback(() => setGoToQuery(""), []);
   const dirtyKeys = useMemo(
     () => new Set(documentsState.documents.filter((doc) => doc.isDirty).map((doc) => doc.key)),
     [documentsState.documents],
@@ -2098,11 +2034,9 @@ function AppShell({ adapter }: AppProps) {
       className="bg-foreground text-text flex h-screen w-screen flex-col overflow-hidden"
     >
       <TitleBar
-        menus={MENUS}
-        commands={commands}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
-        onSearch={openSearch}
+        onGoToFile={openGoToFile}
         switcher={
           currentWorkspace && (
             <WorkspaceSwitcher
@@ -2115,7 +2049,7 @@ function AppShell({ adapter }: AppProps) {
             />
           )
         }
-        searchShortcut={workspace ? GO_TO_FILE_SHORTCUT : COMMANDS_SHORTCUT}
+        goToFileShortcut={GO_TO_FILE_SHORTCUT}
       />
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <Sidebar

@@ -267,7 +267,7 @@ export function GoToDialog({
                 {isCommandMode
                   ? "No matching commands."
                   : files.length === 0
-                    ? "Open a folder to search its files."
+                    ? "Open a folder to find its files. Type > for commands."
                     : "No matching files."}
               </p>
             )}
