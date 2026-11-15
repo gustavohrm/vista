@@ -200,16 +200,6 @@ describe("Menu", () => {
     expect(props.onClose).toHaveBeenCalledOnce();
   });
 
-  it("reports ArrowLeft and ArrowRight to a menu bar", async () => {
-    const user = userEvent.setup();
-    const onNavigate = vi.fn();
-    renderMenu({ onNavigate });
-
-    await user.keyboard("{ArrowRight}{ArrowLeft}");
-
-    expect(onNavigate.mock.calls).toEqual([[1], [-1]]);
-  });
-
   describe("viewport clamping", () => {
     const originalInnerWidth = window.innerWidth;
     const originalInnerHeight = window.innerHeight;

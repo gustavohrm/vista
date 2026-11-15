@@ -65,9 +65,7 @@ interface MenuProps {
    * had focus when the menu opened, so an action chosen from the menu runs where the user was.
    */
   returnFocusTo?: Element | null;
-  /** Called with -1 or 1 for ArrowLeft or ArrowRight, so a menu bar can move to the next menu. */
-  onNavigate?: (direction: -1 | 1) => void;
-  /** A pointer down inside this element does not close the menu, such as the menu bar that toggles it. */
+  /** A pointer down inside this element does not close the menu, such as the button that toggles it. */
   ignorePointerDownIn?: Element | null;
 }
 
@@ -77,7 +75,7 @@ interface MenuProps {
  * arrow keys, Home, and End, and closes on Escape, Tab, a choice, or a pointer down outside it. Closing by keyboard or by a choice returns focus to where it was, and
  * a chosen action runs after that, so editing actions apply to the editor the user was in.
  */
-export function Menu({ label, items, x, y, onClose, returnFocusTo, onNavigate, ignorePointerDownIn }: MenuProps) {
+export function Menu({ label, items, x, y, onClose, returnFocusTo, ignorePointerDownIn }: MenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: x, top: y });
   // Captured during the first render, before the menu takes focus.
@@ -171,13 +169,6 @@ export function Menu({ label, items, x, y, onClose, returnFocusTo, onNavigate, i
         break;
       case "End":
         focusAt(-1);
-        break;
-      case "ArrowLeft":
-      case "ArrowRight":
-        if (!onNavigate) {
-          return;
-        }
-        onNavigate(event.key === "ArrowLeft" ? -1 : 1);
         break;
       case "Escape":
         closeAndReturnFocus();
