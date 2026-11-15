@@ -79,7 +79,7 @@ clippy runs with warnings denied over every target. A lint that is wrong for one
 
 Every third-party dependency version is declared once, in the catalog in `pnpm-workspace.yaml`, and referred to as `catalog:` in each `package.json`. The workspace therefore cannot hold two versions of one dependency by accident, and an upgrade is a one-line change that Dependabot can propose ([CI](ci.md#dependency-updates)). A workspace package depends on another as `workspace:*`, so it is not a catalog entry.
 
-`@types/node` never takes a major update from Dependabot. Node's types follow the Node.js release in `engines` and `.nvmrc`, and types for a newer Node accept APIs the pinned runtime does not have; they move by hand, with `.nvmrc`.
+`@types/node` never takes a major update from Dependabot. Node's types follow the Node.js release in `engines` and `.nvmrc`, and types for a newer Node accept APIs the pinned runtime does not have. A major update moves by hand, with `.nvmrc`; minor and patch updates within the pinned line still arrive through Dependabot with the rest.
 
 Rust dependencies are declared in `apps/native/src-tauri/Cargo.toml` and locked in its `Cargo.lock`.
 
