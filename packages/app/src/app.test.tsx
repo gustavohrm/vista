@@ -10,6 +10,7 @@ import {
   type AppAdapter,
   type FileStat,
   type WorkspaceCapability,
+  type WorkspaceFolder,
   type WorkspaceNode,
 } from "./ports";
 import { createMemoryWorkspace, writtenTexts, type MemoryWorkspace } from "./test-support/memory-workspace";
@@ -122,11 +123,262 @@ async function appendToRawEditor(user: UserEvent, editor: HTMLElement, text: str
   await user.keyboard(text);
 }
 
+interface StoredFolder {
+  folder: WorkspaceFolder;
+  files: Record<string, string>;
+}
+
+/**
+ * A capability over several in-memory folders, each answering for its own id, and a stored workspace
+ * of them that reopens at startup. `restoreFolder` restores every folder unless overridden.
+ */
+function createFoldersCapability(folders: readonly StoredFolder[], overrides?: Partial<WorkspaceCapability>) {
+  localStorage.setItem(
+    "vista.workspaces",
+    JSON.stringify({
+      version: 1,
+      lastWorkspaceId: "w1",
+      workspaces: [{ id: "w1", name: "Research", folderIds: folders.map(({ folder }) => folder.id), lastOpenedAt: 1 }],
+    }),
+  );
+  const memory = new Map(folders.map(({ folder, files }) => [folder.id, createMemoryWorkspace(files)]));
+  const of = (folder: WorkspaceFolder): MemoryWorkspace => {
+    const found = memory.get(folder.id);
+    if (!found) {
+      throw new Error(`No folder ${folder.id}`);
+    }
+    return found;
+  };
+  const capability: MemoryWorkspace = {
+    ...createMemoryWorkspace({}),
+    restoreFolder: vi.fn(async (id: string) => {
+      const stored = folders.find(({ folder }) => folder.id === id);
+      return stored ? { status: "restored" as const, folder: stored.folder } : { status: "none" as const };
+    }),
+    readTree: vi.fn((folder) => of(folder).readTree(folder)),
+    stat: vi.fn((folder, path) => of(folder).stat(folder, path)),
+    readFile: vi.fn((folder, path) => of(folder).readFile(folder, path)),
+    writeFile: vi.fn((folder, path, bytes, options) => of(folder).writeFile(folder, path, bytes, options)),
+    createFile: vi.fn((folder, path) => of(folder).createFile(folder, path)),
+    createDirectory: vi.fn((folder, path) => of(folder).createDirectory(folder, path)),
+    move: vi.fn((folder, from, to) => of(folder).move(folder, from, to)),
+    remove: vi.fn((folder, path) => of(folder).remove(folder, path)),
+    ...(overrides as Partial<MemoryWorkspace>),
+  };
+  return { capability, folder: (id: string) => memory.get(id)! };
+}
+
+const NOTES_FOLDER: WorkspaceFolder = { id: "notes", name: "notes", rootPath: "/notes" };
+const SOURCES_FOLDER: WorkspaceFolder = { id: "sources", name: "sources", rootPath: "/sources" };
+
+function storedFolders(): StoredFolder[] {
+  return [
+    { folder: NOTES_FOLDER, files: { "a.txt": PLAIN_TEXT } },
+    { folder: SOURCES_FOLDER, files: { "a.txt": PLAIN_TEXT, "plan.txt": PLAIN_TEXT } },
+  ];
+}
+
+function explorerPanel(): HTMLElement {
+  return screen.getByRole("navigation", { name: "File Explorer" });
+}
+
+/** The file rows named `name`, in folder order. */
+async function findFileRows(name: string): Promise<HTMLElement[]> {
+  return within(explorerPanel()).findAllByRole("button", { name });
+}
+
 function getTab(name: string): HTMLElement {
   return screen.getByRole("tab", { name: new RegExp(`^${name.replaceAll(".", "\\.")}`) });
 }
 
 describe("App", () => {
+  describe("workspaces with several folders", () => {
+    it("shows a root row for each folder and saves a file to the folder it came from", async () => {
+      const user = userEvent.setup();
+      const { capability, folder } = createFoldersCapability(storedFolders());
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+
+      await user.click((await findFileRows("plan.txt"))[0]!);
+      await appendToRawEditor(user, await screen.findByRole("textbox", { name: "Raw text content of plan.txt" }), "!");
+      await user.keyboard("{Control>}s{/Control}");
+
+      expect(within(explorerPanel()).getByText("Research")).toBeInTheDocument();
+      expect(within(explorerPanel()).getByRole("button", { name: "notes", expanded: true })).toBeInTheDocument();
+      expect(within(explorerPanel()).getByRole("button", { name: "sources", expanded: true })).toBeInTheDocument();
+      await waitFor(() => expect(folder("sources").textOf("plan.txt")).toBe(`${PLAIN_TEXT}!`));
+      expect(folder("notes").textOf("plan.txt")).toBeUndefined();
+    });
+
+    it("keeps same-named files of two folders in separate tabs", async () => {
+      const user = userEvent.setup();
+      const { capability } = createFoldersCapability(storedFolders());
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+
+      const [notesFile, sourcesFile] = await findFileRows("a.txt");
+      await user.click(notesFile!);
+      await user.click(sourcesFile!);
+
+      await waitFor(() => expect(screen.getAllByRole("tab", { name: /^a\.txt/ })).toHaveLength(2));
+    });
+
+    it("finds the files of every folder with go to, by folder name too", async () => {
+      const user = userEvent.setup();
+      const { capability } = createFoldersCapability(storedFolders());
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("plan.txt");
+
+      await user.keyboard("{Control>}p{/Control}");
+      await user.keyboard("sources/a");
+      const options = screen.getAllByRole("option").map((option) => option.textContent);
+      expect(options[0]).toBe("a.txtsources");
+      expect(options).not.toContain("a.txtnotes");
+      await user.keyboard("{Enter}");
+
+      expect(await screen.findByRole("textbox", { name: "Raw text content of a.txt" })).toBeInTheDocument();
+      expect(capability.readFile).toHaveBeenCalledWith(SOURCES_FOLDER, "a.txt");
+    });
+
+    it("lists unsaved files with their folder's name when several are about to close", async () => {
+      const user = userEvent.setup();
+      const { capability } = createFoldersCapability(storedFolders());
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      const [notesFile, sourcesFile] = await findFileRows("a.txt");
+      for (const row of [notesFile!, sourcesFile!]) {
+        // oxlint-disable-next-line eslint/no-await-in-loop -- each edit goes to the tab just opened
+        await user.click(row);
+        // oxlint-disable-next-line eslint/no-await-in-loop -- each edit goes to the tab just opened
+        await appendToRawEditor(user, await screen.findByRole("textbox", { name: "Raw text content of a.txt" }), "!");
+      }
+
+      await user.click(screen.getByRole("menuitem", { name: "File" }));
+      await user.click(screen.getByRole("menuitem", { name: "Close All Tabs" }));
+
+      const dialog = await screen.findByRole("dialog", { name: "Save changes to 2 files?" });
+      expect(
+        within(dialog)
+          .getAllByRole("listitem")
+          .map((item) => item.textContent),
+      ).toEqual(["notes / a.txt", "sources / a.txt"]);
+    });
+
+    it("removes a folder after asking, and leaves its files alone", async () => {
+      const user = userEvent.setup();
+      const { capability, folder } = createFoldersCapability(storedFolders());
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await user.click((await findFileRows("plan.txt"))[0]!);
+      await screen.findByRole("textbox", { name: "Raw text content of plan.txt" });
+
+      fireEvent.contextMenu(within(explorerPanel()).getByRole("button", { name: "sources" }));
+      expect(screen.queryByRole("menuitem", { name: "Rename" })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("menuitem", { name: "Remove Folder from Workspace" }));
+      const dialog = await screen.findByRole("dialog", { name: 'Remove "sources" from the workspace?' });
+      expect(dialog).toHaveTextContent("Your folders and files aren't changed.");
+      await user.click(within(dialog).getByRole("button", { name: "Remove" }));
+
+      await waitFor(() =>
+        expect(within(explorerPanel()).queryByRole("button", { name: "sources" })).not.toBeInTheDocument(),
+      );
+      expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+      expect(JSON.parse(localStorage.getItem("vista.workspaces") ?? "null").workspaces[0].folderIds).toEqual(["notes"]);
+      expect(capability.forgetFolder).toHaveBeenCalledWith("sources");
+      expect(folder("sources").textOf("plan.txt")).toBe(PLAIN_TEXT);
+    });
+
+    it("does not offer removing a workspace's only folder", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+
+      fireEvent.contextMenu(within(explorerPanel()).getByRole("button", { name: "My Notes" }));
+
+      expect(screen.getByRole("menuitem", { name: "New File" })).toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: "Remove Folder from Workspace" })).not.toBeInTheDocument();
+    });
+
+    it("adds a folder to the workspace and remembers it", async () => {
+      const user = userEvent.setup();
+      const work: WorkspaceFolder = { id: "work", name: "Work", rootPath: "/work" };
+      const mockWorkspace = createMockWorkspaceCapability();
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      await openFolderFromWelcome(user);
+      mockWorkspace.pickFolder.mockResolvedValueOnce(work);
+
+      await user.click(within(explorerPanel()).getByRole("button", { name: "Add Folder to Workspace" }));
+
+      expect(await within(explorerPanel()).findByRole("button", { name: "Work" })).toBeInTheDocument();
+      const stored = JSON.parse(localStorage.getItem("vista.workspaces") ?? "null");
+      expect(stored.workspaces[0].folderIds).toEqual(["workspace-1", "work"]);
+    });
+
+    it("refuses a folder inside one the workspace has, and forgets it", async () => {
+      const user = userEvent.setup();
+      const mockWorkspace = createMockWorkspaceCapability();
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      await openFolderFromWelcome(user);
+      mockWorkspace.pickFolder.mockResolvedValueOnce({ id: "inner", name: "inner", rootPath: "/notes/inner" });
+
+      await user.click(within(explorerPanel()).getByRole("button", { name: "Add Folder to Workspace" }));
+
+      expect(await findToast('"inner" is already part of this workspace, inside "My Notes".')).toBeInTheDocument();
+      expect(within(explorerPanel()).queryByRole("button", { name: "inner" })).not.toBeInTheDocument();
+      expect(mockWorkspace.forgetFolder).toHaveBeenCalledWith("inner");
+    });
+
+    it("refuses a folder already in the workspace without forgetting it", async () => {
+      const user = userEvent.setup();
+      const mockWorkspace = createMockWorkspaceCapability();
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      await openFolderFromWelcome(user);
+
+      await user.click(within(explorerPanel()).getByRole("button", { name: "Add Folder to Workspace" }));
+
+      expect(await findToast('"My Notes" is already part of this workspace.')).toBeInTheDocument();
+      expect(mockWorkspace.forgetFolder).not.toHaveBeenCalled();
+    });
+
+    it("waits at startup for a folder that needs permission, then offers it on its row", async () => {
+      const user = userEvent.setup();
+      const { capability } = createFoldersCapability(storedFolders());
+      const restoreFolder = capability.restoreFolder;
+      restoreFolder.mockImplementation(async (id) =>
+        id === "notes" ? { status: "restored", folder: NOTES_FOLDER } : { status: "needs-permission", name: "sources" },
+      );
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+
+      await user.click(await screen.findByRole("button", { name: /Reopen Research/ }));
+      await user.click(await within(explorerPanel()).findByRole("button", { name: "Allow access" }));
+      expect(within(explorerPanel()).queryByRole("button", { name: "plan.txt" })).not.toBeInTheDocument();
+      restoreFolder.mockResolvedValueOnce({ status: "restored", folder: SOURCES_FOLDER });
+      await user.click(within(explorerPanel()).getByRole("button", { name: "Allow access" }));
+
+      expect(await within(explorerPanel()).findByRole("button", { name: "plan.txt" })).toBeInTheDocument();
+      expect(restoreFolder).toHaveBeenLastCalledWith("sources", { interactive: true });
+    });
+
+    it("opens a workspace whose other folders are gone, marking each missing one", async () => {
+      const { capability } = createFoldersCapability(storedFolders());
+      capability.restoreFolder.mockImplementation(async (id) =>
+        id === "notes" ? { status: "restored", folder: NOTES_FOLDER } : { status: "unavailable", name: "sources" },
+      );
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+
+      expect(await within(explorerPanel()).findByText(/This folder can't be found/)).toBeInTheDocument();
+      expect(within(explorerPanel()).getByRole("button", { name: "Remove Folder from Workspace" })).toBeInTheDocument();
+      expect(within(explorerPanel()).getByRole("button", { name: "a.txt" })).toBeInTheDocument();
+    });
+
+    it("tells same-named folders apart by their location on desktop", async () => {
+      const { capability } = createFoldersCapability([
+        { folder: { id: "a", name: "notes", rootPath: "/home/a/notes" }, files: {} },
+        { folder: { id: "b", name: "notes", rootPath: "/home/b/notes" }, files: {} },
+      ]);
+      render(<App adapter={{ platform: "native", workspace: capability }} />);
+
+      expect(await within(explorerPanel()).findByText("/home/a")).toBeInTheDocument();
+      expect(within(explorerPanel()).getByText("/home/b")).toBeInTheDocument();
+    });
+  });
+
   it.each(["web", "native"] as const)("renders the start screen for the %s host", async (platform) => {
     const adapter: AppAdapter = {
       platform,
@@ -768,7 +1020,7 @@ describe("App", () => {
 
       await user.keyboard("{Control>}p{/Control}");
       await user.keyboard("readme:2:3");
-      expect(screen.getByRole("option", { name: "readme.md" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByRole("option", { name: "readme.mdMy Notes" })).toHaveAttribute("aria-selected", "true");
       await user.keyboard("{Enter}");
 
       const editor = await screen.findByRole("textbox", { name: "Raw text content of readme.md" });
@@ -1511,7 +1763,8 @@ describe("App", () => {
     await openFolderFromWelcome(user);
 
     await user.click(screen.getByText("readme.md"));
-    await user.click(screen.getByRole("button", { name: "Open Another Folder" }));
+    await user.click(screen.getByRole("menuitem", { name: "File" }));
+    await user.click(screen.getByRole("menuitem", { name: "Open Folder…" }));
     await waitFor(() => expect(mockWorkspace.readTree).toHaveBeenCalledTimes(2));
     await act(async () => finishRead(README_CONTENT));
 

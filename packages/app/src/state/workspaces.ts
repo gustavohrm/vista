@@ -30,9 +30,17 @@ const UNTITLED_NAME = "Untitled workspace";
 
 export interface WorkspaceStore {
   lastWorkspace(): WorkspaceRecord | null;
+  workspace(workspaceId: string): WorkspaceRecord | null;
   /** The workspace Open Folder opens for a folder: the one that is exactly it, or a new one. */
   openFolder(folder: WorkspaceFolder): WorkspaceRecord;
   markOpened(workspaceId: string): void;
+  addFolder(workspaceId: string, folderId: string): WorkspaceRecord | null;
+  isFolderUsed(folderId: string): boolean;
+  /**
+   * Null when the folder is the workspace's only one, since a workspace is one or more folders.
+   * `isFolderUnused` says no workspace holds the folder anymore, so its host may forget it.
+   */
+  removeFolder(workspaceId: string, folderId: string): { isFolderUnused: boolean } | null;
   /**
    * Once, before any workspace is stored, turns the folder an earlier Vista remembered into the last
    * workspace. Returns the restore result it got, so the caller need not restore the folder again.
@@ -85,6 +93,20 @@ export function createWorkspaceStore(
     return updated;
   }
 
+  function replace(workspace: WorkspaceRecord): WorkspaceRecord {
+    const next = { ...list, workspaces: list.workspaces.map((w) => (w.id === workspace.id ? workspace : w)) };
+    if (sessionOnlyIds.has(workspace.id)) {
+      list = next;
+    } else {
+      save(next);
+    }
+    return workspace;
+  }
+
+  function isUsed(folderId: string): boolean {
+    return list.workspaces.some((w) => w.folderIds.includes(folderId));
+  }
+
   function createFor(folderId: string, folderName: string): WorkspaceRecord {
     const name = validateWorkspaceName(folderName);
     return {
@@ -104,6 +126,8 @@ export function createWorkspaceStore(
       return workspace && !sessionOnlyIds.has(workspace.id) ? workspace : null;
     },
 
+    workspace: (workspaceId) => list.workspaces.find((w) => w.id === workspaceId) ?? null,
+
     openFolder(folder) {
       if (folder.accessMode === "fallback") {
         const workspace = createFor(folder.id, folder.name);
@@ -120,6 +144,23 @@ export function createWorkspaceStore(
         opened(workspace);
       }
     },
+
+    addFolder(workspaceId, folderId) {
+      const workspace = list.workspaces.find((w) => w.id === workspaceId);
+      return workspace ? replace({ ...workspace, folderIds: [...workspace.folderIds, folderId] }) : null;
+    },
+
+    removeFolder(workspaceId, folderId) {
+      const workspace = list.workspaces.find((w) => w.id === workspaceId);
+      const folderIds = workspace?.folderIds.filter((id) => id !== folderId) ?? [];
+      if (!workspace || folderIds.length === 0 || folderIds.length === workspace.folderIds.length) {
+        return null;
+      }
+      replace({ ...workspace, folderIds });
+      return { isFolderUnused: !isUsed(folderId) };
+    },
+
+    isFolderUsed: (folderId) => isUsed(folderId),
 
     async migrateLegacyFolder(capability) {
       if (hasStoredList) {

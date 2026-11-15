@@ -16,11 +16,11 @@ export interface LoadedFile {
 /** What another program did to an open file since Vista last read or wrote it. */
 export type ExternalChange = "changed" | "deleted";
 
-/** An open tab: a document buffer plus which workspace it belongs to and how it is shown. */
+/** An open tab: a document buffer plus which folder it belongs to and how it is shown. */
 export interface OpenDocument extends FileDocument {
-  /** Unique across workspaces, so several roots can have files at the same relative path. */
+  /** Unique across folders, so several folders can have files at the same relative path. */
   key: string;
-  workspaceId: string;
+  folderId: string;
   viewMode: ViewMode;
   /** The version on disk the buffer was last read from or written to. Saving expects it. */
   diskStat: FileStat;
@@ -37,14 +37,14 @@ export interface DocumentsState {
   activeKey: string | null;
 }
 
-/** A workspace-relative path in one workspace. */
-export interface WorkspaceEntryRef {
-  workspaceId: string;
+/** A path within one folder of the workspace. */
+export interface FolderEntryRef {
+  folderId: string;
   path: string;
 }
 
 export type DocumentsAction =
-  | { type: "open"; workspaceId: string; path: string; file: LoadedFile }
+  | { type: "open"; folderId: string; path: string; file: LoadedFile }
   | { type: "activate"; key: string }
   | { type: "close"; keys: string[] }
   | { type: "edit"; key: string; content: string }
@@ -53,12 +53,12 @@ export type DocumentsAction =
   // `expected` is the version the reload started from; a save during the read makes the result stale.
   | { type: "reloaded"; key: string; expected: FileStat; file: LoadedFile }
   | { type: "setViewMode"; key: string; viewMode: ViewMode }
-  | { type: "move"; workspaceId: string; fromPath: string; toPath: string };
+  | { type: "move"; folderId: string; fromPath: string; toPath: string };
 
 export const INITIAL_DOCUMENTS_STATE: DocumentsState = { documents: [], activeKey: null };
 
-export function documentKey(workspaceId: string, path: string): string {
-  return `${workspaceId}:${path}`;
+export function documentKey(folderId: string, path: string): string {
+  return `${folderId}:${path}`;
 }
 
 export function getActiveDocument(state: DocumentsState): OpenDocument | null {
@@ -66,8 +66,8 @@ export function getActiveDocument(state: DocumentsState): OpenDocument | null {
 }
 
 /** Documents at an entry's path or inside it, in tab order. */
-export function findAffectedDocuments(state: DocumentsState, entry: WorkspaceEntryRef): OpenDocument[] {
-  return state.documents.filter((doc) => doc.workspaceId === entry.workspaceId && isSameOrInside(doc.path, entry.path));
+export function findAffectedDocuments(state: DocumentsState, entry: FolderEntryRef): OpenDocument[] {
+  return state.documents.filter((doc) => doc.folderId === entry.folderId && isSameOrInside(doc.path, entry.path));
 }
 
 export function documentsReducer(state: DocumentsState, action: DocumentsAction): DocumentsState {
@@ -133,9 +133,9 @@ export function isSameStat(a: FileStat, b: FileStat): boolean {
 
 function openDocument(
   state: DocumentsState,
-  { workspaceId, path, file }: { workspaceId: string; path: string; file: LoadedFile },
+  { folderId, path, file }: { folderId: string; path: string; file: LoadedFile },
 ): DocumentsState {
-  const key = documentKey(workspaceId, path);
+  const key = documentKey(folderId, path);
   if (state.documents.some((doc) => doc.key === key)) {
     return { ...state, activeKey: key };
   }
@@ -143,7 +143,7 @@ function openDocument(
   const extension = normalizeExtension(name);
   const opened: OpenDocument = {
     key,
-    workspaceId,
+    folderId,
     path,
     name,
     extension,
@@ -202,17 +202,17 @@ function updateDocument(
 
 function moveDocuments(
   state: DocumentsState,
-  { workspaceId, fromPath, toPath }: { workspaceId: string; fromPath: string; toPath: string },
+  { folderId, fromPath, toPath }: { folderId: string; fromPath: string; toPath: string },
 ): DocumentsState {
   let activeKey = state.activeKey;
   const documents = state.documents.map((doc) => {
-    if (doc.workspaceId !== workspaceId || !isSameOrInside(doc.path, fromPath)) {
+    if (doc.folderId !== folderId || !isSameOrInside(doc.path, fromPath)) {
       return doc;
     }
     const path = toPath + doc.path.slice(fromPath.length);
     const name = baseName(path);
     const extension = normalizeExtension(name);
-    const key = documentKey(workspaceId, path);
+    const key = documentKey(folderId, path);
     if (doc.key === state.activeKey) {
       activeKey = key;
     }

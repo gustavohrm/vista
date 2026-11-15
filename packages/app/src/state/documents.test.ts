@@ -19,8 +19,7 @@ function loaded(content: string, changes?: Partial<LoadedFile>): LoadedFile {
 
 function openAll(...paths: string[]): DocumentsState {
   return paths.reduce(
-    (state, path) =>
-      documentsReducer(state, { type: "open", workspaceId: WS, path, file: loaded(`content of ${path}`) }),
+    (state, path) => documentsReducer(state, { type: "open", folderId: WS, path, file: loaded(`content of ${path}`) }),
     INITIAL_DOCUMENTS_STATE,
   );
 }
@@ -36,7 +35,7 @@ describe("documentsReducer", () => {
     expect(state.documents).toEqual([
       {
         key: documentKey(WS, "notes/todo.md"),
-        workspaceId: WS,
+        folderId: WS,
         path: "notes/todo.md",
         name: "todo.md",
         extension: "md",
@@ -62,7 +61,7 @@ describe("documentsReducer", () => {
   it("activates the existing tab instead of reloading a document that is already open", () => {
     let state = openAll("a.md", "b.md");
     state = documentsReducer(state, { type: "edit", key: documentKey(WS, "a.md"), content: "edited" });
-    state = documentsReducer(state, { type: "open", workspaceId: WS, path: "a.md", file: loaded("from disk") });
+    state = documentsReducer(state, { type: "open", folderId: WS, path: "a.md", file: loaded("from disk") });
 
     expect(paths(state)).toEqual(["a.md", "b.md"]);
     expect(state.documents[0]?.content).toBe("edited");
@@ -72,7 +71,7 @@ describe("documentsReducer", () => {
   it("inserts a new tab to the right of the active tab", () => {
     let state = openAll("a.md", "b.md");
     state = documentsReducer(state, { type: "activate", key: documentKey(WS, "a.md") });
-    state = documentsReducer(state, { type: "open", workspaceId: WS, path: "c.md", file: loaded("") });
+    state = documentsReducer(state, { type: "open", folderId: WS, path: "c.md", file: loaded("") });
 
     expect(paths(state)).toEqual(["a.md", "c.md", "b.md"]);
   });
@@ -164,7 +163,7 @@ describe("documentsReducer", () => {
   it("renames an open file in place, keeping its buffer and active state", () => {
     let state = openAll("a.md");
     state = documentsReducer(state, { type: "edit", key: documentKey(WS, "a.md"), content: "unsaved" });
-    state = documentsReducer(state, { type: "move", workspaceId: WS, fromPath: "a.md", toPath: "b.md" });
+    state = documentsReducer(state, { type: "move", folderId: WS, fromPath: "a.md", toPath: "b.md" });
 
     expect(state.documents[0]).toMatchObject({
       key: documentKey(WS, "b.md"),
@@ -178,14 +177,14 @@ describe("documentsReducer", () => {
 
   it("moves every open file inside a renamed folder, and nothing outside it", () => {
     let state = openAll("docs/a.md", "docs/sub/b.md", "docs-old/c.md");
-    state = documentsReducer(state, { type: "move", workspaceId: WS, fromPath: "docs", toPath: "notes" });
+    state = documentsReducer(state, { type: "move", folderId: WS, fromPath: "docs", toPath: "notes" });
 
     expect(paths(state)).toEqual(["notes/a.md", "notes/sub/b.md", "docs-old/c.md"]);
   });
 
   it("updates the view mode when a rename changes the format", () => {
     let state = openAll("a.md");
-    state = documentsReducer(state, { type: "move", workspaceId: WS, fromPath: "a.md", toPath: "a.txt" });
+    state = documentsReducer(state, { type: "move", folderId: WS, fromPath: "a.md", toPath: "a.txt" });
 
     expect(state.documents[0]).toMatchObject({ extension: "txt", viewMode: "raw" });
   });
@@ -195,7 +194,7 @@ describe("findAffectedDocuments", () => {
   it("finds the file itself and everything under a folder path", () => {
     const state = openAll("docs/a.md", "docs/sub/b.md", "docs-old/c.md", "docs");
 
-    expect(findAffectedDocuments(state, { workspaceId: WS, path: "docs" }).map((doc) => doc.path)).toEqual([
+    expect(findAffectedDocuments(state, { folderId: WS, path: "docs" }).map((doc) => doc.path)).toEqual([
       "docs/a.md",
       "docs/sub/b.md",
       "docs",
@@ -205,7 +204,7 @@ describe("findAffectedDocuments", () => {
   it("ignores documents from other workspaces", () => {
     const state = openAll("a.md");
 
-    expect(findAffectedDocuments(state, { workspaceId: "other", path: "a.md" })).toEqual([]);
+    expect(findAffectedDocuments(state, { folderId: "other", path: "a.md" })).toEqual([]);
   });
 
   describe("changes on disk", () => {
@@ -285,7 +284,7 @@ describe("findAffectedDocuments", () => {
   it("ignores edits to a read-only document", () => {
     const state = documentsReducer(INITIAL_DOCUMENTS_STATE, {
       type: "open",
-      workspaceId: WS,
+      folderId: WS,
       path: "legacy.csv",
       file: loaded("a�b", { isReadOnly: true }),
     });
@@ -296,7 +295,7 @@ describe("findAffectedDocuments", () => {
   it("keeps a read-only document in the raw view, the only view that shows it read-only", () => {
     let state = documentsReducer(INITIAL_DOCUMENTS_STATE, {
       type: "open",
-      workspaceId: WS,
+      folderId: WS,
       path: "legacy.md",
       file: loaded("text", { isReadOnly: true }),
     });

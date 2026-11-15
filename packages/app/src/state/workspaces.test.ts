@@ -131,6 +131,54 @@ describe("createWorkspaceStore", () => {
   });
 });
 
+describe("folders of a workspace", () => {
+  it("adds a folder after the ones a workspace has", () => {
+    const storage = memoryStorage();
+    const store = createWorkspaceStore(storage, options());
+    const workspace = store.openFolder(notes);
+
+    expect(store.addFolder(workspace.id, "f2")?.folderIds).toEqual(["f1", "f2"]);
+    expect(createWorkspaceStore(storage, options()).workspace(workspace.id)?.folderIds).toEqual(["f1", "f2"]);
+  });
+
+  it("removes a folder and says whether any workspace still uses it", () => {
+    const store = createWorkspaceStore(memoryStorage(), options());
+    const first = store.openFolder(notes);
+    store.addFolder(first.id, "f2");
+    const second = store.openFolder({ id: "f2", name: "work", rootPath: "/work" });
+
+    expect(store.removeFolder(first.id, "f2")).toEqual({ isFolderUnused: false });
+    expect(store.workspace(first.id)?.folderIds).toEqual(["f1"]);
+    store.addFolder(second.id, "f3");
+    expect(store.removeFolder(second.id, "f3")).toEqual({ isFolderUnused: true });
+  });
+
+  it("says whether any workspace holds a folder", () => {
+    const store = createWorkspaceStore(memoryStorage(), options());
+    store.openFolder(notes);
+
+    expect(store.isFolderUsed("f1")).toBe(true);
+    expect(store.isFolderUsed("f2")).toBe(false);
+  });
+
+  it("never removes a workspace's only folder", () => {
+    const store = createWorkspaceStore(memoryStorage(), options());
+    const workspace = store.openFolder(notes);
+
+    expect(store.removeFolder(workspace.id, "f1")).toBeNull();
+    expect(store.workspace(workspace.id)?.folderIds).toEqual(["f1"]);
+  });
+
+  it("changes a session-only workspace without storing it", () => {
+    const storage = memoryStorage();
+    const store = createWorkspaceStore(storage, options());
+    const workspace = store.openFolder({ ...notes, accessMode: "fallback" });
+
+    expect(store.addFolder(workspace.id, "f2")?.folderIds).toEqual(["f1", "f2"]);
+    expect(storage.values.has(WORKSPACES_STORAGE_KEY)).toBe(false);
+  });
+});
+
 describe("migrateLegacyFolder", () => {
   it("turns the folder an earlier Vista remembered into the last workspace", async () => {
     const storage = memoryStorage();

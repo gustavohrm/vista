@@ -16,9 +16,17 @@ import { FileIcon } from "../layout/file-icon";
 /** Typed first in the picker to list commands instead of files. */
 export const COMMAND_QUERY_PREFIX = ">";
 
-/** Where to go: a file, or the current one when `path` is null, and optionally a position in it. */
+/** A file the picker can open. */
+export interface GoToFile {
+  /** Handed back in the request when this file is chosen. */
+  key: string;
+  /** Shown and searched, such as "notes/docs/a.md": the folder name, then the path in it. */
+  label: string;
+}
+
+/** Where to go: a file, or the current one when `fileKey` is null, and optionally a position in it. */
 export interface GoToRequest {
-  path: string | null;
+  fileKey: string | null;
   line?: number;
   column?: number;
 }
@@ -31,8 +39,8 @@ export interface PaletteCommand {
 }
 
 interface GoToDialogProps {
-  /** Workspace-relative paths of every file in the open folder. */
-  files: readonly string[];
+  /** Every file of the open workspace. */
+  files: readonly GoToFile[];
   /** Commands listed when the query starts with `>`. */
   commands: readonly PaletteCommand[];
   /** Text the field starts with, such as ":" for go-to-line or ">" for commands. */
@@ -71,9 +79,10 @@ export function GoToDialog({
   const commandQuery = isCommandMode ? query.trimStart().slice(COMMAND_QUERY_PREFIX.length) : "";
   const target = parseGoToQuery(query);
   const isLineInCurrentFile = !isCommandMode && target.path === "" && query.trim().startsWith(":");
+  const labels = useMemo(() => files.map((file) => file.label), [files]);
   const fileMatches = useMemo<FileMatch[]>(
-    () => (isCommandMode || isLineInCurrentFile ? [] : rankFiles(files, target.path)),
-    [files, isCommandMode, isLineInCurrentFile, target.path],
+    () => (isCommandMode || isLineInCurrentFile ? [] : rankFiles(labels, target.path)),
+    [labels, isCommandMode, isLineInCurrentFile, target.path],
   );
   const commandMatches = useMemo(
     () => (isCommandMode ? rankCommands(commands, commandQuery) : []),
@@ -110,12 +119,13 @@ export function GoToDialog({
   const goToFile = (match: FileMatch | undefined) => {
     if (isLineInCurrentFile) {
       if (hasCurrentFile && target.line !== undefined) {
-        onGo({ path: null, line: target.line, column: target.column });
+        onGo({ fileKey: null, line: target.line, column: target.column });
       }
       return;
     }
-    if (match) {
-      onGo({ path: match.path, line: target.line, column: target.column });
+    const file = match && files[match.index];
+    if (file) {
+      onGo({ fileKey: file.key, line: target.line, column: target.column });
     }
   };
 
@@ -239,7 +249,7 @@ export function GoToDialog({
               : fileMatches.map((match, index) => (
                   // oxlint-disable-next-line jsx-a11y/click-events-have-key-events -- the combobox field handles the keyboard: arrows pick an option and Enter opens it
                   <div
-                    key={match.path}
+                    key={files[match.index]?.key}
                     id={optionId(index)}
                     // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- an option of the custom listbox above
                     role="option"
