@@ -31,8 +31,8 @@ function tabNames(page: Page) {
   return page.getByRole("tab").allTextContents();
 }
 
-function dropMarker(page: Page) {
-  return page.locator("[data-tab-drop-marker]");
+function draggedTab(page: Page) {
+  return page.locator("[data-tab-dragging]");
 }
 
 /** Presses the pointer on the middle of a tab. */
@@ -47,7 +47,7 @@ async function pressOnTab(page: Page, name: string) {
 }
 
 test.describe("tabs", () => {
-  test("drags a tab to a new place, with a marker where it will land", async ({ page }) => {
+  test("drags a tab to a new place, sliding the tabs it passes aside", async ({ page }) => {
     await openTwoTabs(page);
     await openFromPicker(page, "badge.svg");
     const notes = await page.getByRole("tab", { name: "notes.md" }).boundingBox();
@@ -55,11 +55,15 @@ test.describe("tabs", () => {
     // Between notes.md and badge.svg.
     await pressOnTab(page, "gallery.md");
     await page.mouse.move(notes!.x + notes!.width + 12, notes!.y + notes!.height / 2, { steps: 8 });
-    await expect(dropMarker(page)).toBeVisible();
+    await expect(draggedTab(page)).toBeVisible();
+    // notes.md has slid left into the place gallery.md left.
+    await expect
+      .poll(async () => (await page.getByRole("tab", { name: "notes.md" }).boundingBox())!.x)
+      .toBeLessThan(notes!.x);
     await page.mouse.up();
 
     await expect.poll(() => tabNames(page)).toEqual(["notes.md", "gallery.md", "badge.svg"]);
-    await expect(dropMarker(page)).toHaveCount(0);
+    await expect(draggedTab(page)).toHaveCount(0);
   });
 
   test("puts the tab back when Escape is pressed during a drag", async ({ page }) => {
@@ -68,9 +72,9 @@ test.describe("tabs", () => {
 
     await pressOnTab(page, "gallery.md");
     await page.mouse.move(notes!.x + notes!.width - 4, notes!.y + notes!.height / 2, { steps: 8 });
-    await expect(dropMarker(page)).toBeVisible();
+    await expect(draggedTab(page)).toBeVisible();
     await page.keyboard.press("Escape");
-    await expect(dropMarker(page)).toHaveCount(0);
+    await expect(draggedTab(page)).toHaveCount(0);
     await page.mouse.up();
 
     await expect.poll(() => tabNames(page)).toEqual(["gallery.md", "notes.md"]);

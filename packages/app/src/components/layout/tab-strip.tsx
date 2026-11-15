@@ -1,3 +1,4 @@
+import { useReducedMotion } from "motion/react";
 import {
   useEffect,
   useRef,
@@ -64,7 +65,8 @@ export function TabStrip({
   // order. Chromium keeps focus on an element React moves, so the e2e tests pass without this; the
   // HTML focus fixup rule drops focus from a removed element, which other engines may apply to a move.
   const movedKeyRef = useRef<string | null>(null);
-  const { drag, startDrag } = useTabDrag(listRef, onReorder);
+  const isReducedMotion = useReducedMotion() ?? false;
+  const { drag, startDrag } = useTabDrag(listRef, onReorder, isReducedMotion);
 
   const closeTabs = async (focusedKey: string | null, close: () => Promise<boolean>) => {
     keyboardClosedKeyRef.current = focusedKey;
@@ -141,6 +143,9 @@ export function TabStrip({
             {...describeTab(doc, documents, locate)}
             isActive={doc.key === activeKey}
             isDragged={drag?.key === doc.key}
+            dragOffset={drag?.offsets[doc.key]}
+            isSettling={drag?.isSettling ?? false}
+            isRowDragging={drag !== null}
             onActivate={() => onActivate(doc.key)}
             onPointerDown={(event) => startDrag(doc.key, event)}
             onClose={(event) => {
@@ -154,15 +159,6 @@ export function TabStrip({
             }}
           />
         ))}
-        {drag && drag.markerLeft !== null && (
-          // Where the dragged tab will land.
-          <div
-            data-tab-drop-marker
-            aria-hidden="true"
-            className="pointer-events-none absolute top-2 bottom-2 w-0.5 rounded-full bg-[var(--focus-ring)]"
-            style={{ left: drag.markerLeft - 1 }}
-          />
-        )}
         {menu && (
           <Menu
             label="Tab actions"
@@ -273,12 +269,25 @@ interface TabProps {
   isActive: boolean;
   /** Whether the tab is being dragged to another place. */
   isDragged: boolean;
+  /** How far a drag has moved the tab from its place, in pixels: under the pointer, or aside for it. */
+  dragOffset: number | undefined;
+  /** Whether a drag has ended and the tabs are sliding into their places. */
+  isSettling: boolean;
+  /** Whether any tab in the row is being dragged, which lets the others slide aside. */
+  isRowDragging: boolean;
   onActivate: () => void;
   onPointerDown: (event: PointerEvent) => void;
   onClose: (event: MouseEvent) => void;
   onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
   onContextMenu: (event: MouseEvent) => void;
 }
+
+/**
+ * The dragged tab: above the tabs it passes, and filled opaquely with the selected tint over the
+ * frame, so a tab under it does not show through. No shadow: it stays in the row, not above it.
+ */
+const DRAGGED_TAB_CLASS =
+  "relative z-10 bg-frame! bg-[image:linear-gradient(var(--color-selected),var(--color-selected))] text-text-strong!";
 
 function Tab({
   document: doc,
@@ -287,6 +296,9 @@ function Tab({
   title,
   isActive,
   isDragged,
+  dragOffset,
+  isSettling,
+  isRowDragging,
   onActivate,
   onPointerDown,
   onClose,
@@ -313,9 +325,17 @@ function Tab({
       onAuxClick={handleAuxClick}
       onMouseDown={handleMouseDown}
       onContextMenu={onContextMenu}
-      className={`group flex h-7 max-w-56 flex-none items-center rounded-md transition-colors duration-100 ${isDragged ? "opacity-50" : ""} ${
-        isActive ? "bg-selected text-text-strong" : "text-text-muted hover:bg-hover hover:text-text"
-      }`}
+      data-tab-dragging={isDragged ? "" : undefined}
+      style={dragOffset ? { transform: `translateX(${dragOffset}px)` } : undefined}
+      // The dragged tab stays under the pointer and above the tabs it passes; the others, and the
+      // dragged one once released, slide. Outside a drag nothing slides, so keyboard moves are instant.
+      className={`group flex h-7 max-w-56 flex-none items-center rounded-md ease-(--ease-move) motion-reduce:transition-none ${
+        isDragged ? DRAGGED_TAB_CLASS : ""
+      } ${
+        isRowDragging && (!isDragged || isSettling)
+          ? "transition-[transform,background-color,color] duration-150"
+          : "transition-colors duration-100"
+      } ${isActive ? "bg-selected text-text-strong" : "text-text-muted hover:bg-hover hover:text-text"}`}
     >
       <button
         type="button"
