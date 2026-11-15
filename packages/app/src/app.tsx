@@ -35,7 +35,17 @@ import { BYTES_PER_MB, type EditorSettings } from "./domain/settings";
 import { encodeText } from "./domain/text-codec";
 import { getViewer } from "./domain/viewers";
 import { isDesktopViewport } from "./domain/viewport";
-import type { Session, WorkspaceColor, WorkspaceIcon, WorkspaceRecord } from "./domain/workspaces";
+import {
+  HOME_FOLDER_LOCATION,
+  serializeWorkspaceFile,
+  WORKSPACE_FILE_DIRECTORY,
+  WORKSPACE_FILE_PATH,
+  type Session,
+  type WorkspaceColor,
+  type WorkspaceIcon,
+  type WorkspaceRecord,
+  type WorkspaceStorage,
+} from "./domain/workspaces";
 import {
   LEGACY_FOLDER_ID,
   WorkspaceError,
@@ -83,6 +93,8 @@ interface OpenFolder {
   folder: WorkspaceFolder | null;
   status: ExplorerFolder["status"];
   tree: WorkspaceNode[];
+  /** Where the folder is from the home folder, set while the workspace's details live in its folder. */
+  location?: string;
 }
 
 interface OpenWorkspace {
@@ -90,6 +102,7 @@ interface OpenWorkspace {
   name: string;
   icon: WorkspaceIcon;
   color: WorkspaceColor;
+  storage: WorkspaceStorage;
   folders: OpenFolder[];
 }
 
@@ -571,7 +584,7 @@ function AppShell({ adapter }: AppProps) {
       await adoptWorkspace(() => {
         // The workspace that is exactly this folder, which has no other folder.
         const record = workspaceStore.openFolder(opened);
-        return { id: record.id, name: record.name, icon: record.icon, color: record.color, folders: [folder] };
+        return withLocations(record, [folder]);
       }, approvedEdits);
       // Shows the files of the folder the user just picked, also where the explorer is a drawer.
       setIsSidebarOpen(true);
@@ -645,7 +658,7 @@ function AppShell({ adapter }: AppProps) {
       const folders = await Promise.all(results.map(([id, result]) => toOpenFolder(id, result)));
       return adoptWorkspace(() => {
         workspaceStore.markOpened(record.id);
-        return { id: record.id, name: record.name, icon: record.icon, color: record.color, folders };
+        return withLocations(record, folders);
       }, approvedEdits);
     },
     [adapter.workspace, adoptWorkspace, toOpenFolder, toast, workspaceStore],
@@ -804,6 +817,136 @@ function AppShell({ adapter }: AppProps) {
     [workspaceStore],
   );
 
+  /** Where a folder is from the home folder, as the host says or, when it can't, beside it. */
+  const locateFolder = useCallback(
+    async (home: WorkspaceFolder, entry: OpenFolder): Promise<string> => {
+      const found =
+        entry.folder && adapter.workspace.relativeLocation
+          ? await adapter.workspace.relativeLocation(home, entry.folder)
+          : null;
+      return found ?? `../${entry.name}`;
+    },
+    [adapter.workspace],
+  );
+
+  const writeWorkspaceFile = useCallback(
+    async (home: WorkspaceFolder, text: string) => {
+      try {
+        await adapter.workspace.createDirectory(home, WORKSPACE_FILE_DIRECTORY);
+      } catch {
+        // Usually it exists already; any real problem fails the write below, which says why.
+      }
+      await adapter.workspace.writeFile(home, WORKSPACE_FILE_PATH, encodeText(text, false));
+    },
+    [adapter.workspace],
+  );
+
+  // The file text last written or being written for the open workspace, so a change rewrites it once.
+  const writtenFileRef = useRef<string | null>(null);
+  const fileWriteRef = useRef<Promise<void>>(Promise.resolve());
+  useEffect(() => {
+    const home = workspace?.folders[0]?.folder;
+    if (!workspace || workspace.storage !== "folder" || !home) {
+      return;
+    }
+    const text = serializeWorkspaceFile(describeWorkspaceFile(workspace));
+    const key = `${workspace.id}\n${text}`;
+    if (writtenFileRef.current === key) {
+      return;
+    }
+    writtenFileRef.current = key;
+    const previous = fileWriteRef.current;
+    const write = async () => {
+      await previous;
+      try {
+        await writeWorkspaceFile(home, text);
+      } catch (err) {
+        console.error("Failed to save the workspace details:", err);
+        if (writtenFileRef.current === key) {
+          writtenFileRef.current = null;
+        }
+        toast.show({ kind: "error", text: describeFileWriteFailure(home.name, err) });
+      }
+    };
+    fileWriteRef.current = write();
+  }, [toast, workspace, writeWorkspaceFile]);
+
+  const handleChangeStorage = useCallback(
+    async (next: WorkspaceStorage) => {
+      const current = workspaceRef.current;
+      const home = current?.folders[0];
+      if (!current || !home?.folder || current.storage === next) {
+        return;
+      }
+      const homeFolder = home.folder;
+      if (next === "folder") {
+        try {
+          const located = new Map<string, string>();
+          for (const entry of current.folders.slice(1)) {
+            // oxlint-disable-next-line eslint/no-await-in-loop -- a workspace has few folders
+            located.set(entry.id, await locateFolder(homeFolder, entry));
+          }
+          const folders = current.folders.map((entry) => ({
+            ...entry,
+            location: located.get(entry.id) ?? HOME_FOLDER_LOCATION,
+          }));
+          const text = serializeWorkspaceFile(describeWorkspaceFile({ ...current, folders }));
+          await writeWorkspaceFile(homeFolder, text);
+          workspaceStore.storeInFolder(
+            current.id,
+            Object.fromEntries([...located].map(([folderId, location]) => [location, folderId])),
+          );
+          writtenFileRef.current = `${current.id}\n${text}`;
+          setWorkspace((previous) =>
+            previous?.id === current.id
+              ? {
+                  ...previous,
+                  storage: "folder",
+                  folders: previous.folders.map((entry, index) => ({
+                    ...entry,
+                    location: index === 0 ? HOME_FOLDER_LOCATION : (located.get(entry.id) ?? `../${entry.name}`),
+                  })),
+                }
+              : previous,
+          );
+        } catch (err) {
+          console.error("Failed to store the workspace details in its folder:", err);
+          toast.show({ kind: "error", text: describeFileWriteFailure(home.name, err) });
+        }
+        return;
+      }
+      const confirmed = await toast.confirm({
+        title: "Store the details on this device?",
+        message: `Vista deletes "${home.name}/${WORKSPACE_FILE_PATH}", so opening the folder elsewhere no longer opens this workspace.`,
+        confirmLabel: "Delete File",
+        destructive: true,
+      });
+      if (!confirmed) {
+        return;
+      }
+      try {
+        // A rewrite still under way would bring the file back after it is deleted.
+        await fileWriteRef.current;
+        if (await adapter.workspace.stat(homeFolder, WORKSPACE_FILE_PATH)) {
+          await adapter.workspace.remove(homeFolder, WORKSPACE_FILE_PATH);
+        }
+      } catch (err) {
+        console.error("Failed to delete the workspace file:", err);
+        const reason = err instanceof Error ? ` ${err.message}` : "";
+        toast.show({ kind: "error", text: `Couldn't delete "${home.name}/${WORKSPACE_FILE_PATH}".${reason}` });
+        return;
+      }
+      workspaceStore.storeOnDevice(current.id);
+      writtenFileRef.current = null;
+      setWorkspace((previous) =>
+        previous?.id === current.id
+          ? { ...previous, storage: "device", folders: previous.folders.map(({ location: _, ...entry }) => entry) }
+          : previous,
+      );
+    },
+    [adapter.workspace, locateFolder, toast, workspaceStore, writeWorkspaceFile],
+  );
+
   const handleAddFolder = useCallback(async () => {
     const current = workspaceRef.current;
     if (!current) {
@@ -830,8 +973,12 @@ function AppShell({ adapter }: AppProps) {
       if (workspaceRef.current?.id !== current.id) {
         return;
       }
-      workspaceStore.addFolder(current.id, picked.id);
+      const home = current.folders[0]?.folder;
       const added: OpenFolder = { id: picked.id, name: picked.name, folder: picked, status: "ready", tree };
+      if (current.storage === "folder" && home) {
+        added.location = await locateFolder(home, added);
+      }
+      workspaceStore.addFolder(current.id, picked.id, added.location);
       setWorkspace((previous) =>
         previous?.id === current.id ? { ...previous, folders: [...previous.folders, added] } : previous,
       );
@@ -841,13 +988,20 @@ function AppShell({ adapter }: AppProps) {
       const message = err instanceof Error ? err.message : "Failed to add the folder.";
       toast.show({ kind: "error", text: message });
     }
-  }, [adapter.workspace, toast, workspaceStore]);
+  }, [adapter.workspace, locateFolder, toast, workspaceStore]);
 
   const handleRemoveFolder = useCallback(
     async (folderId: string) => {
       const current = workspaceRef.current;
       const entry = current?.folders.find((candidate) => candidate.id === folderId);
       if (!current || !entry) {
+        return;
+      }
+      if (current.storage === "folder" && current.folders[0]?.id === folderId) {
+        toast.show({
+          kind: "info",
+          text: "The workspace's details are stored in this folder. Store them on this device first.",
+        });
         return;
       }
       const confirmed = await toast.confirm({
@@ -1838,6 +1992,9 @@ function AppShell({ adapter }: AppProps) {
           onChange={handleChangeWorkspaceDetails}
           onAddFolder={() => void handleAddFolder()}
           onRemoveFolder={(folderId) => void handleRemoveFolder(folderId)}
+          storage={workspace?.storage ?? "device"}
+          canStoreInFolder={canStoreInFolder(workspace)}
+          onChangeStorage={(storage) => void handleChangeStorage(storage)}
           onClose={() => setHelpDialog(null)}
         />
       )}
@@ -2025,4 +2182,45 @@ function summarizeRestored(results: readonly (readonly [string, RestoreFolderRes
         return { id, name: UNKNOWN_FOLDER_NAME, status: "unavailable" };
     }
   });
+}
+
+function withLocations(record: WorkspaceRecord, folders: OpenFolder[]): OpenWorkspace {
+  const { id, name, icon, color, storage } = record;
+  if (record.storage === "device") {
+    return { id, name, icon, color, storage, folders };
+  }
+  const locationOf = new Map(Object.entries(record.locations).map(([location, folderId]) => [folderId, location]));
+  return {
+    id,
+    name,
+    icon,
+    color,
+    storage,
+    folders: folders.map((entry, index) => ({
+      ...entry,
+      location: index === 0 ? HOME_FOLDER_LOCATION : (locationOf.get(entry.id) ?? `../${entry.name}`),
+    })),
+  };
+}
+
+function describeWorkspaceFile(workspace: OpenWorkspace) {
+  return {
+    name: workspace.name,
+    icon: workspace.icon,
+    color: workspace.color,
+    folders: workspace.folders.map((entry, index) =>
+      index === 0 ? HOME_FOLDER_LOCATION : (entry.location ?? `../${entry.name}`),
+    ),
+  };
+}
+
+// The file needs a home folder Vista can write to, and every folder remembered past this session.
+function canStoreInFolder(workspace: OpenWorkspace | null): boolean {
+  const home = workspace?.folders[0]?.folder;
+  return Boolean(home) && !workspace?.folders.some((entry) => entry.folder?.accessMode === "fallback");
+}
+
+function describeFileWriteFailure(homeName: string, err: unknown): string {
+  const reason = err instanceof Error ? ` ${err.message}` : "";
+  return `Couldn't store the details in "${homeName}/${WORKSPACE_FILE_DIRECTORY}".${reason}`;
 }

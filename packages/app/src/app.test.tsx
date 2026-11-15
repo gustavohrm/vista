@@ -835,6 +835,185 @@ describe("App", () => {
     });
   });
 
+  describe("workspace details in the folder", () => {
+    async function openWorkspaceSettings(user: ReturnType<typeof userEvent.setup>, name = "Research") {
+      const buttons = await screen.findAllByRole("button", { name });
+      await user.click(buttons.find((button) => button.getAttribute("aria-haspopup") === "menu")!);
+      await user.click(screen.getByRole("menuitem", { name: "Workspace Settings…" }));
+      return screen.findByRole("dialog", { name: "Workspace Settings" });
+    }
+
+    function storedWorkspace() {
+      return JSON.parse(localStorage.getItem("vista.workspaces") ?? "null").workspaces[0];
+    }
+
+    function workspaceFile(text: string | undefined) {
+      return text === undefined ? undefined : JSON.parse(text);
+    }
+
+    async function storeInNotes(user: ReturnType<typeof userEvent.setup>, folder: (id: string) => MemoryWorkspace) {
+      const dialog = await openWorkspaceSettings(user);
+      await user.click(within(dialog).getByRole("radio", { name: "In notes/.vista" }));
+      await waitFor(() => expect(folder("notes").textOf(".vista/workspace.json")).toBeDefined());
+      return dialog;
+    }
+
+    it("stores the details in the home folder, with each folder's location", async () => {
+      const user = userEvent.setup();
+      const { capability, folder } = createFoldersCapability(storedFolders(), {
+        relativeLocation: vi.fn(async () => null),
+      });
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("plan.txt");
+      const dialog = await openWorkspaceSettings(user);
+      expect(within(dialog).getByRole("radio", { name: "On this device" })).toBeChecked();
+
+      await user.click(within(dialog).getByRole("radio", { name: "In notes/.vista" }));
+
+      await waitFor(() => expect(within(dialog).getByRole("radio", { name: "In notes/.vista" })).toBeChecked());
+      expect(workspaceFile(folder("notes").textOf(".vista/workspace.json"))).toEqual({
+        version: 1,
+        name: "Research",
+        icon: "folder",
+        color: "neutral",
+        folders: [".", "../sources"],
+      });
+      expect(storedWorkspace()).toMatchObject({
+        storage: "folder",
+        locations: { ".": "notes", "../sources": "sources" },
+      });
+    });
+
+    it("uses the location the host gives for a folder", async () => {
+      const user = userEvent.setup();
+      const { capability, folder } = createFoldersCapability(storedFolders(), {
+        relativeLocation: vi.fn(async () => "deep/sources"),
+      });
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("plan.txt");
+      await storeInNotes(user, folder);
+
+      expect(workspaceFile(folder("notes").textOf(".vista/workspace.json"))?.folders).toEqual([".", "deep/sources"]);
+    });
+
+    it("rewrites the file when the workspace's details change", async () => {
+      const user = userEvent.setup();
+      const { capability, folder } = createFoldersCapability(storedFolders());
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("plan.txt");
+      const dialog = await storeInNotes(user, folder);
+
+      const name = within(dialog).getByRole("textbox", { name: "Name" });
+      await user.clear(name);
+      await user.type(name, "Thesis");
+      await user.click(within(dialog).getByRole("radio", { name: "Rose" }));
+
+      await waitFor(() =>
+        expect(workspaceFile(folder("notes").textOf(".vista/workspace.json"))).toMatchObject({
+          name: "Thesis",
+          color: "rose",
+        }),
+      );
+    });
+
+    it("keeps the details on the device when the file can't be written, and says why", async () => {
+      const user = userEvent.setup();
+      const { capability } = createFoldersCapability(storedFolders());
+      vi.mocked(capability.writeFile).mockRejectedValueOnce(
+        new Error("Permission to write to this folder was not granted."),
+      );
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("plan.txt");
+      const dialog = await openWorkspaceSettings(user);
+
+      await user.click(within(dialog).getByRole("radio", { name: "In notes/.vista" }));
+
+      expect(
+        await screen.findByText(
+          'Couldn\'t store the details in "notes/.vista". Permission to write to this folder was not granted.',
+        ),
+      ).toBeInTheDocument();
+      expect(within(dialog).getByRole("radio", { name: "On this device" })).toBeChecked();
+      expect(storedWorkspace().storage).toBe("device");
+    });
+
+    it("deletes the file after asking when the details move back to the device", async () => {
+      const user = userEvent.setup();
+      const { capability, folder } = createFoldersCapability(storedFolders());
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("plan.txt");
+      const dialog = await storeInNotes(user, folder);
+
+      await user.click(within(dialog).getByRole("radio", { name: "On this device" }));
+      const confirm = await screen.findByRole("dialog", { name: "Store the details on this device?" });
+      expect(confirm).toHaveTextContent('Vista deletes "notes/.vista/workspace.json"');
+      await user.click(within(confirm).getByRole("button", { name: "Cancel" }));
+      expect(folder("notes").textOf(".vista/workspace.json")).toBeDefined();
+      expect(within(dialog).getByRole("radio", { name: "In notes/.vista" })).toBeChecked();
+
+      await user.click(within(dialog).getByRole("radio", { name: "On this device" }));
+      await user.click(
+        within(await screen.findByRole("dialog", { name: "Store the details on this device?" })).getByRole("button", {
+          name: "Delete File",
+        }),
+      );
+
+      await waitFor(() => expect(folder("notes").textOf(".vista/workspace.json")).toBeUndefined());
+      expect(within(dialog).getByRole("radio", { name: "On this device" })).toBeChecked();
+      expect(storedWorkspace().storage).toBe("device");
+      expect(storedWorkspace().locations).toBeUndefined();
+    });
+
+    it("won't remove the home folder while the details are stored in it", async () => {
+      const user = userEvent.setup();
+      const { capability, folder } = createFoldersCapability(storedFolders());
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("plan.txt");
+      const dialog = await storeInNotes(user, folder);
+
+      await user.click(within(dialog).getByRole("button", { name: 'Remove "notes" from the workspace' }));
+
+      expect(
+        await screen.findByText("The workspace's details are stored in this folder. Store them on this device first."),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("dialog", { name: 'Remove "notes" from the workspace?' })).not.toBeInTheDocument();
+      expect(storedWorkspace().folderIds).toEqual(["notes", "sources"]);
+    });
+
+    it("rewrites the file without a folder removed from the workspace", async () => {
+      const user = userEvent.setup();
+      const { capability, folder } = createFoldersCapability(storedFolders());
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("plan.txt");
+      const dialog = await storeInNotes(user, folder);
+
+      await user.click(within(dialog).getByRole("button", { name: 'Remove "sources" from the workspace' }));
+      await user.click(
+        within(await screen.findByRole("dialog", { name: 'Remove "sources" from the workspace?' })).getByRole(
+          "button",
+          { name: "Remove" },
+        ),
+      );
+
+      await waitFor(() =>
+        expect(workspaceFile(folder("notes").textOf(".vista/workspace.json"))?.folders).toEqual(["."]),
+      );
+    });
+
+    it("doesn't offer the folder for a folder this browser can't write to", async () => {
+      const user = userEvent.setup();
+      const mockWorkspace = createMockWorkspaceCapability({
+        pickFolder: vi.fn().mockResolvedValue({ id: "f1", name: "My Notes", rootPath: "/", accessMode: "fallback" }),
+      });
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+      const dialog = await openWorkspaceSettings(user, "My Notes");
+
+      expect(within(dialog).getByRole("radio", { name: "On this device" })).toBeChecked();
+      expect(within(dialog).queryByRole("radio", { name: "In My Notes/.vista" })).not.toBeInTheDocument();
+    });
+  });
+
   describe("recent workspaces", () => {
     /** Research holds `notes`, Work holds `sources`; Research was used last unless `lastWorkspaceId` says otherwise. */
     function twoWorkspaces(lastWorkspaceId: string | null = "w1", workFolderIds = ["sources"]) {

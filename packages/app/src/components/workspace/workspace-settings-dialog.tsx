@@ -7,6 +7,7 @@ import {
   type WorkspaceColor,
   type WorkspaceIcon,
 } from "../../domain/workspaces";
+import type { WorkspaceStorage } from "../../domain/workspaces";
 import type { WorkspaceDetails } from "../../state/workspaces";
 import { HelpDialog } from "../help/help-dialog";
 import { WorkspaceGlyph } from "./workspace-glyph";
@@ -49,6 +50,10 @@ interface WorkspaceSettingsDialogProps {
   onChange: (changes: WorkspaceDetails) => void;
   onAddFolder: () => void;
   onRemoveFolder: (folderId: string) => void;
+  storage: WorkspaceStorage;
+  /** Whether the details may move into the home folder, which needs write access to it. */
+  canStoreInFolder: boolean;
+  onChangeStorage: (storage: WorkspaceStorage) => void;
   onClose: () => void;
 }
 
@@ -58,6 +63,9 @@ export function WorkspaceSettingsDialog({
   onChange,
   onAddFolder,
   onRemoveFolder,
+  storage,
+  canStoreInFolder,
+  onChangeStorage,
   onClose,
 }: WorkspaceSettingsDialogProps) {
   const nameId = useId();
@@ -65,6 +73,7 @@ export function WorkspaceSettingsDialog({
   const [nameDraft, setNameDraft] = useState(workspace.name);
   const nameCheck = validateWorkspaceName(nameDraft);
   const folders = workspace.folders ?? [];
+  const homeName = folders[0]?.name;
 
   return (
     <HelpDialog title="Workspace Settings" onClose={onClose}>
@@ -160,6 +169,34 @@ export function WorkspaceSettingsDialog({
           Add Folder…
         </button>
       </section>
+      <fieldset className="pt-4">
+        <legend className="text-text-secondary pb-1 text-xs font-medium">Details stored</legend>
+        <label className="text-body text-text flex items-center gap-2 py-1">
+          <input
+            type="radio"
+            name="workspace-storage"
+            checked={storage === "device"}
+            onChange={() => onChangeStorage("device")}
+          />
+          On this device
+        </label>
+        {homeName !== undefined && (canStoreInFolder || storage === "folder") && (
+          <label className="text-body text-text flex items-center gap-2 py-1">
+            <input
+              type="radio"
+              name="workspace-storage"
+              checked={storage === "folder"}
+              onChange={() => onChangeStorage("folder")}
+            />
+            In {homeName}/.vista
+          </label>
+        )}
+        <p className="text-text-secondary pt-1 text-xs">
+          {storage === "folder"
+            ? "The details travel with the folder, so opening it on another device opens this workspace."
+            : "Nothing is written into your folders."}
+        </p>
+      </fieldset>
     </HelpDialog>
   );
 }
