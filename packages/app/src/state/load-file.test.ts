@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type { Workspace } from "../ports";
+import type { WorkspaceFolder } from "../ports";
 import { createMemoryWorkspace } from "../test-support/memory-workspace";
 import { loadFile } from "./load-file";
 
-const WORKSPACE: Workspace = { id: "w", name: "w", rootPath: "/w" };
+const WORKSPACE: WorkspaceFolder = { id: "w", name: "w", rootPath: "/w" };
 
 describe("loadFile", () => {
   it("reports a file that does not exist", async () => {

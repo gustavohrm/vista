@@ -16,6 +16,8 @@ tauri-build = { version = "2.7.4", features = [] }
 tauri = { version = "2.12.5", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
+# Only to show an entry in the file manager; the capability grants nothing else.
+tauri-plugin-opener = "2"
 tauri-plugin-persisted-scope = "2"
 # Used by the code tauri::generate_context! generates for the plugins section of tauri.conf.json.
 serde_json = "1"

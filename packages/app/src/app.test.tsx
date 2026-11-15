@@ -5,7 +5,13 @@ import { StrictMode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { App } from "./app";
-import type { AppAdapter, FileStat, WorkspaceCapability, WorkspaceNode } from "./ports";
+import {
+  LEGACY_FOLDER_ID,
+  type AppAdapter,
+  type FileStat,
+  type WorkspaceCapability,
+  type WorkspaceNode,
+} from "./ports";
 import { createMemoryWorkspace, writtenTexts, type MemoryWorkspace } from "./test-support/memory-workspace";
 
 const README_CONTENT = "# Hello Vista\nThis is notes.";
@@ -147,7 +153,7 @@ describe("App", () => {
 
     await openFolderFromWelcome(user);
 
-    expect(mockWorkspace.openFolder).toHaveBeenCalled();
+    expect(mockWorkspace.pickFolder).toHaveBeenCalled();
     expect(screen.getByText("data.csv")).toBeInTheDocument();
 
     // Select readme.md
@@ -211,7 +217,7 @@ describe("App", () => {
   it("shows an error toast when opening a folder fails for a reason other than user cancellation", async () => {
     const user = userEvent.setup();
     const mockWorkspace = createMockWorkspaceCapability({
-      openFolder: vi.fn().mockRejectedValue(new Error("Permission to read this folder was not granted.")),
+      pickFolder: vi.fn().mockRejectedValue(new Error("Permission to read this folder was not granted.")),
     });
     const adapter: AppAdapter = { platform: "web", workspace: mockWorkspace };
 
@@ -225,7 +231,7 @@ describe("App", () => {
   it("shows no error toast when the user cancels the folder picker", async () => {
     const user = userEvent.setup();
     const mockWorkspace = createMockWorkspaceCapability({
-      openFolder: vi.fn().mockResolvedValue(null),
+      pickFolder: vi.fn().mockResolvedValue(null),
     });
     const adapter: AppAdapter = { platform: "web", workspace: mockWorkspace };
 
@@ -233,7 +239,7 @@ describe("App", () => {
 
     await user.click(await screen.findByRole("button", { name: "Open Folder" }));
 
-    await waitFor(() => expect(mockWorkspace.openFolder).toHaveBeenCalled());
+    await waitFor(() => expect(mockWorkspace.pickFolder).toHaveBeenCalled());
     expect(document.querySelector(".coden-toast")).not.toBeInTheDocument();
     expect(screen.getByText("No folder open")).toBeInTheDocument();
   });
@@ -241,7 +247,7 @@ describe("App", () => {
   it("shows an info toast when a folder is opened through the fallback (non-direct) access mode", async () => {
     const user = userEvent.setup();
     const mockWorkspace = createMockWorkspaceCapability({
-      openFolder: vi.fn().mockResolvedValue({
+      pickFolder: vi.fn().mockResolvedValue({
         id: "workspace-1",
         name: "My Notes",
         rootPath: "/notes",
@@ -1148,13 +1154,13 @@ describe("App", () => {
 
     it("reopens the last folder on startup without showing the picker", async () => {
       const mockWorkspace = createMockWorkspaceCapability({
-        restoreFolder: vi.fn().mockResolvedValue({ status: "restored", workspace: REMEMBERED_WORKSPACE }),
+        restoreFolder: vi.fn().mockResolvedValue({ status: "restored", folder: REMEMBERED_WORKSPACE }),
       });
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
 
       expect(await screen.findByText("readme.md")).toBeInTheDocument();
-      expect(mockWorkspace.restoreFolder).toHaveBeenCalledWith({ interactive: false });
-      expect(mockWorkspace.openFolder).not.toHaveBeenCalled();
+      expect(mockWorkspace.restoreFolder).toHaveBeenCalledWith(LEGACY_FOLDER_ID, { interactive: false });
+      expect(mockWorkspace.pickFolder).not.toHaveBeenCalled();
     });
 
     it("reopens a remembered folder that needs permission when the user clicks its button", async () => {
@@ -1163,13 +1169,13 @@ describe("App", () => {
         restoreFolder: vi
           .fn()
           .mockResolvedValueOnce({ status: "needs-permission", name: "My Notes" })
-          .mockResolvedValueOnce({ status: "restored", workspace: REMEMBERED_WORKSPACE }),
+          .mockResolvedValueOnce({ status: "restored", folder: REMEMBERED_WORKSPACE }),
       });
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
 
       await user.click(await screen.findByRole("button", { name: "Reopen My Notes" }));
 
-      expect(mockWorkspace.restoreFolder).toHaveBeenLastCalledWith({ interactive: true });
+      expect(mockWorkspace.restoreFolder).toHaveBeenLastCalledWith(LEGACY_FOLDER_ID, { interactive: true });
       expect(await screen.findByText("readme.md")).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Reopen My Notes" })).not.toBeInTheDocument();
     });
@@ -1183,7 +1189,9 @@ describe("App", () => {
 
       await user.click(await screen.findByRole("button", { name: "Reopen My Notes" }));
 
-      await waitFor(() => expect(mockWorkspace.restoreFolder).toHaveBeenCalledWith({ interactive: true }));
+      await waitFor(() =>
+        expect(mockWorkspace.restoreFolder).toHaveBeenCalledWith(LEGACY_FOLDER_ID, { interactive: true }),
+      );
       expect(screen.getByRole("button", { name: "Reopen My Notes" })).toBeInTheDocument();
       expect(document.querySelector(".coden-toast")).not.toBeInTheDocument();
     });
@@ -1199,6 +1207,36 @@ describe("App", () => {
       ).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /^Reopen/ })).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Open Folder" })).toBeInTheDocument();
+    });
+
+    it("reopens the last workspace's folder by its id", async () => {
+      localStorage.setItem(
+        "vista.workspaces",
+        JSON.stringify({
+          version: 1,
+          lastWorkspaceId: "w1",
+          workspaces: [{ id: "w1", name: "Notes", folderIds: ["folder-7"], lastOpenedAt: 1 }],
+        }),
+      );
+      const mockWorkspace = createMockWorkspaceCapability({
+        restoreFolder: vi.fn().mockResolvedValue({ status: "restored", folder: REMEMBERED_WORKSPACE }),
+      });
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+
+      expect(await screen.findByText("readme.md")).toBeInTheDocument();
+      expect(mockWorkspace.restoreFolder).toHaveBeenCalledTimes(1);
+      expect(mockWorkspace.restoreFolder).toHaveBeenCalledWith("folder-7", { interactive: false });
+    });
+
+    it("remembers a picked folder as the workspace to reopen next time", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+
+      await openFolderFromWelcome(user);
+
+      const stored = JSON.parse(localStorage.getItem("vista.workspaces") ?? "null");
+      expect(stored.workspaces).toMatchObject([{ name: "My Notes", folderIds: ["workspace-1"] }]);
+      expect(stored.lastWorkspaceId).toBe(stored.workspaces[0].id);
     });
 
     it("offers Open Folder on the start screen when no folder is remembered", async () => {
@@ -1459,7 +1497,7 @@ describe("App", () => {
     const user = userEvent.setup();
     let finishRead: (content: string) => void = () => {};
     const mockWorkspace = createMockWorkspaceCapability({
-      openFolder: vi
+      pickFolder: vi
         .fn()
         .mockResolvedValueOnce({ id: "workspace-1", name: "My Notes", rootPath: "/notes" })
         .mockResolvedValueOnce({ id: "workspace-1", name: "My Notes", rootPath: "/notes" }),

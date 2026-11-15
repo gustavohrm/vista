@@ -4,16 +4,16 @@ export type AppPlatform = "native" | "web";
 /** Presentation mode for document content. */
 export type ViewMode = "raw" | "enriched";
 
-/** Opaque workspace descriptor representing an opened root folder. */
-export interface Workspace {
-  /** Unique identifier for the workspace session. */
+/** A folder the host gave access to. A workspace holds one or more of them. */
+export interface WorkspaceFolder {
+  /** Opaque identifier, stable across restarts for a folder the host remembers. */
   id: string;
   /** Human-readable folder name. */
   name: string;
   /** Platform-specific root path or uri reference. */
   rootPath: string;
   /**
-   * How this workspace accesses disk. `"direct"` means reads and writes go straight
+   * How this folder is accessed. `"direct"` means reads and writes go straight
    * to the file system. `"fallback"` means the host could not get direct write access
    * (for example, an unsupported browser) and writes take a different, more limited
    * path such as downloading a file instead of writing it in place. Omitted or
@@ -55,17 +55,17 @@ export interface FileDocument {
 }
 
 /**
- * Outcome of trying to reopen the most recently opened folder without showing a picker.
+ * Outcome of trying to reopen a remembered folder without showing a picker.
  *
  * - `"restored"`: the folder was reopened and is ready to read.
  * - `"needs-permission"`: the folder is remembered, but the host needs a user gesture before it
- *   may access it again (web). Call `restoreFolder({ interactive: true })` from a click handler.
+ *   may access it again (web). Call `restoreFolder(id, { interactive: true })` from a click handler.
  * - `"unavailable"`: the folder is remembered but can no longer be opened (deleted, moved, or
- *   access revoked). The host has already forgotten it, so later attempts return `"none"`.
- * - `"none"`: no folder is remembered, or the host cannot remember folders at all.
+ *   access revoked). The host keeps remembering it until `forgetFolder`.
+ * - `"none"`: no folder is remembered under that id, or the host cannot remember folders at all.
  */
 export type RestoreFolderResult =
-  | { status: "restored"; workspace: Workspace }
+  | { status: "restored"; folder: WorkspaceFolder }
   | { status: "needs-permission"; name: string }
   | { status: "unavailable"; name: string }
   | { status: "none" };
@@ -104,49 +104,80 @@ export class WorkspaceError extends Error {
   }
 }
 
+/** How one folder lies relative to another, as `relate(a, b)` reports it from `a`'s side. */
+export type FolderRelation = "same" | "contains" | "inside" | "separate";
+
 /**
- * Host capabilities for accessing, reading, and persisting local files and folders. Every
- * operation after `openFolder` and `restoreFolder` names the workspace it acts on, and paths are
- * relative to that workspace's root, with `/` separators.
+ * The id under which a host keeps the folder an earlier Vista remembered as its last folder, so the
+ * shared app can turn it into a workspace once. A host with no such folder reports `"none"` for it.
+ */
+export const LEGACY_FOLDER_ID = "last-folder";
+
+/**
+ * Host capabilities for accessing, reading, and persisting local files and folders. Hosts deal only
+ * in folders; which folders form a workspace is the shared app's business. Every file operation
+ * names the folder it acts on, and paths are relative to that folder's root, with `/` separators.
  */
 export interface WorkspaceCapability {
   /** Whether workspace filesystem access is supported in the current environment. */
   readonly isSupported: boolean;
   /**
-   * Prompts the user to pick a local directory to open as a workspace. A successfully opened
-   * folder becomes the one `restoreFolder` reopens later, where the host supports that.
+   * Prompts the user to pick a local folder and remembers access to it under its id, where the host
+   * can remember folders. Picking a folder the host already remembers returns the same id.
    *
-   * @returns The opened workspace descriptor, or null if the user cancelled.
+   * @returns The picked folder, or null if the user cancelled.
    */
-  openFolder(): Promise<Workspace | null>;
+  pickFolder(): Promise<WorkspaceFolder | null>;
   /**
-   * Reopens the most recently opened folder without showing a picker.
+   * Reopens a remembered folder without showing a picker.
    *
    * @param options - `interactive: true` allows the host to show a permission prompt, and MUST only
    *   be passed from a user gesture such as a click handler. With `false`, the host never prompts.
    * @returns The restore outcome. Rejects only on unexpected failures; a missing or inaccessible
    *   folder resolves to `"unavailable"` instead.
    */
-  restoreFolder(options: { interactive: boolean }): Promise<RestoreFolderResult>;
+  restoreFolder(id: string, options: { interactive: boolean }): Promise<RestoreFolderResult>;
+  /** Drops the host's record of a folder. Nothing on disk changes; an unknown id is ignored. */
+  forgetFolder(id: string): Promise<void>;
   /**
-   * Scans and returns the directory tree structure for the given workspace.
+   * Says whether `a` is the same folder as `b`, contains it, is inside it, or is separate from it.
    *
-   * @param workspace - The workspace to read.
+   * @throws If either folder can no longer be reached.
+   */
+  relate(a: WorkspaceFolder, b: WorkspaceFolder): Promise<FolderRelation>;
+  /**
+   * Finds and remembers a folder from a location relative to another one, such as `../sources`.
+   * Only hosts that can turn a path into a folder without a picker provide it.
+   *
+   * @returns The folder, or null when nothing readable is there.
+   */
+  resolveRelative?(from: WorkspaceFolder, relativePath: string): Promise<WorkspaceFolder | null>;
+  /**
+   * Opens the operating system's file manager with an entry selected. Only hosts with a file
+   * manager provide it.
+   *
+   * @param path - The entry, relative to the folder; `""` is the folder itself.
+   * @throws If the entry does not exist or the file manager cannot be opened.
+   */
+  reveal?(folder: WorkspaceFolder, path: string): Promise<void>;
+  /**
+   * Scans and returns the directory tree of a folder.
+   *
    * @returns A promise resolving to the list of root nodes in the directory tree.
    */
-  readTree(workspace: Workspace): Promise<WorkspaceNode[]>;
+  readTree(folder: WorkspaceFolder): Promise<WorkspaceNode[]>;
   /**
    * Reads a file's current version without reading its bytes.
    *
    * @returns The file's stat, or null when no file exists at path.
    */
-  stat(workspace: Workspace, path: string): Promise<FileStat | null>;
+  stat(folder: WorkspaceFolder, path: string): Promise<FileStat | null>;
   /**
    * Reads a file's bytes and the version they belong to.
    *
    * @throws If no file exists at path or it cannot be read.
    */
-  readFile(workspace: Workspace, path: string): Promise<FileContents>;
+  readFile(folder: WorkspaceFolder, path: string): Promise<FileContents>;
   /**
    * Replaces a file's bytes. A reader never sees a partly written file: the host writes the new
    * bytes beside the file and swaps them in, or uses a platform write with the same guarantee.
@@ -158,7 +189,7 @@ export interface WorkspaceCapability {
    * @throws `WorkspaceError` `"conflict"` as described above; otherwise, if the file cannot be written.
    */
   writeFile(
-    workspace: Workspace,
+    folder: WorkspaceFolder,
     path: string,
     bytes: Uint8Array<ArrayBuffer>,
     options?: { expected?: FileStat },
@@ -168,13 +199,13 @@ export interface WorkspaceCapability {
    *
    * @throws If an entry already exists at path, or an intermediate segment is not a directory.
    */
-  createFile(workspace: Workspace, path: string): Promise<void>;
+  createFile(folder: WorkspaceFolder, path: string): Promise<void>;
   /**
    * Creates a new, empty directory at the given path.
    *
    * @throws If an entry already exists at path, or an intermediate segment is not a directory.
    */
-  createDirectory(workspace: Workspace, path: string): Promise<void>;
+  createDirectory(folder: WorkspaceFolder, path: string): Promise<void>;
   /**
    * Moves or renames a file or directory. A rename is a move within the same parent directory.
    * Directory moves are recursive. On the web host this is implemented as a copy followed by a
@@ -184,13 +215,13 @@ export interface WorkspaceCapability {
    *
    * @throws If fromPath does not exist, or an entry already exists at toPath.
    */
-  move(workspace: Workspace, fromPath: string, toPath: string): Promise<void>;
+  move(folder: WorkspaceFolder, fromPath: string, toPath: string): Promise<void>;
   /**
    * Permanently deletes a file or directory. Directory deletion is recursive. This cannot be undone.
    *
    * @throws If path does not exist.
    */
-  remove(workspace: Workspace, path: string): Promise<void>;
+  remove(folder: WorkspaceFolder, path: string): Promise<void>;
 }
 
 /** Host window behavior the application takes part in. */

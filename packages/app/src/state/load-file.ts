@@ -1,5 +1,5 @@
 import { decodeText } from "../domain/text-codec";
-import type { Workspace, WorkspaceCapability } from "../ports";
+import type { WorkspaceCapability, WorkspaceFolder } from "../ports";
 import type { LoadedFile } from "./documents";
 
 export type LoadFileResult =
@@ -14,7 +14,7 @@ export type LoadFileResult =
  */
 export async function loadFile(
   capability: WorkspaceCapability,
-  { workspace, path, maxBytes }: { workspace: Workspace; path: string; maxBytes: number },
+  { workspace, path, maxBytes }: { workspace: WorkspaceFolder; path: string; maxBytes: number },
 ): Promise<LoadFileResult> {
   const stat = await capability.stat(workspace, path);
   if (stat === null) {

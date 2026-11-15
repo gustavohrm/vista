@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { joinWorkspacePath } from "../../domain/path-validation";
 import { isDesktopViewport } from "../../domain/viewport";
-import type { Workspace, WorkspaceNode } from "../../ports";
+import type { WorkspaceFolder, WorkspaceNode } from "../../ports";
 import { Tooltip } from "../feedback/tooltip";
 import { Menu, MENU_SEPARATOR, type MenuEntry } from "../menu/menu";
 import { FileIcon } from "./file-icon";
@@ -32,7 +32,7 @@ export interface NewEntryRequest {
 
 interface SidebarProps {
   /** Active workspace descriptor, if any. */
-  workspace: Workspace | null;
+  workspace: WorkspaceFolder | null;
   /** Hierarchical tree nodes for the open workspace. */
   tree: WorkspaceNode[];
   /** Relative path of the currently active document. */

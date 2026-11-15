@@ -33,12 +33,13 @@ import { encodeText } from "./domain/text-codec";
 import { getViewer } from "./domain/viewers";
 import { isDesktopViewport } from "./domain/viewport";
 import {
+  LEGACY_FOLDER_ID,
   WorkspaceError,
   type AppAdapter,
   type FileStat,
   type RestoreFolderResult,
   type ViewMode,
-  type Workspace,
+  type WorkspaceFolder,
   type WorkspaceNode,
 } from "./ports";
 import {
@@ -52,6 +53,7 @@ import {
 } from "./state/documents";
 import { loadFile } from "./state/load-file";
 import { useSettings } from "./state/settings";
+import { browserStorage, createWorkspaceStore } from "./state/workspaces";
 import { useTheme } from "./theme/theme-manager";
 
 interface AppProps {
@@ -162,7 +164,7 @@ export function App({ adapter }: AppProps) {
 function AppShell({ adapter }: AppProps) {
   const theme = useTheme();
   const toast = useToast();
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [workspace, setWorkspace] = useState<WorkspaceFolder | null>(null);
   const [tree, setTree] = useState<WorkspaceNode[]>([]);
   const [documentsState, dispatchDocuments] = useReducer(documentsReducer, INITIAL_DOCUMENTS_STATE);
   // Starts true when restore will run, so the explorer never flashes its "Open Folder" state.
@@ -170,7 +172,11 @@ function AppShell({ adapter }: AppProps) {
   // Defaults to open at `md` and above (a persistent column there) and closed below it (a
   // transient overlay drawer), matching the breakpoint Sidebar itself switches behavior at.
   const [isSidebarOpen, setIsSidebarOpen] = useState(isDesktopViewport);
-  const [restorableFolderName, setRestorableFolderName] = useState<string | null>(null);
+  // The last workspace's folder when it waits for the user to allow access again.
+  const [restorableFolder, setRestorableFolder] = useState<{ id: string; name: string } | null>(null);
+  const [workspaceStore] = useState(() =>
+    createWorkspaceStore(browserStorage, { now: Date.now, newId: () => crypto.randomUUID() }),
+  );
   const [unsavedRequest, setUnsavedRequest] = useState<UnsavedChangesRequest | null>(null);
   // Tagged with its tab so a position from another tab is never shown.
   const [cursor, setCursor] = useState<{ key: string; position: CursorInfo } | null>(null);
@@ -412,24 +418,26 @@ function AppShell({ adapter }: AppProps) {
    * @param opened - The workspace to adopt.
    * @param approvedEdits - Unsaved edits the user already agreed to lose or saved before the
    *   folder was picked. Edits made while the tree loads are asked about again.
+   * @returns Whether the folder was adopted; false when the user kept their unsaved edits instead.
    * @throws If the workspace tree cannot be read.
    */
   const adoptWorkspace = useCallback(
-    async (opened: Workspace, approvedEdits?: ApprovedEdits) => {
+    async (opened: WorkspaceFolder, approvedEdits?: ApprovedEdits): Promise<boolean> => {
       const nodes = await adapter.workspace.readTree(opened);
       if (!(await confirmUnsavedChangesInAllDocuments(approvedEdits))) {
-        return;
+        return false;
       }
       setWorkspace(opened);
       setTree(nodes);
       dispatchDocuments({ type: "close", keys: documentsRef.current.documents.map((doc) => doc.key) });
-      setRestorableFolderName(null);
+      setRestorableFolder(null);
       if (opened.accessMode === "fallback") {
         toast.show({
           kind: "info",
           text: "This browser can't write files directly, so saving will download a copy instead.",
         });
       }
+      return true;
     },
     [adapter.workspace, confirmUnsavedChangesInAllDocuments, toast],
   );
@@ -444,12 +452,14 @@ function AppShell({ adapter }: AppProps) {
       return;
     }
     try {
-      const opened = await adapter.workspace.openFolder();
+      const opened = await adapter.workspace.pickFolder();
       if (!opened) {
         return;
       }
       setIsLoading(true);
-      await adoptWorkspace(opened, approvedEdits);
+      if (await adoptWorkspace(opened, approvedEdits)) {
+        workspaceStore.openFolder(opened);
+      }
       // Shows the files of the folder the user just picked, also where the explorer is a drawer.
       setIsSidebarOpen(true);
     } catch (err) {
@@ -459,28 +469,35 @@ function AppShell({ adapter }: AppProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [adapter.workspace, adoptWorkspace, confirmUnsavedChangesInAllDocuments, toast]);
+  }, [adapter.workspace, adoptWorkspace, confirmUnsavedChangesInAllDocuments, toast, workspaceStore]);
 
   /**
    * Acts on the outcome of a folder restore. A folder that needs permission is remembered so the
    * explorer can offer a reopen button, and a folder that is gone is reported to the user.
    *
    * @param result - The outcome returned by `restoreFolder`.
+   * @param target - The workspace and the folder of it that was restored.
    * @param approvedEdits - Unsaved edits the user already agreed to lose or saved.
    * @throws If the restored workspace tree cannot be read.
    */
   const applyRestoreResult = useCallback(
-    async (result: RestoreFolderResult, approvedEdits?: ApprovedEdits) => {
+    async (
+      result: RestoreFolderResult,
+      target: { workspaceId: string; folderId: string },
+      approvedEdits?: ApprovedEdits,
+    ) => {
       switch (result.status) {
         case "restored":
-          await adoptWorkspace(result.workspace, approvedEdits);
+          if (await adoptWorkspace(result.folder, approvedEdits)) {
+            workspaceStore.markOpened(target.workspaceId);
+          }
           return;
         case "needs-permission":
-          setRestorableFolderName(result.name);
+          setRestorableFolder({ id: target.folderId, name: result.name });
           return;
         case "unavailable":
-          // The host has already forgotten the folder, so a reopen button would lead nowhere.
-          setRestorableFolderName(null);
+          // Asking again would only fail again; the folder stays remembered until another is opened.
+          setRestorableFolder(null);
           toast.show({
             kind: "info",
             text: `Couldn't reopen "${result.name}". It may have been moved or deleted.`,
@@ -490,13 +507,22 @@ function AppShell({ adapter }: AppProps) {
           return;
       }
     },
-    [adoptWorkspace, toast],
+    [adoptWorkspace, toast, workspaceStore],
   );
 
   const restoreLastFolder = useCallback(async () => {
     try {
-      const result = await adapter.workspace.restoreFolder({ interactive: false });
-      await applyRestoreResult(result);
+      const migrated = await workspaceStore.migrateLegacyFolder(adapter.workspace);
+      const last = workspaceStore.lastWorkspace();
+      const folderId = last?.folderIds[0];
+      if (!last || !folderId) {
+        if (migrated) {
+          await applyRestoreResult(migrated, { workspaceId: "", folderId: LEGACY_FOLDER_ID });
+        }
+        return;
+      }
+      const result = migrated ?? (await adapter.workspace.restoreFolder(folderId, { interactive: false }));
+      await applyRestoreResult(result, { workspaceId: last.id, folderId });
     } catch (err) {
       console.error("Failed to restore the last folder:", err);
       const message = err instanceof Error ? err.message : "Failed to restore the last folder.";
@@ -504,7 +530,7 @@ function AppShell({ adapter }: AppProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [adapter.workspace, applyRestoreResult, toast]);
+  }, [adapter.workspace, applyRestoreResult, toast, workspaceStore]);
 
   useEffect(() => {
     if (!adapter.workspace.isSupported || startupRestoreRef.current) {
@@ -514,13 +540,17 @@ function AppShell({ adapter }: AppProps) {
   }, [adapter.workspace.isSupported, restoreLastFolder]);
 
   const handleReopenFolder = useCallback(async () => {
+    const last = workspaceStore.lastWorkspace();
+    if (!restorableFolder || !last) {
+      return;
+    }
     const approvedEdits = await confirmUnsavedChangesInAllDocuments();
     if (!approvedEdits) {
       return;
     }
     try {
-      const result = await adapter.workspace.restoreFolder({ interactive: true });
-      await applyRestoreResult(result, approvedEdits);
+      const result = await adapter.workspace.restoreFolder(restorableFolder.id, { interactive: true });
+      await applyRestoreResult(result, { workspaceId: last.id, folderId: restorableFolder.id }, approvedEdits);
       if (result.status === "restored") {
         setIsSidebarOpen(true);
       }
@@ -529,7 +559,14 @@ function AppShell({ adapter }: AppProps) {
       const message = err instanceof Error ? err.message : "Failed to reopen the folder.";
       toast.show({ kind: "error", text: message });
     }
-  }, [adapter.workspace, applyRestoreResult, confirmUnsavedChangesInAllDocuments, toast]);
+  }, [
+    adapter.workspace,
+    applyRestoreResult,
+    confirmUnsavedChangesInAllDocuments,
+    restorableFolder,
+    toast,
+    workspaceStore,
+  ]);
 
   const refreshTree = useCallback(async () => {
     if (!workspace) {
@@ -1291,7 +1328,7 @@ function AppShell({ adapter }: AppProps) {
               <StartScreen
                 workspaceName={workspace?.name ?? null}
                 isLoading={isLoading}
-                restorableFolderName={restorableFolderName}
+                restorableFolderName={restorableFolder?.name ?? null}
                 onOpenFolder={() => void handleOpenFolder()}
                 onReopenFolder={() => void handleReopenFolder()}
                 actions={startActions}

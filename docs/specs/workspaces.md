@@ -112,9 +112,9 @@ The shared app stores workspaces and sessions in `localStorage`, beside `vista.s
 - `vista.workspaces`: `{ "version": 1, "lastWorkspaceId": "…", "workspaces": [{ "id", "name", "icon", "color", "folderIds": [], "storage": "device" | "folder", "lastOpenedAt" }] }`. A workspace stored in its folder keeps a copy of its name, icon, and colour here too, so the recent list can show it while its folder still waits for permission; the file's values replace the copy each time it is read.
 - `vista.session.{workspaceId}`: `{ "version": 1, "tabs": [{ "folderId", "path", "viewMode" }], "activeIndex", "expanded": { "{folderId}": ["path"] } }`.
 
-A stored value that is missing, of the wrong type, or out of range falls back field by field, as [Editor settings](#editor-settings) describes for settings, so one bad field does not lose a workspace. When the store can't be read, Vista starts with no remembered workspaces; when it can't be written, the current session still works but is not remembered.
+A list Vista can only partly read, such as one that is not valid JSON or holds a workspace without folders, is copied to `vista.workspaces.damaged` before Vista first saves over it, and is not saved over when the copy can't be written. A stored value that is missing, of the wrong type, or out of range falls back field by field, as [Editor settings](#editor-settings) describes for settings, so one bad field does not lose a workspace. When the store can't be read, Vista starts with no remembered workspaces; when it can't be written, the current session still works but is not remembered.
 
-**Migration.** At the first start of a version with workspaces, the folder the earlier version remembered (IndexedDB key `lastFolder` in store `workspace` on web, `localStorage` key `vista.lastFolder` on native) becomes a one-folder workspace on the device, and the old key is removed.
+**Migration.** At the first start of a version with workspaces, the folder the earlier version remembered (IndexedDB key `lastFolder` in store `workspace` on web, `localStorage` key `vista.lastFolder` on native) becomes a one-folder workspace on the device, and the old key is removed. Each host moves that folder into its new store under the id `last-folder` (`LEGACY_FOLDER_ID`), which the shared app restores once, before any workspace is stored. A folder that is already gone is forgotten instead, with the same `Couldn't reopen` message as before, since a workspace for it could never open.
 
 ## Supported formats & view modes
 
@@ -335,6 +335,8 @@ export interface FileContents {
 }
 
 export type FolderRelation = "same" | "contains" | "inside" | "separate";
+
+export const LEGACY_FOLDER_ID = "last-folder";
 
 export type RestoreFolderResult = { status: "restored"; folder: WorkspaceFolder } | { status: "needs-permission"; name: string } | { status: "unavailable"; name: string } | { status: "none" };
 ```
