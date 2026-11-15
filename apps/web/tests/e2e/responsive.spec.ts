@@ -1,40 +1,59 @@
-import { expect, test } from "./test";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { expect, test, type Page } from "./test";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const fixtureVaultPath = path.join(__dirname, "fixtures", "sample-vault");
+
+/** Opens the fixture folder through the fallback folder picker, which Playwright can drive. */
+async function openFixtureVault(page: Page) {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "showDirectoryPicker", { value: undefined, configurable: true });
+  });
+  await page.goto("/workspace/example");
+  const fileChooserPromise = page.waitForEvent("filechooser");
+  await page.getByRole("main").getByRole("button", { name: "Open Folder" }).click();
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles(fixtureVaultPath);
+}
 
 test.describe("responsive shell at mobile width", () => {
   test.use({ viewport: { width: 375, height: 812 } });
 
-  test("starts on the start screen with the explorer closed and toggles it open and closed", async ({ page }) => {
+  test("shows no explorer and no rail on the start screen", async ({ page }) => {
     await page.goto("/workspace/example");
 
-    const explorer = page.getByRole("navigation", { name: "File Explorer" });
-    const openButton = page.getByRole("button", { name: "Open explorer" });
-
-    // The start screen offers the folder, so the drawer does not cover it.
     await expect(page.getByRole("main").getByRole("button", { name: "Open Folder" })).toBeVisible();
-    await expect(openButton).toHaveAttribute("aria-pressed", "false");
-    await expect.poll(async () => (await explorer.boundingBox())?.x).toBeLessThan(0);
+    await expect(page.getByRole("navigation", { name: "File Explorer" })).toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: "Activity bar" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /explorer$/ })).toHaveCount(0);
+  });
 
-    await openButton.click();
+  test("opens the drawer when a folder opens, with the rail's actions at its top, and toggles it", async ({ page }) => {
+    await openFixtureVault(page);
 
+    const explorer = page.getByRole("navigation", { name: "File Explorer" });
     const closeButton = page.getByRole("button", { name: "Close explorer" });
     await expect(closeButton).toHaveAttribute("aria-pressed", "true");
-    await expect(explorer).toContainText("No folder open");
     // The drawer opens below the title bar, which stays above it so its toggle remains tappable.
     // It animates in via a CSS transform transition, so poll until it settles.
     await expect.poll(async () => (await explorer.boundingBox())?.x).toBe(0);
     expect((await explorer.boundingBox())?.y).toBe(40);
+    await expect(page.getByRole("navigation", { name: "Activity bar" })).toBeHidden();
+    await expect(explorer.getByRole("button", { name: "Settings" })).toBeVisible();
+    await expect(explorer.getByRole("button", { name: "Search" })).toBeVisible();
 
     await closeButton.click();
 
-    await expect(openButton).toHaveAttribute("aria-pressed", "false");
+    await expect(page.getByRole("button", { name: "Open explorer" })).toHaveAttribute("aria-pressed", "false");
     await expect.poll(async () => (await explorer.boundingBox())?.x).toBeLessThan(0);
   });
 
   test("closes the explorer when tapping the backdrop", async ({ page }) => {
-    await page.goto("/workspace/example");
+    await openFixtureVault(page);
 
     const explorer = page.getByRole("navigation", { name: "File Explorer" });
-    await page.getByRole("button", { name: "Open explorer" }).click();
     await expect.poll(async () => (await explorer.boundingBox())?.x).toBe(0);
 
     // Click near the right edge of the viewport, outside the drawer's own width.
@@ -46,22 +65,29 @@ test.describe("responsive shell at mobile width", () => {
 });
 
 test.describe("responsive shell at desktop width", () => {
-  test("keeps the explorer open by default and toggles it closed and open", async ({ page }) => {
-    await page.goto("/workspace/example");
+  test("shows the rail, whose Explorer button toggles the explorer column", async ({ page }) => {
+    await openFixtureVault(page);
 
+    const rail = page.getByRole("navigation", { name: "Activity bar" });
     const explorer = page.getByRole("navigation", { name: "File Explorer" });
-    await expect(page.getByRole("button", { name: "Close explorer" })).toBeVisible();
-    expect((await explorer.boundingBox())?.x).toBe(0);
+    const toggle = rail.getByRole("button", { name: "Explorer" });
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await expect(rail.getByRole("button", { name: "Settings" })).toBeVisible();
+    // The title bar's drawer button and the drawer's own actions are for narrow screens only.
+    await expect(page.getByRole("button", { name: "Close explorer" })).toBeHidden();
+    await expect(explorer.getByRole("button", { name: "Settings" })).toBeHidden();
+    const railBox = await rail.boundingBox();
+    expect((await explorer.boundingBox())?.x).toBe((railBox?.x ?? 0) + (railBox?.width ?? 0));
 
-    await page.getByRole("button", { name: "Close explorer" }).click();
+    await toggle.click();
 
-    await expect(page.getByRole("button", { name: "Open explorer" })).toHaveAttribute("aria-pressed", "false");
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
     // The column collapses its width via a CSS transition, so poll until it settles.
     await expect.poll(async () => (await explorer.boundingBox())?.width).toBe(0);
 
-    await page.getByRole("button", { name: "Open explorer" }).click();
+    await toggle.click();
 
-    await expect(page.getByRole("button", { name: "Close explorer" })).toHaveAttribute("aria-pressed", "true");
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
     await expect.poll(async () => (await explorer.boundingBox())?.width).toBeGreaterThan(0);
   });
 });

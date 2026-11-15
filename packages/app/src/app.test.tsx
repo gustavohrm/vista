@@ -185,9 +185,14 @@ function explorerPanel(): HTMLElement {
   return screen.getByRole("navigation", { name: "File Explorer" });
 }
 
+/** Waits for the explorer, which appears once a workspace has opened. */
+function findExplorerPanel(): Promise<HTMLElement> {
+  return screen.findByRole("navigation", { name: "File Explorer" });
+}
+
 /** The file rows named `name`, in folder order. */
 async function findFileRows(name: string): Promise<HTMLElement[]> {
-  return within(explorerPanel()).findAllByRole("button", { name });
+  return within(await findExplorerPanel()).findAllByRole("button", { name });
 }
 
 /**
@@ -319,7 +324,7 @@ describe("App", () => {
 
       await user.click(within(explorerPanel()).getByRole("button", { name: "Add Folder to Workspace" }));
 
-      expect(await within(explorerPanel()).findByRole("button", { name: "Work" })).toBeInTheDocument();
+      expect(await within(await findExplorerPanel()).findByRole("button", { name: "Work" })).toBeInTheDocument();
       const stored = JSON.parse(localStorage.getItem("vista.workspaces") ?? "null");
       expect(stored.workspaces[0].folderIds).toEqual(["workspace-1", "work"]);
     });
@@ -362,12 +367,12 @@ describe("App", () => {
       const entry = await screen.findByRole("button", { name: "Research" });
       expect(entry).toHaveAccessibleDescription("Click to allow access");
       await user.click(entry);
-      await user.click(await within(explorerPanel()).findByRole("button", { name: "Allow access" }));
+      await user.click(await within(await findExplorerPanel()).findByRole("button", { name: "Allow access" }));
       expect(within(explorerPanel()).queryByRole("button", { name: "plan.txt" })).not.toBeInTheDocument();
       restoreFolder.mockResolvedValueOnce({ status: "restored", folder: SOURCES_FOLDER });
       await user.click(within(explorerPanel()).getByRole("button", { name: "Allow access" }));
 
-      expect(await within(explorerPanel()).findByRole("button", { name: "plan.txt" })).toBeInTheDocument();
+      expect(await within(await findExplorerPanel()).findByRole("button", { name: "plan.txt" })).toBeInTheDocument();
       expect(restoreFolder).toHaveBeenLastCalledWith("sources", { interactive: true });
     });
 
@@ -378,7 +383,7 @@ describe("App", () => {
       );
       render(<App adapter={{ platform: "web", workspace: capability }} />);
 
-      expect(await within(explorerPanel()).findByText(/This folder can't be found/)).toBeInTheDocument();
+      expect(await within(await findExplorerPanel()).findByText(/This folder can't be found/)).toBeInTheDocument();
       expect(within(explorerPanel()).getByRole("button", { name: "Remove Folder from Workspace" })).toBeInTheDocument();
       expect(within(explorerPanel()).getByRole("button", { name: "a.txt" })).toBeInTheDocument();
     });
@@ -390,7 +395,7 @@ describe("App", () => {
       ]);
       render(<App adapter={{ platform: "native", workspace: capability }} />);
 
-      expect(await within(explorerPanel()).findByText("/home/a")).toBeInTheDocument();
+      expect(await within(await findExplorerPanel()).findByText("/home/a")).toBeInTheDocument();
       expect(within(explorerPanel()).getByText("/home/b")).toBeInTheDocument();
     });
   });
@@ -509,7 +514,7 @@ describe("App", () => {
 
     await waitFor(() => expect(mockWorkspace.pickFolder).toHaveBeenCalled());
     expect(document.querySelector(".coden-toast")).not.toBeInTheDocument();
-    expect(screen.getByText("No folder open")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open Folder" })).toBeInTheDocument();
   });
 
   it("shows an info toast when a folder is opened through the fallback (non-direct) access mode", async () => {
@@ -558,9 +563,11 @@ describe("App", () => {
     const adapter: AppAdapter = { platform: "web", workspace: createMockWorkspaceCapability() };
 
     render(<App adapter={adapter} />);
+    // Opening a folder opens the drawer, so its files are the next thing a phone user sees.
+    await openFolderFromWelcome(user);
 
-    // The explorer is a drawer at this width, and the start screen offers the folder, so it starts closed.
-    const toggleBtn = await screen.findByRole("button", { name: "Open explorer" });
+    await user.click(screen.getByRole("button", { name: "Close explorer" }));
+    const toggleBtn = screen.getByRole("button", { name: "Open explorer" });
     expect(toggleBtn).toHaveAttribute("aria-pressed", "false");
 
     await user.click(toggleBtn);
@@ -714,6 +721,69 @@ describe("App", () => {
     expect(
       within(dialog).getByText("This folder and everything in it will be permanently deleted."),
     ).toBeInTheDocument();
+  });
+
+  describe("rail", () => {
+    it("shows neither the rail nor the explorer while no workspace is open", async () => {
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await screen.findByRole("button", { name: "Open Folder" });
+
+      expect(screen.queryByRole("navigation", { name: "Activity bar" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("navigation", { name: "File Explorer" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /explorer$/ })).not.toBeInTheDocument();
+    });
+
+    it("shows or hides the explorer from its Explorer button", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      const rail = screen.getByRole("navigation", { name: "Activity bar" });
+      const explorer = within(rail).getByRole("button", { name: "Explorer" });
+      expect(explorer).toHaveAttribute("aria-pressed", "true");
+
+      await user.click(explorer);
+
+      expect(explorer).toHaveAttribute("aria-pressed", "false");
+      expect(screen.getByRole("button", { name: "Open explorer" })).toBeInTheDocument();
+    });
+
+    it("shows Search and Graph as coming soon, doing nothing when chosen", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      const rail = screen.getByRole("navigation", { name: "Activity bar" });
+
+      const search = within(rail).getByRole("button", { name: "Search" });
+      const graph = within(rail).getByRole("button", { name: "Graph" });
+      for (const button of [search, graph]) {
+        expect(button).toHaveAttribute("aria-disabled", "true");
+        expect(button).toHaveAccessibleDescription("Coming soon");
+      }
+      await user.click(search);
+      await user.click(graph);
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(screen.getByRole("navigation", { name: "File Explorer" })).toBeInTheDocument();
+    });
+
+    it("opens Settings from the gear, in the rail and at the top of the drawer", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+
+      await user.click(
+        within(screen.getByRole("navigation", { name: "Activity bar" })).getByRole("button", { name: "Settings" }),
+      );
+      expect(screen.getByRole("dialog", { name: "Settings" })).toBeInTheDocument();
+      fireEvent(screen.getByRole("dialog", { name: "Settings" }), new Event("cancel", { cancelable: true }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+      const drawer = screen.getByRole("navigation", { name: "File Explorer" });
+      expect(within(drawer).getByRole("button", { name: "Search" })).toHaveAttribute("aria-disabled", "true");
+      expect(within(drawer).getByRole("button", { name: "Graph" })).toHaveAttribute("aria-disabled", "true");
+      await user.click(within(drawer).getByRole("button", { name: "Settings" }));
+      expect(screen.getByRole("dialog", { name: "Settings" })).toBeInTheDocument();
+    });
   });
 
   describe("settings", () => {
@@ -1149,7 +1219,7 @@ describe("App", () => {
 
       await openFolderFromSwitcher(user, "Research");
 
-      expect(await within(explorerPanel()).findByRole("button", { name: "plan.txt" })).toBeInTheDocument();
+      expect(await within(await findExplorerPanel()).findByRole("button", { name: "plan.txt" })).toBeInTheDocument();
       expect(within(explorerPanel()).getByRole("button", { name: "d.txt" })).toBeInTheDocument();
       expect(switcherButton("Thesis")).toBeDefined();
       expect(storedThesis()).toMatchObject({
@@ -1173,7 +1243,7 @@ describe("App", () => {
       render(<App adapter={{ platform: "web", workspace: capability }} />);
       await findFileRows("a.txt");
       await openFolderFromSwitcher(user, "Research");
-      await within(explorerPanel()).findByRole("button", { name: "d.txt" });
+      await within(await findExplorerPanel()).findByRole("button", { name: "d.txt" });
       expect(
         within(explorerPanel()).getByText("This folder can't be found. It may have been moved or deleted."),
       ).toBeInTheDocument();
@@ -1184,7 +1254,7 @@ describe("App", () => {
 
       await user.click(within(explorerPanel()).getByRole("button", { name: "Locate…" }));
 
-      expect(await within(explorerPanel()).findByRole("button", { name: "plan.txt" })).toBeInTheDocument();
+      expect(await within(await findExplorerPanel()).findByRole("button", { name: "plan.txt" })).toBeInTheDocument();
       expect(storedThesis()).toMatchObject({
         folderIds: ["drafts", "sources"],
         locations: { ".": "drafts", "../shelf/sources": "sources" },
@@ -1199,7 +1269,7 @@ describe("App", () => {
       render(<App adapter={{ platform: "web", workspace: capability }} />);
       await findFileRows("a.txt");
       await openFolderFromSwitcher(user, "Research");
-      await within(explorerPanel()).findByRole("button", { name: "Locate…" });
+      await within(await findExplorerPanel()).findByRole("button", { name: "Locate…" });
 
       await user.click(within(explorerPanel()).getByRole("button", { name: "Remove Folder from Workspace" }));
       const dialog = await screen.findByRole("dialog", { name: 'Remove "sources" from the workspace?' });
@@ -1283,7 +1353,7 @@ describe("App", () => {
       vi.mocked(capability.writeFile).mockClear();
       render(<App adapter={{ platform: "web", workspace: capability }} />);
 
-      expect(await within(explorerPanel()).findByRole("button", { name: "plan.txt" })).toBeInTheDocument();
+      expect(await within(await findExplorerPanel()).findByRole("button", { name: "plan.txt" })).toBeInTheDocument();
       expect(switcherButton("Dissertation")).toBeDefined();
       expect(JSON.parse(localStorage.getItem("vista.workspaces") ?? "null").workspaces[0]).toMatchObject({
         name: "Dissertation",
@@ -1321,7 +1391,7 @@ describe("App", () => {
       const user = userEvent.setup();
       const { capability, folder } = await storedThesisWith(fileText({ name: "Thesis", folders: [".", "../sources"] }));
       render(<App adapter={{ platform: "web", workspace: capability }} />);
-      await within(explorerPanel()).findByRole("button", { name: "plan.txt" });
+      await within(await findExplorerPanel()).findByRole("button", { name: "plan.txt" });
 
       await user.click(switcherButton("Thesis")!);
       await user.click(screen.getByRole("menuitem", { name: "Workspace Settings…" }));
@@ -1353,12 +1423,12 @@ describe("App", () => {
       });
       render(<App adapter={{ platform: "web", workspace: capability }} />);
       await user.click(await screen.findByRole("button", { name: "Thesis" }));
-      await within(explorerPanel()).findByRole("button", { name: "plan.txt" });
+      await within(await findExplorerPanel()).findByRole("button", { name: "plan.txt" });
 
       isAllowed = true;
       await user.click(within(explorerPanel()).getByRole("button", { name: "Allow access" }));
 
-      expect(await within(explorerPanel()).findByRole("button", { name: "d.txt" })).toBeInTheDocument();
+      expect(await within(await findExplorerPanel()).findByRole("button", { name: "d.txt" })).toBeInTheDocument();
       expect(switcherButton("Dissertation")).toBeDefined();
       expect(JSON.parse(localStorage.getItem("vista.workspaces") ?? "null").workspaces[0]).toMatchObject({
         name: "Dissertation",
@@ -1377,7 +1447,7 @@ describe("App", () => {
           '"drafts" has workspace details this version of Vista can\'t read, so it opened as a plain folder.',
         ),
       ).toBeInTheDocument();
-      expect(await within(explorerPanel()).findByRole("button", { name: "d.txt" })).toBeInTheDocument();
+      expect(await within(await findExplorerPanel()).findByRole("button", { name: "d.txt" })).toBeInTheDocument();
       expect(within(explorerPanel()).queryByRole("button", { name: "plan.txt" })).not.toBeInTheDocument();
       expect(switcherButton("drafts")).toBeDefined();
       expect(folder("drafts").textOf(".vista/workspace.json")).toBe(text);
@@ -1409,7 +1479,7 @@ describe("App", () => {
           '"drafts/.vista/workspace.json" is gone, so the workspace\'s details are kept on this device now.',
         ),
       ).toBeInTheDocument();
-      expect(await within(explorerPanel()).findByRole("button", { name: "d.txt" })).toBeInTheDocument();
+      expect(await within(await findExplorerPanel()).findByRole("button", { name: "d.txt" })).toBeInTheDocument();
       expect(JSON.parse(localStorage.getItem("vista.workspaces") ?? "null").workspaces[0].storage).toBe("device");
       expect(capability.writeFile).not.toHaveBeenCalled();
     });
@@ -1446,7 +1516,7 @@ describe("App", () => {
       await waitFor(() => expect(work).toHaveAccessibleDescription("sources"));
       await user.click(work);
 
-      expect(await within(explorerPanel()).findByRole("button", { name: "plan.txt" })).toBeInTheDocument();
+      expect(await within(await findExplorerPanel()).findByRole("button", { name: "plan.txt" })).toBeInTheDocument();
       expect(screen.queryByRole("tab")).not.toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: "Work" }));
@@ -1621,7 +1691,7 @@ describe("App", () => {
 
       await user.click((await findFileRows("plan.txt"))[0]!);
       await user.click(within(explorerPanel()).getByRole("button", { name: "docs" }));
-      await user.click(await within(explorerPanel()).findByRole("button", { name: "guide.md" }));
+      await user.click(await within(await findExplorerPanel()).findByRole("button", { name: "guide.md" }));
       await user.click(await screen.findByRole("button", { name: "Raw" }));
       await user.click(getTab("plan.txt"));
 
@@ -2466,7 +2536,6 @@ describe("App", () => {
 
       expect(await screen.findByRole("button", { name: "Open Folder" })).toBeInTheDocument();
       expect(screen.queryByRole("heading", { name: "Recent workspaces" })).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Open explorer" })).toBeInTheDocument();
     });
 
     it("shows an error message when restoring the last folder fails unexpectedly", async () => {

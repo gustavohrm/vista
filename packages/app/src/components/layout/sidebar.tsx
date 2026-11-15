@@ -53,8 +53,8 @@ export interface NewEntryRequest {
 }
 
 interface SidebarProps {
-  /** Name of the open workspace, or null when none is open. */
-  workspaceName: string | null;
+  /** Name of the open workspace. The explorer is shown only while one is open. */
+  workspaceName: string;
   /** The workspace's folders, in order. */
   folders: readonly ExplorerFolder[];
   /** The currently active document. */
@@ -98,6 +98,8 @@ interface SidebarProps {
   onLocate?: (folderId: string) => void;
   /** Starts naming a new entry in the first folder. */
   newEntryRequest?: NewEntryRequest | null;
+  /** Actions shown at the top of the panel, such as the rail's when the rail is not shown. */
+  activities?: ReactNode;
 }
 
 /** Icon classes for file and folder glyphs in the tree, matching the row text color. */
@@ -157,6 +159,7 @@ export function Sidebar({
   onAllowAccess,
   onLocate,
   newEntryRequest,
+  activities,
 }: SidebarProps) {
   // Root rows start expanded, so only the collapsed ones are tracked.
   const [collapsedFolderIds, setCollapsedFolderIds] = useState<ReadonlySet<string>>(() => new Set());
@@ -256,18 +259,17 @@ export function Sidebar({
           isOpen ? "translate-x-0 md:w-60 lg:w-64" : "-translate-x-full md:w-0 md:translate-x-0"
         }`}
       >
+        {activities}
         <div className="flex h-10 flex-none items-center justify-between gap-2 pr-1.5 pl-3">
-          <span className="text-text min-w-0 truncate text-[13px] font-semibold">{workspaceName ?? "Explorer"}</span>
-          {workspaceName !== null && (
-            <div className="flex flex-none items-center gap-0.5">
-              <ExplorerActionButton label="Collapse All" onClick={handleCollapseAll}>
-                <i className="ic-chevrons-down-up text-sm" aria-hidden="true" />
-              </ExplorerActionButton>
-              <ExplorerActionButton label="Add Folder to Workspace" onClick={onAddFolder}>
-                <i className="ic-folder-input text-sm" aria-hidden="true" />
-              </ExplorerActionButton>
-            </div>
-          )}
+          <span className="text-text min-w-0 truncate text-[13px] font-semibold">{workspaceName}</span>
+          <div className="flex flex-none items-center gap-0.5">
+            <ExplorerActionButton label="Collapse All" onClick={handleCollapseAll}>
+              <i className="ic-chevrons-down-up text-sm" aria-hidden="true" />
+            </ExplorerActionButton>
+            <ExplorerActionButton label="Add Folder to Workspace" onClick={onAddFolder}>
+              <i className="ic-folder-input text-sm" aria-hidden="true" />
+            </ExplorerActionButton>
+          </div>
         </div>
 
         <div
@@ -288,8 +290,6 @@ export function Sidebar({
         >
           {isLoading ? (
             <LoadingIndicator />
-          ) : workspaceName === null ? (
-            <EmptyState />
           ) : (
             <div className="flex flex-col gap-px">
               {folders.map((folder) => (
@@ -486,21 +486,6 @@ function LoadingIndicator() {
     <div className="text-text-secondary flex items-center justify-center p-4">
       <i className="ic-loader-circle ic-anim-spin" aria-hidden="true" />
       <span className="visually-hidden">Loading…</span>
-    </div>
-  );
-}
-
-/**
- * Explorer content shown when no workspace is open. The start screen in the editor area offers
- * opening a folder, so this only says why the list is empty.
- *
- * @returns Empty state element.
- */
-function EmptyState() {
-  return (
-    <div className="flex flex-col gap-1 px-1.5 py-1">
-      <p className="text-text text-[13px]">No folder open</p>
-      <p className="text-text-secondary text-xs">Files of the folder you open are listed here.</p>
     </div>
   );
 }

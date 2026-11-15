@@ -12,6 +12,7 @@ import type { FindMode } from "./components/editor/find-bar";
 import type { CursorInfo, EditorPosition, RawEditorStateCache } from "./components/editor/raw-editor";
 import { ToastProvider, useToast } from "./components/feedback/toast";
 import { UnsavedChangesDialog, type UnsavedChangesChoice } from "./components/feedback/unsaved-changes-dialog";
+import { ActivityRail, DrawerActivities } from "./components/layout/activity-rail";
 import { Sidebar, type ExplorerEntry, type ExplorerFolder, type NewEntryRequest } from "./components/layout/sidebar";
 import { StartScreen, type StartAction } from "./components/layout/start-screen";
 import { StatusBar } from "./components/layout/status-bar";
@@ -2035,6 +2036,7 @@ function AppShell({ adapter }: AppProps) {
     >
       <TitleBar
         isSidebarOpen={isSidebarOpen}
+        hasExplorer={workspace !== null}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
         onGoToFile={openGoToFile}
         switcher={
@@ -2052,43 +2054,53 @@ function AppShell({ adapter }: AppProps) {
         goToFileShortcut={GO_TO_FILE_SHORTCUT}
       />
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        <Sidebar
-          workspaceName={workspace?.name ?? null}
-          folders={explorerFolders}
-          activeEntry={activeDocument ? { folderId: activeDocument.folderId, path: activeDocument.path } : undefined}
-          dirtyKeys={dirtyKeys}
-          expandedKeys={expandedKeys}
-          onExpandedKeysChange={setExpandedKeys}
-          onSelectFile={handleSelectFile}
-          onAddFolder={() => void handleAddFolder()}
-          isLoading={isLoading}
-          isOpen={isSidebarOpen}
-          onClose={() => setIsSidebarOpen(false)}
-          onCreateFile={handleCreateFile}
-          onCreateDirectory={handleCreateDirectory}
-          onRename={handleRename}
-          onDelete={handleDelete}
-          onCopyRelativePath={(entry) => void copyText(entry.path)}
-          onCopyPath={
-            adapter.platform === "native"
-              ? (entry) => {
-                  const folder = readyFolder(entry.folderId);
-                  if (folder) {
-                    void copyText(joinAbsolutePath(folder.rootPath, entry.path));
+        {workspace && (
+          <ActivityRail
+            isExplorerOpen={isSidebarOpen}
+            onToggleExplorer={() => setIsSidebarOpen((previous) => !previous)}
+            onOpenSettings={() => setOpenDialog("appearance")}
+          />
+        )}
+        {workspace && (
+          <Sidebar
+            workspaceName={workspace.name}
+            activities={<DrawerActivities onOpenSettings={() => setOpenDialog("appearance")} />}
+            folders={explorerFolders}
+            activeEntry={activeDocument ? { folderId: activeDocument.folderId, path: activeDocument.path } : undefined}
+            dirtyKeys={dirtyKeys}
+            expandedKeys={expandedKeys}
+            onExpandedKeysChange={setExpandedKeys}
+            onSelectFile={handleSelectFile}
+            onAddFolder={() => void handleAddFolder()}
+            isLoading={isLoading}
+            isOpen={isSidebarOpen}
+            onClose={() => setIsSidebarOpen(false)}
+            onCreateFile={handleCreateFile}
+            onCreateDirectory={handleCreateDirectory}
+            onRename={handleRename}
+            onDelete={handleDelete}
+            onCopyRelativePath={(entry) => void copyText(entry.path)}
+            onCopyPath={
+              adapter.platform === "native"
+                ? (entry) => {
+                    const folder = readyFolder(entry.folderId);
+                    if (folder) {
+                      void copyText(joinAbsolutePath(folder.rootPath, entry.path));
+                    }
                   }
-                }
-              : undefined
-          }
-          onRemoveFolder={
-            workspace && workspace.folders.length > 1 ? (folderId) => void handleRemoveFolder(folderId) : undefined
-          }
-          onAllowAccess={(folderId) => void handleAllowAccess(folderId)}
-          onLocate={(folderId) => void handleLocate(folderId)}
-          newEntryRequest={newEntryRequest}
-        />
+                : undefined
+            }
+            onRemoveFolder={
+              workspace && workspace.folders.length > 1 ? (folderId) => void handleRemoveFolder(folderId) : undefined
+            }
+            onAllowAccess={(folderId) => void handleAllowAccess(folderId)}
+            onLocate={(folderId) => void handleLocate(folderId)}
+            newEntryRequest={newEntryRequest}
+          />
+        )}
         {/* The document frame: a rounded panel set into the chrome on wide screens, edge to edge on narrow ones. */}
         <div
-          className={`bg-background flex min-w-0 flex-1 flex-col overflow-hidden md:mr-1.5 md:rounded-lg ${isSidebarOpen ? "" : "md:ml-1.5"}`}
+          className={`bg-background flex min-w-0 flex-1 flex-col overflow-hidden md:mr-1.5 md:rounded-lg ${workspace && isSidebarOpen ? "" : "md:ml-1.5"}`}
         >
           <TabStrip
             documents={documentsState.documents}
