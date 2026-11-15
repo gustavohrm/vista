@@ -126,6 +126,8 @@ async function appendToRawEditor(user: UserEvent, editor: HTMLElement, text: str
 interface StoredFolder {
   folder: WorkspaceFolder;
   files: Record<string, string>;
+  /** The tree the folder lists; a flat list of its files when absent. */
+  tree?: WorkspaceNode[];
 }
 
 /**
@@ -141,7 +143,7 @@ function createFoldersCapability(folders: readonly StoredFolder[], overrides?: P
       workspaces: [{ id: "w1", name: "Research", folderIds: folders.map(({ folder }) => folder.id), lastOpenedAt: 1 }],
     }),
   );
-  const memory = new Map(folders.map(({ folder, files }) => [folder.id, createMemoryWorkspace(files)]));
+  const memory = new Map(folders.map(({ folder, files, tree }) => [folder.id, createMemoryWorkspace(files, { tree })]));
   const of = (folder: WorkspaceFolder): MemoryWorkspace => {
     const found = memory.get(folder.id);
     if (!found) {
@@ -715,6 +717,156 @@ describe("App", () => {
     await user.click(themeBtn);
 
     expect(document.documentElement.getAttribute("data-theme")).toBeDefined();
+  });
+
+  describe("sessions", () => {
+    const SESSION_KEY = "vista.session.w1";
+
+    function sessionFolders(): StoredFolder[] {
+      return [
+        {
+          folder: NOTES_FOLDER,
+          files: { "a.txt": PLAIN_TEXT, "docs/guide.md": README_CONTENT },
+          tree: [
+            { id: "a.txt", name: "a.txt", path: "a.txt", kind: "file", extension: "txt" },
+            {
+              id: "docs",
+              name: "docs",
+              path: "docs",
+              kind: "directory",
+              children: [
+                { id: "docs/guide.md", name: "guide.md", path: "docs/guide.md", kind: "file", extension: "md" },
+              ],
+            },
+          ],
+        },
+        { folder: SOURCES_FOLDER, files: { "plan.txt": PLAIN_TEXT } },
+      ];
+    }
+
+    function storeSession(tabs: { folderId: string; path: string; viewMode: string }[], activeIndex: number) {
+      localStorage.setItem(
+        SESSION_KEY,
+        JSON.stringify({ version: 1, tabs, activeIndex, expanded: { notes: ["docs"] } }),
+      );
+    }
+
+    function tabNames(): string[] {
+      return screen.getAllByRole("tab").map((tab) => tab.textContent ?? "");
+    }
+
+    it("reopens the tabs in order with the active one, view modes, and expanded folders", async () => {
+      const user = userEvent.setup();
+      storeSession(
+        [
+          { folderId: "notes", path: "a.txt", viewMode: "raw" },
+          { folderId: "notes", path: "docs/guide.md", viewMode: "raw" },
+          { folderId: "sources", path: "plan.txt", viewMode: "raw" },
+        ],
+        2,
+      );
+      const { capability } = createFoldersCapability(sessionFolders());
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+
+      expect(await screen.findByRole("textbox", { name: "Raw text content of plan.txt" })).toBeInTheDocument();
+      expect(tabNames().map((name) => name.split(/\W/)[0])).toEqual(["a", "guide", "plan"]);
+      expect(within(explorerPanel()).getByRole("button", { name: "docs", expanded: true })).toBeInTheDocument();
+      // A tab's file is read when the tab is first shown.
+      expect(capability.readFile).not.toHaveBeenCalledWith(NOTES_FOLDER, "docs/guide.md");
+
+      await user.click(getTab("guide.md"));
+
+      expect(await screen.findByRole("textbox", { name: "Raw text content of guide.md" })).toBeInTheDocument();
+    });
+
+    it("drops a tab whose file no longer exists and names it", async () => {
+      storeSession(
+        [
+          { folderId: "notes", path: "gone.txt", viewMode: "raw" },
+          { folderId: "notes", path: "a.txt", viewMode: "raw" },
+        ],
+        0,
+      );
+      const { capability } = createFoldersCapability(sessionFolders());
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+
+      expect(await findToast('"gone.txt" from your last session no longer exists.')).toBeInTheDocument();
+      expect(await screen.findByRole("textbox", { name: "Raw text content of a.txt" })).toBeInTheDocument();
+      expect(tabNames()).toHaveLength(1);
+    });
+
+    it("counts the tabs it drops when several files no longer exist", async () => {
+      storeSession(
+        [
+          { folderId: "notes", path: "gone.txt", viewMode: "raw" },
+          { folderId: "sources", path: "lost.txt", viewMode: "raw" },
+        ],
+        0,
+      );
+      const { capability } = createFoldersCapability(sessionFolders());
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+
+      expect(await findToast("2 files from your last session no longer exist.")).toBeInTheDocument();
+      expect(screen.queryAllByRole("tab")).toHaveLength(0);
+    });
+
+    it("closes a restored tab whose file is deleted before it is shown", async () => {
+      const user = userEvent.setup();
+      storeSession(
+        [
+          { folderId: "notes", path: "a.txt", viewMode: "raw" },
+          { folderId: "sources", path: "plan.txt", viewMode: "raw" },
+        ],
+        0,
+      );
+      const { capability, folder } = createFoldersCapability(sessionFolders());
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await screen.findByRole("textbox", { name: "Raw text content of a.txt" });
+
+      folder("sources").deleteExternally("plan.txt");
+      await user.click(getTab("plan.txt"));
+
+      expect(await findToast('"plan.txt" no longer exists. It may have been moved or deleted.')).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByRole("tab", { name: /^plan\.txt/ })).not.toBeInTheDocument());
+    });
+
+    it("remembers the open tabs, the active one, and the expanded folders", async () => {
+      const user = userEvent.setup();
+      const { capability } = createFoldersCapability(sessionFolders());
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+
+      await user.click((await findFileRows("plan.txt"))[0]!);
+      await user.click(within(explorerPanel()).getByRole("button", { name: "docs" }));
+      await user.click(await within(explorerPanel()).findByRole("button", { name: "guide.md" }));
+      await user.click(await screen.findByRole("button", { name: "Raw" }));
+      await user.click(getTab("plan.txt"));
+
+      await waitFor(() =>
+        expect(JSON.parse(localStorage.getItem(SESSION_KEY) ?? "null")).toEqual({
+          version: 1,
+          tabs: [
+            { folderId: "sources", path: "plan.txt", viewMode: "raw" },
+            { folderId: "notes", path: "docs/guide.md", viewMode: "raw" },
+          ],
+          activeIndex: 0,
+          expanded: { notes: ["docs"] },
+        }),
+      );
+    });
+
+    it("keeps the stored session until it has been restored", async () => {
+      storeSession([{ folderId: "notes", path: "a.txt", viewMode: "raw" }], 0);
+      const stored = localStorage.getItem(SESSION_KEY);
+      const { capability, folder } = createFoldersCapability(sessionFolders());
+      // Restoring checks each tab's file first; this check never finishes.
+      capability.stat = vi.fn((target: WorkspaceFolder, path: string) =>
+        path === "a.txt" ? new Promise<never>(() => {}) : folder(target.id).stat(target, path),
+      );
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("a.txt");
+
+      expect(localStorage.getItem(SESSION_KEY)).toBe(stored);
+    });
   });
 
   describe("tabs", () => {

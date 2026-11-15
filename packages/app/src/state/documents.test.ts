@@ -47,6 +47,7 @@ describe("documentsReducer", () => {
         isReadOnly: false,
         externalChange: null,
         revision: 0,
+        isPending: false,
       },
     ]);
     expect(state.activeKey).toBe(documentKey(WS, "notes/todo.md"));
@@ -303,5 +304,67 @@ describe("findAffectedDocuments", () => {
     state = documentsReducer(state, { type: "setViewMode", key: documentKey(WS, "legacy.md"), viewMode: "enriched" });
 
     expect(state.documents[0]?.viewMode).toBe("raw");
+  });
+});
+
+describe("restored tabs", () => {
+  function restore(state = INITIAL_DOCUMENTS_STATE): DocumentsState {
+    return documentsReducer(state, {
+      type: "restore",
+      tabs: [
+        { folderId: WS, path: "a.md", viewMode: "raw" },
+        { folderId: WS, path: "b.md", viewMode: "enriched" },
+      ],
+      activeIndex: 1,
+    });
+  }
+
+  it("adds pending tabs in session order with their view modes and the active one", () => {
+    const state = restore();
+
+    expect(paths(state)).toEqual(["a.md", "b.md"]);
+    expect(state.documents.map((doc) => [doc.isPending, doc.viewMode])).toEqual([
+      [true, "raw"],
+      [true, "enriched"],
+    ]);
+    expect(state.activeKey).toBe(documentKey(WS, "b.md"));
+  });
+
+  it("keeps a view mode the file type does not offer out of a restored tab", () => {
+    const state = documentsReducer(INITIAL_DOCUMENTS_STATE, {
+      type: "restore",
+      tabs: [{ folderId: WS, path: "a.txt", viewMode: "enriched" }],
+      activeIndex: 0,
+    });
+
+    expect(state.documents[0]?.viewMode).toBe("raw");
+  });
+
+  it("puts restored tabs before tabs opened meanwhile, which stay active", () => {
+    const state = restore(openAll("b.md", "c.md"));
+
+    expect(paths(state)).toEqual(["a.md", "b.md", "c.md"]);
+    expect(state.documents[1]?.isPending).toBe(false);
+    expect(state.activeKey).toBe(documentKey(WS, "c.md"));
+  });
+
+  it("replaces a pending tab in place when its file is read, keeping its view mode", () => {
+    let state = restore();
+    state = documentsReducer(state, { type: "activate", key: documentKey(WS, "a.md") });
+    state = documentsReducer(state, { type: "open", folderId: WS, path: "a.md", file: loaded("text") });
+
+    expect(paths(state)).toEqual(["a.md", "b.md"]);
+    expect(state.documents[0]).toMatchObject({ isPending: false, content: "text", viewMode: "raw", diskStat: STAT });
+    expect(state.activeKey).toBe(documentKey(WS, "a.md"));
+  });
+
+  it("ignores edits and disk changes for a tab not read yet", () => {
+    const key = documentKey(WS, "a.md");
+    let state = restore();
+    const before = state;
+    state = documentsReducer(state, { type: "edit", key, content: "typed" });
+    state = documentsReducer(state, { type: "diskChanged", key, stat: null });
+
+    expect(state).toBe(before);
   });
 });

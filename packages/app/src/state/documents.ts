@@ -29,6 +29,15 @@ export interface OpenDocument extends FileDocument {
   externalChange: ExternalChange | null;
   /** Counts reloads from disk, so views that own their copy of the text start over. */
   revision: number;
+  /** A tab restored from the session whose file is read when the tab is first shown; until then it has no content. */
+  isPending: boolean;
+}
+
+/** A tab as a session remembers it. */
+export interface RestoredTab {
+  folderId: string;
+  path: string;
+  viewMode: ViewMode;
 }
 
 export interface DocumentsState {
@@ -45,6 +54,8 @@ export interface FolderEntryRef {
 
 export type DocumentsAction =
   | { type: "open"; folderId: string; path: string; file: LoadedFile }
+  // `activeIndex` is into `tabs`, or -1; a tab activated meanwhile stays active.
+  | { type: "restore"; tabs: readonly RestoredTab[]; activeIndex: number }
   | { type: "activate"; key: string }
   | { type: "close"; keys: string[] }
   | { type: "edit"; key: string; content: string }
@@ -74,13 +85,17 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
   switch (action.type) {
     case "open":
       return openDocument(state, action);
+    case "restore":
+      return restoreDocuments(state, action);
     case "activate":
       return state.documents.some((doc) => doc.key === action.key) ? { ...state, activeKey: action.key } : state;
     case "close":
       return closeDocuments(state, new Set(action.keys));
     case "edit":
       return updateDocument(state, action.key, (doc) =>
-        doc.content === action.content || doc.isReadOnly ? doc : { ...doc, content: action.content, isDirty: true },
+        doc.content === action.content || doc.isReadOnly || doc.isPending
+          ? doc
+          : { ...doc, content: action.content, isDirty: true },
       );
     case "saved":
       // The buffer may have changed while the write was in flight; only what was written is clean.
@@ -93,7 +108,7 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
     case "diskChanged":
       return updateDocument(state, action.key, (doc) => {
         // A check can finish after a save already recorded the version it saw.
-        if (action.stat !== null && isSameStat(action.stat, doc.diskStat)) {
+        if (doc.isPending || (action.stat !== null && isSameStat(action.stat, doc.diskStat))) {
           return doc;
         }
         const externalChange = action.stat === null ? "deleted" : "changed";
@@ -101,7 +116,7 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
       });
     case "reloaded":
       return updateDocument(state, action.key, (doc) => {
-        if (!isSameStat(action.expected, doc.diskStat)) {
+        if (doc.isPending || !isSameStat(action.expected, doc.diskStat)) {
           return doc;
         }
         return doc.isDirty
@@ -136,13 +151,38 @@ function openDocument(
   { folderId, path, file }: { folderId: string; path: string; file: LoadedFile },
 ): DocumentsState {
   const key = documentKey(folderId, path);
-  if (state.documents.some((doc) => doc.key === key)) {
+  const existing = state.documents.find((doc) => doc.key === key);
+  if (existing?.isPending) {
+    const read = toOpenDocument({ folderId, path, file, viewMode: existing.viewMode });
+    return { documents: state.documents.map((doc) => (doc === existing ? read : doc)), activeKey: key };
+  }
+  if (existing) {
     return { ...state, activeKey: key };
   }
+  const opened = toOpenDocument({ folderId, path, file });
+  const activeIndex = state.documents.findIndex((doc) => doc.key === state.activeKey);
+  const insertAt = activeIndex === -1 ? state.documents.length : activeIndex + 1;
+  return {
+    documents: [...state.documents.slice(0, insertAt), opened, ...state.documents.slice(insertAt)],
+    activeKey: key,
+  };
+}
+
+function toOpenDocument({
+  folderId,
+  path,
+  file,
+  viewMode,
+}: {
+  folderId: string;
+  path: string;
+  file: LoadedFile;
+  viewMode?: ViewMode;
+}): OpenDocument {
   const name = baseName(path);
   const extension = normalizeExtension(name);
-  const opened: OpenDocument = {
-    key,
+  return {
+    key: documentKey(folderId, path),
     folderId,
     path,
     name,
@@ -150,18 +190,52 @@ function openDocument(
     content: file.content,
     isDirty: false,
     // Only the raw editor can show a read-only buffer.
-    viewMode: file.isReadOnly ? "raw" : getViewer(extension).defaultMode,
+    viewMode: file.isReadOnly ? "raw" : (viewMode ?? getViewer(extension).defaultMode),
     diskStat: file.stat,
     hasBom: file.hasBom,
     isReadOnly: file.isReadOnly,
     externalChange: null,
     revision: 0,
+    isPending: false,
   };
-  const activeIndex = state.documents.findIndex((doc) => doc.key === state.activeKey);
-  const insertAt = activeIndex === -1 ? state.documents.length : activeIndex + 1;
+}
+
+function restoreDocuments(
+  state: DocumentsState,
+  { tabs, activeIndex }: { tabs: readonly RestoredTab[]; activeIndex: number },
+): DocumentsState {
+  const openKeys = new Set(state.documents.map((doc) => doc.key));
+  const restored = tabs.flatMap(({ folderId, path, viewMode }): OpenDocument[] => {
+    const key = documentKey(folderId, path);
+    if (openKeys.has(key)) {
+      return [];
+    }
+    openKeys.add(key);
+    const name = baseName(path);
+    const extension = normalizeExtension(name);
+    return [
+      {
+        key,
+        folderId,
+        path,
+        name,
+        extension,
+        content: "",
+        isDirty: false,
+        viewMode: resolveViewMode(extension, viewMode),
+        diskStat: { size: 0, modifiedAt: 0 },
+        hasBom: false,
+        isReadOnly: false,
+        externalChange: null,
+        revision: 0,
+        isPending: true,
+      },
+    ];
+  });
+  const active = tabs[activeIndex];
   return {
-    documents: [...state.documents.slice(0, insertAt), opened, ...state.documents.slice(insertAt)],
-    activeKey: key,
+    documents: [...restored, ...state.documents],
+    activeKey: state.activeKey ?? (active ? documentKey(active.folderId, active.path) : null),
   };
 }
 

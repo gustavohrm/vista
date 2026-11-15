@@ -33,7 +33,7 @@ import { BYTES_PER_MB, type EditorSettings } from "./domain/settings";
 import { encodeText } from "./domain/text-codec";
 import { getViewer } from "./domain/viewers";
 import { isDesktopViewport } from "./domain/viewport";
-import type { WorkspaceRecord } from "./domain/workspaces";
+import type { Session, WorkspaceRecord } from "./domain/workspaces";
 import {
   LEGACY_FOLDER_ID,
   WorkspaceError,
@@ -51,7 +51,9 @@ import {
   getActiveDocument,
   INITIAL_DOCUMENTS_STATE,
   isSameStat,
+  type DocumentsState,
   type OpenDocument,
+  type RestoredTab,
 } from "./state/documents";
 import { loadFile } from "./state/load-file";
 import { useSettings } from "./state/settings";
@@ -221,6 +223,10 @@ function AppShell({ adapter }: AppProps) {
   documentsRef.current = documentsState;
   const workspaceRef = useRef(workspace);
   workspaceRef.current = workspace;
+  // Set while the open workspace's session is being restored, so it isn't saved over before then.
+  const sessionRestoreRef = useRef<object | null>(null);
+  // The session last written, with its workspace, so an unchanged session isn't written again.
+  const savedSessionRef = useRef<string | null>(null);
 
   // A folder that is open now, by id; null when it isn't reachable or isn't part of the workspace.
   const readyFolder = useCallback(
@@ -260,6 +266,8 @@ function AppShell({ adapter }: AppProps) {
     }
   }, [documentsState.documents]);
   const activeDocumentKey = activeDocument?.key ?? null;
+  // The active tab once its file is read; a restored tab has no content to show before.
+  const shownDocument = activeDocument?.isPending ? null : activeDocument;
   const hasDirtyDocuments = documentsState.documents.some((doc) => doc.isDirty);
   const isPromptingForUnsavedChanges = unsavedRequest !== null;
   const isPromptingRef = useRef(isPromptingForUnsavedChanges);
@@ -458,6 +466,50 @@ function AppShell({ adapter }: AppProps) {
   }, [adapter.updater, toast]);
 
   /**
+   * Reopens a session's tabs as tabs that read their file when first shown. Each file is checked
+   * first, and the tabs whose file no longer exists are dropped with one notice.
+   *
+   * @param restore - The token of this restore in `sessionRestoreRef`.
+   */
+  const restoreSessionTabs = useCallback(
+    async (opened: OpenWorkspace, session: Session, restore: object) => {
+      const checked = await Promise.all(
+        session.tabs.map(async (tab): Promise<{ tab: RestoredTab; isGone: boolean } | null> => {
+          const folder = opened.folders.find((entry) => entry.id === tab.folderId)?.folder;
+          // A folder Vista can't reach says why on its row; its tabs aren't reopened.
+          if (!folder) {
+            return null;
+          }
+          try {
+            return { tab, isGone: (await adapter.workspace.stat(folder, tab.path)) === null };
+          } catch (err) {
+            // Kept: reading it when it is shown reports the problem.
+            console.error("Failed to check a file from the last session:", err);
+            return { tab, isGone: false };
+          }
+        }),
+      );
+      // Another workspace opened during the checks.
+      if (sessionRestoreRef.current !== restore) {
+        return;
+      }
+      sessionRestoreRef.current = null;
+      const activeTab = session.tabs[session.activeIndex];
+      const kept = checked.flatMap((entry) => (entry && !entry.isGone ? [entry.tab] : []));
+      const gone = checked.flatMap((entry) => (entry?.isGone ? [entry.tab] : []));
+      dispatchDocuments({
+        type: "restore",
+        tabs: kept,
+        activeIndex: findRestoredActiveIndex(session.tabs, kept, activeTab),
+      });
+      if (gone.length > 0) {
+        toast.show({ kind: "info", text: describeGoneSessionFiles(gone) });
+      }
+    },
+    [adapter.workspace, toast],
+  );
+
+  /**
    * Makes a workspace the open one, closing the previous one's tabs after asking about their unsaved
    * edits. The folders' trees are read before, so a failed read leaves the previous state intact.
    *
@@ -473,9 +525,13 @@ function AppShell({ adapter }: AppProps) {
         return false;
       }
       const opened = open();
+      const session = workspaceStore.loadSession(opened.id);
+      const restore = {};
+      sessionRestoreRef.current = restore;
       setWorkspace(opened);
-      setExpandedKeys(new Set());
+      setExpandedKeys(toExpandedKeys(opened, session));
       dispatchDocuments({ type: "close", keys: documentsRef.current.documents.map((doc) => doc.key) });
+      void restoreSessionTabs(opened, session, restore);
       setRestorable(null);
       if (opened.folders.some((entry) => entry.folder?.accessMode === "fallback")) {
         toast.show({
@@ -485,7 +541,7 @@ function AppShell({ adapter }: AppProps) {
       }
       return true;
     },
-    [confirmUnsavedChangesInAllDocuments, toast],
+    [confirmUnsavedChangesInAllDocuments, restoreSessionTabs, toast, workspaceStore],
   );
 
   const handleOpenFolder = useCallback(async () => {
@@ -758,19 +814,13 @@ function AppShell({ adapter }: AppProps) {
     [adapter.workspace, isStillOpen, setFolderTree, toast],
   );
 
-  /** Opens a file in a tab, or switches to its tab; resolves to whether it is now the active tab. */
-  const handleSelectFile = useCallback(
-    async ({ folderId, path }: ExplorerEntry): Promise<boolean> => {
-      const folder = readyFolder(folderId);
-      if (!folder) {
-        return false;
-      }
-      const key = documentKey(folderId, path);
-      // Selecting an open file only switches to its tab; reloading it would discard unsaved edits.
-      if (documentsRef.current.documents.some((doc) => doc.key === key)) {
-        dispatchDocuments({ type: "activate", key });
-        return true;
-      }
+  /**
+   * Reads a file into its tab, opening one when needed and filling it when it was restored and not
+   * read yet. A file Vista can't show is reported; resolves to whether the tab now shows it.
+   */
+  const readIntoTab = useCallback(
+    async (folder: WorkspaceFolder, path: string): Promise<boolean> => {
+      const folderId = folder.id;
       const name = path.split("/").pop() ?? path;
       try {
         const result = await loadFile(adapter.workspace, {
@@ -815,8 +865,71 @@ function AppShell({ adapter }: AppProps) {
         return false;
       }
     },
-    [adapter.workspace, isStillOpen, readyFolder, refreshTree, settings.files.maxOpenSizeMb, toast],
+    [adapter.workspace, isStillOpen, refreshTree, settings.files.maxOpenSizeMb, toast],
   );
+
+  /** Opens a file in a tab, or switches to its tab; resolves to whether it is now the active tab. */
+  const handleSelectFile = useCallback(
+    async ({ folderId, path }: ExplorerEntry): Promise<boolean> => {
+      const folder = readyFolder(folderId);
+      if (!folder) {
+        return false;
+      }
+      const key = documentKey(folderId, path);
+      // Selecting an open file only switches to its tab; reloading it would discard unsaved edits.
+      if (documentsRef.current.documents.some((doc) => doc.key === key)) {
+        dispatchDocuments({ type: "activate", key });
+        return true;
+      }
+      return readIntoTab(folder, path);
+    },
+    [readIntoTab, readyFolder],
+  );
+
+  // A restored tab reads its file when it is first shown, and closes when the file can't be shown.
+  const pendingReadsRef = useRef(new Set<string>());
+  const pendingActive = activeDocument?.isPending ? activeDocument : null;
+  useEffect(() => {
+    if (!pendingActive || pendingReadsRef.current.has(pendingActive.key)) {
+      return;
+    }
+    const { key, folderId, path } = pendingActive;
+    const closeIfStillPending = () => {
+      if (documentsRef.current.documents.some((doc) => doc.key === key && doc.isPending)) {
+        dispatchDocuments({ type: "close", keys: [key] });
+      }
+    };
+    const folder = readyFolder(folderId);
+    if (!folder) {
+      closeIfStillPending();
+      return;
+    }
+    pendingReadsRef.current.add(key);
+    const read = async () => {
+      try {
+        if (!(await readIntoTab(folder, path))) {
+          closeIfStillPending();
+        }
+      } finally {
+        pendingReadsRef.current.delete(key);
+      }
+    };
+    void read();
+  }, [pendingActive, readIntoTab, readyFolder]);
+
+  // The session follows every change to the tabs and expanded folders, so leaving keeps it.
+  useEffect(() => {
+    if (!workspace || sessionRestoreRef.current !== null) {
+      return;
+    }
+    const session = describeSession(workspace, documentsState, expandedKeys);
+    const serialized = JSON.stringify([workspace.id, session]);
+    if (serialized === savedSessionRef.current) {
+      return;
+    }
+    savedSessionRef.current = serialized;
+    workspaceStore.saveSession(workspace.id, session);
+  }, [documentsState, expandedKeys, workspace, workspaceStore]);
 
   const isRecheckingRef = useRef(false);
 
@@ -850,7 +963,8 @@ function AppShell({ adapter }: AppProps) {
       await Promise.all(
         documentsRef.current.documents.map(async (doc) => {
           const target = folders.find((folder) => folder.id === doc.folderId);
-          if (!target) {
+          // A tab not read yet has nothing to compare; it reads the disk when shown.
+          if (!target || doc.isPending) {
             return;
           }
           try {
@@ -1534,7 +1648,7 @@ function AppShell({ adapter }: AppProps) {
           />
           <EditorPane
             platform={adapter.platform}
-            document={activeDocument}
+            document={shownDocument}
             onViewModeChange={handleViewModeChange}
             onContentChange={handleContentChange}
             onCursorChange={handleCursorChange}
@@ -1551,20 +1665,23 @@ function AppShell({ adapter }: AppProps) {
             contextMenuItems={editorMenuItems}
             loadImage={loadImage}
             emptyState={
-              <StartScreen
-                workspaceName={workspace?.name ?? null}
-                isLoading={isLoading}
-                restorableFolderName={restorable?.name ?? null}
-                onOpenFolder={() => void handleOpenFolder()}
-                onReopenFolder={() => void handleReopenWorkspace()}
-                actions={startActions}
-              />
+              // Blank while a restored tab reads its file.
+              pendingActive ? null : (
+                <StartScreen
+                  workspaceName={workspace?.name ?? null}
+                  isLoading={isLoading}
+                  restorableFolderName={restorable?.name ?? null}
+                  onOpenFolder={() => void handleOpenFolder()}
+                  onReopenFolder={() => void handleReopenWorkspace()}
+                  actions={startActions}
+                />
+              )
             }
           />
         </div>
       </div>
       <StatusBar
-        activeFile={activeDocument}
+        activeFile={shownDocument}
         cursor={activeCursor}
         vimMode={activeVimMode}
         onGoToLine={() => setGoToQuery(":")}
@@ -1702,4 +1819,58 @@ function findTreeNode(nodes: WorkspaceNode[], path: string): WorkspaceNode | und
     }
   }
   return undefined;
+}
+
+/** The `documentKey`s of a session's expanded folders, for the folders of the workspace. */
+function toExpandedKeys(opened: OpenWorkspace, session: Session): Set<string> {
+  return new Set(
+    opened.folders.flatMap((folder) => (session.expanded[folder.id] ?? []).map((path) => documentKey(folder.id, path))),
+  );
+}
+
+/** The workspace's session as it is now: its tabs, the active one, and the expanded folders. */
+function describeSession(
+  workspace: OpenWorkspace,
+  { documents, activeKey }: DocumentsState,
+  expandedKeys: ReadonlySet<string>,
+): Session {
+  const expanded: Record<string, string[]> = {};
+  for (const folder of workspace.folders) {
+    const prefix = documentKey(folder.id, "");
+    const paths = [...expandedKeys].filter((key) => key.startsWith(prefix)).map((key) => key.slice(prefix.length));
+    if (paths.length > 0) {
+      expanded[folder.id] = paths;
+    }
+  }
+  return {
+    version: 1,
+    tabs: documents.map(({ folderId, path, viewMode }) => ({ folderId, path, viewMode })),
+    activeIndex: documents.findIndex((doc) => doc.key === activeKey),
+    expanded,
+  };
+}
+
+/**
+ * Where the active tab is among the restored ones. When its file is gone, the next restored tab
+ * after it is active, or else the closest one before it.
+ */
+function findRestoredActiveIndex(
+  tabs: readonly RestoredTab[],
+  kept: readonly RestoredTab[],
+  active: RestoredTab | undefined,
+): number {
+  if (!active || kept.length === 0) {
+    return -1;
+  }
+  const activeAt = tabs.indexOf(active);
+  const after = kept.findIndex((tab) => tabs.indexOf(tab) >= activeAt);
+  return after === -1 ? kept.length - 1 : after;
+}
+
+function describeGoneSessionFiles(gone: readonly RestoredTab[]): string {
+  const [only] = gone;
+  if (gone.length === 1 && only) {
+    return `"${only.path.split("/").pop() ?? only.path}" from your last session no longer exists.`;
+  }
+  return `${gone.length} files from your last session no longer exist.`;
 }
