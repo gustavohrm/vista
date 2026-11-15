@@ -1,3 +1,6 @@
+import { motion, useReducedMotion } from "motion/react";
+import { useId, type ReactNode } from "react";
+
 import { formatShortcut } from "../../commands/shortcuts";
 import type { EditorSettings } from "../../domain/settings";
 import { getViewer } from "../../domain/viewers";
@@ -62,11 +65,14 @@ export function DocumentActions({
   );
 }
 
-/** Buttons of the view switch: smaller than a row button, so the group around them is as tall as one. */
-const VIEW_BUTTON_CLASS = "size-7! min-h-0! min-w-0! p-0! [--ui-radius:4px]";
+/** The hairline box that holds the view switch's two labelled segments. */
+const VIEW_GROUP_CLASS = "border-line mr-1 flex h-[30px] flex-none items-center gap-0.5 rounded-md border p-0.5";
 
-/** The tinted box that makes the two view buttons read as one control. */
-const VIEW_GROUP_CLASS = "bg-surface/60 mr-1 flex flex-none items-center gap-0.5 rounded-md p-0.5";
+/** One segment; its text sits above the sliding fill, so the fill never covers it. */
+const VIEW_SEGMENT_CLASS =
+  "relative flex h-full items-center gap-1.5 rounded-[5px] px-2 text-xs font-medium transition-colors duration-100 outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)]";
+
+const EASE_MOVE = [0.4, 0, 0.2, 1] as const;
 
 interface ViewModeToggleProps {
   /** Currently selected presentation mode. */
@@ -78,48 +84,53 @@ interface ViewModeToggleProps {
 }
 
 /**
- * Two icon buttons for switching between the enriched and raw presentations, named in tooltips.
+ * The view switch: two labelled segments for the enriched and raw presentations. The fill behind
+ * the pressed one slides to the other when the view changes, so the switch shows which way it went;
+ * with reduced motion it moves at once.
  *
  * @param props - ViewModeToggle properties.
- * @returns The pair of toggle buttons.
+ * @returns The switch.
  */
 function ViewModeToggle({ viewMode, enriched, onViewModeChange }: ViewModeToggleProps) {
-  const enrichedLabel = enriched === "markdown" ? "Rich text" : "Table";
+  const indicatorId = useId();
+  const isReduced = useReducedMotion() ?? false;
+  const segment = (mode: ViewMode, label: string, icon: ReactNode) => {
+    const isPressed = viewMode === mode;
+    return (
+      <button
+        type="button"
+        onClick={() => onViewModeChange(mode)}
+        aria-pressed={isPressed}
+        className={`${VIEW_SEGMENT_CLASS} ${isPressed ? "text-text-strong" : "text-text-muted hover:text-text"}`}
+      >
+        {isPressed && (
+          <motion.span
+            layoutId={indicatorId}
+            transition={{ duration: isReduced ? 0 : 0.2, ease: EASE_MOVE }}
+            aria-hidden="true"
+            className="bg-selected absolute inset-0 rounded-[5px]"
+          />
+        )}
+        <span className="relative flex items-center gap-1.5">
+          {icon}
+          {label}
+        </span>
+      </button>
+    );
+  };
   return (
     // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a plain row of two toggles; a native fieldset would bring browser styling to reset
     <div role="group" aria-label="Document view mode" className={VIEW_GROUP_CLASS}>
-      <Tooltip text={enrichedLabel} position="bottom" align="end">
-        {(bubbleId) => (
-          <button
-            type="button"
-            onClick={() => onViewModeChange("enriched")}
-            aria-label={enrichedLabel}
-            aria-describedby={bubbleId}
-            aria-pressed={viewMode === "enriched"}
-            className={`btn icon sm ${VIEW_BUTTON_CLASS} ${viewMode === "enriched" ? "soft" : "ghost"}`}
-          >
-            {enriched === "markdown" ? (
-              <i className="ic-eye" aria-hidden="true" />
-            ) : (
-              <i className="ic-table" aria-hidden="true" />
-            )}
-          </button>
-        )}
-      </Tooltip>
-      <Tooltip text="Raw" position="bottom" align="end">
-        {(bubbleId) => (
-          <button
-            type="button"
-            onClick={() => onViewModeChange("raw")}
-            aria-label="Raw"
-            aria-describedby={bubbleId}
-            aria-pressed={viewMode === "raw"}
-            className={`btn icon sm ${VIEW_BUTTON_CLASS} ${viewMode === "raw" ? "soft" : "ghost"}`}
-          >
-            <i className="ic-code" aria-hidden="true" />
-          </button>
-        )}
-      </Tooltip>
+      {segment(
+        "enriched",
+        enriched === "markdown" ? "Rich text" : "Table",
+        enriched === "markdown" ? (
+          <i className="ic-eye text-sm" aria-hidden="true" />
+        ) : (
+          <i className="ic-table text-sm" aria-hidden="true" />
+        ),
+      )}
+      {segment("raw", "Raw", <i className="ic-code text-sm" aria-hidden="true" />)}
     </div>
   );
 }

@@ -194,7 +194,7 @@ Shortcuts are written with spaced plus signs, as in `Ctrl + P` and `Ctrl + Shift
 
 **Motion.** The shell moves only where something changes place, so the user can see where a part came from and where it went. Opening a workspace grows the title bar down from the top and the rail and explorer in from the left while the frame shrinks to make room; closing it reverses that. Showing or hiding the explorer resizes the frame. The status bar slides up when a file opens and down when the last one closes. A folder's rows unfold from its row as it opens, and its chevron turns. These take 140 to 350 ms, ease without bouncing, and are instant with the operating system's reduced-motion setting. Typing, switching tabs, moving through a list or menu with the keyboard, and scrolling never animate, since a delay there is only a delay.
 
-The view switch is two icon buttons in one tinted group, named in their tooltips and to assistive technology: **Rich text** (eye) and **Raw** (code) for Markdown, **Table** (table) and **Raw** for CSV. The pressed one is the view shown. A format with one view shows no switch.
+The view switch is two labelled segments in one hairline box: **Rich text** (eye) and **Raw** (code) for Markdown, **Table** (table) and **Raw** for CSV. The pressed one is the view shown, with a fill behind it that slides to the other segment when the view changes. The labels are written out, not left to tooltips, because two icons alone did not say which view was which until hovered. A format with one view shows no switch.
 
 There is no breadcrumb above the document: the path bar shows the whole path instead, so no folder is hidden on a narrow screen.
 
