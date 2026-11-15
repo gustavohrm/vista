@@ -91,6 +91,8 @@ interface SidebarProps {
   onCopyRelativePath: (entry: ExplorerEntry) => void;
   /** Copies an entry's full path on disk. Omitted where there is none, such as in the browser. */
   onCopyPath?: (entry: ExplorerEntry) => void;
+  /** Shows an entry in the operating system's file manager. Omitted where there is none. */
+  onReveal?: (entry: ExplorerEntry) => void;
   /** Removes a folder from the workspace. Omitted while the workspace has only one folder. */
   onRemoveFolder?: (folderId: string) => void;
   /** Asks the browser again for access to a folder that needs permission. */
@@ -155,6 +157,7 @@ export function Sidebar({
   onDelete,
   onCopyRelativePath,
   onCopyPath,
+  onReveal,
   onRemoveFolder,
   onAllowAccess,
   onLocate,
@@ -336,6 +339,7 @@ export function Sidebar({
             onDelete,
             onCopyRelativePath,
             onCopyPath,
+            onReveal,
             onRemoveFolder,
           })}
           x={contextMenu.x}
@@ -364,18 +368,20 @@ interface TreeMenuActions {
   onDelete: (entry: ExplorerEntry) => void;
   onCopyRelativePath: (entry: ExplorerEntry) => void;
   onCopyPath?: (entry: ExplorerEntry) => void;
+  onReveal?: (entry: ExplorerEntry) => void;
   onRemoveFolder?: (folderId: string) => void;
 }
 
 /**
  * Lists the actions for a tree entry: Open for a file, New File and New Folder for a folder or a
- * root row, then Rename and Delete, then the copy actions. A root row has no rename, delete, or
- * relative path, and offers Remove Folder from Workspace instead.
+ * root row, then Rename and Delete, then the path actions: Copy Path and Reveal where the host has
+ * them, and Copy Relative Path. A root row has no rename, delete, or relative path, and offers
+ * Remove Folder from Workspace instead.
  */
 function buildTreeMenu({ folderId, path, kind }: ContextMenuTarget, actions: TreeMenuActions): MenuEntry[] {
   const entry = { folderId, path };
   const isRoot = path === "";
-  const { onCopyPath, onRemoveFolder } = actions;
+  const { onCopyPath, onReveal, onRemoveFolder } = actions;
   const groups: MenuEntry[][] = [
     kind === "file"
       ? [{ label: "Open", icon: <i className="ic-file" aria-hidden="true" />, onSelect: () => actions.onOpen(entry) }]
@@ -425,6 +431,15 @@ function buildTreeMenu({ folderId, path, kind }: ContextMenuTarget, actions: Tre
               onSelect: () => actions.onCopyRelativePath(entry),
             },
           ]),
+      ...(onReveal
+        ? [
+            {
+              label: "Reveal in File Explorer",
+              icon: <i className="ic-folder-open" aria-hidden="true" />,
+              onSelect: () => onReveal(entry),
+            },
+          ]
+        : []),
     ],
     isRoot && onRemoveFolder
       ? [

@@ -69,6 +69,7 @@ import {
   INITIAL_DOCUMENTS_STATE,
   isSameStat,
   type DocumentsState,
+  type FolderEntryRef,
   type OpenDocument,
   type RestoredTab,
 } from "./state/documents";
@@ -1667,33 +1668,40 @@ function AppShell({ adapter }: AppProps) {
   );
 
   // The desktop copies the full path on disk; the web has none, so it copies the path within the folder.
-  const copyDocumentPath = useCallback(
-    async (doc: OpenDocument) => {
-      const folder = readyFolder(doc.folderId);
-      if (adapter.platform !== "native") {
-        await copyText(doc.path);
-      } else if (folder) {
-        await copyText(joinAbsolutePath(folder.rootPath, doc.path));
-      }
-    },
+  // Copy Path and Reveal exist only where the host has them: the web has no full path to copy and
+  // can't open the file manager, so they are left out there rather than shown disabled.
+  const copyFullPath = useMemo(
+    () =>
+      adapter.platform === "native"
+        ? (entry: FolderEntryRef) => {
+            const folder = readyFolder(entry.folderId);
+            if (folder) {
+              void copyText(joinAbsolutePath(folder.rootPath, entry.path));
+            }
+          }
+        : undefined,
     [adapter.platform, copyText, readyFolder],
   );
 
-  const revealDocument = useCallback(
-    async (doc: OpenDocument) => {
-      const folder = readyFolder(doc.folderId);
-      if (!folder || !adapter.workspace.reveal) {
+  const revealEntry = useMemo(() => {
+    const { reveal } = adapter.workspace;
+    if (!reveal) {
+      return undefined;
+    }
+    return async (entry: FolderEntryRef) => {
+      const folder = readyFolder(entry.folderId);
+      if (!folder) {
         return;
       }
       try {
-        await adapter.workspace.reveal(folder, doc.path);
+        await reveal(folder, entry.path);
       } catch (err) {
-        console.error("Failed to reveal the file:", err);
-        toast.show({ kind: "error", text: "Couldn't show the file in the file manager." });
+        console.error("Failed to reveal the entry:", err);
+        const name = entry.path === "" ? "the folder" : `"${entry.path.split("/").at(-1)}"`;
+        toast.show({ kind: "error", text: `Couldn't show ${name} in the file manager.` });
       }
-    },
-    [adapter.workspace, readyFolder, toast],
-  );
+    };
+  }, [adapter.workspace, readyFolder, toast]);
 
   const runEditing = useCallback(
     async (action: EditingAction) => {
@@ -1798,6 +1806,47 @@ function AppShell({ adapter }: AppProps) {
         isEnabled: !isPromptingForUnsavedChanges && hasDirtyDocuments,
         run: saveAllDocuments,
       },
+      ...(copyFullPath
+        ? ([
+            {
+              id: "file.copyPath",
+              category: "File",
+              label: "Copy Path",
+              isEnabled: activeDocument !== null,
+              run: () => {
+                if (activeDocument) {
+                  copyFullPath(activeDocument);
+                }
+              },
+            },
+          ] satisfies Command[])
+        : []),
+      {
+        id: "file.copyRelativePath",
+        category: "File",
+        label: "Copy Relative Path",
+        isEnabled: activeDocument !== null,
+        run: () => {
+          if (activeDocument) {
+            void copyText(activeDocument.path);
+          }
+        },
+      },
+      ...(revealEntry
+        ? ([
+            {
+              id: "file.reveal",
+              category: "File",
+              label: "Reveal in File Explorer",
+              isEnabled: activeDocument !== null,
+              run: () => {
+                if (activeDocument) {
+                  void revealEntry(activeDocument);
+                }
+              },
+            },
+          ] satisfies Command[])
+        : []),
       {
         id: "file.settings",
         category: "Settings",
@@ -2004,6 +2053,8 @@ function AppShell({ adapter }: AppProps) {
       canToggleView,
       closeActiveDocument,
       closeAllDocuments,
+      copyFullPath,
+      copyText,
       documentsState.documents.length,
       editorSettings,
       handleAddFolder,
@@ -2016,6 +2067,7 @@ function AppShell({ adapter }: AppProps) {
       isSidebarOpen,
       openFind,
       requestNewEntry,
+      revealEntry,
       runEditing,
       runSelection,
       saveActiveDocument,
@@ -2151,16 +2203,8 @@ function AppShell({ adapter }: AppProps) {
             onRename={handleRename}
             onDelete={handleDelete}
             onCopyRelativePath={(entry) => void copyText(entry.path)}
-            onCopyPath={
-              adapter.platform === "native"
-                ? (entry) => {
-                    const folder = readyFolder(entry.folderId);
-                    if (folder) {
-                      void copyText(joinAbsolutePath(folder.rootPath, entry.path));
-                    }
-                  }
-                : undefined
-            }
+            onCopyPath={copyFullPath}
+            onReveal={revealEntry && ((entry) => void revealEntry(entry))}
             onRemoveFolder={
               workspace && workspace.folders.length > 1 ? (folderId) => void handleRemoveFolder(folderId) : undefined
             }
@@ -2181,6 +2225,8 @@ function AppShell({ adapter }: AppProps) {
             onClose={(key) => closeDocuments([key])}
             onCloseMany={(keys) => closeDocuments(keys)}
             onCopyRelativePath={(path) => void copyText(path)}
+            onCopyPath={copyFullPath}
+            onReveal={revealEntry && ((doc) => void revealEntry(doc))}
             locate={locateDocument}
             actions={
               shownDocument && (
@@ -2232,8 +2278,12 @@ function AppShell({ adapter }: AppProps) {
         activeFile={shownDocument}
         location={activeLocation}
         copyPathLabel={adapter.platform === "native" ? "Copy Path" : "Copy Relative Path"}
-        onCopyPath={shownDocument ? () => void copyDocumentPath(shownDocument) : undefined}
-        onReveal={shownDocument && adapter.workspace.reveal ? () => void revealDocument(shownDocument) : undefined}
+        onCopyPath={
+          shownDocument
+            ? () => (copyFullPath ? copyFullPath(shownDocument) : void copyText(shownDocument.path))
+            : undefined
+        }
+        onReveal={shownDocument && revealEntry ? () => void revealEntry(shownDocument) : undefined}
         cursor={activeCursor}
         vimMode={activeVimMode}
         onGoToLine={() => setGoToQuery(":")}

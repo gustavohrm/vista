@@ -2902,7 +2902,7 @@ describe("App", () => {
 
       await user.click(within(statusBar()).getByRole("button", { name: "Reveal in File Explorer" }));
 
-      expect(await findToast("Couldn't show the file in the file manager.")).toBeInTheDocument();
+      expect(await findToast(`Couldn't show "data.csv" in the file manager.`)).toBeInTheDocument();
     });
 
     it("copies a tree entry's relative path, and offers its full path only on desktop", async () => {
@@ -2928,6 +2928,116 @@ describe("App", () => {
       await user.click(screen.getByRole("menuitem", { name: "Copy Path" }));
 
       expect(writeText).toHaveBeenCalledWith("/notes/readme.md");
+    });
+
+    it("ends the tab menu with Copy Path, Copy Relative Path, and Reveal on desktop", async () => {
+      const user = userEvent.setup();
+      const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+      const reveal = vi.fn(async () => {});
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability({ reveal }) }} />);
+      await openFolderFromWelcome(user);
+      await user.click(screen.getByText("data.csv"));
+
+      fireEvent.contextMenu(getTab("data.csv"));
+      const menu = screen.getByRole("menu", { name: "Tab actions" });
+      expect(
+        within(menu)
+          .getAllByRole("menuitem")
+          .map((item) => item.textContent),
+      ).toEqual([
+        "Close",
+        "Close Others",
+        "Close to the Right",
+        "Close Saved",
+        "Close All",
+        "Copy Path",
+        "Copy Relative Path",
+        "Reveal in File Explorer",
+      ]);
+      await user.click(within(menu).getByRole("menuitem", { name: "Copy Path" }));
+      expect(writeText).toHaveBeenCalledWith("/notes/data.csv");
+
+      fireEvent.contextMenu(getTab("data.csv"));
+      await user.click(screen.getByRole("menuitem", { name: "Reveal in File Explorer" }));
+      expect(reveal).toHaveBeenCalledWith(expect.objectContaining({ rootPath: "/notes" }), "data.csv");
+    });
+
+    it("offers only Copy Relative Path in the tab menu on the web", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      await user.click(screen.getByText("data.csv"));
+
+      fireEvent.contextMenu(getTab("data.csv"));
+
+      const menu = screen.getByRole("menu", { name: "Tab actions" });
+      expect(within(menu).getAllByRole("menuitem").at(-1)).toHaveTextContent("Copy Relative Path");
+      expect(within(menu).queryByRole("menuitem", { name: "Copy Path" })).not.toBeInTheDocument();
+      expect(within(menu).queryByRole("menuitem", { name: /^Reveal/ })).not.toBeInTheDocument();
+    });
+
+    it("reveals a file, a folder, and a root row from the explorer on desktop", async () => {
+      const user = userEvent.setup();
+      const reveal = vi.fn<NonNullable<WorkspaceCapability["reveal"]>>(async () => {});
+      const readTree = vi
+        .fn()
+        .mockResolvedValue([{ id: "docs", name: "docs", path: "docs", kind: "directory", children: [] }, ...ROOT_TREE]);
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability({ reveal, readTree }) }} />);
+      await openFolderFromWelcome(user);
+      const explorer = explorerPanel();
+
+      fireEvent.contextMenu(within(explorer).getByText("readme.md"));
+      await user.click(screen.getByRole("menuitem", { name: "Reveal in File Explorer" }));
+      fireEvent.contextMenu(within(explorer).getByRole("button", { name: "docs" }));
+      await user.click(screen.getByRole("menuitem", { name: "Reveal in File Explorer" }));
+      fireEvent.contextMenu(within(explorer).getByRole("button", { name: "My Notes" }));
+      expect(
+        within(screen.getByRole("menu"))
+          .getAllByRole("menuitem")
+          .map((item) => item.textContent),
+      ).toEqual(["New File", "New Folder", "Copy Path", "Reveal in File Explorer"]);
+      await user.click(screen.getByRole("menuitem", { name: "Reveal in File Explorer" }));
+
+      expect(reveal.mock.calls.map(([, path]) => path)).toEqual(["readme.md", "docs", ""]);
+    });
+
+    it("offers no Reveal in the explorer on the web", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+
+      fireEvent.contextMenu(within(explorerPanel()).getByText("readme.md"));
+
+      expect(screen.queryByRole("menuitem", { name: /^Reveal/ })).not.toBeInTheDocument();
+    });
+
+    it("copies and reveals the active file from the palette on desktop", async () => {
+      const user = userEvent.setup();
+      const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+      const reveal = vi.fn(async () => {});
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability({ reveal }) }} />);
+      await openFolderFromWelcome(user);
+      await user.click(screen.getByText("data.csv"));
+
+      await runFromPalette(user, "File: Copy Path");
+      expect(writeText).toHaveBeenLastCalledWith("/notes/data.csv");
+      await runFromPalette(user, "File: Copy Relative Path");
+      expect(writeText).toHaveBeenLastCalledWith("data.csv");
+      await runFromPalette(user, "File: Reveal in File Explorer");
+      expect(reveal).toHaveBeenCalledWith(expect.objectContaining({ rootPath: "/notes" }), "data.csv");
+    });
+
+    it("lists only Copy Relative Path of the three in the palette on the web", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      await user.click(screen.getByText("data.csv"));
+
+      await user.keyboard("{Control>}{Shift>}p{/Shift}{/Control}");
+
+      expect(screen.getByRole("option", { name: /^File: Copy Relative Path/ })).toBeInTheDocument();
+      expect(screen.queryByRole("option", { name: /^File: Copy Path/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("option", { name: /^File: Reveal/ })).not.toBeInTheDocument();
     });
 
     it("opens the app's editor menu on right click, and leaves Shift+right click to the browser", async () => {

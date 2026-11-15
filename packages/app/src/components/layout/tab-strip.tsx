@@ -27,6 +27,10 @@ interface TabStripProps {
   /** Closes several tabs at once, from the tab menu. The caller asks about unsaved changes. */
   onCloseMany: (keys: string[]) => Promise<boolean>;
   onCopyRelativePath: (path: string) => void;
+  /** Copies a tab's full path on disk. Omitted where there is none, such as in the browser. */
+  onCopyPath?: (doc: OpenDocument) => void;
+  /** Shows a tab's file in the operating system's file manager. Omitted where there is none. */
+  onReveal?: (doc: OpenDocument) => void;
   /** What acts on the active tab, at the row's right end. */
   actions?: ReactNode;
   /** Where a tab's file is, as the path bar shows it. */
@@ -45,6 +49,8 @@ export function TabStrip({
   onClose,
   onCloseMany,
   onCopyRelativePath,
+  onCopyPath,
+  onReveal,
   actions,
   locate,
 }: TabStripProps) {
@@ -164,6 +170,8 @@ export function TabStrip({
               onClose: (key) => void closeTabs(key, () => onClose(key)),
               onCloseMany: (keys) => void closeTabs(keys.includes(menu.key) ? menu.key : null, () => onCloseMany(keys)),
               onCopyRelativePath,
+              onCopyPath,
+              onReveal,
             })}
             x={menu.x}
             y={menu.y}
@@ -176,7 +184,10 @@ export function TabStrip({
   );
 }
 
-/** Lists the close actions for a tab, each disabled when it would close nothing, then Copy Relative Path. */
+/**
+ * Lists the close actions for a tab, each disabled when it would close nothing, then the path
+ * actions: Copy Path and Reveal where the host has them, and Copy Relative Path.
+ */
 function buildTabMenu(
   documents: readonly OpenDocument[],
   key: string,
@@ -184,6 +195,8 @@ function buildTabMenu(
     onClose: (key: string) => void;
     onCloseMany: (keys: string[]) => void;
     onCopyRelativePath: (path: string) => void;
+    onCopyPath?: (doc: OpenDocument) => void;
+    onReveal?: (doc: OpenDocument) => void;
   },
 ): MenuEntry[] {
   const index = documents.findIndex((doc) => doc.key === key);
@@ -191,6 +204,7 @@ function buildTabMenu(
   if (!target) {
     return [];
   }
+  const { onCopyPath, onReveal } = actions;
   const keysOf = (docs: readonly OpenDocument[]) => docs.map((doc) => doc.key);
   const others = keysOf(documents.filter((doc) => doc.key !== key));
   const toTheRight = keysOf(documents.slice(index + 1));
@@ -202,11 +216,29 @@ function buildTabMenu(
     { label: "Close Saved", disabled: saved.length === 0, onSelect: () => actions.onCloseMany(saved) },
     { label: "Close All", onSelect: () => actions.onCloseMany(keysOf(documents)) },
     MENU_SEPARATOR,
+    ...(onCopyPath
+      ? [
+          {
+            label: "Copy Path",
+            icon: <i className="ic-clipboard" aria-hidden="true" />,
+            onSelect: () => onCopyPath(target),
+          },
+        ]
+      : []),
     {
       label: "Copy Relative Path",
       icon: <i className="ic-copy" aria-hidden="true" />,
       onSelect: () => actions.onCopyRelativePath(target.path),
     },
+    ...(onReveal
+      ? [
+          {
+            label: "Reveal in File Explorer",
+            icon: <i className="ic-folder-open" aria-hidden="true" />,
+            onSelect: () => onReveal(target),
+          },
+        ]
+      : []),
   ];
 }
 
