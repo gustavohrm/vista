@@ -721,6 +721,120 @@ describe("App", () => {
     expect(document.documentElement.getAttribute("data-theme")).toBeDefined();
   });
 
+  describe("workspace settings", () => {
+    async function openWorkspaceSettings(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(await screen.findByRole("button", { name: "Research" }));
+      await user.click(screen.getByRole("menuitem", { name: "Workspace Settings…" }));
+      return screen.findByRole("dialog", { name: "Workspace Settings" });
+    }
+
+    function storedWorkspace() {
+      return JSON.parse(localStorage.getItem("vista.workspaces") ?? "null").workspaces[0];
+    }
+
+    it("renames the workspace as the name is typed, and keeps the old name while it is invalid", async () => {
+      const user = userEvent.setup();
+      const { capability } = createFoldersCapability(storedFolders());
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("plan.txt");
+      const dialog = await openWorkspaceSettings(user);
+      const name = within(dialog).getByRole("textbox", { name: "Name" });
+
+      await user.clear(name);
+      expect(within(dialog).getByRole("alert")).toHaveTextContent("Enter a name. The name stays “Research”.");
+      expect(storedWorkspace().name).toBe("Research");
+      await user.type(name, "  Thesis ");
+
+      expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument();
+      expect(storedWorkspace().name).toBe("Thesis");
+      await user.click(within(dialog).getByRole("button", { name: "Close" }));
+      expect(screen.getByRole("button", { name: "Thesis" })).toBeInTheDocument();
+    });
+
+    it("refuses a name longer than 80 characters", async () => {
+      const user = userEvent.setup();
+      const { capability } = createFoldersCapability(storedFolders());
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("plan.txt");
+      const dialog = await openWorkspaceSettings(user);
+      const name = within(dialog).getByRole("textbox", { name: "Name" });
+
+      await user.clear(name);
+      await user.paste("x".repeat(81));
+
+      expect(within(dialog).getByRole("alert")).toHaveTextContent("Use at most 80 characters.");
+      expect(storedWorkspace().name).toBe("Research");
+    });
+
+    it("changes the icon and colour at once", async () => {
+      const user = userEvent.setup();
+      const { capability } = createFoldersCapability(storedFolders());
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("plan.txt");
+      const dialog = await openWorkspaceSettings(user);
+
+      await user.click(within(dialog).getByRole("radio", { name: "Book" }));
+      await user.click(within(dialog).getByRole("radio", { name: "Rose" }));
+
+      expect(within(dialog).getByRole("radio", { name: "Book" })).toBeChecked();
+      expect(within(dialog).getByRole("radio", { name: "Rose" })).toBeChecked();
+      expect(storedWorkspace()).toMatchObject({ icon: "book-open", color: "rose" });
+    });
+
+    it("lists the folders, and removes one after asking", async () => {
+      const user = userEvent.setup();
+      const { capability } = createFoldersCapability(storedFolders());
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("plan.txt");
+      const dialog = await openWorkspaceSettings(user);
+      expect(
+        within(dialog)
+          .getAllByRole("listitem")
+          .map((item) => item.textContent),
+      ).toEqual(["notes", "sources"]);
+
+      await user.click(within(dialog).getByRole("button", { name: 'Remove "sources" from the workspace' }));
+      const confirm = await screen.findByRole("dialog", { name: 'Remove "sources" from the workspace?' });
+      await user.click(within(confirm).getByRole("button", { name: "Remove" }));
+
+      await waitFor(() => expect(within(dialog).getAllByRole("listitem")).toHaveLength(1));
+      expect(storedWorkspace().folderIds).toEqual(["notes"]);
+      expect(within(dialog).queryByRole("button", { name: /^Remove "notes"/ })).not.toBeInTheDocument();
+    });
+
+    it("adds a folder from the dialog", async () => {
+      const user = userEvent.setup();
+      const extra = { id: "drafts", name: "drafts", rootPath: "/drafts" };
+      const { capability } = createFoldersCapability([
+        ...storedFolders(),
+        { folder: extra, files: { "d.txt": PLAIN_TEXT } },
+      ]);
+      localStorage.setItem(
+        "vista.workspaces",
+        JSON.stringify({
+          version: 1,
+          lastWorkspaceId: "w1",
+          workspaces: [{ id: "w1", name: "Research", folderIds: ["notes"], lastOpenedAt: 1 }],
+        }),
+      );
+      vi.mocked(capability.pickFolder).mockResolvedValueOnce(extra);
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("a.txt");
+      const dialog = await openWorkspaceSettings(user);
+
+      await user.click(within(dialog).getByRole("button", { name: "Add Folder…" }));
+
+      await waitFor(() =>
+        expect(
+          within(dialog)
+            .getAllByRole("listitem")
+            .map((item) => item.textContent),
+        ).toEqual(["notes", "drafts"]),
+      );
+      expect(storedWorkspace().folderIds).toEqual(["notes", "drafts"]);
+    });
+  });
+
   describe("recent workspaces", () => {
     /** Research holds `notes`, Work holds `sources`; Research was used last unless `lastWorkspaceId` says otherwise. */
     function twoWorkspaces(lastWorkspaceId: string | null = "w1", workFolderIds = ["sources"]) {

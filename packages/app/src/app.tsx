@@ -27,6 +27,7 @@ import {
   type PaletteCommand,
 } from "./components/navigation/go-to-dialog";
 import { SettingsDialog } from "./components/settings/settings-dialog";
+import { WorkspaceSettingsDialog } from "./components/workspace/workspace-settings-dialog";
 import { WorkspaceSwitcher, type FolderStatus, type RecentWorkspace } from "./components/workspace/workspace-switcher";
 import { imageMimeType, resolveImageSource } from "./domain/image-source";
 import { joinWorkspacePath } from "./domain/path-validation";
@@ -34,7 +35,7 @@ import { BYTES_PER_MB, type EditorSettings } from "./domain/settings";
 import { encodeText } from "./domain/text-codec";
 import { getViewer } from "./domain/viewers";
 import { isDesktopViewport } from "./domain/viewport";
-import type { Session, WorkspaceRecord } from "./domain/workspaces";
+import type { Session, WorkspaceColor, WorkspaceIcon, WorkspaceRecord } from "./domain/workspaces";
 import {
   LEGACY_FOLDER_ID,
   WorkspaceError,
@@ -58,7 +59,7 @@ import {
 } from "./state/documents";
 import { loadFile } from "./state/load-file";
 import { useSettings } from "./state/settings";
-import { browserStorage, checkFolderOverlap, createWorkspaceStore } from "./state/workspaces";
+import { browserStorage, checkFolderOverlap, createWorkspaceStore, type WorkspaceDetails } from "./state/workspaces";
 import { useTheme } from "./theme/theme-manager";
 
 interface AppProps {
@@ -87,6 +88,8 @@ interface OpenFolder {
 interface OpenWorkspace {
   id: string;
   name: string;
+  icon: WorkspaceIcon;
+  color: WorkspaceColor;
   folders: OpenFolder[];
 }
 
@@ -212,7 +215,7 @@ function AppShell({ adapter }: AppProps) {
   const [pendingJump, setPendingJump] = useState<{ key: string; position: EditorPosition } | null>(null);
   // A File menu request to name a new entry at the workspace root.
   const [newEntryRequest, setNewEntryRequest] = useState<NewEntryRequest | null>(null);
-  const [helpDialog, setHelpDialog] = useState<"shortcuts" | "about" | "settings" | null>(null);
+  const [helpDialog, setHelpDialog] = useState<"shortcuts" | "about" | "settings" | "workspace" | null>(null);
   // Raw editor state of each open tab: selection, scroll position, and undo history.
   const rawEditorStatesRef = useRef<RawEditorStateCache>(new Map());
   // Holds the startup restore so StrictMode's second effect run reuses it instead of restoring
@@ -568,7 +571,7 @@ function AppShell({ adapter }: AppProps) {
       await adoptWorkspace(() => {
         // The workspace that is exactly this folder, which has no other folder.
         const record = workspaceStore.openFolder(opened);
-        return { id: record.id, name: record.name, folders: [folder] };
+        return { id: record.id, name: record.name, icon: record.icon, color: record.color, folders: [folder] };
       }, approvedEdits);
       // Shows the files of the folder the user just picked, also where the explorer is a drawer.
       setIsSidebarOpen(true);
@@ -642,7 +645,7 @@ function AppShell({ adapter }: AppProps) {
       const folders = await Promise.all(results.map(([id, result]) => toOpenFolder(id, result)));
       return adoptWorkspace(() => {
         workspaceStore.markOpened(record.id);
-        return { id: record.id, name: record.name, folders };
+        return { id: record.id, name: record.name, icon: record.icon, color: record.color, folders };
       }, approvedEdits);
     },
     [adapter.workspace, adoptWorkspace, toOpenFolder, toast, workspaceStore],
@@ -737,13 +740,24 @@ function AppShell({ adapter }: AppProps) {
     [adapter.workspace, toast, workspaceStore],
   );
 
-  const recents: RecentWorkspace[] = workspaceStore.recentWorkspaces().map((record) => ({
-    id: record.id,
-    name: workspace?.id === record.id ? workspace.name : record.name,
-    icon: record.icon,
-    color: record.color,
-    folders: workspace?.id === record.id ? summarizeFolders(workspace.folders) : (recentFolders.get(record.id) ?? null),
-  }));
+  const currentWorkspace: RecentWorkspace | null = workspace && {
+    id: workspace.id,
+    name: workspace.name,
+    icon: workspace.icon,
+    color: workspace.color,
+    folders: summarizeFolders(workspace.folders),
+  };
+  const recents: RecentWorkspace[] = workspaceStore.recentWorkspaces().map((record) =>
+    currentWorkspace?.id === record.id
+      ? currentWorkspace
+      : {
+          id: record.id,
+          name: record.name,
+          icon: record.icon,
+          color: record.color,
+          folders: recentFolders.get(record.id) ?? null,
+        },
+  );
   const unknownRecentIds = recents.flatMap((recent) => (recent.folders === null ? [recent.id] : [])).join("\n");
 
   // Looks up the folders of the workspaces Vista hasn't opened or restored in this run, without
@@ -778,6 +792,17 @@ function AppShell({ adapter }: AppProps) {
       void probe();
     }
   }, [adapter.workspace, isLoading, unknownRecentIds, workspaceStore]);
+
+  const handleChangeWorkspaceDetails = useCallback(
+    (changes: WorkspaceDetails) => {
+      const current = workspaceRef.current;
+      if (!current || !workspaceStore.updateDetails(current.id, changes)) {
+        return;
+      }
+      setWorkspace((previous) => (previous?.id === current.id ? { ...previous, ...changes } : previous));
+    },
+    [workspaceStore],
+  );
 
   const handleAddFolder = useCallback(async () => {
     const current = workspaceRef.current;
@@ -1684,21 +1709,14 @@ function AppShell({ adapter }: AppProps) {
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
         onSearch={openSearch}
         switcher={
-          workspace && (
+          currentWorkspace && (
             <WorkspaceSwitcher
-              current={
-                recents.find((recent) => recent.id === workspace.id) ?? {
-                  id: workspace.id,
-                  name: workspace.name,
-                  icon: "folder",
-                  color: "neutral",
-                  folders: summarizeFolders(workspace.folders),
-                }
-              }
+              current={currentWorkspace}
               recents={recents}
               onSwitch={(workspaceId) => void handleOpenWorkspace(workspaceId)}
               onOpenFolder={() => void handleOpenFolder()}
               onAddFolder={() => void handleAddFolder()}
+              onOpenSettings={() => setHelpDialog("workspace")}
             />
           )
         }
@@ -1811,6 +1829,17 @@ function AppShell({ adapter }: AppProps) {
       {helpDialog === "about" && <AboutDialog platform={adapter.platform} onClose={() => setHelpDialog(null)} />}
       {helpDialog === "settings" && (
         <SettingsDialog settings={settings} onChange={updateSettings} onClose={() => setHelpDialog(null)} />
+      )}
+      {helpDialog === "workspace" && currentWorkspace && (
+        <WorkspaceSettingsDialog
+          // A new name draft for each workspace, should the open one change underneath.
+          key={currentWorkspace.id}
+          workspace={currentWorkspace}
+          onChange={handleChangeWorkspaceDetails}
+          onAddFolder={() => void handleAddFolder()}
+          onRemoveFolder={(folderId) => void handleRemoveFolder(folderId)}
+          onClose={() => setHelpDialog(null)}
+        />
       )}
       {unsavedRequest && <UnsavedChangesDialog fileNames={unsavedRequest.fileNames} onChoose={handleUnsavedChoice} />}
     </div>

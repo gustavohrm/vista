@@ -179,6 +179,32 @@ describe("folders of a workspace", () => {
   });
 });
 
+describe("workspace details", () => {
+  it("changes a workspace's name, icon, and colour, and keeps them", () => {
+    const storage = memoryStorage();
+    const store = createWorkspaceStore(storage, options());
+    const workspace = store.openFolder(notes);
+
+    expect(store.updateDetails(workspace.id, { name: "Research", icon: "book-open" })).toMatchObject({
+      name: "Research",
+      icon: "book-open",
+      color: "neutral",
+    });
+    store.updateDetails(workspace.id, { color: "rose" });
+    expect(createWorkspaceStore(storage, options()).workspace(workspace.id)).toMatchObject({
+      name: "Research",
+      icon: "book-open",
+      color: "rose",
+    });
+  });
+
+  it("returns null for a workspace it doesn't hold", () => {
+    const store = createWorkspaceStore(memoryStorage(), options());
+
+    expect(store.updateDetails("missing", { name: "Research" })).toBeNull();
+  });
+});
+
 describe("recent workspaces", () => {
   function clockedStore(storage = memoryStorage()) {
     let time = 0;

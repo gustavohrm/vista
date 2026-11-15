@@ -28,6 +28,9 @@ export const WORKSPACES_BACKUP_KEY = "vista.workspaces.damaged";
 
 const UNTITLED_NAME = "Untitled workspace";
 
+/** The details Workspace Settings changes. */
+export type WorkspaceDetails = Partial<Pick<WorkspaceRecord, "name" | "icon" | "color">>;
+
 export interface WorkspaceStore {
   lastWorkspace(): WorkspaceRecord | null;
   /** Every workspace, the most recently opened first. */
@@ -36,6 +39,8 @@ export interface WorkspaceStore {
   /** The workspace Open Folder opens for a folder: the one that is exactly it, or a new one. */
   openFolder(folder: WorkspaceFolder): WorkspaceRecord;
   markOpened(workspaceId: string): void;
+  /** Changes a workspace's name, icon, or colour. The name must already pass `validateWorkspaceName`. */
+  updateDetails(workspaceId: string, changes: WorkspaceDetails): WorkspaceRecord | null;
   addFolder(workspaceId: string, folderId: string): WorkspaceRecord | null;
   isFolderUsed(folderId: string): boolean;
   /**
@@ -152,6 +157,11 @@ export function createWorkspaceStore(
       } else if (workspace) {
         opened(workspace);
       }
+    },
+
+    updateDetails(workspaceId, changes) {
+      const workspace = list.workspaces.find((w) => w.id === workspaceId);
+      return workspace ? replace({ ...workspace, ...changes }) : null;
     },
 
     addFolder(workspaceId, folderId) {
