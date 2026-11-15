@@ -7,6 +7,7 @@ import { flushSync } from "react-dom";
 import { version as APP_VERSION } from "../package.json";
 import { runCommand, sortByCategory, useCommandShortcuts, type Command } from "./commands";
 import { findCodeMirrorView, runEditingAction, type EditingAction } from "./commands/editing";
+import { DocumentActions } from "./components/editor/document-actions";
 import { EditorPane, type FindRequest } from "./components/editor/editor-pane";
 import type { FindMode } from "./components/editor/find-bar";
 import type { CursorInfo, EditorPosition, RawEditorStateCache } from "./components/editor/raw-editor";
@@ -2153,20 +2154,30 @@ function AppShell({ adapter }: AppProps) {
             onClose={(key) => closeDocuments([key])}
             onCloseMany={(keys) => closeDocuments(keys)}
             onCopyRelativePath={(path) => void copyText(path)}
+            actions={
+              shownDocument && (
+                <DocumentActions
+                  document={shownDocument}
+                  onViewModeChange={handleViewModeChange}
+                  isFindOpen={find !== null}
+                  onFind={() => openFind("find")}
+                  editorSettings={settings.editor}
+                  onEditorSettingsChange={handleEditorSettingsChange}
+                  onOpenSettings={() => setOpenDialog("editor")}
+                />
+              )
+            }
           />
           <EditorPane
             platform={adapter.platform}
             document={shownDocument}
-            onViewModeChange={handleViewModeChange}
             onContentChange={handleContentChange}
             onCursorChange={handleCursorChange}
             onVimModeChange={handleVimModeChange}
             rawEditorStates={rawEditorStatesRef.current}
             reservedShortcuts={reservedShortcuts}
             editorSettings={settings.editor}
-            onEditorSettingsChange={handleEditorSettingsChange}
             find={find}
-            onFind={() => openFind("find")}
             onFindClose={() => setFind(null)}
             pendingJump={pendingJump?.key === activeDocumentKey ? pendingJump.position : null}
             onJumpApplied={handleJumpApplied}

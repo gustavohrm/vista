@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import type { EditorSettings } from "../../domain/settings";
 import { Tooltip } from "../feedback/tooltip";
-import { Menu, type MenuItem } from "../menu/menu";
+import { Menu, MENU_SEPARATOR, type MenuEntry } from "../menu/menu";
 
 /** Space between the button and its menu, in pixels. */
 const MENU_GAP_PX = 4;
@@ -10,6 +10,8 @@ const MENU_GAP_PX = 4;
 interface EditorSettingsMenuProps {
   settings: EditorSettings;
   onChange: (changes: Partial<EditorSettings>) => void;
+  /** Opens the Settings dialog, from the menu's last item. */
+  onOpenSettings: () => void;
 }
 
 const SETTING_LABELS: { name: keyof EditorSettings; label: string }[] = [
@@ -20,13 +22,13 @@ const SETTING_LABELS: { name: keyof EditorSettings; label: string }[] = [
 ];
 
 /**
- * Gear button that opens the raw editor settings as a menu of check items, the same menu the
- * menu bar and the right-click menus use.
+ * Gear button that opens the raw editor settings as a menu of check items, followed by All
+ * settings…, in the same menu the right-click menus use.
  *
  * @param props - EditorSettingsMenu properties.
  * @returns The button and, while open, its menu.
  */
-export function EditorSettingsMenu({ settings, onChange }: EditorSettingsMenuProps) {
+export function EditorSettingsMenu({ settings, onChange, onOpenSettings }: EditorSettingsMenuProps) {
   const [button, setButton] = useState<HTMLButtonElement | null>(null);
   const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null);
 
@@ -40,11 +42,15 @@ export function EditorSettingsMenu({ settings, onChange }: EditorSettingsMenuPro
     setAnchor({ x: rect.left, y: rect.bottom + MENU_GAP_PX });
   };
 
-  const items: MenuItem[] = SETTING_LABELS.map(({ name, label }) => ({
-    label,
-    checked: settings[name],
-    onSelect: () => onChange({ [name]: !settings[name] }),
-  }));
+  const items: MenuEntry[] = [
+    ...SETTING_LABELS.map(({ name, label }) => ({
+      label,
+      checked: settings[name],
+      onSelect: () => onChange({ [name]: !settings[name] }),
+    })),
+    MENU_SEPARATOR,
+    { label: "All settings…", onSelect: onOpenSettings },
+  ];
 
   return (
     <>

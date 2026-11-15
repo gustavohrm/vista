@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 
 import type { OpenDocument } from "../../state/documents";
 import { Menu, MENU_SEPARATOR, type MenuEntry } from "../menu/menu";
@@ -15,11 +15,13 @@ interface TabStripProps {
   /** Closes several tabs at once, from the tab menu. The caller asks about unsaved changes. */
   onCloseMany: (keys: string[]) => Promise<boolean>;
   onCopyRelativePath: (path: string) => void;
+  /** What acts on the active tab, at the row's right end. */
+  actions?: ReactNode;
 }
 
 /**
- * One tab per open document. Arrow keys move between tabs, a middle click closes one, and a right
- * click opens a menu of close and copy actions.
+ * The tabs row: one tab per open document, then the active tab's actions. Arrow keys move between
+ * tabs, a middle click closes one, and a right click opens a menu of close and copy actions.
  */
 export function TabStrip({
   documents,
@@ -28,6 +30,7 @@ export function TabStrip({
   onClose,
   onCloseMany,
   onCopyRelativePath,
+  actions,
 }: TabStripProps) {
   const [menu, setMenu] = useState<{ key: string; x: number; y: number } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -79,42 +82,45 @@ export function TabStrip({
   };
 
   return (
-    <div
-      ref={listRef}
-      role="tablist"
-      aria-label="Open files"
-      className="bg-background flex h-10 flex-none [scrollbar-width:none] items-center gap-1 overflow-x-auto overflow-y-hidden px-2"
-    >
-      {documents.map((doc) => (
-        <Tab
-          key={doc.key}
-          document={doc}
-          isActive={doc.key === activeKey}
-          onActivate={() => onActivate(doc.key)}
-          onClose={(event) => {
-            // A click with no pointer detail came from the keyboard (Enter or Space).
-            void closeTabs(event.detail === 0 ? doc.key : null, () => onClose(doc.key));
-          }}
-          onKeyDown={handleKeyDown}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            setMenu({ key: doc.key, x: event.clientX, y: event.clientY });
-          }}
-        />
-      ))}
-      {menu && (
-        <Menu
-          label="Tab actions"
-          items={buildTabMenu(documents, menu.key, {
-            onClose: (key) => void closeTabs(key, () => onClose(key)),
-            onCloseMany: (keys) => void closeTabs(keys.includes(menu.key) ? menu.key : null, () => onCloseMany(keys)),
-            onCopyRelativePath,
-          })}
-          x={menu.x}
-          y={menu.y}
-          onClose={() => setMenu(null)}
-        />
-      )}
+    <div className="bg-background flex h-10 flex-none items-center gap-2 pr-2">
+      <div
+        ref={listRef}
+        role="tablist"
+        aria-label="Open files"
+        className="flex h-full min-w-0 flex-1 [scrollbar-width:none] items-center gap-1 overflow-x-auto overflow-y-hidden pl-2"
+      >
+        {documents.map((doc) => (
+          <Tab
+            key={doc.key}
+            document={doc}
+            isActive={doc.key === activeKey}
+            onActivate={() => onActivate(doc.key)}
+            onClose={(event) => {
+              // A click with no pointer detail came from the keyboard (Enter or Space).
+              void closeTabs(event.detail === 0 ? doc.key : null, () => onClose(doc.key));
+            }}
+            onKeyDown={handleKeyDown}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              setMenu({ key: doc.key, x: event.clientX, y: event.clientY });
+            }}
+          />
+        ))}
+        {menu && (
+          <Menu
+            label="Tab actions"
+            items={buildTabMenu(documents, menu.key, {
+              onClose: (key) => void closeTabs(key, () => onClose(key)),
+              onCloseMany: (keys) => void closeTabs(keys.includes(menu.key) ? menu.key : null, () => onCloseMany(keys)),
+              onCopyRelativePath,
+            })}
+            x={menu.x}
+            y={menu.y}
+            onClose={() => setMenu(null)}
+          />
+        )}
+      </div>
+      {actions}
     </div>
   );
 }

@@ -655,8 +655,8 @@ describe("App", () => {
     );
     // The mocked readTree always returns the same static list, so this verifies the
     // in-place document path update rather than a refreshed tree from disk.
-    const editor = screen.getByRole("main");
-    await waitFor(() => expect(within(editor).getByText("guide.md")).toBeInTheDocument());
+    await waitFor(() => expect(getTab("guide.md")).toBeInTheDocument());
+    expect(within(statusBar()).getByText("My Notes / guide.md", { ignore: "[role=tooltip]" })).toBeInTheDocument();
   });
 
   it("asks for confirmation before deleting a file and deletes it when confirmed", async () => {
@@ -1724,6 +1724,79 @@ describe("App", () => {
       await findFileRows("a.txt");
 
       expect(localStorage.getItem(SESSION_KEY)).toBe(stored);
+    });
+  });
+
+  describe("tabs row", () => {
+    it("ends with the active file's view switch, Find, and editor settings, with no header above the document", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      await user.click(screen.getByText("readme.md"));
+      await screen.findByRole("heading", { name: "Hello Vista" });
+
+      const actions = screen.getByRole("group", { name: "Document actions" });
+      const tabs = screen.getByRole("tablist", { name: "Open files" });
+      expect(actions.parentElement).toBe(tabs.parentElement);
+      expect(within(actions).getByRole("button", { name: "Rich text" })).toHaveAttribute("aria-pressed", "true");
+      expect(within(actions).getByRole("button", { name: "Raw" })).toHaveAttribute("aria-pressed", "false");
+      expect(within(actions).getByRole("button", { name: "Find" })).toBeInTheDocument();
+      expect(within(actions).getByRole("button", { name: "Editor settings" })).toBeInTheDocument();
+      expect(screen.queryByRole("navigation", { name: "Breadcrumb" })).not.toBeInTheDocument();
+      expect(screen.getByRole("main").querySelector("header")).toBeNull();
+    });
+
+    it("names the CSV views Table and Raw, and shows no switch for a format with one view", async () => {
+      const user = userEvent.setup();
+      render(
+        <App
+          adapter={{
+            platform: "web",
+            workspace: createMemoryWorkspace({ "data.csv": CSV_CONTENT, "notes.txt": PLAIN_TEXT }),
+          }}
+        />,
+      );
+      await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+
+      await user.click(await screen.findByText("data.csv"));
+      const actions = screen.getByRole("group", { name: "Document actions" });
+      expect(within(actions).getByRole("button", { name: "Table" })).toBeInTheDocument();
+      await user.click(within(actions).getByRole("button", { name: "Raw" }));
+      expect(await screen.findByRole("textbox", { name: /Raw text content of data\.csv/ })).toBeInTheDocument();
+
+      await user.click(screen.getByText("notes.txt"));
+      await screen.findByRole("textbox", { name: /Raw text content of notes\.txt/ });
+      const textActions = screen.getByRole("group", { name: "Document actions" });
+      expect(within(textActions).queryByRole("group", { name: "Document view mode" })).not.toBeInTheDocument();
+      expect(within(textActions).getByRole("button", { name: "Find" })).toBeInTheDocument();
+    });
+
+    it("shows no view switch for a read-only file, which only opens raw", async () => {
+      const user = userEvent.setup();
+      // "café" in Windows-1252, which is not valid UTF-8.
+      const mockWorkspace = createMemoryWorkspace(
+        { "legacy.md": new Uint8Array([0x63, 0x61, 0x66, 0xe9]) },
+        { tree: [{ id: "legacy.md", name: "legacy.md", path: "legacy.md", kind: "file", extension: "md" }] },
+      );
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+      await user.click(await screen.findByText("legacy.md"));
+      await screen.findByRole("textbox", { name: /Raw text content of legacy\.md/i });
+
+      const actions = screen.getByRole("group", { name: "Document actions" });
+      expect(within(actions).queryByRole("group", { name: "Document view mode" })).not.toBeInTheDocument();
+    });
+
+    it("opens the Editor section of Settings from the editor settings menu", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openRawReadme(user);
+
+      await user.click(screen.getByRole("button", { name: "Editor settings" }));
+      await user.click(screen.getByRole("menuitem", { name: "All settings…" }));
+
+      expect(screen.getByRole("dialog", { name: "Settings" })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Editor" })).toHaveAttribute("aria-selected", "true");
     });
   });
 
