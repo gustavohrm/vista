@@ -55,9 +55,6 @@ export function StartScreen({
   onRemoveRecent,
   hints,
 }: StartScreenProps) {
-  const openFolderLabelId = useId();
-  const openFolderHintId = useId();
-
   if (!hasWorkspace && isLoading) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center p-6">
@@ -95,22 +92,9 @@ export function StartScreen({
           </h2>
           <ul className="-mx-2 flex flex-col gap-px">
             <li>
-              <button
-                type="button"
-                onClick={onOpenFolder}
-                aria-labelledby={openFolderLabelId}
-                aria-describedby={openFolderHintId}
-                className={`${ROW_CLASS} items-start`}
-              >
-                <i className="ic-folder-open text-text-muted mt-0.5 flex-none text-base" aria-hidden="true" />
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span id={openFolderLabelId} className="text-text-strong">
-                    Open Folder…
-                  </span>
-                  <span id={openFolderHintId} aria-hidden="true" className="text-text-muted text-xs">
-                    The folder becomes a workspace. You can add more folders to it later.
-                  </span>
-                </span>
+              <button type="button" onClick={onOpenFolder} className={ROW_CLASS}>
+                <i className="ic-folder-open text-text-muted flex-none text-base" aria-hidden="true" />
+                <span className="text-text-strong flex-1">Open Folder…</span>
               </button>
             </li>
             <li>

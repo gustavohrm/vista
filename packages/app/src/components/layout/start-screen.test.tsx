@@ -34,9 +34,7 @@ describe("StartScreen", () => {
 
     expect(screen.getByRole("heading", { name: "Vista" })).toBeInTheDocument();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open Folder…" })).toHaveAccessibleDescription(
-      "The folder becomes a workspace. You can add more folders to it later.",
-    );
+    expect(screen.getByRole("button", { name: "Open Folder…" })).not.toHaveAccessibleDescription();
   });
 
   it("opens Settings from the Start list", async () => {
