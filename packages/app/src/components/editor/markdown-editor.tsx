@@ -189,18 +189,18 @@ function createImageView(initialNode: ProseNode, loader: ImageLoader): ProseNode
 
   const showPlaceholder = (current: ProseNode) => {
     const placeholder = document.createElement("span");
-    const icon = document.createElement("i");
     const label = document.createElement("span");
     const name = current.attrs.alt || current.attrs.src || "image";
     placeholder.className = "markdown-image-placeholder";
     placeholder.setAttribute("role", "img");
     placeholder.setAttribute("aria-label", `Image not shown: ${name}`);
     placeholder.title = current.attrs.src;
-    icon.className = "ic-image-off";
-    icon.setAttribute("aria-hidden", "true");
+    // Written as markup, a fixed literal with nothing from the document in it, so the icon build
+    // finds the tag and inlines its SVG; an element made with createElement is never rewritten.
+    placeholder.innerHTML = '<i class="ic-image-off" aria-hidden="true"></i>';
     label.textContent = name;
     label.setAttribute("aria-hidden", "true");
-    placeholder.append(icon, label);
+    placeholder.append(label);
     dom.replaceChildren(placeholder);
   };
 
