@@ -18,6 +18,8 @@ interface TitleBarProps {
   switcher?: ReactNode;
   /** The panel toggles at the right end, from `md` up. */
   panels?: readonly PanelToggle[];
+  /** A quiet notice at the right end, before the panel toggles, such as a newer version being out. */
+  notice?: ReactNode;
 }
 
 /** One of the title bar's panel toggles, which shows or hides a bar around the frame. */
@@ -42,7 +44,7 @@ const PANEL_TOGGLE_CLASS =
 
 /**
  * The bar across the top of the application shell: the workspace switcher on the left, the
- * go-to-file field in the middle, and from `md` up the panel toggles on the right, one for each bar
+ * go-to-file field in the middle, and on the right any notice, then from `md` up the panel toggles, one for each bar
  * around the frame. Below `md`, where there is no rail, a button at the left opens the explorer
  * drawer instead; the bar stays above the drawer, so the button that opened it also closes it.
  *
@@ -57,6 +59,7 @@ export function TitleBar({
   goToFileShortcut,
   switcher,
   panels = [],
+  notice,
 }: TitleBarProps) {
   const explorerLabel = isSidebarOpen ? "Close explorer" : "Open explorer";
 
@@ -99,6 +102,7 @@ export function TitleBar({
       </button>
 
       <div className="flex flex-none items-center justify-end gap-0.5 lg:flex-1">
+        {notice && <div className="mr-1 flex flex-none">{notice}</div>}
         {panels.map((panel) => (
           <Tooltip key={panel.label} text={panel.label} position="bottom" className="hidden flex-none md:flex">
             {(bubbleId) => (
