@@ -1,14 +1,18 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import {
+  isPaletteColor,
+  parseWorkspaceColor,
   validateWorkspaceName,
   WORKSPACE_COLORS,
   WORKSPACE_ICONS,
+  type PaletteColor,
   type WorkspaceColor,
   type WorkspaceIcon,
   type WorkspaceStorage,
 } from "../../domain/workspaces";
 import type { WorkspaceDetails } from "../../state/workspaces";
+import { Tooltip } from "../feedback/tooltip";
 import { WorkspaceGlyph } from "../workspace/workspace-glyph";
 import type { RecentWorkspace } from "../workspace/workspace-switcher";
 import { GroupHeading, SectionHeading, SettingsGroup, SettingsRow } from "./settings-parts";
@@ -28,7 +32,7 @@ const ICON_LABELS: Record<WorkspaceIcon, string> = {
   globe: "Globe",
 };
 
-const COLOR_LABELS: Record<WorkspaceColor, string> = {
+const COLOR_LABELS: Record<PaletteColor, string> = {
   neutral: "Neutral",
   indigo: "Indigo",
   emerald: "Emerald",
@@ -37,7 +41,7 @@ const COLOR_LABELS: Record<WorkspaceColor, string> = {
 };
 
 /** Each swatch's fill: the hue's middle step, which reads on both themes. */
-const SWATCH_COLORS: Record<WorkspaceColor, string> = {
+const SWATCH_COLORS: Record<PaletteColor, string> = {
   neutral: "var(--color-neutral-500)",
   indigo: "var(--color-indigo-600)",
   emerald: "var(--color-emerald-600)",
@@ -169,11 +173,31 @@ export function WorkspaceSection({
                 />
               </label>
             ))}
+            <CustomColorSwatch color={workspace.color} onChange={(color) => onChange({ color })} />
           </div>
         </SettingsRow>
       </SettingsGroup>
 
-      <GroupHeading id={`${idPrefix}-folders`}>Folders</GroupHeading>
+      <GroupHeading
+        id={`${idPrefix}-folders`}
+        action={
+          <Tooltip text="Add Folder to Workspace" position="bottom" className="-mr-1.5 flex flex-none">
+            {(bubbleId) => (
+              <button
+                type="button"
+                onClick={onAddFolder}
+                aria-label="Add Folder to Workspace"
+                aria-describedby={bubbleId}
+                className="icon-button size-7 text-base"
+              >
+                <i className="ic-plus" aria-hidden="true" />
+              </button>
+            )}
+          </Tooltip>
+        }
+      >
+        Folders
+      </GroupHeading>
       <SettingsGroup labelledBy={`${idPrefix}-folders`}>
         <ul>
           {folders.map((folder) => (
@@ -198,10 +222,6 @@ export function WorkspaceSection({
           ))}
         </ul>
       </SettingsGroup>
-      <button type="button" onClick={onAddFolder} className="btn sm mt-3">
-        <i className="ic-folder-plus" aria-hidden="true" />
-        Add Folder to Workspace…
-      </button>
 
       {canChooseStorage && (
         <>
@@ -264,6 +284,65 @@ function StorageChoice({ name, isChecked, onChoose, label, description }: Storag
           {description}
         </span>
       </span>
+    </label>
+  );
+}
+
+/** What the custom swatch shows before a colour is picked: every hue, so it reads as "any colour". */
+const CUSTOM_SWATCH_IDLE = "conic-gradient(from 90deg, #f43f5e, #f59e0b, #10b981, #0ea5e9, #6366f1, #d946ef, #f43f5e)";
+/** Where the picker starts when the workspace has a palette colour. */
+const CUSTOM_COLOR_START = "#7c8cff";
+
+/**
+ * The last swatch of the colour row, which opens the system colour picker. It shows every hue until
+ * a custom colour is chosen, then that colour, ringed like a chosen swatch. The swatch follows the
+ * picker as it moves, but the workspace takes the colour only once the picker commits it, so
+ * dragging across the picker doesn't save the details on every step.
+ */
+function CustomColorSwatch({ color, onChange }: { color: WorkspaceColor; onChange: (color: WorkspaceColor) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isCustom = !isPaletteColor(color);
+  const [preview, setPreview] = useState<string | null>(null);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) {
+      return undefined;
+    }
+    // React's onChange is the input event, which fires on every step; the native change event fires once.
+    const handleCommit = () => {
+      setPreview(null);
+      onChangeRef.current(parseWorkspaceColor(input.value));
+    };
+    input.addEventListener("change", handleCommit);
+    return () => input.removeEventListener("change", handleCommit);
+  }, []);
+
+  // Uncontrolled, so the picker can move freely; it starts from the colour the workspace has now.
+  const startColor = isCustom ? color : CUSTOM_COLOR_START;
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.value = startColor;
+    }
+  }, [startColor]);
+
+  const shown = preview ?? (isCustom ? color : null);
+  return (
+    <label
+      title="Custom colour"
+      className={`${SWATCH_CLASS} ${isCustom ? "outline-text-strong outline-2" : ""}`}
+      style={{ background: shown ?? CUSTOM_SWATCH_IDLE }}
+    >
+      <input
+        ref={inputRef}
+        type="color"
+        aria-label="Custom colour"
+        defaultValue={startColor}
+        onChange={(event) => setPreview(event.target.value)}
+        className="sr-only"
+      />
     </label>
   );
 }

@@ -68,7 +68,8 @@ export function AppearanceSection({ theme }: { theme: ThemeState }) {
   );
 }
 
-const EDITOR_OPTIONS: readonly { name: keyof EditorSettings; label: string; description: string }[] = [
+/** The editor's switches, in the order Settings and the editor's gear menu list them, with the same labels. */
+export const EDITOR_OPTIONS: readonly { name: keyof EditorSettings; label: string; description: string }[] = [
   { name: "lineNumbers", label: "Line numbers", description: "Numbers each line." },
   {
     name: "wordWrap",

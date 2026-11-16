@@ -20,8 +20,41 @@ export const DEFAULT_WORKSPACE_ICON: WorkspaceIcon = "folder";
 
 /** The design-system palette's hues. */
 export const WORKSPACE_COLORS = ["neutral", "indigo", "emerald", "amber", "rose"] as const;
-export type WorkspaceColor = (typeof WORKSPACE_COLORS)[number];
+export type PaletteColor = (typeof WORKSPACE_COLORS)[number];
+/** A colour the user picked, as six lowercase hex digits after a `#`. */
+export type CustomColor = `#${string}`;
+/** A palette hue by name, or a custom colour. */
+export type WorkspaceColor = PaletteColor | CustomColor;
 export const DEFAULT_WORKSPACE_COLOR: WorkspaceColor = "neutral";
+
+const CUSTOM_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
+
+/**
+ * Whether a colour is one of the palette's hues rather than a custom one.
+ *
+ * @param color - A workspace's colour.
+ * @returns Whether it is a palette name.
+ */
+export function isPaletteColor(color: WorkspaceColor): color is PaletteColor {
+  return (WORKSPACE_COLORS as readonly string[]).includes(color);
+}
+
+/**
+ * Reads a colour from storage or a picker: a palette name, or `#rrggbb` in either case, kept in
+ * lowercase. Anything else is the default.
+ *
+ * @param value - The stored or picked value.
+ * @returns The colour.
+ */
+export function parseWorkspaceColor(value: unknown): WorkspaceColor {
+  const palette = WORKSPACE_COLORS.find((color) => color === value);
+  if (palette) {
+    return palette;
+  }
+  return typeof value === "string" && CUSTOM_COLOR_PATTERN.test(value)
+    ? (value.toLowerCase() as CustomColor)
+    : DEFAULT_WORKSPACE_COLOR;
+}
 
 export const MAX_WORKSPACE_NAME_LENGTH = 80;
 const FALLBACK_WORKSPACE_NAME = "Untitled workspace";
@@ -104,7 +137,7 @@ function parseWorkspaceRecord(value: unknown): WorkspaceRecord | null {
     id: value.id,
     name: parseName(value.name) ?? FALLBACK_WORKSPACE_NAME,
     icon: parseIcon(value.icon),
-    color: parseColor(value.color),
+    color: parseWorkspaceColor(value.color),
     folderIds: [...value.folderIds],
     lastOpenedAt:
       typeof value.lastOpenedAt === "number" && Number.isFinite(value.lastOpenedAt) && value.lastOpenedAt >= 0
@@ -176,10 +209,6 @@ function parseName(value: unknown): string | null {
 
 function parseIcon(value: unknown): WorkspaceIcon {
   return WORKSPACE_ICONS.find((icon) => icon === value) ?? DEFAULT_WORKSPACE_ICON;
-}
-
-function parseColor(value: unknown): WorkspaceColor {
-  return WORKSPACE_COLORS.find((color) => color === value) ?? DEFAULT_WORKSPACE_COLOR;
 }
 
 export interface SessionTab {
@@ -271,7 +300,7 @@ export function parseWorkspaceFile(text: string, homeFolderName: string): Worksp
     details: {
       name: parseName(value.name) ?? parseName(homeFolderName) ?? FALLBACK_WORKSPACE_NAME,
       icon: parseIcon(value.icon),
-      color: parseColor(value.color),
+      color: parseWorkspaceColor(value.color),
       folders,
     },
   };

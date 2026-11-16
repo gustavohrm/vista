@@ -173,10 +173,14 @@ function AppShell({ adapter }: AppProps) {
   // past `md` would turn an open column into a drawer over the document, so the explorer closes
   // then, and widening brings back the column as the user left it, whatever the drawer did since.
   const isColumnOpenRef = useRef(isSidebarOpen);
+  const [isDesktop, setIsDesktop] = useState(isDesktopViewport);
+  // Whether the status bar is wanted, while there is a document for it to describe. Not remembered.
+  const [isStatusBarOpen, setIsStatusBarOpen] = useState(true);
   useEffect(
     () =>
-      onDesktopViewportChange((isDesktop) => {
-        if (isDesktop) {
+      onDesktopViewportChange((isWide) => {
+        setIsDesktop(isWide);
+        if (isWide) {
           setIsSidebarOpen(isColumnOpenRef.current);
         } else {
           isColumnOpenRef.current = isSidebarOpenRef.current;
@@ -1745,6 +1749,8 @@ function AppShell({ adapter }: AppProps) {
   }, []);
 
   const requestNewEntry = useCallback((kind: NewEntryRequest["kind"]) => {
+    // The name is typed in the explorer, so it comes back from behind Settings, as `showExplorer` does.
+    setSettingsSection(null);
     setIsSidebarOpen(true);
     setNewEntryRequest((previous) => ({ kind, serial: (previous?.serial ?? 0) + 1 }));
   }, []);
@@ -1843,6 +1849,17 @@ function AppShell({ adapter }: AppProps) {
   const isRawShown =
     documentInView !== null && (documentInView.viewMode !== "enriched" || activeViewer?.enriched === undefined);
   const isSettingsShown = settingsSection !== null;
+  // From `md` up Settings takes the explorer's place, so the two never show as two screens at once;
+  // closing Settings brings the explorer back as it was. Below `md` the drawer opens over Settings.
+  const isExplorerShown = isSidebarOpen && !(isDesktop && isSettingsShown);
+  const canToggleExplorer = !(isDesktop && isSettingsShown);
+  /** The document the status bar describes: none while Settings covers the frame. */
+  const statusDocument = documentInView?.isPending ? null : documentInView;
+  const isStatusBarShown = statusDocument !== null && isStatusBarOpen;
+  const showExplorer = useCallback(() => {
+    setSettingsSection(null);
+    setIsSidebarOpen(true);
+  }, []);
   useEffect(() => {
     // Below md the explorer drawer covers the frame, so it steps aside for Settings, however it opened.
     if (isSettingsShown && !isDesktopViewport()) {
@@ -2066,8 +2083,17 @@ function AppShell({ adapter }: AppProps) {
         id: "view.explorer",
         category: "View",
         label: "Explorer",
-        isChecked: isSidebarOpen,
+        isChecked: isExplorerShown,
+        isEnabled: canToggleExplorer,
         run: () => setIsSidebarOpen((previous) => !previous),
+      },
+      {
+        id: "view.statusBar",
+        category: "View",
+        label: "Status Bar",
+        isChecked: isStatusBarShown,
+        isEnabled: statusDocument !== null,
+        run: () => setIsStatusBarOpen((previous) => !previous),
       },
       {
         id: "view.rawText",
@@ -2180,7 +2206,10 @@ function AppShell({ adapter }: AppProps) {
       hasDirtyDocuments,
       isPromptingForUnsavedChanges,
       isRawShown,
-      isSidebarOpen,
+      isExplorerShown,
+      canToggleExplorer,
+      isStatusBarShown,
+      statusDocument,
       openFind,
       requestNewEntry,
       revealEntry,
@@ -2240,8 +2269,6 @@ function AppShell({ adapter }: AppProps) {
   const handleJumpApplied = useCallback(() => setPendingJump(null), []);
   const activeCursor = isRawShown && cursor?.key === documentInView.key ? cursor.position : null;
   const activeVimMode = isRawShown && vimMode?.key === documentInView.key ? vimMode.mode : null;
-  /** The document the status bar describes: none while Settings covers the frame. */
-  const statusDocument = documentInView?.isPending ? null : documentInView;
   // Settings shows the workspace's section only while a workspace is open.
   const shownSettingsSection = settingsSection === "workspace" && !currentWorkspace ? "appearance" : settingsSection;
 
@@ -2271,6 +2298,30 @@ function AppShell({ adapter }: AppProps) {
                 />
               }
               goToFileShortcut={GO_TO_FILE_SHORTCUT}
+              panels={[
+                {
+                  label: "Toggle Explorer",
+                  icon: isExplorerShown ? (
+                    <i className="ic-panel-left" aria-hidden="true" />
+                  ) : (
+                    <i className="ic-panel-left-dashed" aria-hidden="true" />
+                  ),
+                  isShown: isExplorerShown,
+                  isEnabled: workspace !== null && canToggleExplorer,
+                  onToggle: () => setIsSidebarOpen((previous) => !previous),
+                },
+                {
+                  label: "Toggle Status Bar",
+                  icon: isStatusBarShown ? (
+                    <i className="ic-panel-bottom" aria-hidden="true" />
+                  ) : (
+                    <i className="ic-panel-bottom-dashed" aria-hidden="true" />
+                  ),
+                  isShown: isStatusBarShown,
+                  isEnabled: statusDocument !== null,
+                  onToggle: () => setIsStatusBarOpen((previous) => !previous),
+                },
+              ]}
             />
           </ShellReveal>
         )}
@@ -2280,8 +2331,8 @@ function AppShell({ adapter }: AppProps) {
           {workspace && (
             <ShellReveal key="rail" axis="width">
               <ActivityRail
-                isExplorerOpen={isSidebarOpen}
-                onToggleExplorer={() => setIsSidebarOpen((previous) => !previous)}
+                isExplorerCurrent={!isSettingsShown}
+                onShowExplorer={showExplorer}
                 isSettingsOpen={settingsSection !== null}
                 onToggleSettings={toggleSettings}
               />
@@ -2303,7 +2354,7 @@ function AppShell({ adapter }: AppProps) {
                 onSelectFile={handleSelectFile}
                 onAddFolder={() => void handleAddFolder()}
                 isLoading={isLoading}
-                isOpen={isSidebarOpen}
+                isOpen={isExplorerShown}
                 onClose={() => setIsSidebarOpen(false)}
                 onCreateFile={handleCreateFile}
                 onCreateDirectory={handleCreateDirectory}
@@ -2329,8 +2380,10 @@ function AppShell({ adapter }: AppProps) {
             closes up on each side where a panel meets the frame. */}
         <div
           className={`flex min-w-0 flex-1 flex-col transition-[padding] duration-300 ease-(--ease-move) motion-reduce:transition-none md:pr-2 ${
-            workspace && isSidebarOpen ? "" : "md:pl-2"
-          } ${currentWorkspace ? "" : "md:pt-2"} ${statusDocument ? "" : "md:pb-2"}`}
+            // The rail's glyphs sit as far from the frame as from the window's edge, so the frame
+            // needs no margin of its own beside the rail, with the explorer open or not.
+            workspace ? "" : "md:pl-2"
+          } ${currentWorkspace ? "" : "md:pt-2"} ${isStatusBarShown ? "" : "md:pb-2"}`}
         >
           <div className="bg-frame md:border-line md:rounded-frame flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:border">
             {shownSettingsSection !== null && (
@@ -2392,6 +2445,9 @@ function AppShell({ adapter }: AppProps) {
                       onViewModeChange={handleViewModeChange}
                       isFindOpen={find !== null}
                       onFind={() => openFind("find")}
+                      editorSettings={settings.editor}
+                      onEditorSettingsChange={(editor) => updateSettings({ editor })}
+                      onOpenEditorSettings={() => setSettingsSection("editor")}
                     />
                   )
                 }
@@ -2431,7 +2487,7 @@ function AppShell({ adapter }: AppProps) {
             </div>
           </div>
           <AnimatePresence initial={false}>
-            {statusDocument && (
+            {isStatusBarShown && statusDocument && (
               <ShellReveal key="status-bar" axis="height">
                 <StatusBar
                   activeFile={statusDocument}

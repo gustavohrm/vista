@@ -1,4 +1,14 @@
-import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FocusEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 
 import { formatShortcut } from "../../commands/shortcuts";
 
@@ -20,12 +30,6 @@ interface TooltipProps {
   shortcut?: string;
   /** Side of the trigger the bubble opens on. */
   position: "top" | "bottom" | "left" | "right";
-  /**
-   * Horizontal alignment of a `top` or `bottom` bubble. `"end"` lines the bubble up with the
-   * trigger's right edge and `"start"` with its left edge, for controls near an edge of the
-   * window, where a centered bubble would overflow. Defaults to centered.
-   */
-  align?: "center" | "start" | "end";
   /** Extra layout classes for the wrapper, such as `flex` or `flex-none`. */
   className?: string;
   /** Renders the trigger, given the bubble's id for the trigger's `aria-describedby`. */
@@ -45,32 +49,77 @@ const SIDE_CLASS = {
   right: "left-full ml-1.5 top-1/2 -translate-y-1/2 origin-left before:right-full before:inset-y-0 before:w-[7px]",
 } as const;
 
-const ALIGN_CLASS = {
-  center: "left-1/2 -translate-x-1/2",
-  start: "left-0",
-  end: "right-0",
-} as const;
+/** The least room a bubble keeps from the window's edges, in pixels. */
+const VIEWPORT_MARGIN_PX = 8;
 
-const ORIGIN_CLASS = {
-  top: { center: "origin-bottom", start: "origin-bottom-left", end: "origin-bottom-right" },
-  bottom: { center: "origin-top", start: "origin-top-left", end: "origin-top-right" },
-} as const;
+/**
+ * Where a `top` or `bottom` bubble starts, in viewport pixels. It is centered on the trigger
+ * whenever that fits in the window, however close the trigger is to an edge. When it does not fit,
+ * it lines up with the trigger's edge on the crowded side, and only a bubble wider than that allows
+ * is pushed in from the window's edge.
+ *
+ * @param trigger - The trigger's left edge and width, in viewport pixels.
+ * @param bubbleWidth - The bubble's width.
+ * @param viewportWidth - The window's width.
+ * @returns The bubble's left edge.
+ */
+export function placeBubble(
+  trigger: { left: number; width: number },
+  bubbleWidth: number,
+  viewportWidth: number,
+): number {
+  const min = VIEWPORT_MARGIN_PX;
+  const max = viewportWidth - VIEWPORT_MARGIN_PX - bubbleWidth;
+  const centered = trigger.left + (trigger.width - bubbleWidth) / 2;
+  if (centered >= min && centered <= max) {
+    return centered;
+  }
+  // Flush with the trigger even when the trigger itself sits inside the margin, so the two line up.
+  const aligned = centered < min ? trigger.left : trigger.left + trigger.width - bubbleWidth;
+  if (aligned >= 0 && aligned <= viewportWidth - bubbleWidth) {
+    return aligned;
+  }
+  return Math.max(min, Math.min(centered, max));
+}
 
 /**
  * A control's name in a small bubble beside it. It shows after the pointer rests on the control
  * for a moment, or at once when the previous tooltip has just hidden, and at once when keyboard
  * focus reaches the control, so keyboard users see the names of icon-only buttons too. It stays while
- * the pointer is on the bubble. A click or
- * Escape hides it until the pointer enters again or focus leaves, so a clicked button doesn't keep
+ * the pointer is on the bubble. A bubble above or below is centered on the control unless that would
+ * cross the window's edge, as `placeBubble` describes. A click or Escape hides it until the pointer enters again or focus leaves, so a clicked button doesn't keep
  * its bubble. It grows in from the control and is instant with reduced motion. The bubble is always
  * in the document, so the trigger's `aria-describedby` names it whether or not it shows.
  *
  * @param props - Tooltip properties.
  * @returns The trigger wrapped with its bubble.
  */
-export function Tooltip({ text, shortcut, position, align = "center", className, children }: TooltipProps) {
+export function Tooltip({ text, shortcut, position, className, children }: TooltipProps) {
   const bubbleId = useId();
   const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef<HTMLSpanElement>(null);
+  const bubbleRef = useRef<HTMLSpanElement>(null);
+  const isHorizontal = position === "top" || position === "bottom";
+  // The bubble's left edge and the point it grows from, relative to the wrapper; measured as it opens.
+  const [placement, setPlacement] = useState<{ left: number; originX: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const wrapper = wrapperRef.current;
+    const bubble = bubbleRef.current;
+    if (!isOpen || !isHorizontal || !wrapper || !bubble) {
+      return;
+    }
+    const place = () => {
+      const trigger = wrapper.getBoundingClientRect();
+      // `offsetWidth` ignores the scale the bubble grows from, so it is the width it settles at.
+      const left = placeBubble(trigger, bubble.offsetWidth, document.documentElement.clientWidth) - trigger.left;
+      setPlacement({ left, originX: trigger.width / 2 - left });
+    };
+    place();
+    // A resized window can move the control or narrow the room beside it while the bubble shows.
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [isOpen, isHorizontal, text, shortcut]);
   const isDismissedRef = useRef(false);
   const timerRef = useRef(0);
 
@@ -143,12 +192,20 @@ export function Tooltip({ text, shortcut, position, align = "center", className,
   };
 
   const side = SIDE_CLASS[position];
-  const placement =
-    position === "top" || position === "bottom" ? `${ALIGN_CLASS[align]} ${ORIGIN_CLASS[position][align]}` : "";
+  // Until it is measured, the bubble is centered on the trigger.
+  const bubbleStyle: CSSProperties | undefined = isHorizontal
+    ? placement
+      ? {
+          left: placement.left,
+          transformOrigin: `${placement.originX}px ${position === "top" ? "100%" : "0"}`,
+        }
+      : { left: "50%", translate: "-50% 0", transformOrigin: position === "top" ? "50% 100%" : "50% 0" }
+    : undefined;
 
   return (
     // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- the handlers only show and hide the bubble; the trigger inside is the interactive element
     <span
+      ref={wrapperRef}
       className={`relative ${className ?? "inline-flex"}`}
       data-tooltip-open={isOpen ? "" : undefined}
       onPointerEnter={handlePointerEnter}
@@ -160,9 +217,11 @@ export function Tooltip({ text, shortcut, position, align = "center", className,
     >
       {children(bubbleId)}
       <span
+        ref={bubbleRef}
         role="tooltip"
         id={bubbleId}
-        className={`bg-pop border-line-strong text-text-strong shadow-float absolute z-50 flex min-h-6 w-max max-w-[min(48rem,calc(100vw-2rem))] items-center gap-2 rounded-md border px-2 py-0.5 text-xs leading-4 font-normal break-all whitespace-normal transition-[opacity,scale,visibility] ease-(--ease-enter) before:absolute before:content-[''] motion-reduce:transition-none ${side} ${placement} ${
+        style={bubbleStyle}
+        className={`bg-pop border-line-strong text-text-strong shadow-float absolute z-50 flex min-h-6 w-max max-w-[min(48rem,calc(100vw-2rem))] items-center gap-2 rounded-md border px-2 py-0.5 text-xs leading-4 font-normal break-all whitespace-normal transition-[opacity,scale,visibility] ease-(--ease-enter) before:absolute before:content-[''] motion-reduce:transition-none ${side} ${
           isOpen ? "visible scale-100 opacity-100 duration-150" : "invisible scale-96 opacity-0 duration-100"
         }`}
       >

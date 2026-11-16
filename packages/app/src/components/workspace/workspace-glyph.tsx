@@ -1,9 +1,9 @@
 import type { CSSProperties, ReactNode } from "react";
 
-import type { WorkspaceColor, WorkspaceIcon } from "../../domain/workspaces";
+import { isPaletteColor, type PaletteColor, type WorkspaceColor, type WorkspaceIcon } from "../../domain/workspaces";
 
 // Each hue reads on both themes: the darker step on light backgrounds, the lighter one on dark.
-const COLOR_STYLES: Record<WorkspaceColor, CSSProperties | undefined> = {
+const COLOR_STYLES: Record<PaletteColor, CSSProperties | undefined> = {
   neutral: undefined,
   indigo: { color: "light-dark(var(--color-indigo-600), var(--color-indigo-300))" },
   emerald: { color: "light-dark(var(--color-emerald-700), var(--color-emerald-300))" },
@@ -24,7 +24,7 @@ interface WorkspaceGlyphProps {
  * rewrites literal `ic-*` classes.
  */
 export function WorkspaceGlyph({ icon, color, isTile = false, className = "" }: WorkspaceGlyphProps) {
-  const style = COLOR_STYLES[color];
+  const style = isPaletteColor(color) ? COLOR_STYLES[color] : customColorStyle(color);
   const tone = style ? "" : "text-text-secondary";
   // The tile's fill is the icon's own colour, faded, so each colour needs no second value.
   const tile = isTile
@@ -61,4 +61,19 @@ export function WorkspaceGlyph({ icon, color, isTile = false, className = "" }: 
     case "globe":
       return wrap(<i className="ic-globe" aria-hidden="true" />);
   }
+}
+
+/** OKLCH lightness bounds that keep a custom glyph at 3:1 or more against the light and dark surfaces. */
+const MAX_LIGHTNESS_ON_LIGHT = 0.6;
+const MIN_LIGHTNESS_ON_DARK = 0.62;
+
+/**
+ * A picked colour, shaded the way the palette's steps are: toward black on light backgrounds and
+ * toward white on dark ones. Its lightness is then capped on light backgrounds and floored on dark
+ * ones, so even white or black keeps at least 3:1 against the surface.
+ */
+function customColorStyle(color: WorkspaceColor): CSSProperties {
+  const light = `oklch(from color-mix(in oklab, ${color} 80%, black) min(l, ${MAX_LIGHTNESS_ON_LIGHT}) c h)`;
+  const dark = `oklch(from color-mix(in oklab, ${color} 70%, white) max(l, ${MIN_LIGHTNESS_ON_DARK}) c h)`;
+  return { color: `light-dark(${light}, ${dark})` };
 }

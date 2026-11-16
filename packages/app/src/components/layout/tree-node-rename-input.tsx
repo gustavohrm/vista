@@ -91,7 +91,7 @@ export function TreeEntryNameInput({
           aria-label="Entry name"
           aria-invalid={error !== null}
           aria-describedby={error !== null ? errorId : undefined}
-          className="ipt h-6 min-h-0 min-w-0 flex-1 px-1 py-0 text-[13px]"
+          className="ipt ghost edgeless inline-field h-6 min-h-0 min-w-0 flex-1 px-1 py-0 text-[13px]"
         />
       </div>
       {error && (

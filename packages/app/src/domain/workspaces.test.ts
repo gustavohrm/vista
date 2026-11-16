@@ -7,6 +7,7 @@ import {
   MAX_WORKSPACE_NAME_LENGTH,
   findWorkspaceForFolder,
   parseSession,
+  parseWorkspaceColor,
   parseWorkspaceFile,
   parseWorkspaceList,
   serializeWorkspaceFile,
@@ -169,6 +170,25 @@ describe("findWorkspaceForFolder", () => {
     };
 
     expect(findWorkspaceForFolder(list, "f1")?.id).toBe("new");
+  });
+});
+
+describe("parseWorkspaceColor", () => {
+  it.each([
+    ["a palette hue", "indigo", "indigo"],
+    ["a custom colour, in lowercase", "#FF8800", "#ff8800"],
+    ["a short hex colour", "#f80", DEFAULT_WORKSPACE_COLOR],
+    ["a colour name outside the palette", "blue", DEFAULT_WORKSPACE_COLOR],
+    ["a hex colour with alpha", "#ff880080", DEFAULT_WORKSPACE_COLOR],
+    ["a number", 42, DEFAULT_WORKSPACE_COLOR],
+  ])("reads %s", (_case, value, expected) => {
+    expect(parseWorkspaceColor(value)).toBe(expected);
+  });
+
+  it("keeps a custom colour in the workspace file", () => {
+    const text = JSON.stringify({ version: 1, name: "Research", icon: "star", color: "#3a7bd5", folders: ["."] });
+
+    expect(parseWorkspaceFile(text, "home")).toMatchObject({ status: "ok", details: { color: "#3a7bd5" } });
   });
 });
 
