@@ -25,6 +25,19 @@ describe("parseSettings", () => {
     expect(parseSettings(stored)).toEqual({ ...DEFAULT_SETTINGS, files: { maxOpenSizeMb: 50 } });
   });
 
+  it("reads the stored update setting", () => {
+    const stored = JSON.stringify({ version: 1, updates: { checkAtStartup: true } });
+
+    expect(parseSettings(stored)).toEqual({ ...DEFAULT_SETTINGS, updates: { checkAtStartup: true } });
+  });
+
+  it.each([
+    ["missing, as in settings stored before it existed", { version: 1, editor: { vim: true } }],
+    ["mistyped", { version: 1, updates: { checkAtStartup: "yes" } }],
+  ])("leaves startup update checks off when the setting is %s", (_case, stored) => {
+    expect(parseSettings(JSON.stringify(stored)).updates).toEqual({ checkAtStartup: false });
+  });
+
   it("keeps the stored editor settings when the file settings are damaged", () => {
     const stored = JSON.stringify({ version: 1, editor: { vim: true }, files: "big" });
 

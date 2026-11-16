@@ -224,7 +224,7 @@ export function ShortcutsSection({ commands }: { commands: readonly Command[] })
   );
 }
 
-interface AboutSectionProps {
+interface AboutSectionProps extends SettingsSectionProps {
   platform: string;
   version: string;
   onCheckForUpdates?: () => Promise<void>;
@@ -236,8 +236,9 @@ interface AboutSectionProps {
  * @param props - AboutSection properties.
  * @returns Section content.
  */
-export function AboutSection({ platform, version, onCheckForUpdates }: AboutSectionProps) {
+export function AboutSection({ platform, version, onCheckForUpdates, settings, onChange }: AboutSectionProps) {
   const [isChecking, setIsChecking] = useState(false);
+  const checkAtStartupId = useId();
 
   const checkForUpdates = async () => {
     if (!onCheckForUpdates) {
@@ -274,6 +275,21 @@ export function AboutSection({ platform, version, onCheckForUpdates }: AboutSect
             </button>
           )}
         </SettingsRow>
+        {onCheckForUpdates && (
+          <SettingsRow
+            label="Check at startup"
+            htmlFor={checkAtStartupId}
+            description="Asks vista.coden.dev for a newer version each time Vista starts. Check for Updates works either way."
+            descriptionId={`${checkAtStartupId}-description`}
+          >
+            <Switch
+              id={checkAtStartupId}
+              checked={settings.updates.checkAtStartup}
+              onChange={(checked) => onChange({ updates: { checkAtStartup: checked } })}
+              describedBy={`${checkAtStartupId}-description`}
+            />
+          </SettingsRow>
+        )}
       </SettingsGroup>
     </>
   );

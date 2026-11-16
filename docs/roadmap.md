@@ -12,7 +12,7 @@ Durable direction for Vista: the current focus, what is planned, what is possibl
 
 ## Current Focus
 
-- **Opt-in update checks on desktop.** The desktop app checks for updates at every startup with no way to turn it off, which the security guidelines record as a temporary exception to their rule on outbound calls. Update checks become opt-in, tracked in [issue #34](https://github.com/gustavohrm/vista/issues/34). Source: `docs/guidelines/security.md`, "Outbound calls and dependencies".
+- None at the moment. The next focus is chosen from [Planned](#planned).
 
 ## Planned
 
