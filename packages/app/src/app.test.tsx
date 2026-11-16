@@ -481,13 +481,10 @@ describe("App", () => {
     // Click data.csv
     await user.click(screen.getByText("data.csv"));
 
-    // Toggle to enriched mode
-    const enrichedBtn = screen.getByRole("button", { name: "Table" });
-    await user.click(enrichedBtn);
-
-    // Should display table actions and cells
+    // A CSV file opens in the table.
+    expect(screen.getByRole("button", { name: "Table" })).toHaveAttribute("aria-pressed", "true");
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Add Row" })).toBeVisible();
+      expect(screen.getByRole("textbox", { name: "Column 1 name" })).toHaveValue("Name");
       expect(screen.getByDisplayValue("Alice")).toBeVisible();
     });
 
@@ -1876,6 +1873,7 @@ describe("App", () => {
 
       await user.click(screen.getByText("readme.md"));
       await user.click(screen.getByText("data.csv"));
+      await user.click(screen.getByRole("button", { name: "Raw" }));
 
       expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["readme.md", "data.csv"]);
       expect(getTab("data.csv")).toHaveAttribute("aria-selected", "true");
@@ -1932,6 +1930,7 @@ describe("App", () => {
       await makeReadmeDirty(user);
 
       await user.click(screen.getByText("data.csv"));
+      await user.click(screen.getByRole("button", { name: "Raw" }));
       await screen.findByRole("textbox", { name: /Raw text content of data\.csv/i });
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
@@ -2772,6 +2771,7 @@ describe("App", () => {
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
       await makeReadmeDirty(user);
       await user.click(screen.getByText("data.csv"));
+      await user.click(screen.getByRole("button", { name: "Raw" }));
       await appendToRawEditor(user, await screen.findByRole("textbox", { name: "Raw text content of data.csv" }), "!");
 
       await runFromPalette(user, "File: Save All");
@@ -3125,6 +3125,7 @@ describe("App", () => {
     render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
     await makeReadmeDirty(user);
     await user.click(screen.getByText("data.csv"));
+    await user.click(screen.getByRole("button", { name: "Raw" }));
     await appendToRawEditor(user, await screen.findByRole("textbox", { name: "Raw text content of data.csv" }), "!");
 
     await runFromPalette(user, "Tabs: Close All Tabs");

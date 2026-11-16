@@ -123,13 +123,17 @@ A list Vista can only partly read, such as one that is not valid JSON or holds a
 
 The initial format targets in v1 are `.txt`, `.md`, and `.csv`:
 
-| Format | Raw View                   | Enriched View                                                                   |
-| :----- | :------------------------- | :------------------------------------------------------------------------------ |
-| `.txt` | Plain-text editor          | None; plain text has only the raw view                                          |
-| `.md`  | Plain-text Markdown editor | WYSIWYG editable rendering (Milkdown), styled against `@codenhub/styles` tokens |
-| `.csv` | Plain-text CSV editor      | Interactive data table with in-place cell editing                               |
+| Format | Raw View                   | Enriched View                                                                     |
+| :----- | :------------------------- | :-------------------------------------------------------------------------------- |
+| `.txt` | Plain-text editor          | None; plain text has only the raw view                                            |
+| `.md`  | Plain-text Markdown editor | WYSIWYG editable rendering (Milkdown), styled against `@codenhub/styles` tokens   |
+| `.csv` | Plain-text CSV editor      | Interactive data table with in-place cell editing; the first record is the header |
 
 Future versions will expand to `.json`, `.yaml`, canvas representations, and embedded graph links.
+
+### CSV table
+
+The table treats the first record as the header: its cells are the column names, edited in place like any other cell, and the rows below are numbered from 1. A line break at the end of the file ends the last record rather than starting an empty one, so the table shows no empty row for it, and the table writes the file back with that final line break and with the file's own line breaks. **Add column**, a plus at the end of the header, adds an empty column after the last one; **Add row**, under the table, adds an empty row after the last one, so each control sits where its result appears. Cells use the interface's 13px text, as in a spreadsheet, not the document's reading size.
 
 ### Markdown WYSIWYG editing
 
@@ -255,7 +259,7 @@ Right-clicking opens a menu built the same way. The explorer's menu is described
 
 Every opened file gets its own tab, and selecting a file that is already open switches to its tab instead of reloading it. There are no preview tabs: a tab stays until the user closes it. A new tab opens to the right of the active one. Closing the active tab shows its right neighbor, or its left neighbor when it was the last tab.
 
-- Each tab remembers its own view mode. Markdown opens in the rendered view; CSV and plain text open raw. Which views a format offers comes from the viewer registry in `packages/app/src/domain/viewers.ts`, so a later format with no raw form, such as PDF, hides the toggle.
+- Each tab remembers its own view mode. Markdown opens in the rendered view and CSV in the table, since a table is what a CSV file is read as; plain text opens raw. Which views a format offers comes from the viewer registry in `packages/app/src/domain/viewers.ts`, so a later format with no raw form, such as PDF, hides the toggle.
 - A tab closes from its Close button, a middle click, or the Close Tab shortcut: `Ctrl+W` on native and `Alt+W` on the web, because browsers reserve `Ctrl+W` for closing their own tab. Arrow keys move between tabs.
 - **Reordering.** Dragging a tab moves it: the tab follows the pointer along the row, never out of it, and the tabs it passes slide aside to open the place it will land in, so the new order is visible before the drop. On release it slides into that place; Escape slides everything back. The strip scrolls when the drag nears its edge. The dragged tab has no shadow, since it stays in the row rather than lifting off it. A separate marker was dropped because the row itself showing the result needs no legend. With a tab focused, `Shift+ArrowLeft` and `Shift+ArrowRight` move it one place, and **Move Tab Left** and **Move Tab Right** in the palette do the same, so reordering does not need a pointer. The order is part of the workspace's [session](#sessions).
 - **Names.** A tab shows the file name. When two open tabs have the same file name, each adds its folder, as in `readme.md · notes`, so they can be told apart; its tooltip is the path the [path bar](#path-and-status-bar) shows.

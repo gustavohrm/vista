@@ -14,4 +14,27 @@ describe("CsvTableEditor", () => {
 
     expect(onChange).toHaveBeenLastCalledWith('"a\r\nb",c\nx,yz');
   });
+
+  it("edits the first record as the header, and shows no row for the final line break", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<CsvTableEditor content={"Name,Age\nAda,36\n"} onChange={onChange} />);
+
+    expect(screen.getByRole("textbox", { name: "Column 1 name" })).toHaveValue("Name");
+    expect(screen.getAllByRole("row")).toHaveLength(2);
+    await user.type(screen.getByRole("textbox", { name: "Age, row 1" }), "5");
+
+    expect(onChange).toHaveBeenLastCalledWith("Name,Age\nAda,365\n");
+  });
+
+  it("adds a row under the last one and a column after the last one", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<CsvTableEditor content={"Name,Age\nAda,36\n"} onChange={onChange} />);
+
+    await user.click(screen.getByRole("button", { name: "Add row" }));
+    expect(onChange).toHaveBeenLastCalledWith("Name,Age\nAda,36\n,\n");
+    await user.click(screen.getByRole("button", { name: "Add column" }));
+    expect(onChange).toHaveBeenLastCalledWith("Name,Age,\nAda,36,\n");
+  });
 });

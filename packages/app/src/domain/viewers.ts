@@ -15,7 +15,7 @@ const RAW_ONLY: ViewerDefinition = { hasRaw: true, defaultMode: "raw" };
 
 const VIEWERS_BY_KIND: Readonly<Partial<Record<ReturnType<typeof getFileKind>, ViewerDefinition>>> = {
   markdown: { hasRaw: true, enriched: "markdown", defaultMode: "enriched" },
-  csv: { hasRaw: true, enriched: "csv-table", defaultMode: "raw" },
+  csv: { hasRaw: true, enriched: "csv-table", defaultMode: "enriched" },
 };
 
 export function getViewer(extension: string): ViewerDefinition {

@@ -53,10 +53,10 @@ describe("documentsReducer", () => {
     expect(state.activeKey).toBe(documentKey(WS, "notes/todo.md"));
   });
 
-  it("opens CSV and plain text in raw mode", () => {
+  it("opens CSV in the table and plain text raw", () => {
     const state = openAll("data.csv", "a.txt");
 
-    expect(state.documents.map((doc) => doc.viewMode)).toEqual(["raw", "raw"]);
+    expect(state.documents.map((doc) => doc.viewMode)).toEqual(["enriched", "raw"]);
   });
 
   it("activates the existing tab instead of reloading a document that is already open", () => {
