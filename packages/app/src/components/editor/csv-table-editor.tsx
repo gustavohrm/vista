@@ -109,7 +109,9 @@ export function CsvTableEditor({ content, onChange }: CsvTableEditorProps) {
   const columns = Array.from({ length: columnCount }, (_, colIndex) => colIndex);
 
   return (
-    <div ref={scrollRef} className="csv-table text-text h-full w-full overflow-auto px-1.5 pt-1.5 pb-3">
+    // No top padding: the tabs row already leaves 6px below its tabs, the same as the 6px at the
+    // frame's edges, so the table sits as far from the tabs as the tabs and table sit from the edge.
+    <div ref={scrollRef} className="csv-table text-text h-full w-full overflow-auto px-1.5 pb-3">
       <div className="table-wrap w-fit max-w-none">
         <table className="data-table ruled edged">
           <thead>
