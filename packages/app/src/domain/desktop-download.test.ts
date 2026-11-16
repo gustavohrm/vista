@@ -9,17 +9,12 @@ describe("desktopDownloadFor", () => {
     ).toEqual({ label: "Download for Windows", href: "/download/windows" });
   });
 
-  it("offers the AppImage on desktop Linux whose user agent names its processor, as Firefox's does", () => {
-    expect(desktopDownloadFor("Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0")).toEqual({
-      label: "Download for Linux",
-      href: "/download/linux",
-    });
-  });
-
-  it("offers nothing to Chromium on Linux that reports no processor, since its user agent says x86_64 on ARM too", () => {
-    expect(
-      desktopDownloadFor("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/142.0.0.0 Safari/537.36"),
-    ).toBeNull();
+  // Both name `Linux x86_64` on ARM too, so with no reported processor the offer names the build's.
+  it.each([
+    ["Firefox", "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"],
+    ["Chromium", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/142.0.0.0 Safari/537.36"],
+  ])("offers the AppImage, naming its x86_64 build, to %s on Linux that reports no processor", (_name, userAgent) => {
+    expect(desktopDownloadFor(userAgent)).toEqual({ label: "Download for Linux (x86_64)", href: "/download/linux" });
   });
 
   const REDUCED_LINUX_CHROME = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/142.0.0.0 Safari/537.36";

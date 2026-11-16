@@ -2942,9 +2942,8 @@ interface NavigatorWithClientHints {
 /**
  * Asks the browser for its processor, which Chromium leaves out of its user agent.
  *
- * @returns The processor; an unknown one where the browser has client hints but they give no answer,
- *   since its user agent may then name x86_64 on ARM; or null where the browser has none, such as
- *   Firefox, whose user agent names its real processor.
+ * @returns The processor, or null where the browser does not say, such as Firefox, or Chromium on a
+ *   non-secure origin or under a Permissions Policy that blocks it.
  */
 async function readCpuArchitecture(): Promise<CpuArchitecture | null> {
   const clientHints = (navigator as NavigatorWithClientHints).userAgentData;
@@ -2954,12 +2953,8 @@ async function readCpuArchitecture(): Promise<CpuArchitecture | null> {
   try {
     const { architecture, bitness } = await clientHints.getHighEntropyValues(["architecture", "bitness"]);
     // Chromium answers with empty strings where it cannot tell.
-    return architecture && bitness ? { architecture, bitness } : UNKNOWN_CPU;
+    return architecture && bitness ? { architecture, bitness } : null;
   } catch {
-    // A Permissions Policy can block the values.
-    return UNKNOWN_CPU;
+    return null;
   }
 }
-
-/** A processor the browser would not name, which no desktop build is offered for. */
-const UNKNOWN_CPU: CpuArchitecture = { architecture: "unknown", bitness: "unknown" };

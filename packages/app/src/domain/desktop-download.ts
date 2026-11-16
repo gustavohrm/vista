@@ -16,22 +16,24 @@ export interface CpuArchitecture {
  * desktop Linux have a build; Linux gets the AppImage, which needs no package manager.
  *
  * @param userAgent - The browser's `navigator.userAgent`.
- * @param cpu - The processor the browser reports, where it reports one. Chromium's user agent names
- *   `Linux x86_64` on every Linux, ARM included, so where this is known it decides the architecture.
- * @returns The download, or null on a system with no desktop build, such as macOS, ARM Linux, or a phone.
+ * @param cpu - The processor the browser reports, where it reports one. Chromium's and Firefox's
+ *   user agents both name `Linux x86_64` on every Linux, ARM included, so where this is known it
+ *   decides the architecture; where it is not, the Linux offer names the build's, so the user can judge.
+ * @returns The download, or null on a system with no desktop build, such as macOS, ARM Linux the
+ *   browser reports, or a phone.
  */
 export function desktopDownloadFor(userAgent: string, cpu: CpuArchitecture | null = null): DesktopDownload | null {
   if (/Windows NT/.test(userAgent)) {
     return { label: "Download for Windows", href: "/download/windows" };
   }
-  // Releases hold only `linux-x86_64-*` builds, so an ARM or 32-bit Linux browser gets nothing.
-  // Without a reported processor only a user agent that names its real one can decide, which Chromium's,
-  // reduced to `Linux x86_64` on every Linux, does not; it reports none on a non-secure origin.
-  const isX86_64 = cpu
-    ? cpu.architecture === "x86" && cpu.bitness === "64"
-    : /Linux (?:x86_64|amd64)/.test(userAgent) && !/Chrome\//.test(userAgent);
-  if (/Linux/.test(userAgent) && isX86_64 && !/Android|CrOS/.test(userAgent)) {
-    return { label: "Download for Linux", href: "/download/linux" };
+  // Releases hold only `linux-x86_64-*` builds.
+  if (!/Linux (?:x86_64|amd64)/.test(userAgent) || /Android|CrOS/.test(userAgent)) {
+    return null;
   }
-  return null;
+  if (!cpu) {
+    return { label: "Download for Linux (x86_64)", href: "/download/linux" };
+  }
+  return cpu.architecture === "x86" && cpu.bitness === "64"
+    ? { label: "Download for Linux", href: "/download/linux" }
+    : null;
 }

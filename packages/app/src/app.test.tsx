@@ -2801,27 +2801,44 @@ describe("App", () => {
     });
 
     it.each([
-      ["reports an ARM processor", () => Promise.resolve({ architecture: "arm", bitness: "64" })],
-      ["cannot name its processor", () => Promise.resolve({ architecture: "", bitness: "" })],
-      ["is blocked from naming its processor", () => Promise.reject(new DOMException("Blocked", "NotAllowedError"))],
-    ])("offers no download when Chromium on Linux, whose user agent says x86_64, %s", async (_case, answer) => {
-      vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/142.0.0.0 Safari/537.36",
-      );
-      const getHighEntropyValues = vi.fn(answer);
-      Object.defineProperty(navigator, "userAgentData", { value: { getHighEntropyValues }, configurable: true });
-      try {
-        render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
-        await screen.findByRole("button", { name: "Open Folder…" });
-        await waitFor(() => expect(getHighEntropyValues).toHaveBeenCalled());
-        // Let the reported processor reach the screen before checking it offers nothing.
-        await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+      ["reports an ARM processor", () => Promise.resolve({ architecture: "arm", bitness: "64" }), null],
+      [
+        "reports an x86_64 processor",
+        () => Promise.resolve({ architecture: "x86", bitness: "64" }),
+        "Download for Linux",
+      ],
+      [
+        "cannot name its processor",
+        () => Promise.resolve({ architecture: "", bitness: "" }),
+        "Download for Linux (x86_64)",
+      ],
+      [
+        "is blocked from naming its processor",
+        () => Promise.reject(new DOMException("Blocked", "NotAllowedError")),
+        "Download for Linux (x86_64)",
+      ],
+    ])(
+      "offers the matching download when Chromium on Linux, whose user agent says x86_64, %s",
+      async (_case, answer, label) => {
+        vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/142.0.0.0 Safari/537.36",
+        );
+        const getHighEntropyValues = vi.fn(answer);
+        Object.defineProperty(navigator, "userAgentData", { value: { getHighEntropyValues }, configurable: true });
+        try {
+          render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+          await screen.findByRole("button", { name: "Open Folder…" });
+          await waitFor(() => expect(getHighEntropyValues).toHaveBeenCalled());
+          // Let the reported processor reach the screen before checking what it offers.
+          await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
 
-        expect(screen.queryByRole("link", { name: /Download for/ })).not.toBeInTheDocument();
-      } finally {
-        Reflect.deleteProperty(navigator, "userAgentData");
-      }
-    });
+          const links = screen.queryAllByRole("link", { name: /Download for/ }).map((link) => link.textContent);
+          expect(links).toEqual(label ? [label] : []);
+        } finally {
+          Reflect.deleteProperty(navigator, "userAgentData");
+        }
+      },
+    );
 
     it("offers no download in the desktop app", async () => {
       vi.spyOn(navigator, "userAgent", "get").mockReturnValue(WINDOWS_CHROME);
