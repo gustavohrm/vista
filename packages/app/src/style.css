@@ -133,8 +133,9 @@ body,
   @apply border-border bg-surface text-text-secondary inline-flex max-w-full items-center gap-1.5 rounded-sm border border-dashed px-2 py-1 align-bottom text-xs;
 }
 
-/* The icon build writes JSX attribute names (strokeWidth, strokeLinecap) into the placeholder's
-   innerHTML string, where HTML parsing ignores them; this restores the stroke the other icons get. */
+/* Workaround for codenhub/codenhub#561: the icon wrapper in the Vite configs writes JSX attribute
+   names (strokeWidth, strokeLinecap) into the placeholder's innerHTML string, where HTML parsing
+   drops them; this restores the stroke the other icons get. */
 .markdown-editor .ProseMirror .markdown-image-placeholder svg g {
   stroke-width: 2;
   stroke-linecap: round;
