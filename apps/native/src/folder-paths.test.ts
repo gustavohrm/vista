@@ -36,6 +36,12 @@ describe("relateFolderPaths", () => {
     expect(relateFolderPaths(a, b)).toBe(relation);
   });
 
+  it("keeps a backslash in a POSIX name instead of reading it as a separator", () => {
+    expect(normalizeFolderPath("/home/me/foo\\bar/")).toBe("/home/me/foo\\bar");
+    expect(relateFolderPaths("/home/me/foo\\bar", "/home/me/foo/bar")).toBe("separate");
+    expect(resolveRelativePath("/home/me/foo\\bar", "notes")).toBe("/home/me/foo\\bar/notes");
+  });
+
   it("keeps letter case apart outside Windows", () => {
     expect(relateFolderPaths("/home/me/Notes", "/home/me/notes")).toBe("separate");
   });

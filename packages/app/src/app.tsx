@@ -43,6 +43,7 @@ import { WorkspaceSwitcher, type FolderStatus, type RecentWorkspace } from "./co
 import { documentLocation } from "./domain/document-location";
 import { imageMimeType, resolveImageSource } from "./domain/image-source";
 import { joinWorkspacePath } from "./domain/path-validation";
+import { randomId } from "./domain/random-id";
 import { BYTES_PER_MB } from "./domain/settings";
 import { decodeText, encodeText } from "./domain/text-codec";
 import { getViewer } from "./domain/viewers";
@@ -186,9 +187,7 @@ function AppShell({ adapter }: AppProps) {
   );
   // The folders of each workspace other than the open one, as last seen, by workspace id.
   const [recentFolders, setRecentFolders] = useState<ReadonlyMap<string, RecentWorkspace["folders"]>>(() => new Map());
-  const [workspaceStore] = useState(() =>
-    createWorkspaceStore(browserStorage, { now: Date.now, newId: () => crypto.randomUUID() }),
-  );
+  const [workspaceStore] = useState(() => createWorkspaceStore(browserStorage, { now: Date.now, newId: randomId }));
   const [unsavedRequest, setUnsavedRequest] = useState<UnsavedChangesRequest | null>(null);
   // Tagged with its tab so a position from another tab is never shown.
   const [cursor, setCursor] = useState<{ key: string; position: CursorInfo } | null>(null);

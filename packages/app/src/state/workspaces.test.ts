@@ -394,6 +394,26 @@ describe("migrateLegacyFolder", () => {
     expect(store.lastWorkspace()).toBeNull();
   });
 
+  it("still reports a folder that is gone when the host can't forget it", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const capability = createMemoryWorkspace(
+      {},
+      {
+        overrides: {
+          restoreFolder: async () => ({ status: "unavailable", name: "Old Notes" }),
+          forgetFolder: async () => {
+            throw new Error("storage failed");
+          },
+        },
+      },
+    );
+    const store = createWorkspaceStore(memoryStorage(), options());
+
+    expect(await store.migrateLegacyFolder(capability)).toEqual({ status: "unavailable", name: "Old Notes" });
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
   it("creates nothing when no folder was remembered", async () => {
     const storage = memoryStorage();
     const store = createWorkspaceStore(storage, options());

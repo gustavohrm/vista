@@ -46,7 +46,8 @@ type FolderPaths = Record<string, string>;
 
 /** The remembered folders' paths by id. Unreadable storage is logged and read as none. */
 function readFolderPaths(): FolderPaths {
-  const paths: FolderPaths = {};
+  // No prototype, so an id such as `toString` is unknown rather than an inherited function.
+  const paths: FolderPaths = Object.create(null) as FolderPaths;
   try {
     const stored: unknown = JSON.parse(window.localStorage.getItem(FOLDERS_STORAGE_KEY) ?? "{}");
     if (typeof stored === "object" && stored !== null && !Array.isArray(stored)) {

@@ -3,9 +3,12 @@ import type { FolderRelation } from "@vista/app";
 const DRIVE_ROOT = /^[A-Za-z]:\/$/;
 const WINDOWS_PATH = /^([A-Za-z]:\/|\/\/)/;
 
-/** Uses `/` separators, without repeated or trailing ones, keeping a UNC path's leading `//`. */
+/**
+ * Uses `/` separators, without repeated or trailing ones, keeping a UNC path's leading `//`. A
+ * backslash is a separator only in a Windows path; elsewhere it is part of a name.
+ */
 export function normalizeFolderPath(path: string): string {
-  const forward = path.replace(/\\/g, "/");
+  const forward = /^([A-Za-z]:|\\\\)/.test(path) ? path.replace(/\\/g, "/") : path;
   const isUnc = forward.startsWith("//");
   let normalized = (isUnc ? "/" : "") + forward.replace(/\/{2,}/g, "/");
   if (normalized.length > 1 && normalized.endsWith("/") && !DRIVE_ROOT.test(normalized)) {

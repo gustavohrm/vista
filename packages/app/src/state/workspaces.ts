@@ -288,7 +288,13 @@ export function createWorkspaceStore(
       }
       // A folder that is already gone would only become a workspace that can never open.
       if (result.status === "unavailable") {
-        await capability.forgetFolder(LEGACY_FOLDER_ID);
+        try {
+          await capability.forgetFolder(LEGACY_FOLDER_ID);
+        } catch (err) {
+          // The folder is reported as gone either way; the host keeping its record only means the
+          // same check runs again on the next start.
+          console.warn("Could not forget the earlier folder:", err);
+        }
         return result;
       }
       const name = result.status === "restored" ? result.folder.name : result.name;

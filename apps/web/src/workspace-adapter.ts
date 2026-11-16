@@ -533,6 +533,17 @@ async function findRememberedId(handle: FileSystemDirectoryHandle): Promise<stri
   return null;
 }
 
+/**
+ * An id for a folder that is never remembered. `crypto.randomUUID` exists only in secure contexts,
+ * and the directory input this id serves is also the fallback outside them.
+ */
+function newSessionId(): string {
+  if (typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 /** A folder opened with the File System Access API, read and written in place. */
 interface DirectSession {
   kind: "direct";
@@ -744,7 +755,7 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
         return null;
       }
       // Never remembered: this folder cannot be reopened without a picker.
-      const id = crypto.randomUUID();
+      const id = newSessionId();
       sessions.set(id, {
         kind: "fallback",
         tree: inputResult.nodes,
