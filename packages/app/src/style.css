@@ -59,6 +59,91 @@
   --intent-border: var(--intent-color);
 }
 
+/* Toasts sit on the floating surface the menus and tooltips use, so a routine notice is no louder
+   than a menu; the icon alone carries the kind. The toaster's rules are all `:where`, so these
+   win without `!important`. */
+/* The stack clips its overflow to scroll a long stack, which would cut off the toasts' shadow;
+   the padding gives the shadow room and the margin keeps the toasts where they were. Clicks in
+   the padding reach what is under it; the toasts take their own. */
+[data-toast-instance].coden-toast-stack {
+  margin: -1rem;
+  padding: 1rem;
+  pointer-events: none;
+}
+
+[data-toast-instance].coden-toast {
+  border: 1px solid var(--color-line-strong);
+  border-radius: 8px;
+  background: var(--color-frame);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.14);
+  color: var(--color-text-strong);
+  font-family: var(--font-default);
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+
+[data-toast-instance].coden-toast .coden-toast-title {
+  font-weight: 500;
+}
+
+[data-toast-instance].coden-toast .coden-toast-description {
+  color: var(--color-text-muted);
+  opacity: 1;
+}
+
+[data-toast-instance].coden-toast .coden-toast-icon {
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.125rem;
+  color: var(--color-text-muted);
+}
+
+[data-toast-instance].coden-toast-error .coden-toast-icon {
+  color: light-dark(var(--color-rose-700), var(--color-rose-400));
+}
+
+[data-toast-instance].coden-toast-warning .coden-toast-icon {
+  color: light-dark(var(--color-amber-600), var(--color-amber-400));
+}
+
+[data-toast-instance].coden-toast-success .coden-toast-icon {
+  color: light-dark(var(--color-emerald-700), var(--color-emerald-400));
+}
+
+[data-toast-instance].coden-toast .coden-toast-action {
+  height: 1.5rem;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 6px;
+  padding: 0 0.5rem;
+  color: var(--color-text-strong);
+  font-size: 0.75rem;
+  font-weight: 500;
+  opacity: 1;
+}
+
+[data-toast-instance].coden-toast .coden-toast-action:hover {
+  border-color: var(--color-line-strong);
+  background: var(--color-hover);
+}
+
+[data-toast-instance].coden-toast .coden-toast-dismiss {
+  border-radius: 6px;
+  color: var(--color-text-muted);
+  opacity: 1;
+}
+
+[data-toast-instance].coden-toast .coden-toast-dismiss:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+[data-toast-instance].coden-toast :is(.coden-toast-action, .coden-toast-dismiss):focus-visible {
+  outline: 1px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
 ::selection {
   background-color: var(--color-highlight);
 }
