@@ -9,10 +9,17 @@ describe("desktopDownloadFor", () => {
     ).toEqual({ label: "Download for Windows", href: "/download/windows" });
   });
 
-  it("offers the AppImage on desktop Linux", () => {
+  it("offers the AppImage on desktop Linux whose user agent names its processor, as Firefox's does", () => {
+    expect(desktopDownloadFor("Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0")).toEqual({
+      label: "Download for Linux",
+      href: "/download/linux",
+    });
+  });
+
+  it("offers nothing to Chromium on Linux that reports no processor, since its user agent says x86_64 on ARM too", () => {
     expect(
       desktopDownloadFor("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/142.0.0.0 Safari/537.36"),
-    ).toEqual({ label: "Download for Linux", href: "/download/linux" });
+    ).toBeNull();
   });
 
   const REDUCED_LINUX_CHROME = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/142.0.0.0 Safari/537.36";
