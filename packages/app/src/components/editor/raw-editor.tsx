@@ -8,6 +8,7 @@ import {
 import { Annotation, Compartment, EditorState, Prec, Transaction } from "@codemirror/state";
 import type { Extension, StateEffect } from "@codemirror/state";
 import {
+  Decoration,
   drawSelection,
   EditorView,
   highlightActiveLine,
@@ -96,28 +97,47 @@ const SELECTION_SEARCH_KEYMAP = [
 const editorTheme = EditorView.theme({
   "&": {
     height: "100%",
-    backgroundColor: "var(--color-background)",
+    backgroundColor: "var(--color-frame)",
     color: "var(--color-text)",
     fontSize: "0.875rem",
   },
   "&.cm-focused": { outline: "none" },
   ".cm-scroller": { fontFamily: "var(--font-mono)", lineHeight: "1.625" },
   ".cm-content": { padding: "1rem 0", caretColor: "var(--color-text)" },
-  ".cm-line": { padding: "0 1rem" },
+  // The text starts a gutter's width in from the numbers, and the numbers well in from the frame's
+  // edge, so neither reads as pressed against the other.
+  ".cm-line": { padding: "0 1.5rem 0 0.75rem" },
   ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--color-text)" },
   "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
-    { backgroundColor: "var(--color-primary-subtle)" },
-  ".cm-activeLine": { backgroundColor: "color-mix(in srgb, var(--color-foreground) 50%, transparent)" },
+    { backgroundColor: "var(--color-selection)" },
+  ".cm-selectedText": { color: "var(--color-selection-text)" },
+  // The current line is marked by its number alone; a fill under it competed with the selection.
+  ".cm-activeLine": { backgroundColor: "transparent" },
   ".cm-gutters": {
-    backgroundColor: "var(--color-background)",
-    color: "var(--color-text-secondary)",
+    backgroundColor: "var(--color-frame)",
+    color: "var(--color-text-faint)",
     border: "none",
   },
   ".cm-activeLineGutter": { backgroundColor: "transparent", color: "var(--color-text)" },
-  ".cm-selectionMatch": { backgroundColor: "var(--color-accent-subtle)" },
-  ".cm-searchMatch": { backgroundColor: "var(--color-warning-subtle)" },
-  ".cm-searchMatch.cm-searchMatch-selected": { backgroundColor: "var(--color-primary-subtle)" },
+  ".cm-lineNumbers .cm-gutterElement": { padding: "0 0.5rem 0 1.25rem" },
+  ".cm-selectionMatch": { backgroundColor: "var(--color-selected)" },
+  ".cm-searchMatch": { backgroundColor: "var(--color-highlight-soft)" },
+  ".cm-searchMatch.cm-searchMatch-selected": { backgroundColor: "var(--color-highlight)" },
 });
+
+const selectedTextMark = Decoration.mark({ class: "cm-selectedText" });
+
+/**
+ * Sets selected text in the selection's ink. CodeMirror draws the selection in a layer behind the
+ * text, so the text keeps its own colour unless it is marked, and on the solid Daylight fill the
+ * interface's light text would not read.
+ */
+const selectedText = EditorView.decorations.compute(["selection"], (state) =>
+  Decoration.set(
+    state.selection.ranges.filter((range) => !range.empty).map((range) => selectedTextMark.range(range.from, range.to)),
+    true,
+  ),
+);
 
 /**
  * Plain-text editor for every file type, built on CodeMirror 6. One editor instance serves every
@@ -201,7 +221,7 @@ export function RawEditor(props: RawEditorProps) {
     binding.props.onJumpApplied?.();
   }, [binding, documentKey, pendingJump]);
 
-  return <div ref={hostRef} className="bg-background h-full w-full overflow-hidden" />;
+  return <div ref={hostRef} className="h-full w-full overflow-hidden" />;
 }
 
 /** Connects editor callbacks to the mounted component. It is mutated in place, so callbacks always see current props. */
@@ -259,6 +279,7 @@ function createEditorState(content: string): EditorState {
       compartments.readOnly.of([]),
       history(),
       drawSelection(),
+      selectedText,
       highlightActiveLine(),
       highlightSelectionMatches(),
       hiddenSearchPanel,

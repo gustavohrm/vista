@@ -8,7 +8,7 @@
     "build": "pnpm build:web && pnpm build:native",
     "build:native": "pnpm --filter=@vista/native build",
     "build:web": "pnpm --filter=@vista/web build",
-    "deploy:web": "pnpm --filter=@vista/web deploy",
+    "deploy:web": "pnpm --filter=@vista/web run deploy",
     "dev:native": "pnpm --filter=@vista/native dev:native",
     "dev:web": "pnpm --filter=@vista/web dev",
     "format:check": "oxfmt --check && prettier --check --log-level warn \"**/*.md\"",
@@ -37,7 +37,7 @@
     "vitest": "catalog:"
   },
   "engines": {
-    "node": ">=24.22.1 <25",
+    "node": ">=26.13.1 <27",
     "pnpm": ">=12.16.1 <13"
   },
   "packageManager": "pnpm@12.16.1"

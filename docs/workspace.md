@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-12
+last_updated: 2026-11-16
 scope: The root script names and what each guarantees, the shared tool configurations, the pinned toolchain, install rules, how dependency versions are declared, and how the git hooks are wired.
 ---
 
@@ -23,7 +23,7 @@ This document is the workspace's contract: the names of the root scripts and wha
 | `pnpm test:e2e`      | The web host's browser suite passes. Needs a browser installed; `pnpm verify` does not run it.                                     |
 | `pnpm build`         | The web and native frontend bundles build.                                                                                         |
 | `pnpm verify`        | `verify:web`, then `verify:rust`, stopping at the first failure. It is the delivery gate [Contributing](../CONTRIBUTING.md) names. |
-| `pnpm verify:web`    | `format:check`, `lint:check`, `typecheck`, `test`, `build:web` and `build:native`, in that order.                                  |
+| `pnpm verify:web`    | `versions:check`, `format:check`, `lint:check`, `typecheck`, `test`, `build:web` and `build:native`, in that order.                |
 | `pnpm verify:rust`   | rustfmt, then clippy, over the native host's Rust crate.                                                                           |
 | `pnpm prepare`       | Runs on install: points git at the committed hooks in `.githooks/`.                                                                |
 
@@ -33,14 +33,14 @@ Keep these names as they are: CI, the git hooks and the agent instructions call 
 
 Vista's own root scripts:
 
-| Script              | Does                                                                            |
-| ------------------- | ------------------------------------------------------------------------------- |
-| `pnpm dev:web`      | The web host's Vite dev server.                                                 |
-| `pnpm dev:native`   | `tauri dev`, the native app with the interface served by Vite.                  |
-| `pnpm build:web`    | The web host's production bundle.                                               |
-| `pnpm build:native` | The native host's frontend bundle, which the Tauri build packages.              |
-| `pnpm deploy:web`   | `build:web`, then `wrangler deploy` for the web host. Production is not set up. |
-| `pnpm labels`       | Creates or updates the GitHub labels in `.github/labels.json`.                  |
+| Script              | Does                                                                                |
+| ------------------- | ----------------------------------------------------------------------------------- |
+| `pnpm dev:web`      | The web host's Vite dev server.                                                     |
+| `pnpm dev:native`   | `tauri dev`, the native app with the interface served by Vite.                      |
+| `pnpm build:web`    | The web host's production bundle.                                                   |
+| `pnpm build:native` | The native host's frontend bundle, which the Tauri build packages.                  |
+| `pnpm deploy:web`   | `build:web`, then `wrangler deploy` for the web host. The release workflow runs it. |
+| `pnpm labels`       | Creates or updates the GitHub labels in `.github/labels.json`.                      |
 
 There is no `pnpm format` script. When a name matches no pnpm script, pnpm runs the executable of that name from `PATH` instead, and on Windows `format` is the system disk formatter. The explicit `format:check` and `format:fix` names avoid that.
 
@@ -79,6 +79,8 @@ clippy runs with warnings denied over every target. A lint that is wrong for one
 
 Every third-party dependency version is declared once, in the catalog in `pnpm-workspace.yaml`, and referred to as `catalog:` in each `package.json`. The workspace therefore cannot hold two versions of one dependency by accident, and an upgrade is a one-line change that Dependabot can propose ([CI](ci.md#dependency-updates)). A workspace package depends on another as `workspace:*`, so it is not a catalog entry.
 
+`@types/node` never takes a major update from Dependabot. Node's types follow the Node.js release in `engines` and `.nvmrc`, and types for a newer Node accept APIs the pinned runtime does not have. A major update moves by hand, with `.nvmrc`; minor and patch updates within the pinned line still arrive through Dependabot with the rest.
+
 Rust dependencies are declared in `apps/native/src-tauri/Cargo.toml` and locked in its `Cargo.lock`.
 
 ## Toolchain
@@ -94,6 +96,8 @@ Local and CI runs resolve the same versions, each declared once:
 | `rust-toolchain.toml`                | The exact Rust version and its `clippy` and `rustfmt` |
 
 [CI](ci.md#toolchain) describes how the workflow reads the same files rather than repeating a version, and why `engineStrict` is set where it is.
+
+`.nvmrc` pins a release of the Node.js line in Active LTS: the line with the longest support ahead of it, and the one the Node.js website offers by default, so a new contributor's install meets `engines`. When a new line enters Active LTS each October, `.nvmrc`, `engines`, and `@types/node` move to it together, in one change.
 
 ### Dependency installs
 

@@ -16,9 +16,17 @@ import { FileIcon } from "../layout/file-icon";
 /** Typed first in the picker to list commands instead of files. */
 export const COMMAND_QUERY_PREFIX = ">";
 
-/** Where to go: a file, or the current one when `path` is null, and optionally a position in it. */
+/** A file the picker can open. */
+export interface GoToFile {
+  /** Handed back in the request when this file is chosen. */
+  key: string;
+  /** Shown and searched, such as "notes/docs/a.md": the folder name, then the path in it. */
+  label: string;
+}
+
+/** Where to go: a file, or the current one when `fileKey` is null, and optionally a position in it. */
 export interface GoToRequest {
-  path: string | null;
+  fileKey: string | null;
   line?: number;
   column?: number;
 }
@@ -31,8 +39,8 @@ export interface PaletteCommand {
 }
 
 interface GoToDialogProps {
-  /** Workspace-relative paths of every file in the open folder. */
-  files: readonly string[];
+  /** Every file of the open workspace. */
+  files: readonly GoToFile[];
   /** Commands listed when the query starts with `>`. */
   commands: readonly PaletteCommand[];
   /** Text the field starts with, such as ":" for go-to-line or ">" for commands. */
@@ -71,9 +79,10 @@ export function GoToDialog({
   const commandQuery = isCommandMode ? query.trimStart().slice(COMMAND_QUERY_PREFIX.length) : "";
   const target = parseGoToQuery(query);
   const isLineInCurrentFile = !isCommandMode && target.path === "" && query.trim().startsWith(":");
+  const labels = useMemo(() => files.map((file) => file.label), [files]);
   const fileMatches = useMemo<FileMatch[]>(
-    () => (isCommandMode || isLineInCurrentFile ? [] : rankFiles(files, target.path)),
-    [files, isCommandMode, isLineInCurrentFile, target.path],
+    () => (isCommandMode || isLineInCurrentFile ? [] : rankFiles(labels, target.path)),
+    [labels, isCommandMode, isLineInCurrentFile, target.path],
   );
   const commandMatches = useMemo(
     () => (isCommandMode ? rankCommands(commands, commandQuery) : []),
@@ -110,12 +119,13 @@ export function GoToDialog({
   const goToFile = (match: FileMatch | undefined) => {
     if (isLineInCurrentFile) {
       if (hasCurrentFile && target.line !== undefined) {
-        onGo({ path: null, line: target.line, column: target.column });
+        onGo({ fileKey: null, line: target.line, column: target.column });
       }
       return;
     }
-    if (match) {
-      onGo({ path: match.path, line: target.line, column: target.column });
+    const file = match && files[match.index];
+    if (file) {
+      onGo({ fileKey: file.key, line: target.line, column: target.column });
     }
   };
 
@@ -156,7 +166,7 @@ export function GoToDialog({
   const optionId = (index: number) => `${listId}-${index}`;
   const optionClass = (index: number) =>
     `flex h-8 cursor-pointer items-center gap-2 rounded-md px-2.5 text-[13px] ${
-      index === activeIndex ? "bg-surface" : ""
+      index === activeIndex ? "bg-selected" : ""
     }`;
 
   return (
@@ -169,14 +179,14 @@ export function GoToDialog({
         onClose();
       }}
       onClick={handleBackdropClick}
-      className="card soft floating flush mx-auto mt-[12vh] w-[min(38rem,calc(100vw-2rem))] backdrop:bg-black/40"
+      className="card soft floating flush mx-auto mt-[12vh] w-[min(38rem,calc(100vw-2rem))] overflow-hidden [--ui-radius-surface:12px]"
     >
       <div className="flex flex-col">
-        <div className="border-surface flex items-center gap-2 border-b px-3.5">
+        <div className="border-line flex items-center gap-2.5 border-b px-4">
           {isCommandMode ? (
-            <i className="ic-terminal text-text-secondary text-sm" aria-hidden="true" />
+            <i className="ic-terminal text-text-faint text-[15px]" aria-hidden="true" />
           ) : (
-            <i className="ic-search text-text-secondary text-sm" aria-hidden="true" />
+            <i className="ic-file-search text-text-faint text-[15px]" aria-hidden="true" />
           )}
           <input
             ref={inputRef}
@@ -187,18 +197,18 @@ export function GoToDialog({
             aria-controls={listId}
             aria-autocomplete="list"
             aria-activedescendant={activeIndex < resultCount ? optionId(activeIndex) : undefined}
-            placeholder="Search files by name"
+            placeholder="Type a file name, or :line"
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
               setActiveIndex(0);
             }}
             onKeyDown={handleKeyDown}
-            className="text-text placeholder:text-text-secondary h-12 min-w-0 flex-1 bg-transparent text-sm outline-none"
+            className="text-text-strong placeholder:text-text-faint h-12 min-w-0 flex-1 bg-transparent text-sm outline-none"
           />
         </div>
         {isLineInCurrentFile ? (
-          <p className="text-text-secondary px-4 py-3 text-[13px]">
+          <p className="text-text-muted px-4 py-3 text-[13px]">
             {describeLineTarget(hasCurrentFile, target.line, target.column)}
           </p>
         ) : (
@@ -207,7 +217,7 @@ export function GoToDialog({
             // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a combobox's popup listbox; a native select can't hold rich options or follow the field's arrow keys
             role="listbox"
             aria-label={isCommandMode ? "Commands" : "Files"}
-            className="max-h-80 overflow-y-auto p-1.5"
+            className="max-h-80 scroll-py-1.5 overflow-y-auto p-1.5"
           >
             {isCommandMode
               ? commandMatches.map((match, index) => {
@@ -231,15 +241,15 @@ export function GoToDialog({
                       <span className="text-text min-w-0 flex-1 truncate">
                         <Highlighted text={title} from={0} to={title.length} positions={match.positions} />
                       </span>
-                      {command.isChecked && <i className="ic-check text-text-secondary text-sm" aria-hidden="true" />}
-                      {shortcut && <kbd className="kbd flex-none text-[11px]">{formatShortcut(shortcut)}</kbd>}
+                      {command.isChecked && <i className="ic-check text-text-muted text-sm" aria-hidden="true" />}
+                      {shortcut && <kbd className="shortcut-key flex-none">{formatShortcut(shortcut)}</kbd>}
                     </div>
                   );
                 })
               : fileMatches.map((match, index) => (
                   // oxlint-disable-next-line jsx-a11y/click-events-have-key-events -- the combobox field handles the keyboard: arrows pick an option and Enter opens it
                   <div
-                    key={match.path}
+                    key={files[match.index]?.key}
                     id={optionId(index)}
                     // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- an option of the custom listbox above
                     role="option"
@@ -253,30 +263,30 @@ export function GoToDialog({
                   </div>
                 ))}
             {resultCount === 0 && (
-              <p className="text-text-secondary px-2.5 py-2 text-[13px]">
+              <p className="text-text-muted px-2.5 py-2 text-[13px]">
                 {isCommandMode
                   ? "No matching commands."
                   : files.length === 0
-                    ? "Open a folder to search its files."
+                    ? "Open a folder to find its files. Type > for commands."
                     : "No matching files."}
               </p>
             )}
           </div>
         )}
-        <div className="text-text-secondary flex items-center gap-4 px-3.5 pt-1 pb-2.5 text-xs">
+        <div className="border-line text-text-faint flex h-9 items-center gap-4 border-t px-4 text-xs">
           <span className="flex items-center gap-1.5">
-            <kbd className="kbd text-[11px]">↑</kbd>
-            <kbd className="kbd text-[11px]">↓</kbd>
+            <kbd className="shortcut-key">↑</kbd>
+            <kbd className="shortcut-key">↓</kbd>
             Navigate
           </span>
           <span className="flex items-center gap-1.5">
-            <kbd className="kbd text-[11px]">Enter</kbd>
+            <kbd className="shortcut-key">Enter</kbd>
             {isCommandMode ? "Run" : "Open"}
           </span>
           <span className="ml-auto hidden items-center gap-1.5 sm:flex">
-            <kbd className="kbd text-[11px]">{COMMAND_QUERY_PREFIX}</kbd>
+            <kbd className="shortcut-key">{COMMAND_QUERY_PREFIX}</kbd>
             Commands
-            <kbd className="kbd ml-2 text-[11px]">:</kbd>
+            <kbd className="shortcut-key ml-2">:</kbd>
             Go to line
           </span>
         </div>
@@ -344,12 +354,12 @@ function MatchedPath({ match }: { match: FileMatch }) {
   const extension = extensionStart > nameStart ? path.slice(extensionStart + 1).toLowerCase() : "";
   return (
     <>
-      <FileIcon extension={extension} className="text-text-secondary flex-none text-sm" />
+      <FileIcon extension={extension} className="text-text-faint flex-none text-sm" />
       <span className="text-text flex-none truncate">
         <Highlighted text={path} from={nameStart} to={path.length} positions={positions} />
       </span>
       {nameStart > 0 && (
-        <span className="text-text-secondary min-w-0 truncate text-xs">
+        <span className="text-text-faint min-w-0 truncate text-xs">
           <Highlighted text={path} from={0} to={nameStart - 1} positions={positions} />
         </span>
       )}

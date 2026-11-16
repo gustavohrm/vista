@@ -86,7 +86,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const getDialogs = useCallback((): Dialogs => {
     if (!dialogsRef.current) {
-      dialogsRef.current = createDialogs();
+      // The class carries the primary colours of Vista's confirming button; see `.vista-dialog` in style.css.
+      dialogsRef.current = createDialogs({ className: "vista-dialog" });
     }
     return dialogsRef.current;
   }, []);

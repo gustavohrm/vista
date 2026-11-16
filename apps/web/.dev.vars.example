@@ -1,0 +1,2 @@
+# Copy to `.dev.vars` so `wrangler dev` points release URLs at the local server instead of production.
+PUBLIC_ORIGIN=http://localhost:8787

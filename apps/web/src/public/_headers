@@ -1,0 +1,7 @@
+# The security headers for the static app, which Cloudflare serves without running the Worker. They must match
+# `SECURITY_HEADERS` in `../security-headers.ts`, which the Worker sets on its own responses; `worker.test.ts`
+# compares the two.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff

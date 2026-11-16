@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import staticHeaders from "./public/_headers?raw";
+import { SECURITY_HEADERS } from "./security-headers";
 import worker from "./worker";
 
 const MANIFEST = {
@@ -27,6 +29,7 @@ function objectOf(text: string) {
 
 function envWith(objects: Record<string, string>) {
   return {
+    PUBLIC_ORIGIN: ORIGIN,
     ASSETS: { fetch: vi.fn(async () => new Response("app shell")) },
     RELEASES: {
       get: vi.fn(async (key: string) => {
@@ -49,7 +52,7 @@ describe("worker", () => {
     expect(env.RELEASES.get).not.toHaveBeenCalled();
   });
 
-  it("serves the manifest with installer URLs on its own origin", async () => {
+  it("serves the manifest with installer URLs on the configured origin", async () => {
     const response = await worker.fetch(
       request("/releases/latest.json"),
       envWith({ "latest.json": JSON.stringify(MANIFEST) }),
@@ -66,6 +69,17 @@ describe("worker", () => {
         "linux-x86_64-rpm": { url: `${ORIGIN}/releases/0.2.0/Vista-0.2.0-1.x86_64.rpm`, signature: "sig-r" },
       },
     });
+  });
+
+  it("points release URLs at the configured origin, whatever host the request names", async () => {
+    const env = envWith({ "latest.json": JSON.stringify(MANIFEST) });
+    const elsewhere = (path: string) => new Request(`https://attacker.example${path}`);
+
+    const manifest = await (await worker.fetch(elsewhere("/releases/latest.json"), env)).json();
+    const redirect = await worker.fetch(elsewhere("/download/windows"), env);
+
+    expect(manifest.platforms["windows-x86_64-nsis"].url).toBe(`${ORIGIN}/releases/0.2.0/Vista_0.2.0_x64-setup.exe`);
+    expect(redirect.headers.get("location")).toBe(`${ORIGIN}/releases/0.2.0/Vista_0.2.0_x64-setup.exe`);
   });
 
   it("says there is no update when nothing is published", async () => {
@@ -128,6 +142,33 @@ describe("worker", () => {
     expect(response.status).toBe(302);
     expect(response.headers.get("location")).toBe(`${ORIGIN}/releases/0.2.0/${file}`);
     expect(response.headers.get("cache-control")).toBe("no-cache");
+  });
+
+  it.each([
+    ["the manifest", "/releases/latest.json", { "latest.json": JSON.stringify(MANIFEST) }],
+    ["an installer", "/releases/0.2.0/Vista_0.2.0_x64-setup.exe", { "0.2.0/Vista_0.2.0_x64-setup.exe": "bytes" }],
+    ["a download link", "/download/windows", { "latest.json": JSON.stringify(MANIFEST) }],
+    ["a 404", "/releases/0.2.0/nothing.exe", {}],
+    ["a 405", "/releases/latest.json", {}, { method: "PUT", body: "{}" }],
+  ])("sets the security headers on %s", async (_case, path, objects, init?: RequestInit) => {
+    const response = await worker.fetch(request(path, init), envWith(objects));
+
+    for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+      expect(response.headers.get(name)).toBe(value);
+    }
+  });
+
+  it("gives the static app the same security headers as its own responses", () => {
+    const lines = staticHeaders.split("\n").filter((line) => line.trim() !== "" && !line.startsWith("#"));
+    expect(lines[0]).toBe("/*");
+    const declared = Object.fromEntries(
+      lines.slice(1).map((line) => {
+        const colon = line.indexOf(":");
+        return [line.slice(0, colon).trim().toLowerCase(), line.slice(colon + 1).trim()];
+      }),
+    );
+
+    expect(declared).toEqual(SECURITY_HEADERS);
   });
 
   it("says so when there is no desktop release to download", async () => {

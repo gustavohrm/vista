@@ -1,7 +1,274 @@
 @import "@codenhub/styles/tw";
 @import "@codenhub/icons";
 @import "@codenhub/toaster/styles";
+@import "@fontsource-variable/inter";
 @source ".";
+
+/* Vista's shell. The chrome around the document recedes and the frame that holds the document comes
+   forward; each boundary is drawn once, by the frame's background and its hairline. `--ui-ink` is the
+   styles package's hook for its components' border colour, so buttons, inputs, and keys take the
+   same hairline instead of the package's stronger default border. */
+@theme {
+  --font-default: "Inter Variable", "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "Cascadia Code", Consolas, "DejaVu Sans Mono", monospace;
+  --color-chrome: light-dark(#f4f4f4, #0a0a0a);
+  --color-frame: light-dark(#ffffff, #161616);
+  --color-line: light-dark(#e8e8e8, #262626);
+  --color-line-strong: light-dark(#d4d4d4, #333333);
+  --color-hover: light-dark(rgb(0 0 0 / 4.5%), rgb(255 255 255 / 5.5%));
+  --color-selected: light-dark(rgb(0 0 0 / 7%), rgb(255 255 255 / 9%));
+  --color-text-muted: light-dark(#5c5c5c, #a3a3a3);
+  --color-text-faint: light-dark(#737373, #737373);
+  /* What floats over the frame: menus, the palette, the find bar, dialogs, tooltips, and toasts. A
+     step lighter than the frame in dark mode, where a shadow alone barely shows. */
+  --color-pop: light-dark(#ffffff, #1c1c1c);
+  --color-scrim: light-dark(rgb(0 0 0 / 28%), rgb(0 0 0 / 55%));
+  --shadow-float:
+    0 8px 24px light-dark(rgb(0 0 0 / 10%), rgb(0 0 0 / 45%)), 0 1px 3px light-dark(rgb(0 0 0 / 6%), rgb(0 0 0 / 30%));
+  /* Daylight, the brand colour: text selection, find matches, and the dark primary button. Selection
+     is full Daylight with ink text on both grounds: a translucent Daylight over the dark frame mixed
+     to olive. */
+  --color-daylight: #c5f03b;
+  --color-selection: var(--color-daylight);
+  --color-selection-text: #0a0a0a;
+  --color-highlight: light-dark(rgb(197 240 59 / 75%), rgb(197 240 59 / 35%));
+  --color-highlight-soft: light-dark(rgb(197 240 59 / 35%), rgb(197 240 59 / 16%));
+  --radius-frame: 10px;
+  --ease-enter: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 1, 1);
+  --ease-move: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:root {
+  --ui-ink: var(--color-line);
+}
+
+/* A shortcut written out beside its action, as in `Ctrl + P`. Vista's own rather than the package's
+   `kbd`, which sets keys in a bold monospace that reads louder than the label it follows. */
+@utility shortcut-key {
+  @apply border-line bg-hover text-text-muted inline-flex h-5 items-center rounded border px-1.5 font-sans text-[11px] leading-none font-medium whitespace-nowrap;
+}
+
+/* An icon-only button in the shell's toolbars: the explorer, tabs row, title bar, status bar, and
+   find bar. Vista's own rather than the package's `.btn icon`, whose padding leaves a small icon in
+   a large hover square; here the icon fills more of the same box. Size and icon size are set where
+   it is used (`size-7 text-base`, `size-6 text-[15px]`, `size-5 text-[13px]`), so they never compete
+   with these rules. A pressed toggle, or one whose menu is open, keeps the selected fill. */
+@utility icon-button {
+  @apply text-text-muted hover:bg-hover hover:text-text aria-expanded:bg-selected aria-expanded:text-text-strong aria-pressed:bg-selected aria-pressed:text-text-strong inline-flex flex-none cursor-pointer items-center justify-center rounded-md transition-colors duration-100 outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] disabled:pointer-events-none disabled:opacity-40;
+}
+
+/* The primary button: ink on light grounds, Daylight with ink text on dark ones, where Daylight is
+   strongest and the one action per view is the right place to spend it. Scoped to the button: the
+   package derives the focus ring and checkboxes from `--color-primary`, which stay neutral.
+   Unlayered, so it wins over the package's layered `.primary` intent. */
+.btn.primary {
+  --intent-color: light-dark(var(--color-neutral-950), var(--color-daylight));
+  --intent-hover: light-dark(var(--color-neutral-700), #d6f670);
+  --intent-contrast: light-dark(var(--color-neutral-50), var(--color-neutral-950));
+  --intent-border: var(--intent-color);
+}
+
+/* The floating surface: menus, the palette, the find bar, and dialogs are `.card.soft.floating`,
+   given Vista's ground, edge, and shadow through the package's own hooks. The package's soft card
+   rests on its grey foreground, which in light mode turned a menu over the white frame grey. The
+   corner is set where each is used: 8px for menus and the find bar, 12px for the palette and
+   dialogs. Unlayered, so it wins over the package's layered defaults. */
+.card.floating {
+  --ui-surface-ground: var(--color-pop);
+  --ui-ink: var(--color-line-strong);
+  --ui-surface-shadow: var(--shadow-float);
+  color: var(--color-text);
+}
+
+/* A field edited in place, such as a CSV cell or a name in the explorer. Focused, it keeps the
+   size and corner of the text it replaces and shows only a hairline over the hover fill, instead of
+   the package's 3px focus ring, which made a cell look like a form field. An invalid name takes the
+   hairline in red. Unlayered, so it wins over the package's layered ring. */
+.ipt.inline-field {
+  border-radius: 4px;
+}
+
+.ipt.inline-field:focus-visible {
+  outline: 1px solid var(--color-line-strong);
+  outline-offset: -1px;
+  background-color: var(--color-hover);
+  box-shadow: none;
+}
+
+.ipt.inline-field[aria-invalid="true"] {
+  outline: 1px solid var(--color-destructive);
+  outline-offset: -1px;
+}
+
+dialog::backdrop {
+  background-color: var(--color-scrim);
+}
+
+/* Confirmations come from the toaster's `<dialog>`. Its defaults are a page-sized prompt: a bold
+   19px title, 44px buttons, a blurred backdrop, and no edge. These give it the same floating
+   surface and the sizes of Vista's own dialog (`unsaved-changes-dialog.tsx`). Its rules are
+   `:where`, so these win without `!important`. */
+dialog[data-toast-instance].toast-dialog::backdrop {
+  background-color: var(--color-scrim);
+  backdrop-filter: none;
+}
+
+dialog[data-toast-instance] .toast-dialog-container {
+  width: min(24rem, 100vw - 2rem);
+  gap: 1rem;
+  padding: 1.25rem;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 12px;
+  background: var(--color-pop);
+  box-shadow: var(--shadow-float);
+  color: var(--color-text);
+  font-family: var(--font-default);
+}
+
+dialog[data-toast-instance] .toast-dialog-title {
+  color: var(--color-text-strong);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+dialog[data-toast-instance] .toast-dialog-message,
+dialog[data-toast-instance] .toast-dialog-title + .toast-dialog-message {
+  margin-top: -0.5rem;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+dialog[data-toast-instance] .toast-dialog-actions {
+  gap: 0.5rem;
+}
+
+dialog[data-toast-instance] .toast-dialog-btn {
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  border-radius: 6px;
+  box-shadow: none;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  transition: background-color 100ms;
+}
+
+dialog[data-toast-instance] .toast-dialog-btn:focus-visible {
+  outline: 1px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+dialog[data-toast-instance] .toast-dialog-btn-cancel {
+  border-color: var(--color-line-strong);
+  background: transparent;
+  color: var(--color-text-strong);
+}
+
+dialog[data-toast-instance] .toast-dialog-btn-cancel:hover {
+  background: var(--color-hover);
+}
+
+/* The confirming button follows `.btn.primary` below: ink on light, Daylight on dark. The toaster
+   colours it from `--color-primary`, so the primary tokens are set on Vista's confirm dialogs only
+   (`vista-dialog`, given in `toast.tsx`), leaving the package's focus ring and checkboxes as they are. */
+.vista-dialog {
+  --color-primary: light-dark(var(--color-neutral-950), var(--color-daylight));
+  --color-primary-hover: light-dark(var(--color-neutral-700), #d6f670);
+  --color-primary-contrast: light-dark(var(--color-neutral-50), var(--color-neutral-950));
+}
+
+/* Toasts sit on the floating surface the menus and tooltips use, so a routine notice is no louder
+   than a menu; the icon alone carries the kind. The toaster's rules are all `:where`, so these
+   win without `!important`. */
+/* The stack clips its overflow to scroll a long stack, which would cut off the toasts' shadow;
+   the padding gives the shadow room and the margin keeps the toasts where they were. Clicks in
+   the padding reach what is under it; the toasts take their own. */
+[data-toast-instance].coden-toast-stack {
+  margin: -1rem;
+  padding: 1rem;
+  pointer-events: none;
+}
+
+[data-toast-instance].coden-toast {
+  border: 1px solid var(--color-line-strong);
+  border-radius: 8px;
+  background: var(--color-pop);
+  box-shadow: var(--shadow-float);
+  color: var(--color-text-strong);
+  font-family: var(--font-default);
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+
+[data-toast-instance].coden-toast .coden-toast-title {
+  font-weight: 500;
+}
+
+[data-toast-instance].coden-toast .coden-toast-description {
+  color: var(--color-text-muted);
+  opacity: 1;
+}
+
+[data-toast-instance].coden-toast .coden-toast-icon {
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.125rem;
+  color: var(--color-text-muted);
+}
+
+[data-toast-instance].coden-toast-error .coden-toast-icon {
+  color: light-dark(var(--color-rose-700), var(--color-rose-400));
+}
+
+[data-toast-instance].coden-toast-warning .coden-toast-icon {
+  color: light-dark(var(--color-amber-600), var(--color-amber-400));
+}
+
+[data-toast-instance].coden-toast-success .coden-toast-icon {
+  color: light-dark(var(--color-emerald-700), var(--color-emerald-400));
+}
+
+[data-toast-instance].coden-toast .coden-toast-action {
+  height: 1.5rem;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 6px;
+  padding: 0 0.5rem;
+  color: var(--color-text-strong);
+  font-size: 0.75rem;
+  font-weight: 500;
+  opacity: 1;
+}
+
+[data-toast-instance].coden-toast .coden-toast-action:hover {
+  border-color: var(--color-line-strong);
+  background: var(--color-hover);
+}
+
+[data-toast-instance].coden-toast .coden-toast-dismiss {
+  border-radius: 6px;
+  color: var(--color-text-muted);
+  opacity: 1;
+}
+
+[data-toast-instance].coden-toast .coden-toast-dismiss:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+[data-toast-instance].coden-toast :is(.coden-toast-action, .coden-toast-dismiss):focus-visible {
+  outline: 1px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+::selection {
+  background-color: var(--color-selection);
+  color: var(--color-selection-text);
+}
 
 html,
 body,
@@ -46,18 +313,21 @@ body,
 }
 
 .markdown-editor .ProseMirror li[data-item-type="task"][data-checked="true"] > .task-list-item-content {
-  color: var(--color-text-secondary);
+  color: var(--color-text-faint);
   text-decoration: line-through;
 }
 
 /* Rich-text elements that Milkdown renders, so markup cannot carry package classes. `/tw/native`
-   is not imported here: its bare-element mappings are global and would restyle the whole app. */
+   is not imported here: its bare-element mappings are global and would restyle the whole app.
+   The document reads as a page: a 700px column of 16px text at 1.65, under headings that are
+   tighter and heavier than the text. */
 .markdown-editor .ProseMirror {
-  @apply text-text mx-auto max-w-3xl leading-relaxed outline-none;
+  @apply text-text mx-auto max-w-[700px] text-base leading-[1.65] outline-none;
 }
 
+/* The underline is faint, so a link reads as text that can be followed rather than as a rule. */
 .markdown-editor .ProseMirror a {
-  @apply text-text-strong underline;
+  @apply text-text-strong decoration-text-faint underline underline-offset-3;
 }
 
 .markdown-editor .ProseMirror .markdown-image img {
@@ -73,34 +343,46 @@ body,
   @apply border-border bg-surface text-text-secondary inline-flex max-w-full items-center gap-1.5 rounded-sm border border-dashed px-2 py-1 align-bottom text-xs;
 }
 
-.markdown-editor .ProseMirror h1 {
-  @apply text-title text-text-strong border-border mb-4 border-b pb-2;
+/* Workaround for codenhub/codenhub#561: the icon wrapper in the Vite configs writes JSX attribute
+   names (strokeWidth, strokeLinecap) into the placeholder's innerHTML string, where HTML parsing
+   drops them; this restores the stroke the other icons get. */
+.markdown-editor .ProseMirror .markdown-image-placeholder svg g {
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-/* No package step sits between `text-title` (text-3xl) and `text-title-sm` (text-xl), so h2 keeps
-   its own size. */
+.markdown-editor .ProseMirror h1 {
+  @apply text-text-strong mb-4 text-[32px] leading-[1.2] font-bold tracking-[-0.02em];
+}
+
 .markdown-editor .ProseMirror h2 {
-  @apply text-text-strong mt-6 mb-3 text-2xl font-semibold;
+  @apply text-text-strong mt-8 mb-2.5 text-xl leading-[1.3] font-[650] tracking-[-0.01em];
 }
 
 .markdown-editor .ProseMirror h3 {
-  @apply text-title-sm text-text-strong mt-4 mb-2;
+  @apply text-text-strong mt-6 mb-2 text-[17px] leading-[1.4] font-semibold;
+}
+
+/* A heading that opens the document needs no space above it. */
+.markdown-editor .ProseMirror > :first-child {
+  @apply mt-0;
 }
 
 .markdown-editor .ProseMirror p {
-  @apply mb-4;
+  @apply mb-3.5;
 }
 
 .markdown-editor .ProseMirror ul {
-  @apply mb-4 list-disc pl-6;
+  @apply mb-3.5 list-disc pl-6;
 }
 
 .markdown-editor .ProseMirror ol {
-  @apply mb-4 list-decimal pl-6;
+  @apply mb-3.5 list-decimal pl-6;
 }
 
 .markdown-editor .ProseMirror li {
-  @apply mb-1;
+  @apply mb-1.5;
 }
 
 /* A paragraph inside a list item sits on the item's own line, so it drops the paragraph gap. */
@@ -108,14 +390,15 @@ body,
   @apply mb-0;
 }
 
+/* A quotation is set off by a rule and a quieter colour, not a box. */
 .markdown-editor .ProseMirror blockquote {
-  @apply quote;
-
-  margin-block: 1rem;
+  @apply border-line-strong text-text-muted my-4.5 border-l-3 pl-4;
 }
 
+/* Inline code sits on the hover fill, a step smaller than the text so the monospace face, which
+   runs large, matches its height. */
 .markdown-editor .ProseMirror code {
-  @apply code;
+  @apply bg-hover rounded px-[5px] py-px font-mono text-[13.5px];
 }
 
 .markdown-editor .ProseMirror pre {
@@ -130,46 +413,227 @@ body,
   @apply data-table mb-4;
 }
 
-/* Body cells hold an input that carries its own padding, so the grid cell adds none; the table's
-   cell padding would double it and make every row as tall as a document table row. */
-.csv-table .data-table tbody td {
+/* Milkdown wraps each cell's text in a paragraph, whose gap would double every row's height. */
+.markdown-editor .ProseMirror :is(th, td) > p {
+  @apply mb-0;
+}
+
+/* Tables take a control's corner, as the tabs above them do, rather than the package's larger
+   surface corner, which read rounder than everything else in the frame. */
+.markdown-editor .ProseMirror table,
+.csv-table .data-table {
+  --ui-corner-surface: 6px;
+  /* The table rests on the frame, header and body alike, through the package's ground token; its
+     default, the foreground tone, set a grey plate on the white frame in light mode. */
+  --ui-surface-ground: var(--color-frame);
+}
+
+/* A dragged row passes over the others, so its cells are opaque, in the selected fill on the frame. */
+.csv-table .data-table tr[data-row-dragging] > td {
+  background-color: var(--color-frame);
+  background-image: linear-gradient(var(--color-selected), var(--color-selected));
+}
+
+/* Header and body cells hold an input that carries its own padding, so the grid cell adds none; the
+   table's cell padding would double it and make every row as tall as a document table row. */
+.csv-table .data-table th,
+.csv-table .data-table td {
   padding: 0;
+  vertical-align: middle;
 }
 
-/* Edge-aligned variants of the design system's bottom tooltip, for controls near the left or right
-   edge of the window. The package only centers a bottom bubble, which would overflow the edge, and
-   a side bubble would cover the neighbouring buttons while it lingers. They set the same
-   positioning custom properties the package's own `data-tooltip-position` rules set. Unlayered, so
-   they win over the package's layered rules. */
-.tooltip.tooltip-start[data-tooltip-position="bottom"] {
-  --tooltip-left: 0;
-  --tooltip-right: auto;
-  --tooltip-transform: translate(0, 100%);
-  --tooltip-origin: top left;
+/* Cells are data in the interface's size, as in a spreadsheet, not the document's reading size. */
+.csv-table .data-table th,
+.csv-table .data-table td,
+.csv-table .data-table .ipt {
+  font-size: 13px;
 }
 
-.tooltip.tooltip-end[data-tooltip-position="bottom"] {
-  --tooltip-left: auto;
-  --tooltip-right: 0;
-  --tooltip-transform: translate(0, 100%);
-  --tooltip-origin: top right;
+.csv-table .data-table .ipt {
+  height: 2rem;
+  min-height: 2rem;
+  padding-block: 0;
 }
 
 /* Find matches in rendered views. Text matches are painted with the CSS Custom Highlight API, so
    the rendered editors' DOM is left alone, and matching form fields such as CSV cells carry
-   `data-find-match` (see `components/editor/dom-find.ts`). Colors match the raw editor's. */
+   `data-find-match` (see `components/editor/dom-find.ts`). Colors match the raw editor's: every
+   match in soft Daylight, the current one in full. */
 ::highlight(vista-find) {
-  background-color: var(--color-warning-subtle);
+  background-color: var(--color-highlight-soft);
 }
 
 ::highlight(vista-find-current) {
-  background-color: var(--color-primary-subtle);
+  background-color: var(--color-highlight);
 }
 
 [data-find-match] {
-  background-color: var(--color-warning-subtle);
+  background-color: var(--color-highlight-soft);
 }
 
 [data-find-match="current"] {
-  background-color: var(--color-primary-subtle);
+  background-color: var(--color-highlight);
+}
+
+/* Vista's logo and loader (`components/brand/vista-logo.tsx`). The bar takes Daylight on dark grounds
+   and Daylight deep on bright ones, as the brand guideline's colour versions do, through the same
+   `light-dark()` switch as the theme's tokens. Hand-written CSS because the motion is keyframes on
+   SVG elements. The bar only ever moves inside the opening's clip and is never scaled, so its ends
+   keep the arms' angle on every frame. Each element's resting style is its last frame, so with the
+   animation off the logo is simply drawn. */
+.vista-logo {
+  --vista-ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+.vista-logo-ink {
+  fill: var(--color-text-strong);
+}
+
+.vista-logo-bar {
+  fill: light-dark(#637b09, #c5f03b);
+}
+
+/* Mask strokes down the middle of each arm, wider than the arm; 79.01 is each stroke's length. */
+.vista-logo-arm {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 20;
+  stroke-dasharray: 79.01 79.01;
+}
+
+/* Entrance, 1.4 s: the arms draw down to the point, the bar rises into the opening, and the letters
+   slide out from behind the right arm. */
+.vista-logo[data-motion="enter"] .vista-logo-arm {
+  animation: vista-draw 520ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.vista-logo[data-motion="enter"] .vista-logo-arm + .vista-logo-arm {
+  animation-delay: 60ms;
+}
+
+.vista-logo[data-motion="enter"] .vista-logo-rise {
+  animation: vista-rise 620ms var(--vista-ease) 380ms both;
+}
+
+.vista-logo[data-motion="enter"] .vista-logo-letter {
+  animation: vista-slide 560ms var(--vista-ease) 640ms both;
+}
+
+.vista-logo[data-motion="enter"] .vista-logo-letter:nth-child(2) {
+  animation-delay: 695ms;
+}
+
+.vista-logo[data-motion="enter"] .vista-logo-letter:nth-child(3) {
+  animation-delay: 750ms;
+}
+
+.vista-logo[data-motion="enter"] .vista-logo-letter:nth-child(4) {
+  animation-delay: 805ms;
+}
+
+/* Loop, 1.8 s: light rises from the point and widens with the opening into the bar, holds, fades. */
+.vista-logo[data-motion="loop"] .vista-logo-sun {
+  animation: vista-sun 1800ms infinite;
+}
+
+.vista-loader {
+  animation: vista-appear 200ms ease-out 300ms both;
+}
+
+@keyframes vista-draw {
+  from {
+    stroke-dashoffset: 79.01;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes vista-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes vista-slide {
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+}
+
+@keyframes vista-sun {
+  0% {
+    opacity: 0;
+    transform: translateY(24px);
+    animation-timing-function: linear;
+  }
+  10% {
+    opacity: 1;
+    transform: translateY(19px);
+    animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+  55% {
+    opacity: 1;
+    transform: none;
+    animation-timing-function: linear;
+  }
+  80% {
+    opacity: 1;
+    transform: none;
+    animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
+  }
+  100% {
+    opacity: 0;
+    transform: none;
+  }
+}
+
+/* A menu or popover coming out of the control or point that opened it. Its origin is set where it
+   is used. Closing is instant: the choice is made, and the result should follow at once. */
+.vista-pop {
+  animation: vista-pop 150ms var(--ease-enter) both;
+}
+
+@keyframes vista-pop {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
+@keyframes vista-appear {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes vista-pulse {
+  to {
+    opacity: 0.35;
+  }
+}
+
+/* Reduced motion: the entrance shows its last frame at once, and the loader pulses in place, since
+   it still has to show that something is happening. */
+@media (prefers-reduced-motion: reduce) {
+  .vista-pop,
+  .vista-logo[data-motion="enter"] .vista-logo-arm,
+  .vista-logo[data-motion="enter"] .vista-logo-rise,
+  .vista-logo[data-motion="enter"] .vista-logo-letter {
+    animation: none;
+  }
+
+  .vista-logo[data-motion="loop"] .vista-logo-sun {
+    animation: vista-pulse 800ms ease-in-out infinite alternate;
+  }
 }

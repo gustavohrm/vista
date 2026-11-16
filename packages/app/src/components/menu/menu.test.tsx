@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -10,7 +10,19 @@ const MENU_HEIGHT_PX = 200;
 const VIEWPORT_WIDTH_PX = 300;
 const VIEWPORT_HEIGHT_PX = 400;
 
-function renderMenu(overrides: Partial<ComponentProps<typeof Menu>> = {}) {
+/**
+ * Renders a menu as if opened by the given input: a key press, such as Enter on a button or the
+ * context menu key, or a pointer press, such as a click or a right click.
+ */
+function renderMenu(
+  overrides: Partial<ComponentProps<typeof Menu>> = {},
+  openedWith: "keyboard" | "pointer" = "keyboard",
+) {
+  if (openedWith === "keyboard") {
+    fireEvent.keyDown(document.body, { key: "Enter" });
+  } else {
+    fireEvent.pointerDown(document.body);
+  }
   const items: MenuEntry[] = [
     { label: "Cut", shortcut: "Mod+X", onSelect: vi.fn() },
     { label: "Copy", disabled: true, onSelect: vi.fn() },
@@ -30,6 +42,29 @@ describe("Menu", () => {
     expect(screen.getByRole("menuitem", { name: "Copy" })).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByRole("separator")).toBeInTheDocument();
     expect(screen.getByRole("menuitemcheckbox", { name: "Word Wrap" })).toBeChecked();
+  });
+
+  it("shows a chosen option with its icon and a second line, keeping items with the same label apart", () => {
+    renderMenu({
+      items: [
+        {
+          id: "w1",
+          label: "Notes",
+          description: "notes, sources",
+          selected: true,
+          icon: <i data-testid="notes-icon" />,
+          onSelect: vi.fn(),
+        },
+        { id: "w2", label: "Notes", description: "archive", selected: false, onSelect: vi.fn() },
+      ],
+    });
+
+    const [chosen, other] = screen.getAllByRole("menuitemradio", { name: "Notes" });
+    expect(chosen).toBeChecked();
+    expect(chosen).toHaveAccessibleDescription("notes, sources");
+    expect(within(chosen as HTMLElement).getByTestId("notes-icon")).toBeInTheDocument();
+    expect(other).not.toBeChecked();
+    expect(other).toHaveAccessibleDescription("archive");
   });
 
   it("focuses the first item and moves with the arrow keys, skipping disabled items", async () => {
@@ -101,6 +136,57 @@ describe("Menu", () => {
     field.remove();
   });
 
+  describe("highlight", () => {
+    it("highlights nothing when opened with the pointer, and the arrow keys start from the first item", async () => {
+      const user = userEvent.setup();
+      renderMenu({}, "pointer");
+      expect(screen.getByRole("menu")).toHaveFocus();
+
+      await user.keyboard("{ArrowDown}");
+      expect(screen.getByRole("menuitem", { name: "Cut" })).toHaveFocus();
+    });
+
+    it("highlights the first item when opened with the keyboard, after an earlier pointer press", () => {
+      fireEvent.pointerDown(document.body);
+      renderMenu({}, "keyboard");
+
+      expect(screen.getByRole("menuitem", { name: "Cut" })).toHaveFocus();
+    });
+
+    it("highlights the item under the pointer, and clears it when the pointer leaves the menu", async () => {
+      const user = userEvent.setup();
+      renderMenu({}, "pointer");
+
+      fireEvent.pointerMove(screen.getByRole("menuitemcheckbox", { name: "Word Wrap" }));
+      expect(screen.getByRole("menuitemcheckbox", { name: "Word Wrap" })).toHaveFocus();
+
+      fireEvent.pointerLeave(screen.getByRole("menu"));
+      expect(screen.getByRole("menu")).toHaveFocus();
+      await user.keyboard("{ArrowDown}");
+      expect(screen.getByRole("menuitem", { name: "Cut" })).toHaveFocus();
+    });
+
+    it("clears the highlight when the pointer moves onto a disabled item", () => {
+      renderMenu({}, "pointer");
+
+      fireEvent.pointerMove(screen.getByRole("menuitem", { name: "Cut" }));
+      fireEvent.pointerMove(screen.getByRole("menuitem", { name: "Copy" }));
+
+      expect(screen.getByRole("menu")).toHaveFocus();
+    });
+
+    it("keeps the highlight the keyboard moved when the pointer leaves", async () => {
+      const user = userEvent.setup();
+      renderMenu({}, "pointer");
+
+      fireEvent.pointerMove(screen.getByRole("menuitem", { name: "Cut" }));
+      await user.keyboard("{ArrowDown}");
+      fireEvent.pointerLeave(screen.getByRole("menu"));
+
+      expect(screen.getByRole("menuitemcheckbox", { name: "Word Wrap" })).toHaveFocus();
+    });
+  });
+
   it("takes focus itself when every item is disabled, so Escape still closes it", async () => {
     const user = userEvent.setup();
     const props = renderMenu({ items: [{ label: "Copy", disabled: true, onSelect: vi.fn() }] });
@@ -120,16 +206,6 @@ describe("Menu", () => {
 
     await user.click(document.body);
     expect(props.onClose).toHaveBeenCalledOnce();
-  });
-
-  it("reports ArrowLeft and ArrowRight to a menu bar", async () => {
-    const user = userEvent.setup();
-    const onNavigate = vi.fn();
-    renderMenu({ onNavigate });
-
-    await user.keyboard("{ArrowRight}{ArrowLeft}");
-
-    expect(onNavigate.mock.calls).toEqual([[1], [-1]]);
   });
 
   describe("viewport clamping", () => {

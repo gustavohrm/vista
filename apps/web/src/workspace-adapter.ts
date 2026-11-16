@@ -1,16 +1,19 @@
 import {
+  LEGACY_FOLDER_ID,
   WorkspaceError,
   type FileContents,
   type FileStat,
+  type FolderRelation,
   type RestoreFolderResult,
-  type Workspace,
   type WorkspaceCapability,
+  type WorkspaceFolder,
   type WorkspaceNode,
 } from "@vista/app";
 
-// Version-control internals, installed dependencies, and OS metadata: never notes, and large
-// enough to slow every scan. A folder such as `build` or `.vscode` is shown, since notes can live there.
-const IGNORED_NAMES = new Set([".git", ".svn", ".hg", "node_modules", ".DS_Store", "Thumbs.db"]);
+// Vista's own folder, version-control internals, installed dependencies, and OS metadata: never
+// notes, and large enough to slow every scan. A folder such as `build` or `.vscode` is shown, since
+// notes can live there.
+const IGNORED_NAMES = new Set([".vista", ".git", ".svn", ".hg", "node_modules", ".DS_Store", "Thumbs.db"]);
 
 interface DirectoryInputResult {
   rootName: string;
@@ -406,23 +409,39 @@ async function ensurePermission(handle: FileSystemDirectoryHandle, mode: FsaPerm
   }
 }
 
-const LAST_FOLDER_DATABASE_NAME = "vista";
-const LAST_FOLDER_STORE_NAME = "workspace";
-const LAST_FOLDER_KEY = "lastFolder";
+const FOLDER_DATABASE_NAME = "vista";
+const FOLDER_DATABASE_VERSION = 2;
+const FOLDER_STORE_NAME = "folders";
+// Where version 1 kept the one folder the Vista before workspaces remembered.
+const LEGACY_STORE_NAME = "workspace";
+const LEGACY_FOLDER_KEY = "lastFolder";
 
 /**
- * Opens the IndexedDB database that stores the last opened folder handle.
+ * Opens the IndexedDB database that stores remembered folder handles by id. Upgrading from version 1
+ * moves its one remembered folder under `LEGACY_FOLDER_ID`.
  *
  * @returns The open database, or null when IndexedDB is unavailable in this environment.
  */
-function openLastFolderDatabase(): Promise<IDBDatabase | null> {
+function openFolderDatabase(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === "undefined") {
     return Promise.resolve(null);
   }
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(LAST_FOLDER_DATABASE_NAME, 1);
+    const request = indexedDB.open(FOLDER_DATABASE_NAME, FOLDER_DATABASE_VERSION);
     request.onupgradeneeded = () => {
-      request.result.createObjectStore(LAST_FOLDER_STORE_NAME);
+      const database = request.result;
+      const folders = database.createObjectStore(FOLDER_STORE_NAME);
+      const upgrade = request.transaction;
+      if (!upgrade || !database.objectStoreNames.contains(LEGACY_STORE_NAME)) {
+        return;
+      }
+      const legacy = upgrade.objectStore(LEGACY_STORE_NAME).get(LEGACY_FOLDER_KEY);
+      legacy.onsuccess = () => {
+        if (legacy.result) {
+          folders.put(legacy.result, LEGACY_FOLDER_ID);
+        }
+        database.deleteObjectStore(LEGACY_STORE_NAME);
+      };
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -430,71 +449,99 @@ function openLastFolderDatabase(): Promise<IDBDatabase | null> {
 }
 
 /**
- * Runs a single request against the last-folder object store in its own transaction.
+ * Runs requests against the folder store in one transaction.
  *
- * @param mode - Transaction mode matching the operation.
- * @param operation - Builds the request to run against the object store.
- * @returns The request result, or undefined when IndexedDB is unavailable.
+ * @returns What `operation` resolves to, or undefined when IndexedDB is unavailable.
  */
-async function runLastFolderRequest<T>(
+async function runFolderTransaction<T>(
   mode: IDBTransactionMode,
-  operation: (store: IDBObjectStore) => IDBRequest<T>,
+  operation: (store: IDBObjectStore) => Promise<T>,
 ): Promise<T | undefined> {
-  const database = await openLastFolderDatabase();
+  const database = await openFolderDatabase();
   if (!database) {
     return undefined;
   }
   try {
-    return await new Promise<T>((resolve, reject) => {
-      const transaction = database.transaction(LAST_FOLDER_STORE_NAME, mode);
-      const request = operation(transaction.objectStore(LAST_FOLDER_STORE_NAME));
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+    const transaction = database.transaction(FOLDER_STORE_NAME, mode);
+    const done = new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
     });
+    const result = await operation(transaction.objectStore(FOLDER_STORE_NAME));
+    await done;
+    return result;
   } finally {
     database.close();
   }
 }
 
-/**
- * Reads the remembered folder handle. Read failures are logged and treated as nothing remembered.
- *
- * @returns The remembered directory handle, or null if none is stored or storage failed.
- */
-async function readLastFolderHandle(): Promise<FileSystemDirectoryHandle | null> {
+function requestResult<T>(request: IDBRequest<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+/** A remembered folder's handle. A read failure is logged and read as nothing remembered. */
+async function readFolderHandle(id: string): Promise<FileSystemDirectoryHandle | null> {
   try {
-    const handle = await runLastFolderRequest<FileSystemDirectoryHandle>("readonly", (store) =>
-      store.get(LAST_FOLDER_KEY),
+    const handle = await runFolderTransaction("readonly", (store) =>
+      requestResult<FileSystemDirectoryHandle | undefined>(store.get(id)),
     );
     return handle ?? null;
   } catch (err) {
-    console.warn("Could not read the last opened folder:", err);
+    console.warn("Could not read a remembered folder:", err);
     return null;
   }
 }
 
-/**
- * Remembers a folder handle as the one to restore on the next launch. Failures are logged only.
- *
- * @param handle - Directory handle of the folder that was just opened.
- */
-async function saveLastFolderHandle(handle: FileSystemDirectoryHandle): Promise<void> {
+/** Every remembered folder's handle, by id. A read failure is logged and read as none. */
+async function readFolderHandles(): Promise<[string, FileSystemDirectoryHandle][]> {
   try {
-    await runLastFolderRequest("readwrite", (store) => store.put(handle, LAST_FOLDER_KEY));
+    const entries = await runFolderTransaction("readonly", async (store) => {
+      const [keys, handles] = await Promise.all([
+        requestResult(store.getAllKeys()),
+        requestResult<FileSystemDirectoryHandle[]>(store.getAll()),
+      ]);
+      return keys.map((key, index): [string, FileSystemDirectoryHandle] => [String(key), handles[index]!]);
+    });
+    return entries ?? [];
   } catch (err) {
-    console.warn("Could not remember the opened folder:", err);
+    console.warn("Could not read the remembered folders:", err);
+    return [];
   }
 }
 
-/**
- * Forgets the remembered folder handle. Failures are logged only.
- */
-async function forgetLastFolderHandle(): Promise<void> {
+/** Remembers a folder handle. A failure is logged: the folder still works until the page closes. */
+async function saveFolderHandle(id: string, handle: FileSystemDirectoryHandle): Promise<void> {
   try {
-    await runLastFolderRequest("readwrite", (store) => store.delete(LAST_FOLDER_KEY));
+    await runFolderTransaction("readwrite", (store) => requestResult(store.put(handle, id)));
   } catch (err) {
-    console.warn("Could not forget the last opened folder:", err);
+    console.warn("Could not remember the folder:", err);
   }
+}
+
+/** The id an already remembered handle for the same folder has, if any. */
+async function findRememberedId(handle: FileSystemDirectoryHandle): Promise<string | null> {
+  for (const [id, remembered] of await readFolderHandles()) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- stops at the first match; few folders are remembered
+    if (await remembered.isSameEntry(handle)) {
+      return id;
+    }
+  }
+  return null;
+}
+
+/**
+ * An id for a folder that is never remembered. `crypto.randomUUID` exists only in secure contexts,
+ * and the directory input this id serves is also the fallback outside them.
+ */
+function newSessionId(): string {
+  if (typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 /** A folder opened with the File System Access API, read and written in place. */
@@ -533,14 +580,14 @@ function statOfFile(file: File): FileStat {
  * @returns Configured web workspace capability.
  */
 export function createWebWorkspaceAdapter(): WorkspaceCapability {
-  // Each open workspace keeps its own handles, so an operation always acts on the folder its
-  // workspace names, even after another folder was opened.
-  const sessions = new WeakMap<Workspace, Session>();
+  // Each open folder keeps its own handles under its id, so an operation always acts on the folder
+  // it names.
+  const sessions = new Map<string, Session>();
 
-  function sessionOf(workspace: Workspace): Session {
-    const session = sessions.get(workspace);
+  function sessionOf(folder: WorkspaceFolder): Session {
+    const session = sessions.get(folder.id);
     if (!session) {
-      throw new Error(`"${workspace.name}" is no longer open. Open the folder again.`);
+      throw new Error(`"${folder.name}" is no longer open. Open the folder again.`);
     }
     return session;
   }
@@ -650,10 +697,9 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
     }
   }
 
-  function adoptDirectoryHandle(dirHandle: FileSystemDirectoryHandle): Workspace {
-    const workspace: Workspace = { id: dirHandle.name, name: dirHandle.name, rootPath: "/", accessMode: "direct" };
-    sessions.set(workspace, { kind: "direct", root: dirHandle, fileHandles: new Map() });
-    return workspace;
+  function adoptDirectoryHandle(id: string, dirHandle: FileSystemDirectoryHandle): WorkspaceFolder {
+    sessions.set(id, { kind: "direct", root: dirHandle, fileHandles: new Map() });
+    return { id, name: dirHandle.name, rootPath: "/", accessMode: "direct" };
   }
 
   async function readFallbackFile(session: FallbackSession, path: string): Promise<FileContents | null> {
@@ -671,7 +717,7 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
   return {
     isSupported: typeof window !== "undefined",
 
-    async openFolder(): Promise<Workspace | null> {
+    async pickFolder(): Promise<WorkspaceFolder | null> {
       // Attempt 1: File System Access API (Chrome, Edge, Opera)
       interface FsaWindow {
         showDirectoryPicker?: (options?: { mode?: "read" | "readwrite" }) => Promise<FileSystemDirectoryHandle>;
@@ -692,9 +738,9 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
             mode: "read",
           });
 
-          const workspace = adoptDirectoryHandle(dirHandle);
-          await saveLastFolderHandle(dirHandle);
-          return workspace;
+          const id = (await findRememberedId(dirHandle)) ?? crypto.randomUUID();
+          await saveFolderHandle(id, dirHandle);
+          return adoptDirectoryHandle(id, dirHandle);
         } catch (err) {
           if (err instanceof DOMException && err.name === "AbortError") {
             return null; // User cancelled the picker
@@ -708,26 +754,19 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
       if (!inputResult) {
         return null;
       }
-      // This folder cannot be reopened without a picker, so drop the previously remembered one.
-      await forgetLastFolderHandle();
-
-      const workspace: Workspace = {
-        id: inputResult.rootName,
-        name: inputResult.rootName,
-        rootPath: "/",
-        accessMode: "fallback",
-      };
-      sessions.set(workspace, {
+      // Never remembered: this folder cannot be reopened without a picker.
+      const id = newSessionId();
+      sessions.set(id, {
         kind: "fallback",
         tree: inputResult.nodes,
         files: new Map(inputResult.fileMap),
         saved: new Map(),
       });
-      return workspace;
+      return { id, name: inputResult.rootName, rootPath: "/", accessMode: "fallback" };
     },
 
-    async restoreFolder({ interactive }: { interactive: boolean }): Promise<RestoreFolderResult> {
-      const handle = await readLastFolderHandle();
+    async restoreFolder(id: string, { interactive }: { interactive: boolean }): Promise<RestoreFolderResult> {
+      const handle = await readFolderHandle(id);
       if (!handle) {
         return { status: "none" };
       }
@@ -750,16 +789,51 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
         // Reading the first entry proves the folder still exists and is readable.
         await handle.values().next();
       } catch (err) {
-        console.warn(`Could not reopen the last folder "${handle.name}":`, err);
-        await forgetLastFolderHandle();
+        console.warn(`Could not reopen the folder "${handle.name}":`, err);
         return { status: "unavailable", name: handle.name };
       }
 
-      return { status: "restored", workspace: adoptDirectoryHandle(handle) };
+      return { status: "restored", folder: adoptDirectoryHandle(id, handle) };
     },
 
-    async readTree(workspace: Workspace): Promise<WorkspaceNode[]> {
-      const session = sessionOf(workspace);
+    async forgetFolder(id: string): Promise<void> {
+      // The app forgets only folders no workspace uses, so their handles and fallback bytes can go too.
+      sessions.delete(id);
+      await runFolderTransaction("readwrite", (store) => requestResult(store.delete(id)));
+    },
+
+    async relate(a: WorkspaceFolder, b: WorkspaceFolder): Promise<FolderRelation> {
+      const left = sessionOf(a);
+      const right = sessionOf(b);
+      // A folder picked through a directory input has no handle to compare, only its own id.
+      if (left.kind === "fallback" || right.kind === "fallback") {
+        return a.id === b.id ? "same" : "separate";
+      }
+      if (await left.root.isSameEntry(right.root)) {
+        return "same";
+      }
+      if ((await left.root.resolve(right.root)) !== null) {
+        return "contains";
+      }
+      return (await right.root.resolve(left.root)) !== null ? "inside" : "separate";
+    },
+
+    // A handle only knows the entries inside it, so a folder anywhere else has no location.
+    async relativeLocation(from: WorkspaceFolder, to: WorkspaceFolder): Promise<string | null> {
+      const source = sessionOf(from);
+      const target = sessionOf(to);
+      if (source.kind === "fallback" || target.kind === "fallback") {
+        return null;
+      }
+      const segments = await source.root.resolve(target.root);
+      if (segments === null) {
+        return null;
+      }
+      return segments.length === 0 ? "." : segments.join("/");
+    },
+
+    async readTree(folder: WorkspaceFolder): Promise<WorkspaceNode[]> {
+      const session = sessionOf(folder);
       if (session.kind === "direct") {
         await ensurePermission(session.root, "read");
         session.fileHandles.clear();
@@ -770,8 +844,8 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
       return structuredClone(session.tree);
     },
 
-    async stat(workspace: Workspace, path: string): Promise<FileStat | null> {
-      const session = sessionOf(workspace);
+    async stat(folder: WorkspaceFolder, path: string): Promise<FileStat | null> {
+      const session = sessionOf(folder);
       if (session.kind === "direct") {
         await ensurePermission(session.root, "read");
         const file = await currentFile(session, path);
@@ -785,8 +859,8 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
       return file ? statOfFile(file) : null;
     },
 
-    async readFile(workspace: Workspace, path: string): Promise<FileContents> {
-      const session = sessionOf(workspace);
+    async readFile(folder: WorkspaceFolder, path: string): Promise<FileContents> {
+      const session = sessionOf(folder);
       if (session.kind === "direct") {
         await ensurePermission(session.root, "read");
         const file = await currentFile(session, path);
@@ -803,12 +877,12 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
     },
 
     async writeFile(
-      workspace: Workspace,
+      folder: WorkspaceFolder,
       path: string,
       bytes: Uint8Array<ArrayBuffer>,
       options?: { expected?: FileStat },
     ): Promise<FileStat> {
-      const session = sessionOf(workspace);
+      const session = sessionOf(folder);
       if (session.kind === "direct") {
         await ensurePermission(session.root, "readwrite");
         const expected = options?.expected;
@@ -839,8 +913,8 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
       return { ...stat };
     },
 
-    async createFile(workspace: Workspace, path: string): Promise<void> {
-      const session = sessionOf(workspace);
+    async createFile(folder: WorkspaceFolder, path: string): Promise<void> {
+      const session = sessionOf(folder);
       const { parentPath, name } = splitPath(path);
 
       if (session.kind === "direct") {
@@ -867,8 +941,8 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
       session.saved.set(path, { bytes: new Uint8Array(), stat: { size: 0, modifiedAt: Date.now() } });
     },
 
-    async createDirectory(workspace: Workspace, path: string): Promise<void> {
-      const session = sessionOf(workspace);
+    async createDirectory(folder: WorkspaceFolder, path: string): Promise<void> {
+      const session = sessionOf(folder);
       const { parentPath, name } = splitPath(path);
 
       if (session.kind === "direct") {
@@ -892,8 +966,8 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
       sortNodes(siblings);
     },
 
-    async move(workspace: Workspace, fromPath: string, toPath: string): Promise<void> {
-      const session = sessionOf(workspace);
+    async move(folder: WorkspaceFolder, fromPath: string, toPath: string): Promise<void> {
+      const session = sessionOf(folder);
       if (session.kind === "direct") {
         await ensurePermission(session.root, "readwrite");
         const { parent: sourceParent, name: sourceName } = await resolveParentDirectoryHandle(session, fromPath);
@@ -959,8 +1033,8 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
       }
     },
 
-    async remove(workspace: Workspace, path: string): Promise<void> {
-      const session = sessionOf(workspace);
+    async remove(folder: WorkspaceFolder, path: string): Promise<void> {
+      const session = sessionOf(folder);
       if (session.kind === "direct") {
         await ensurePermission(session.root, "readwrite");
         const { parent, name } = await resolveParentDirectoryHandle(session, path);

@@ -12,11 +12,23 @@ export interface FileSettings {
   maxOpenSizeMb: number;
 }
 
+/** When the desktop app asks for a newer version. */
+export interface UpdateSettings {
+  /** Whether to check at every start. Off by default, so Vista makes no update request the user didn't ask for. */
+  checkAtStartup: boolean;
+  /**
+   * The version whose update notice the user dismissed, so the notice stays away until a newer one
+   * is out. Null when none was dismissed.
+   */
+  dismissedVersion: string | null;
+}
+
 /** User preferences, stored by the browser or webview under `SETTINGS_STORAGE_KEY`. */
 export interface Settings {
   version: 1;
   editor: EditorSettings;
   files: FileSettings;
+  updates: UpdateSettings;
 }
 
 export const SETTINGS_STORAGE_KEY = "vista.settings";
@@ -36,10 +48,16 @@ export const MAX_OPEN_SIZE_MB_LIMIT = 512;
 /** Far above a note or a spreadsheet export, and below where the editors stop responding. */
 export const DEFAULT_FILE_SETTINGS: FileSettings = { maxOpenSizeMb: 10 };
 
+export const DEFAULT_UPDATE_SETTINGS: UpdateSettings = { checkAtStartup: false, dismissedVersion: null };
+
+/** Longer than any version Vista publishes, such as `1.2.3-beta.4`, and short enough to bound a damaged store. */
+const MAX_VERSION_LENGTH = 64;
+
 export const DEFAULT_SETTINGS: Settings = {
   version: 1,
   editor: DEFAULT_EDITOR_SETTINGS,
   files: DEFAULT_FILE_SETTINGS,
+  updates: DEFAULT_UPDATE_SETTINGS,
 };
 
 export const BYTES_PER_MB = 1024 * 1024;
@@ -71,7 +89,12 @@ export function parseSettings(stored: string | null): Settings {
   if (!isRecord(value) || value.version !== 1) {
     return DEFAULT_SETTINGS;
   }
-  return { version: 1, editor: parseEditorSettings(value.editor), files: parseFileSettings(value.files) };
+  return {
+    version: 1,
+    editor: parseEditorSettings(value.editor),
+    files: parseFileSettings(value.files),
+    updates: parseUpdateSettings(value.updates),
+  };
 }
 
 function parseEditorSettings(value: unknown): EditorSettings {
@@ -93,6 +116,20 @@ function parseFileSettings(value: unknown): FileSettings {
     return DEFAULT_FILE_SETTINGS;
   }
   return { maxOpenSizeMb: value.maxOpenSizeMb };
+}
+
+function parseUpdateSettings(value: unknown): UpdateSettings {
+  if (!isRecord(value)) {
+    return DEFAULT_UPDATE_SETTINGS;
+  }
+  const { checkAtStartup, dismissedVersion } = value;
+  return {
+    checkAtStartup: typeof checkAtStartup === "boolean" ? checkAtStartup : DEFAULT_UPDATE_SETTINGS.checkAtStartup,
+    dismissedVersion:
+      typeof dismissedVersion === "string" && dismissedVersion !== "" && dismissedVersion.length <= MAX_VERSION_LENGTH
+        ? dismissedVersion
+        : DEFAULT_UPDATE_SETTINGS.dismissedVersion,
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

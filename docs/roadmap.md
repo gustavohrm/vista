@@ -1,6 +1,6 @@
 ---
 status: DRAFT
-last_updated: 2026-11-13
+last_updated: 2026-11-16
 scope: Repo-wide direction for Vista, limited to work already stated in the repository's docs and READMEs.
 ---
 
@@ -8,40 +8,39 @@ scope: Repo-wide direction for Vista, limited to work already stated in the repo
 
 ## Purpose
 
-Durable direction for Vista: what is planned, what is possible later, and what has been ruled out. Every entry below is taken from a document in this repository, and the source is cited. Nothing here is a new commitment.
+Durable direction for Vista: the current focus, what is planned, what is possible later, and what has been ruled out. Every entry below is taken from a document in this repository, and the source is cited. Nothing here is a new commitment. What Vista does today is in [Workspaces](specs/workspaces.md), not here.
 
 ## Current Focus
 
-- **Releasing the web and desktop apps.** Windows is the primary desktop platform and Linux the second. CI builds the Windows and Linux installers on every change, and a release tag signs and publishes them with the web app, which the desktop updater checks. Source: `docs/ci.md`, "Releases".
+- None at the moment. The next focus is chosen from [Planned](#planned).
 
 ## Planned
 
-- **Mobile folder access (Android and iOS).** Mobile targets remain planned for the Tauri host, but opening, remembering, and restoring folders is desktop-only until mobile folder access and platform permissions are designed and tested. Support is not claimed before validation on those platforms. Sources: `apps/native/README.md` ("Mobile folder access is not supported yet"); `docs/architecture.md` ("remain planned targets").
-- **Backlinks, folder search, and data export.** Listed as planned capabilities. Source: `README.md` ("Planned capabilities include ... backlinks, folder search, and data export").
+- **Workspace search.** Searching inside file contents, in its own view behind the left rail's **Search** button, which is shown disabled with `Coming soon`. Finding a file by name is already the go-to picker. Source: `docs/specs/workspaces.md`, "Shell layout" and "Go to file and line".
+- **Graph view and backlinks.** The rail's **Graph** button is shown disabled with `Coming soon`. Sources: `docs/specs/workspaces.md`, "Shell layout"; `README.md`.
+- **Data export.** Source: `README.md`.
+- **Moving files between workspace folders.** Moves work within one folder until the host contract gains a copy between folders. Source: `docs/specs/workspaces.md`, "Folder rules".
+- **More file formats.** `.json`, `.yaml`, canvas representations, and embedded graph links. Source: `docs/specs/workspaces.md`, "Supported formats & view modes".
+- **More interface themes.** Daylight as a theme of its own, and a monochrome one, beside today's light and dark appearances. Source: `docs/guidelines/brand.md`, "Colours".
+- **Mobile folder access (Android and iOS).** The Tauri host builds for both, but opening, remembering, and restoring folders is desktop-only until mobile folder access and platform permissions are designed and tested. Support is not claimed before validation on those platforms. Sources: `apps/native/README.md`, "Mobile preparation"; `docs/architecture.md`, "Platform scope".
 - **App-store distribution and operating-system code signing for the native app.** Installers are signed for the updater, not by a code-signing certificate, and are not in any app store. Source: `apps/native/README.md`.
-- **Additional file formats.** Future versions will expand to `.json`, `.yaml`, canvas representations, and embedded graph links. Source: `docs/specs/workspaces.md` ("Future versions will expand to ...").
 
 ## Later / Possible
 
-- **Multi-root workspaces.** Only one folder is active in v1. The capability contract and state models use opaque identifiers and collections so multi-root support is not blocked later. Source: `docs/specs/workspaces.md`. This is a design accommodation, not a commitment.
-- **Feature routing in the web host.** Source: `apps/web/README.md` ("Feature routing is not implemented yet.").
-- **Workspace support in other desktop browsers.** The web host's initial target is current desktop Chrome and Edge. Source: `apps/web/README.md`.
+- **Workspace support in other desktop browsers.** The web host targets current desktop Chrome and Edge; other browsers get the `webkitdirectory` fallback. Source: `apps/web/README.md`, "Browser scope".
+- **macOS builds.** macOS is not built or tested. Sources: `docs/architecture.md`, "Platform scope"; `docs/ci.md`, "Not covered yet".
 
 ## Not Planned
 
 - **Byte-for-byte Markdown round-trip.** No WYSIWYG editor guarantees it. Re-serializing untouched content can normalize list markers, such as `-` and `+` becoming `*`. The project treats this as intentional normalization, not data loss, and asserts the accepted cases in `packages/app/src/components/editor/markdown-round-trip.test.ts`. Source: `docs/specs/workspaces.md`, "Known limitation".
-- **Browser-private storage in place of user folders.** The web MVP operates on user-selected folders through the File System Access API rather than substituting browser-private storage. Source: `docs/architecture.md`, "Initial platform scope".
+- **Browser-private storage in place of user folders.** The web host operates on user-selected folders through the File System Access API rather than substituting browser-private storage. Source: `docs/architecture.md`, "Platform scope".
 - **Equivalent workspace access in mobile browsers and browsers without folder APIs.** These are not promised equivalent access, because folder access depends on the File System Access API. Sources: `apps/web/README.md`; `docs/architecture.md` ("A shared web UI does not imply identical filesystem access across platforms").
-
-## Notes
-
-- `README.md` lists "rich Markdown editing" and "structured CSV views" as planned. `docs/specs/workspaces.md` describes a WYSIWYG Markdown editor and a CSV table editor as implemented, so neither is carried above. The `packages/app` source has both (`markdown-editor.tsx`, `csv-table-editor.tsx`).
-- "Product features are not implemented yet" (`README.md`) is a general status statement. Individual implemented features are described in `docs/specs/workspaces.md`.
 
 ## References
 
-- `README.md` — project status and planned capabilities.
-- `docs/architecture.md` — platform scope and the Cloudflare decision.
-- `docs/specs/workspaces.md` — v1 scope, known limitations, future formats.
-- `apps/native/README.md` — mobile limits and beta preparation.
-- `apps/web/README.md` — web host status and browser targets.
+- `README.md`: what Vista does and its planned capabilities.
+- `docs/architecture.md`: platform scope and the hosting decision.
+- `docs/specs/workspaces.md`: what is built, its known limitations, and the formats still to come.
+- `docs/guidelines/brand.md`: the themes Daylight is meant to become.
+- `apps/native/README.md`: mobile limits and distribution.
+- `apps/web/README.md`: browser targets.

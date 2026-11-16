@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./test";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixtureVaultPath = path.join(__dirname, "fixtures", "sample-vault");
@@ -34,8 +34,11 @@ test.describe("editor settings and go-to", () => {
     await openNotesRaw(page);
     await expect(page.locator(".cm-lineNumbers")).toBeVisible();
 
-    await page.getByRole("button", { name: "Editor settings" }).click();
-    await page.getByRole("menuitemcheckbox", { name: "Line numbers" }).click();
+    await page.keyboard.press("Control+Comma");
+    const settings = page.getByRole("region", { name: "Settings" });
+    await settings.getByRole("button", { name: "Editor" }).click();
+    await settings.getByRole("switch", { name: "Line numbers" }).click();
+    await page.keyboard.press("Escape");
     await expect(page.locator(".cm-lineNumbers")).toHaveCount(0);
 
     await page.reload();
@@ -43,8 +46,9 @@ test.describe("editor settings and go-to", () => {
     await openNotesRaw(page);
 
     await expect(page.locator(".cm-lineNumbers")).toHaveCount(0);
-    await page.getByRole("button", { name: "Editor settings" }).click();
-    await expect(page.getByRole("menuitemcheckbox", { name: "Line numbers" })).not.toBeChecked();
+    await page.keyboard.press("Control+Comma");
+    await settings.getByRole("button", { name: "Editor" }).click();
+    await expect(settings.getByRole("switch", { name: "Line numbers" })).not.toBeChecked();
   });
 
   test("runs a command from the picker in the editor it was opened from", async ({ page }) => {

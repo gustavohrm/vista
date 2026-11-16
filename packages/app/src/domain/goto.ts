@@ -11,6 +11,8 @@ export interface GoToTarget {
 /** A file that matches a go-to query. */
 export interface FileMatch {
   path: string;
+  /** Where the path was in the list ranked, which tells equal paths apart. */
+  index: number;
   /** Indices of the path's characters that matched, for highlighting. */
   positions: number[];
 }
@@ -36,28 +38,31 @@ export function parseGoToQuery(query: string): GoToTarget {
  * Ranks workspace files against a fuzzy query. The query's characters must appear in the path in
  * order, case ignored; matches in the file name, at word starts, and in runs rank higher.
  *
- * @param paths - Workspace-relative file paths.
+ * @param paths - File paths as the picker shows them.
  * @param query - The file part of a go-to query. Spaces are ignored.
  * @returns The best matches, best first, at most `GO_TO_RESULT_LIMIT`.
  */
 export function rankFiles(paths: readonly string[], query: string): FileMatch[] {
   const needle = foldCase(query.replaceAll(" ", ""));
   if (needle === "") {
-    return [...paths]
-      .sort((a, b) => a.localeCompare(b))
-      .slice(0, GO_TO_RESULT_LIMIT)
-      .map((path) => ({ path, positions: [] }));
+    return paths
+      .map((path, index) => ({ path, index, positions: [] }))
+      .sort((a, b) => a.path.localeCompare(b.path) || a.index - b.index)
+      .slice(0, GO_TO_RESULT_LIMIT);
   }
   const scored: { match: FileMatch; score: number }[] = [];
-  for (const path of paths) {
+  paths.forEach((path, index) => {
     const result = scorePath(path, needle);
     if (result) {
-      scored.push({ match: { path, positions: result.positions }, score: result.score });
+      scored.push({ match: { path, index, positions: result.positions }, score: result.score });
     }
-  }
+  });
   scored.sort(
     (a, b) =>
-      b.score - a.score || a.match.path.length - b.match.path.length || a.match.path.localeCompare(b.match.path),
+      b.score - a.score ||
+      a.match.path.length - b.match.path.length ||
+      a.match.path.localeCompare(b.match.path) ||
+      a.match.index - b.match.index,
   );
   return scored.slice(0, GO_TO_RESULT_LIMIT).map(({ match }) => match);
 }

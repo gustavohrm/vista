@@ -24,6 +24,7 @@
     "@codenhub/styles": "catalog:",
     "@codenhub/theme": "catalog:",
     "@codenhub/toaster": "catalog:",
+    "@fontsource-variable/inter": "catalog:",
     "@lezer/common": "catalog:",
     "@lezer/highlight": "catalog:",
     "@milkdown/core": "catalog:",
@@ -33,6 +34,7 @@
     "@milkdown/preset-gfm": "catalog:",
     "@replit/codemirror-minimap": "catalog:",
     "@replit/codemirror-vim": "catalog:",
+    "motion": "catalog:",
     "papaparse": "catalog:",
     "react": "catalog:"
   },

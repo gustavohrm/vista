@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { MAX_TABLE_CELLS } from "../domain/csv";
 import {
   documentKey,
   documentsReducer,
@@ -19,8 +20,7 @@ function loaded(content: string, changes?: Partial<LoadedFile>): LoadedFile {
 
 function openAll(...paths: string[]): DocumentsState {
   return paths.reduce(
-    (state, path) =>
-      documentsReducer(state, { type: "open", workspaceId: WS, path, file: loaded(`content of ${path}`) }),
+    (state, path) => documentsReducer(state, { type: "open", folderId: WS, path, file: loaded(`content of ${path}`) }),
     INITIAL_DOCUMENTS_STATE,
   );
 }
@@ -36,7 +36,7 @@ describe("documentsReducer", () => {
     expect(state.documents).toEqual([
       {
         key: documentKey(WS, "notes/todo.md"),
-        workspaceId: WS,
+        folderId: WS,
         path: "notes/todo.md",
         name: "todo.md",
         extension: "md",
@@ -48,21 +48,22 @@ describe("documentsReducer", () => {
         isReadOnly: false,
         externalChange: null,
         revision: 0,
+        isPending: false,
       },
     ]);
     expect(state.activeKey).toBe(documentKey(WS, "notes/todo.md"));
   });
 
-  it("opens CSV and plain text in raw mode", () => {
+  it("opens CSV in the table and plain text raw", () => {
     const state = openAll("data.csv", "a.txt");
 
-    expect(state.documents.map((doc) => doc.viewMode)).toEqual(["raw", "raw"]);
+    expect(state.documents.map((doc) => doc.viewMode)).toEqual(["enriched", "raw"]);
   });
 
   it("activates the existing tab instead of reloading a document that is already open", () => {
     let state = openAll("a.md", "b.md");
     state = documentsReducer(state, { type: "edit", key: documentKey(WS, "a.md"), content: "edited" });
-    state = documentsReducer(state, { type: "open", workspaceId: WS, path: "a.md", file: loaded("from disk") });
+    state = documentsReducer(state, { type: "open", folderId: WS, path: "a.md", file: loaded("from disk") });
 
     expect(paths(state)).toEqual(["a.md", "b.md"]);
     expect(state.documents[0]?.content).toBe("edited");
@@ -72,9 +73,33 @@ describe("documentsReducer", () => {
   it("inserts a new tab to the right of the active tab", () => {
     let state = openAll("a.md", "b.md");
     state = documentsReducer(state, { type: "activate", key: documentKey(WS, "a.md") });
-    state = documentsReducer(state, { type: "open", workspaceId: WS, path: "c.md", file: loaded("") });
+    state = documentsReducer(state, { type: "open", folderId: WS, path: "c.md", file: loaded("") });
 
     expect(paths(state)).toEqual(["a.md", "c.md", "b.md"]);
+  });
+
+  it("moves a tab to another place, keeping the active tab", () => {
+    const state = openAll("a.md", "b.md", "c.md");
+    const active = state.activeKey;
+
+    const moved = documentsReducer(state, { type: "reorder", key: documentKey(WS, "a.md"), toIndex: 2 });
+    expect(paths(moved)).toEqual(["b.md", "c.md", "a.md"]);
+    expect(moved.activeKey).toBe(active);
+
+    const back = documentsReducer(moved, { type: "reorder", key: documentKey(WS, "a.md"), toIndex: 0 });
+    expect(paths(back)).toEqual(["a.md", "b.md", "c.md"]);
+  });
+
+  it("keeps a moved tab within the row, and ignores a move that changes nothing", () => {
+    const state = openAll("a.md", "b.md", "c.md");
+    const move = (path: string, toIndex: number) =>
+      documentsReducer(state, { type: "reorder", key: documentKey(WS, path), toIndex });
+
+    expect(paths(move("a.md", 9))).toEqual(["b.md", "c.md", "a.md"]);
+    expect(paths(move("b.md", -1))).toEqual(["b.md", "a.md", "c.md"]);
+    expect(move("a.md", -1)).toBe(state);
+    expect(move("c.md", 3)).toBe(state);
+    expect(move("x.md", 0)).toBe(state);
   });
 
   it("marks a document dirty when edited", () => {
@@ -164,7 +189,7 @@ describe("documentsReducer", () => {
   it("renames an open file in place, keeping its buffer and active state", () => {
     let state = openAll("a.md");
     state = documentsReducer(state, { type: "edit", key: documentKey(WS, "a.md"), content: "unsaved" });
-    state = documentsReducer(state, { type: "move", workspaceId: WS, fromPath: "a.md", toPath: "b.md" });
+    state = documentsReducer(state, { type: "move", folderId: WS, fromPath: "a.md", toPath: "b.md" });
 
     expect(state.documents[0]).toMatchObject({
       key: documentKey(WS, "b.md"),
@@ -178,14 +203,14 @@ describe("documentsReducer", () => {
 
   it("moves every open file inside a renamed folder, and nothing outside it", () => {
     let state = openAll("docs/a.md", "docs/sub/b.md", "docs-old/c.md");
-    state = documentsReducer(state, { type: "move", workspaceId: WS, fromPath: "docs", toPath: "notes" });
+    state = documentsReducer(state, { type: "move", folderId: WS, fromPath: "docs", toPath: "notes" });
 
     expect(paths(state)).toEqual(["notes/a.md", "notes/sub/b.md", "docs-old/c.md"]);
   });
 
   it("updates the view mode when a rename changes the format", () => {
     let state = openAll("a.md");
-    state = documentsReducer(state, { type: "move", workspaceId: WS, fromPath: "a.md", toPath: "a.txt" });
+    state = documentsReducer(state, { type: "move", folderId: WS, fromPath: "a.md", toPath: "a.txt" });
 
     expect(state.documents[0]).toMatchObject({ extension: "txt", viewMode: "raw" });
   });
@@ -195,7 +220,7 @@ describe("findAffectedDocuments", () => {
   it("finds the file itself and everything under a folder path", () => {
     const state = openAll("docs/a.md", "docs/sub/b.md", "docs-old/c.md", "docs");
 
-    expect(findAffectedDocuments(state, { workspaceId: WS, path: "docs" }).map((doc) => doc.path)).toEqual([
+    expect(findAffectedDocuments(state, { folderId: WS, path: "docs" }).map((doc) => doc.path)).toEqual([
       "docs/a.md",
       "docs/sub/b.md",
       "docs",
@@ -205,7 +230,7 @@ describe("findAffectedDocuments", () => {
   it("ignores documents from other workspaces", () => {
     const state = openAll("a.md");
 
-    expect(findAffectedDocuments(state, { workspaceId: "other", path: "a.md" })).toEqual([]);
+    expect(findAffectedDocuments(state, { folderId: "other", path: "a.md" })).toEqual([]);
   });
 
   describe("changes on disk", () => {
@@ -285,7 +310,7 @@ describe("findAffectedDocuments", () => {
   it("ignores edits to a read-only document", () => {
     const state = documentsReducer(INITIAL_DOCUMENTS_STATE, {
       type: "open",
-      workspaceId: WS,
+      folderId: WS,
       path: "legacy.csv",
       file: loaded("a�b", { isReadOnly: true }),
     });
@@ -296,13 +321,148 @@ describe("findAffectedDocuments", () => {
   it("keeps a read-only document in the raw view, the only view that shows it read-only", () => {
     let state = documentsReducer(INITIAL_DOCUMENTS_STATE, {
       type: "open",
-      workspaceId: WS,
+      folderId: WS,
       path: "legacy.md",
       file: loaded("text", { isReadOnly: true }),
     });
     expect(state.documents[0]?.viewMode).toBe("raw");
     state = documentsReducer(state, { type: "setViewMode", key: documentKey(WS, "legacy.md"), viewMode: "enriched" });
 
+    expect(state.documents[0]?.viewMode).toBe("raw");
+  });
+});
+
+describe("restored tabs", () => {
+  function restore(state = INITIAL_DOCUMENTS_STATE): DocumentsState {
+    return documentsReducer(state, {
+      type: "restore",
+      tabs: [
+        { folderId: WS, path: "a.md", viewMode: "raw" },
+        { folderId: WS, path: "b.md", viewMode: "enriched" },
+      ],
+      activeIndex: 1,
+    });
+  }
+
+  it("adds pending tabs in session order with their view modes and the active one", () => {
+    const state = restore();
+
+    expect(paths(state)).toEqual(["a.md", "b.md"]);
+    expect(state.documents.map((doc) => [doc.isPending, doc.viewMode])).toEqual([
+      [true, "raw"],
+      [true, "enriched"],
+    ]);
+    expect(state.activeKey).toBe(documentKey(WS, "b.md"));
+  });
+
+  it("keeps a view mode the file type does not offer out of a restored tab", () => {
+    const state = documentsReducer(INITIAL_DOCUMENTS_STATE, {
+      type: "restore",
+      tabs: [{ folderId: WS, path: "a.txt", viewMode: "enriched" }],
+      activeIndex: 0,
+    });
+
+    expect(state.documents[0]?.viewMode).toBe("raw");
+  });
+
+  it("puts restored tabs before tabs opened meanwhile, which stay active", () => {
+    const state = restore(openAll("b.md", "c.md"));
+
+    expect(paths(state)).toEqual(["a.md", "b.md", "c.md"]);
+    expect(state.documents[1]?.isPending).toBe(false);
+    expect(state.activeKey).toBe(documentKey(WS, "c.md"));
+  });
+
+  it("replaces a pending tab in place when its file is read, keeping its view mode", () => {
+    let state = restore();
+    state = documentsReducer(state, { type: "activate", key: documentKey(WS, "a.md") });
+    state = documentsReducer(state, { type: "open", folderId: WS, path: "a.md", file: loaded("text") });
+
+    expect(paths(state)).toEqual(["a.md", "b.md"]);
+    expect(state.documents[0]).toMatchObject({ isPending: false, content: "text", viewMode: "raw", diskStat: STAT });
+    expect(state.activeKey).toBe(documentKey(WS, "a.md"));
+  });
+
+  it("leaves the tab the user switched to active when a pending tab's read finishes", () => {
+    let state = restore();
+    state = documentsReducer(state, { type: "activate", key: documentKey(WS, "a.md") });
+    state = documentsReducer(state, { type: "activate", key: documentKey(WS, "b.md") });
+    state = documentsReducer(state, { type: "open", folderId: WS, path: "a.md", file: loaded("text") });
+
+    expect(state.documents[0]?.isPending).toBe(false);
+    expect(state.activeKey).toBe(documentKey(WS, "b.md"));
+  });
+
+  it("ignores edits and disk changes for a tab not read yet", () => {
+    const key = documentKey(WS, "a.md");
+    let state = restore();
+    const before = state;
+    state = documentsReducer(state, { type: "edit", key, content: "typed" });
+    state = documentsReducer(state, { type: "diskChanged", key, stat: null });
+
+    expect(state).toBe(before);
+  });
+});
+
+describe("CSV files too large for the table", () => {
+  /** A CSV with one more record than the table shows, at one column per record. */
+  const tooLarge = Array.from({ length: MAX_TABLE_CELLS + 1 }, (_, index) => `${index}`).join("\n");
+
+  it("opens one in the raw view", () => {
+    const state = documentsReducer(INITIAL_DOCUMENTS_STATE, {
+      type: "open",
+      folderId: WS,
+      path: "big.csv",
+      file: loaded(tooLarge),
+    });
+    expect(state.documents[0]?.viewMode).toBe("raw");
+  });
+
+  it("still opens a small one in the table", () => {
+    const state = documentsReducer(INITIAL_DOCUMENTS_STATE, {
+      type: "open",
+      folderId: WS,
+      path: "small.csv",
+      file: loaded("Name\nAda\n"),
+    });
+    expect(state.documents[0]?.viewMode).toBe("enriched");
+  });
+
+  it("moves a table to the raw view when an edit grows it past the limit", () => {
+    let state = documentsReducer(INITIAL_DOCUMENTS_STATE, {
+      type: "open",
+      folderId: WS,
+      path: "small.csv",
+      file: loaded("Name\nAda\n"),
+    });
+    state = documentsReducer(state, { type: "edit", key: documentKey(WS, "small.csv"), content: tooLarge });
+    expect(state.documents[0]?.viewMode).toBe("raw");
+  });
+
+  it("keeps one in the raw view when the table is asked for", () => {
+    let state = documentsReducer(INITIAL_DOCUMENTS_STATE, {
+      type: "open",
+      folderId: WS,
+      path: "big.csv",
+      file: loaded(tooLarge),
+    });
+    state = documentsReducer(state, { type: "setViewMode", key: documentKey(WS, "big.csv"), viewMode: "enriched" });
+    expect(state.documents[0]?.viewMode).toBe("raw");
+  });
+
+  it("moves a tab to the raw view when the file grows past the limit on disk", () => {
+    let state = documentsReducer(INITIAL_DOCUMENTS_STATE, {
+      type: "open",
+      folderId: WS,
+      path: "grows.csv",
+      file: loaded("Name\nAda\n"),
+    });
+    state = documentsReducer(state, {
+      type: "reloaded",
+      key: documentKey(WS, "grows.csv"),
+      expected: STAT,
+      file: loaded(tooLarge, { stat: NEWER_STAT }),
+    });
     expect(state.documents[0]?.viewMode).toBe("raw");
   });
 });

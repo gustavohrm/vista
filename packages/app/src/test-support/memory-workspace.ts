@@ -1,6 +1,12 @@
 import { vi, type Mock } from "vitest";
 
-import { WorkspaceError, type FileStat, type WorkspaceCapability, type WorkspaceNode } from "../ports";
+import {
+  WorkspaceError,
+  type FileStat,
+  type FolderRelation,
+  type WorkspaceCapability,
+  type WorkspaceNode,
+} from "../ports";
 
 type MockedCapability = {
   [Name in keyof WorkspaceCapability]: WorkspaceCapability[Name] extends (...args: infer A) => infer R
@@ -66,8 +72,10 @@ export function createMemoryWorkspace(
 
   const capability: MockedCapability = {
     isSupported: true,
-    openFolder: vi.fn(async () => ({ id: WORKSPACE_ID, name: "My Notes", rootPath: "/notes" })),
+    pickFolder: vi.fn(async () => ({ id: WORKSPACE_ID, name: "My Notes", rootPath: "/notes" })),
     restoreFolder: vi.fn(async () => ({ status: "none" as const })),
+    forgetFolder: vi.fn(async () => {}),
+    relate: vi.fn(async (a, b) => relatePaths(a.rootPath, b.rootPath)),
     readTree: vi.fn(async () => structuredClone(tree ?? flatTree())),
     stat: vi.fn(async (_workspace, path) => {
       const file = stored.get(path);
@@ -155,6 +163,17 @@ export function createMemoryWorkspace(
     changeExternally: (path, content) => void put(path, content),
     deleteExternally: (path) => void stored.delete(path),
   };
+}
+
+function relatePaths(a: string, b: string): FolderRelation {
+  if (a === b) {
+    return "same";
+  }
+  const within = (parent: string, child: string) => child.startsWith(parent.endsWith("/") ? parent : `${parent}/`);
+  if (within(a, b)) {
+    return "contains";
+  }
+  return within(b, a) ? "inside" : "separate";
 }
 
 /** The text passed to each `writeFile` call for a path, in call order. */

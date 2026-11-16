@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test";
 
 test("boots the styled shared app on direct navigation and reload", async ({ page }) => {
   const errors: string[] = [];
@@ -7,6 +7,7 @@ test("boots the styled shared app on direct navigation and reload", async ({ pag
   const response = await page.goto("/workspace/example");
 
   expect(response?.status()).toBe(200);
+  expect(response?.headers()["content-security-policy"]).toContain("script-src 'self'");
   const main = page.getByRole("main");
   await expect(main.getByRole("heading", { name: "Vista" })).toBeVisible();
   await expect(main.getByRole("button", { name: "Open Folder" })).toBeVisible();
@@ -19,21 +20,17 @@ test("boots the styled shared app on direct navigation and reload", async ({ pag
   expect(errors).toEqual([]);
 });
 
-test("toggles theme between dark and light", async ({ page }) => {
+test("sets the theme from Settings", async ({ page }) => {
   await page.goto("/workspace/example");
+  await expect(page.getByRole("button", { name: "Open Folder" })).toBeVisible();
 
-  const initialTheme = await page.locator("html").getAttribute("data-theme");
-  const oppositeTheme = initialTheme === "dark" ? "light" : "dark";
+  await page.keyboard.press("Control+Comma");
+  const settings = page.getByRole("region", { name: "Settings" });
+  await settings.getByText("Light", { exact: true }).click();
+  await expect(settings.getByRole("radio", { name: "Light" })).toBeChecked();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
 
-  const themeBtn = page.getByRole("button", { name: new RegExp(`switch to ${oppositeTheme} theme`, "i") });
-  await expect(themeBtn).toBeVisible();
-
-  // Toggle to opposite theme
-  await themeBtn.click();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", oppositeTheme);
-
-  // Toggle back to initial theme
-  const backBtn = page.getByRole("button", { name: new RegExp(`switch to ${initialTheme} theme`, "i") });
-  await backBtn.click();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", initialTheme ?? "dark");
+  await settings.getByText("Dark", { exact: true }).click();
+  await expect(settings.getByRole("radio", { name: "Dark" })).toBeChecked();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 });
