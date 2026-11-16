@@ -147,12 +147,13 @@ dialog[data-toast-instance] .toast-dialog-btn-cancel:hover {
   background: var(--color-hover);
 }
 
-/* The confirming button follows `.btn.primary` below: ink on light, Daylight on dark. */
-dialog[data-toast-instance] .toast-dialog-btn-primary {
-  --_toast-intent: light-dark(var(--color-neutral-950), var(--color-daylight));
-  --_toast-intent-hover: light-dark(var(--color-neutral-700), #d6f670);
-  --_toast-intent-contrast: light-dark(var(--color-neutral-50), var(--color-neutral-950));
-  --_toast-intent-border: var(--_toast-intent);
+/* The confirming button follows `.btn.primary` below: ink on light, Daylight on dark. The toaster
+   colours it from `--color-primary`, so the primary tokens are set on Vista's confirm dialogs only
+   (`vista-dialog`, given in `toast.tsx`), leaving the package's focus ring and checkboxes as they are. */
+.vista-dialog {
+  --color-primary: light-dark(var(--color-neutral-950), var(--color-daylight));
+  --color-primary-hover: light-dark(var(--color-neutral-700), #d6f670);
+  --color-primary-contrast: light-dark(var(--color-neutral-50), var(--color-neutral-950));
 }
 
 /* Toasts sit on the floating surface the menus and tooltips use, so a routine notice is no louder
@@ -397,10 +398,9 @@ body,
 .markdown-editor .ProseMirror table,
 .csv-table .data-table {
   --ui-corner-surface: 6px;
-  /* The body rests on the frame and the header takes the hover fill. The package's soft table
-     rests on its grey foreground, which in light mode set a grey plate on the white frame. */
+  /* The table rests on the frame, header and body alike, through the package's ground token; its
+     default, the foreground tone, set a grey plate on the white frame in light mode. */
   --ui-surface-ground: var(--color-frame);
-  --table-head-plate: var(--color-hover);
 }
 
 /* A dragged row passes over the others, so its cells are opaque, in the selected fill on the frame. */
