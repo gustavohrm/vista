@@ -12,8 +12,8 @@ import {
 import { shortenPath, type DocumentLocation } from "../../domain/document-location";
 import type { OpenDocument } from "../../state/documents";
 import { Menu, MENU_SEPARATOR, type MenuEntry } from "../menu/menu";
+import { useReorderDrag } from "../use-reorder-drag";
 import { FileIcon } from "./file-icon";
-import { useTabDrag } from "./use-tab-drag";
 
 const MIDDLE_BUTTON = 1;
 
@@ -66,7 +66,7 @@ export function TabStrip({
   // HTML focus fixup rule drops focus from a removed element, which other engines may apply to a move.
   const movedKeyRef = useRef<string | null>(null);
   const isReducedMotion = useReducedMotion() ?? false;
-  const { drag, startDrag } = useTabDrag(listRef, onReorder, isReducedMotion);
+  const { drag, startDrag } = useReorderDrag(listRef, onReorder, isReducedMotion, TAB_DRAG_OPTIONS);
 
   const closeTabs = async (focusedKey: string | null, close: () => Promise<boolean>) => {
     keyboardClosedKeyRef.current = focusedKey;
@@ -293,6 +293,13 @@ const EASE_MOVE = [0.4, 0, 0.2, 1] as const;
  * The dragged tab: above the tabs it passes, and filled opaquely with the selected tint over the
  * frame, so a tab under it does not show through. No shadow: it stays in the row, not above it.
  */
+/** Tabs run along the row; each tab's button carries its key inside a box that is the tab's whole width. */
+const TAB_DRAG_OPTIONS = {
+  axis: "x",
+  itemAttribute: "data-tab-key",
+  itemBox: (tab: HTMLElement) => tab.parentElement ?? tab,
+} as const;
+
 const DRAGGED_TAB_CLASS =
   "relative z-10 bg-frame! bg-[image:linear-gradient(var(--color-selected),var(--color-selected))] text-text-strong!";
 

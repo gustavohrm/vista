@@ -37,4 +37,22 @@ describe("CsvTableEditor", () => {
     await user.click(screen.getByRole("button", { name: "Add column" }));
     expect(onChange).toHaveBeenLastCalledWith("Name,Age,\nAda,36,\n");
   });
+
+  it("moves a row with Shift and the arrow keys from its number, keeping the header first", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { rerender } = render(<CsvTableEditor content={"Name\nAda\nBob\n"} onChange={onChange} />);
+
+    screen.getByRole("button", { name: "Move row 1" }).focus();
+    await user.keyboard("{Shift>}{ArrowDown}{/Shift}");
+    expect(onChange).toHaveBeenLastCalledWith("Name\nBob\nAda\n");
+    rerender(<CsvTableEditor content={"Name\nBob\nAda\n"} onChange={onChange} />);
+    expect(screen.getByRole("button", { name: "Move row 2" })).toHaveFocus();
+
+    onChange.mockClear();
+    await user.keyboard("{Shift>}{ArrowDown}{/Shift}");
+    screen.getByRole("button", { name: "Move row 1" }).focus();
+    await user.keyboard("{Shift>}{ArrowUp}{/Shift}");
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });

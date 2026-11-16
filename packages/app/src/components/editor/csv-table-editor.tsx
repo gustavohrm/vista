@@ -1,6 +1,11 @@
-import { useCallback, useMemo } from "react";
+import { useReducedMotion } from "motion/react";
+import { useCallback, useEffect, useMemo, useRef, type KeyboardEvent } from "react";
 
 import { parseCsv, serializeCsv } from "../../domain/csv";
+import { useReorderDrag } from "../use-reorder-drag";
+
+/** Body rows run down the table; each row carries its index among the records. */
+const ROW_DRAG_OPTIONS = { axis: "y", itemAttribute: "data-row-key" } as const;
 
 interface CsvTableEditorProps {
   /** Raw CSV string content. */
@@ -12,7 +17,8 @@ interface CsvTableEditorProps {
 /**
  * Interactive tabular editor for CSV files with in-place cell editing. The first record is the
  * header, edited in place like any cell. A new column is added from the button at the header's end,
- * a new row from the button under the last row, where each one appears.
+ * a new row from the button under the last row, where each one appears. A row moves by dragging its
+ * number, or with Shift+Up and Shift+Down while its number has focus; the header stays first.
  *
  * @param props - CsvTableEditor properties.
  * @returns Tabular CSV editing interface.
@@ -50,11 +56,60 @@ export function CsvTableEditor({ content, onChange }: CsvTableEditorProps) {
     write(rows.map((row) => [...row, ...Array.from({ length: columnCount - row.length + 1 }, () => "")]));
   }, [rows, columnCount, write]);
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // Set when a row is moved from the keyboard, so its handle takes focus again in its new place.
+  const movedRowRef = useRef<number | null>(null);
+  const isReducedMotion = useReducedMotion() ?? false;
+
+  /** Moves the body row at record index `rowIndex` to the place `toIndex` among the body rows. */
+  const moveRow = useCallback(
+    (rowIndex: number, toIndex: number) => {
+      const to = Math.min(Math.max(toIndex + 1, 1), rows.length - 1);
+      const moved = rows[rowIndex];
+      if (rowIndex < 1 || !moved || to === rowIndex) {
+        return false;
+      }
+      const nextRows = rows.filter((_, index) => index !== rowIndex);
+      nextRows.splice(to, 0, moved);
+      write(nextRows);
+      return true;
+    },
+    [rows, write],
+  );
+
+  const { drag, startDrag } = useReorderDrag(
+    scrollRef,
+    (key, toIndex) => moveRow(Number(key), toIndex),
+    isReducedMotion,
+    ROW_DRAG_OPTIONS,
+  );
+
+  useEffect(() => {
+    const moved = movedRowRef.current;
+    if (moved !== null) {
+      movedRowRef.current = null;
+      scrollRef.current?.querySelector<HTMLElement>(`[data-row-key="${moved}"] [data-row-handle]`)?.focus();
+    }
+  }, [rows]);
+
+  const handleHandleKeyDown = (rowIndex: number, event: KeyboardEvent<HTMLButtonElement>) => {
+    const step = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
+    if (step === 0 || !event.shiftKey) {
+      return;
+    }
+    // Moves the row one place, stopping at the ends of the table.
+    event.preventDefault();
+    const to = rowIndex + step;
+    if (moveRow(rowIndex, to - 1)) {
+      movedRowRef.current = to;
+    }
+  };
+
   const columnName = (colIndex: number) => header[colIndex]?.trim() || `Column ${colIndex + 1}`;
   const columns = Array.from({ length: columnCount }, (_, colIndex) => colIndex);
 
   return (
-    <div className="csv-table text-text h-full w-full overflow-auto px-4 py-3">
+    <div ref={scrollRef} className="csv-table text-text h-full w-full overflow-auto px-1.5 pt-1.5 pb-3">
       <div className="table-wrap w-fit max-w-none">
         <table className="data-table ruled edged">
           <thead>
@@ -87,10 +142,38 @@ export function CsvTableEditor({ content, onChange }: CsvTableEditorProps) {
           <tbody>
             {body.map((row, index) => {
               const rowIndex = index + 1;
+              const isDragged = drag?.key === String(rowIndex);
+              const offset = drag?.offsets[String(rowIndex)];
               return (
-                <tr key={rowIndex}>
+                <tr
+                  key={rowIndex}
+                  data-row-key={rowIndex}
+                  data-row-dragging={isDragged ? "" : undefined}
+                  style={offset ? { transform: `translateY(${offset}px)` } : undefined}
+                  // The dragged row stays under the pointer and above the rows it passes; the others,
+                  // and the dragged one once released, slide. Keyboard moves are instant.
+                  className={`group ease-(--ease-move) motion-reduce:transition-none ${
+                    isDragged ? "relative z-10" : ""
+                  } ${drag && (!isDragged || drag.isSettling) ? "transition-transform duration-150" : ""}`}
+                >
                   <td data-find-skip className="select-none">
-                    <span className="text-text-faint block px-3 text-center font-mono text-xs">{rowIndex}</span>
+                    <button
+                      type="button"
+                      data-row-handle
+                      aria-label={`Move row ${rowIndex}`}
+                      title="Drag to move the row, or press Shift + Up or Shift + Down"
+                      onPointerDown={(event) => startDrag(String(rowIndex), event)}
+                      onKeyDown={(event) => handleHandleKeyDown(rowIndex, event)}
+                      className="text-text-faint hover:text-text-muted grid h-8 w-full cursor-grab place-items-center font-mono text-xs outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-inset active:cursor-grabbing"
+                    >
+                      <span className="col-start-1 row-start-1 group-hover:invisible group-data-row-dragging:invisible">
+                        {rowIndex}
+                      </span>
+                      <i
+                        className="ic-grip-vertical invisible col-start-1 row-start-1 text-sm group-hover:visible group-data-row-dragging:visible"
+                        aria-hidden="true"
+                      />
+                    </button>
                   </td>
                   {columns.map((colIndex) => (
                     <td key={colIndex}>

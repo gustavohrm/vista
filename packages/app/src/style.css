@@ -284,6 +284,18 @@ body,
   @apply data-table mb-4;
 }
 
+/* The table takes a control's corner, as the tabs above it do, rather than the package's larger
+   surface corner, which read rounder than everything else in the frame. */
+.csv-table .data-table {
+  --ui-corner-surface: 6px;
+}
+
+/* A dragged row passes over the others, so its cells are opaque, in the selected fill on the frame. */
+.csv-table .data-table tr[data-row-dragging] > td {
+  background-color: var(--color-frame);
+  background-image: linear-gradient(var(--color-selected), var(--color-selected));
+}
+
 /* Header and body cells hold an input that carries its own padding, so the grid cell adds none; the
    table's cell padding would double it and make every row as tall as a document table row. */
 .csv-table .data-table th,
