@@ -17,7 +17,7 @@ import { UnsavedChangesDialog, type UnsavedChangesChoice } from "./components/fe
 import { ActivityRail, DrawerActivities } from "./components/layout/activity-rail";
 import { ShellReveal } from "./components/layout/shell-reveal";
 import { Sidebar, type ExplorerEntry, type ExplorerFolder, type NewEntryRequest } from "./components/layout/sidebar";
-import { StartScreen, type StartAction } from "./components/layout/start-screen";
+import { StartScreen, type StartHint } from "./components/layout/start-screen";
 import { StatusBar } from "./components/layout/status-bar";
 import { TabStrip } from "./components/layout/tab-strip";
 import { TitleBar } from "./components/layout/title-bar";
@@ -123,6 +123,12 @@ interface OpenWorkspace {
 
 const GO_TO_FILE_SHORTCUT = "Mod+P";
 const COMMANDS_SHORTCUT = "Mod+Shift+P";
+const SETTINGS_SHORTCUT = "Mod+,";
+/** The key hints on the empty frame of an open workspace. */
+const START_HINTS: readonly StartHint[] = [
+  { label: "Go to file", shortcut: GO_TO_FILE_SHORTCUT },
+  { label: "All commands", shortcut: COMMANDS_SHORTCUT },
+];
 
 const EDITOR_MENU = ["edit.cut", "edit.copy", "edit.paste", "selection.all", MENU_SEPARATOR, "find.find"];
 const RAW_EDITOR_MENU = [...EDITOR_MENU, "find.replace", "goto.line"];
@@ -873,6 +879,7 @@ function AppShell({ adapter }: AppProps) {
           icon: record.icon,
           color: record.color,
           folders: recentFolders.get(record.id) ?? null,
+          lastOpenedAt: record.lastOpenedAt,
         },
   );
   const unknownRecentIds = recents.flatMap((recent) => (recent.folders === null ? [recent.id] : [])).join("\n");
@@ -1874,7 +1881,7 @@ function AppShell({ adapter }: AppProps) {
         id: "file.settings",
         category: "Settings",
         label: "Settings…",
-        shortcut: "Mod+,",
+        shortcut: SETTINGS_SHORTCUT,
         isEnabled: !isPromptingForUnsavedChanges,
         run: openSettings,
       },
@@ -2129,33 +2136,6 @@ function AppShell({ adapter }: AppProps) {
     () => describeExplorerFolders(workspace?.folders ?? [], adapter.platform === "native"),
     [adapter.platform, workspace],
   );
-  const startActions = useMemo<StartAction[]>(
-    () => [
-      {
-        label: "Go to file",
-        icon: <i className="ic-file-search" aria-hidden="true" />,
-        shortcut: GO_TO_FILE_SHORTCUT,
-        onSelect: () => setGoToQuery(""),
-      },
-      {
-        label: "Create a new file",
-        icon: <i className="ic-file-plus" aria-hidden="true" />,
-        onSelect: () => requestNewEntry("file"),
-      },
-      {
-        label: "Show all commands",
-        icon: <i className="ic-terminal" aria-hidden="true" />,
-        shortcut: COMMANDS_SHORTCUT,
-        onSelect: () => setGoToQuery(COMMAND_QUERY_PREFIX),
-      },
-      {
-        label: "Keyboard shortcuts",
-        icon: <i className="ic-keyboard" aria-hidden="true" />,
-        onSelect: () => setSettingsSection("shortcuts"),
-      },
-    ],
-    [requestNewEntry],
-  );
   const reservedShortcuts = useMemo(
     () => commands.flatMap((command) => (command.shortcut ? [command.shortcut] : [])),
     [commands],
@@ -2350,13 +2330,15 @@ function AppShell({ adapter }: AppProps) {
                   // Blank while a restored tab reads its file.
                   pendingActive ? null : (
                     <StartScreen
-                      workspaceName={workspace?.name ?? null}
+                      hasWorkspace={workspace !== null}
                       isLoading={isLoading}
                       recents={recents}
                       onOpenFolder={() => void handleOpenFolder()}
+                      onOpenSettings={openSettings}
+                      settingsShortcut={SETTINGS_SHORTCUT}
                       onOpenRecent={(workspaceId) => void handleOpenWorkspace(workspaceId)}
                       onRemoveRecent={(workspaceId) => void handleRemoveRecent(workspaceId)}
-                      actions={startActions}
+                      hints={START_HINTS}
                     />
                   )
                 }

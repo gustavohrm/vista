@@ -264,7 +264,7 @@ export function Sidebar({
       >
         <div className="flex min-h-0 w-full flex-1 flex-col md:w-64 md:min-w-64">
           {activities}
-          <div className="flex h-9 flex-none items-center justify-between gap-2 pr-2 pl-4">
+          <div className="flex h-9 flex-none items-center justify-between gap-2 pr-2.5 pl-3">
             <span className="text-text-muted min-w-0 truncate text-xs font-semibold">Explorer</span>
             <div className="flex flex-none items-center gap-0.5">
               <ExplorerActionButton label="Add Folder to Workspace" onClick={onAddFolder}>

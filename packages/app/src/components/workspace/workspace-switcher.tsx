@@ -15,6 +15,8 @@ export interface RecentWorkspace {
   color: WorkspaceColor;
   /** Its folders, or null until Vista has looked them up. */
   folders: readonly { id: string; name: string; status: FolderStatus }[] | null;
+  /** When it was last opened, in milliseconds since the epoch; 0 or absent when unknown. */
+  lastOpenedAt?: number;
 }
 
 /** Space between the switcher button and its menu, in pixels. */
@@ -53,8 +55,7 @@ export function WorkspaceSwitcher({
     ...recents.map((workspace): MenuEntry => ({
       id: workspace.id,
       label: workspace.name,
-      description: describeRecentFolders(workspace),
-      icon: <WorkspaceGlyph icon={workspace.icon} color={workspace.color} />,
+      icon: <WorkspaceGlyph icon={workspace.icon} color={workspace.color} isTile className="text-xs" />,
       selected: workspace.id === current.id,
       onSelect: () => {
         if (workspace.id !== current.id) {

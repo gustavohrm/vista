@@ -68,7 +68,7 @@ function findToast(text: string) {
  * @param user - The user-event instance driving the interaction.
  */
 async function openFolderFromWelcome(user: UserEvent) {
-  await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+  await user.click(await screen.findByRole("button", { name: "Open Folder…" }));
   await screen.findByText("readme.md");
 }
 
@@ -380,7 +380,7 @@ describe("App", () => {
       render(<App adapter={{ platform: "web", workspace: capability }} />);
 
       const entry = await screen.findByRole("button", { name: "Research" });
-      expect(entry).toHaveAccessibleDescription("Click to allow access");
+      expect(entry).toHaveAccessibleDescription(/^Click to allow access/);
       await user.click(entry);
       await user.click(await within(await findExplorerPanel()).findByRole("button", { name: "Allow access" }));
       expect(within(explorerPanel()).queryByRole("button", { name: "plan.txt" })).not.toBeInTheDocument();
@@ -423,7 +423,7 @@ describe("App", () => {
 
     const { container } = render(<App adapter={adapter} />);
 
-    await screen.findByRole("button", { name: "Open Folder" });
+    await screen.findByRole("button", { name: "Open Folder…" });
     expect(within(screen.getByRole("main")).getByRole("heading", { name: "Vista" })).toBeInTheDocument();
     expect(screen.getByRole("main")).toHaveAttribute("data-platform", platform);
     expect(container.firstChild).toHaveAttribute("data-platform", platform);
@@ -511,7 +511,7 @@ describe("App", () => {
 
     render(<App adapter={adapter} />);
 
-    await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+    await user.click(await screen.findByRole("button", { name: "Open Folder…" }));
 
     expect(await findToast("Permission to read this folder was not granted.")).toBeInTheDocument();
   });
@@ -525,11 +525,11 @@ describe("App", () => {
 
     render(<App adapter={adapter} />);
 
-    await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+    await user.click(await screen.findByRole("button", { name: "Open Folder…" }));
 
     await waitFor(() => expect(mockWorkspace.pickFolder).toHaveBeenCalled());
     expect(document.querySelector(".coden-toast")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open Folder" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open Folder…" })).toBeInTheDocument();
   });
 
   it("shows an info toast when a folder is opened through the fallback (non-direct) access mode", async () => {
@@ -546,7 +546,7 @@ describe("App", () => {
 
     render(<App adapter={adapter} />);
 
-    await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+    await user.click(await screen.findByRole("button", { name: "Open Folder…" }));
 
     expect(
       await screen.findByText("This browser can't write files directly, so saving will download a copy instead."),
@@ -726,7 +726,7 @@ describe("App", () => {
     const adapter: AppAdapter = { platform: "web", workspace: mockWorkspace };
     render(<App adapter={adapter} />);
 
-    await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+    await user.click(await screen.findByRole("button", { name: "Open Folder…" }));
     await screen.findByText("notes");
     const explorer = screen.getByRole("navigation", { name: "File Explorer" });
     fireEvent.contextMenu(within(explorer).getByText("notes"));
@@ -741,7 +741,7 @@ describe("App", () => {
   describe("rail", () => {
     it("shows neither the rail nor the explorer while no workspace is open", async () => {
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
-      await screen.findByRole("button", { name: "Open Folder" });
+      await screen.findByRole("button", { name: "Open Folder…" });
 
       expect(screen.queryByRole("navigation", { name: "Activity bar" })).not.toBeInTheDocument();
       expect(screen.queryByRole("navigation", { name: "File Explorer" })).not.toBeInTheDocument();
@@ -816,7 +816,7 @@ describe("App", () => {
     it("opens with Ctrl+, on its first section, and lists every section", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
-      await screen.findByRole("button", { name: "Open Folder" });
+      await screen.findByRole("button", { name: "Open Folder…" });
 
       await user.keyboard("{Control>},{/Control}");
       const dialog = await settingsDialog();
@@ -835,7 +835,7 @@ describe("App", () => {
     it("sets the theme in Appearance, and has no theme button outside it", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
-      await screen.findByRole("button", { name: "Open Folder" });
+      await screen.findByRole("button", { name: "Open Folder…" });
       expect(screen.queryByRole("button", { name: /theme/i })).not.toBeInTheDocument();
 
       await user.keyboard("{Control>},{/Control}");
@@ -847,21 +847,6 @@ describe("App", () => {
       await user.click(within(dialog).getByRole("radio", { name: "System" }));
       expect(localStorage.getItem("vista-theme")).toBeNull();
       expect(within(dialog).getByRole("radio", { name: "System" })).toBeChecked();
-    });
-
-    it("opens on Keyboard Shortcuts from the start screen", async () => {
-      const user = userEvent.setup();
-      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
-      await openFolderFromWelcome(user);
-
-      await user.click(screen.getByRole("button", { name: /^Keyboard shortcuts/ }));
-
-      const dialog = await settingsDialog();
-      expect(within(dialog).getByRole("button", { name: "Keyboard Shortcuts" })).toHaveAttribute(
-        "aria-current",
-        "page",
-      );
-      expect(within(dialog).getByRole("row", { name: "Save Ctrl + S" })).toBeInTheDocument();
     });
 
     it("shows the version in About, and checks for updates where the host has an updater", async () => {
@@ -884,7 +869,7 @@ describe("App", () => {
     it("offers no update check in About when the host has no updater", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
-      await screen.findByRole("button", { name: "Open Folder" });
+      await screen.findByRole("button", { name: "Open Folder…" });
 
       await user.keyboard("{Control>},{/Control}");
       const dialog = await settingsDialog();
@@ -1180,7 +1165,7 @@ describe("App", () => {
         pickFolder: vi.fn().mockResolvedValue({ id: "f1", name: "My Notes", rootPath: "/", accessMode: "fallback" }),
       });
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
-      await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+      await user.click(await screen.findByRole("button", { name: "Open Folder…" }));
       const dialog = await openWorkspaceSettings(user, "My Notes");
 
       // With one place to keep them, there is nothing to choose.
@@ -1541,7 +1526,6 @@ describe("App", () => {
       await user.click(screen.getByRole("button", { name: "Research" }));
       expect(screen.getByRole("menuitemradio", { name: "Research" })).toBeChecked();
       const work = await screen.findByRole("menuitemradio", { name: "Work" });
-      await waitFor(() => expect(work).toHaveAccessibleDescription("sources"));
       await user.click(work);
 
       expect(await within(await findExplorerPanel()).findByRole("button", { name: "plan.txt" })).toBeInTheDocument();
@@ -1560,9 +1544,9 @@ describe("App", () => {
 
       expect(await screen.findByRole("heading", { name: "Recent workspaces" })).toBeInTheDocument();
       await waitFor(() =>
-        expect(screen.getByRole("button", { name: "Research" })).toHaveAccessibleDescription("notes"),
+        expect(screen.getByRole("button", { name: "Research" })).toHaveAccessibleDescription(/^notes/),
       );
-      expect(screen.getByRole("button", { name: "Work" })).toHaveAccessibleDescription("sources");
+      expect(screen.getByRole("button", { name: "Work" })).toHaveAccessibleDescription(/^sources/);
       expect(capability.restoreFolder).not.toHaveBeenCalledWith(expect.anything(), { interactive: true });
     });
 
@@ -1802,7 +1786,7 @@ describe("App", () => {
           }}
         />,
       );
-      await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+      await user.click(await screen.findByRole("button", { name: "Open Folder…" }));
 
       await user.click(await screen.findByText("data.csv"));
       const actions = screen.getByRole("group", { name: "Document actions" });
@@ -1825,7 +1809,7 @@ describe("App", () => {
         { tree: [{ id: "legacy.md", name: "legacy.md", path: "legacy.md", kind: "file", extension: "md" }] },
       );
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
-      await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+      await user.click(await screen.findByRole("button", { name: "Open Folder…" }));
       await user.click(await screen.findByText("legacy.md"));
       await screen.findByRole("textbox", { name: /Raw text content of legacy\.md/i });
 
@@ -1837,7 +1821,7 @@ describe("App", () => {
       const user = userEvent.setup();
       const mockWorkspace = createMemoryWorkspace({ "docs/readme.md": "# Docs", "readme.md": "# Home" });
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
-      await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+      await user.click(await screen.findByRole("button", { name: "Open Folder…" }));
       const explorer = await findExplorerPanel();
       const [docsRow, homeRow] = await within(explorer).findAllByText("readme.md");
       await user.click(homeRow!);
@@ -2368,7 +2352,7 @@ describe("App", () => {
     it("says to open a folder when searching files with none open, and opens on files from the title bar's field once one is", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
-      await screen.findByRole("button", { name: "Open Folder" });
+      await screen.findByRole("button", { name: "Open Folder…" });
       // With no workspace the title bar has nothing to show, so it is not there.
       expect(screen.queryByRole("button", { name: "Go to file" })).not.toBeInTheDocument();
 
@@ -2385,19 +2369,15 @@ describe("App", () => {
   });
 
   describe("start screen", () => {
-    it("lists ways to get to a file once a folder is open", async () => {
+    it("shows key hints, not buttons, once a folder is open", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
       await openFolderFromWelcome(user);
       const main = screen.getByRole("main");
 
-      expect(within(main).getByRole("heading", { name: "My Notes" })).toBeInTheDocument();
-      await user.click(within(main).getByRole("button", { name: /^Go to file/ }));
-      // jsdom does not turn Escape into the dialog's cancel event.
-      fireEvent(screen.getByRole("dialog", { name: "Go to file" }), new Event("cancel", { cancelable: true }));
-
-      await user.click(within(main).getByRole("button", { name: "Create a new file" }));
-      expect(screen.getByRole("textbox", { name: "Entry name" })).toBeInTheDocument();
+      expect(within(main).queryByRole("heading")).not.toBeInTheDocument();
+      expect(within(main).getByText("Go to file")).toBeInTheDocument();
+      expect(within(main).getByText("Ctrl + P")).toBeInTheDocument();
     });
 
     it("gives way to the document when a file is opened", async () => {
@@ -2408,7 +2388,7 @@ describe("App", () => {
       await user.click(screen.getByText("readme.md"));
 
       await screen.findByRole("heading", { name: "Hello Vista" });
-      expect(within(screen.getByRole("main")).queryByRole("button", { name: /^Go to file/ })).not.toBeInTheDocument();
+      expect(within(screen.getByRole("main")).queryByText("Ctrl + P")).not.toBeInTheDocument();
     });
   });
 
@@ -2687,7 +2667,7 @@ describe("App", () => {
       await waitFor(() =>
         expect(mockWorkspace.restoreFolder).toHaveBeenCalledWith(LEGACY_FOLDER_ID, { interactive: true }),
       );
-      expect(screen.getByRole("button", { name: "My Notes" })).toHaveAccessibleDescription("Click to allow access");
+      expect(screen.getByRole("button", { name: "My Notes" })).toHaveAccessibleDescription(/^Click to allow access/);
       expect(document.querySelector(".coden-toast")).not.toBeInTheDocument();
     });
 
@@ -2701,7 +2681,7 @@ describe("App", () => {
         await screen.findByText('Couldn\'t reopen "My Notes". It may have been moved or deleted.'),
       ).toBeInTheDocument();
       expect(screen.queryByRole("heading", { name: "Recent workspaces" })).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Open Folder" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Open Folder…" })).toBeInTheDocument();
     });
 
     it("reopens the last workspace's folder by its id", async () => {
@@ -2738,7 +2718,7 @@ describe("App", () => {
       const mockWorkspace = createMockWorkspaceCapability();
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
 
-      expect(await screen.findByRole("button", { name: "Open Folder" })).toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: "Open Folder…" })).toBeInTheDocument();
       expect(screen.queryByRole("heading", { name: "Recent workspaces" })).not.toBeInTheDocument();
     });
 
@@ -2749,7 +2729,7 @@ describe("App", () => {
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
 
       expect(await findToast("Storage is unavailable.")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Open Folder" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Open Folder…" })).toBeInTheDocument();
     });
 
     it("restores the last folder once under StrictMode", async () => {
@@ -2769,7 +2749,7 @@ describe("App", () => {
       const mockWorkspace = createMockWorkspaceCapability({ isSupported: false });
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
 
-      await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+      await user.click(await screen.findByRole("button", { name: "Open Folder…" }));
 
       expect(mockWorkspace.restoreFolder).not.toHaveBeenCalled();
       expect(
@@ -2781,7 +2761,7 @@ describe("App", () => {
   describe("commands", () => {
     it("has no menu bar", async () => {
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
-      await screen.findByRole("button", { name: "Open Folder" });
+      await screen.findByRole("button", { name: "Open Folder…" });
 
       expect(screen.queryByRole("menubar")).not.toBeInTheDocument();
     });
@@ -2841,7 +2821,7 @@ describe("App", () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
 
-      await screen.findByRole("button", { name: "Open Folder" });
+      await screen.findByRole("button", { name: "Open Folder…" });
       await runFromPalette(user, "Settings: Keyboard Shortcuts");
 
       const dialog = await screen.findByRole("region", { name: "Settings" });
@@ -3320,7 +3300,7 @@ describe("App", () => {
       );
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
 
-      await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+      await user.click(await screen.findByRole("button", { name: "Open Folder…" }));
 
       expect(await screen.findByRole("button", { name: "private" })).toHaveAccessibleDescription(
         "Vista can't read this folder, so its files aren't listed",
@@ -3331,7 +3311,7 @@ describe("App", () => {
       const user = userEvent.setup();
       const mockWorkspace = createMemoryWorkspace({ "photo.bin": new Uint8Array([0x89, 0x00, 0x01]) });
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
-      await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+      await user.click(await screen.findByRole("button", { name: "Open Folder…" }));
 
       await user.click(await screen.findByText("photo.bin"));
 
@@ -3347,7 +3327,7 @@ describe("App", () => {
         { tree: [fileNode("legacy.txt")] },
       );
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
-      await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+      await user.click(await screen.findByRole("button", { name: "Open Folder…" }));
 
       await user.click(await screen.findByText("legacy.txt"));
       const editor = await screen.findByRole("textbox", { name: /Raw text content of legacy\.txt/i });
@@ -3368,7 +3348,7 @@ describe("App", () => {
         { tree: [fileNode("legacy.txt")] },
       );
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
-      await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+      await user.click(await screen.findByRole("button", { name: "Open Folder…" }));
       await user.click(await screen.findByText("legacy.txt"));
       await screen.findByRole("textbox", { name: /Raw text content of legacy\.txt/i });
 
@@ -3388,7 +3368,7 @@ describe("App", () => {
         { tree: [fileNode("notes.txt")] },
       );
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
-      await user.click(await screen.findByRole("button", { name: "Open Folder" }));
+      await user.click(await screen.findByRole("button", { name: "Open Folder…" }));
       await user.click(await screen.findByText("notes.txt"));
       const editor = await screen.findByRole("textbox", { name: /Raw text content of notes\.txt/i });
 
@@ -3416,7 +3396,7 @@ describe("App", () => {
     it("closes at once when nothing is unsaved", async () => {
       const { window, requestClose } = createWindow();
       render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), window }} />);
-      await screen.findByRole("button", { name: "Open Folder" });
+      await screen.findByRole("button", { name: "Open Folder…" });
 
       await expect(requestClose()).resolves.toBe(true);
     });

@@ -83,7 +83,7 @@ A window shows one workspace at a time. Switching closes the current workspace's
 
 The switcher at the top left of the title bar is the one home for workspace actions. Its button shows the current workspace's icon and name. Its menu lists:
 
-- The recent workspaces, each with its icon, name, and folders, the current one checked. Choosing one switches to it.
+- The recent workspaces, each with its icon tile in its colour and its name, the current one checked. Choosing one switches to it. The folders are not repeated here: for a one-folder workspace the name usually is the folder's, and the start screen and Settings list them.
 - **Open Folder…**, as [Opening a folder](#opening-a-folder) describes.
 - **Workspace Settings…**
 
@@ -177,8 +177,8 @@ The Files section holds **Largest file to open (MB)**, the size limit [Opening a
 
 With no file open, the editor area shows a start screen instead of staying empty, so the next step is always on screen.
 
-- **No workspace open.** The start screen fills the window; the explorer and rail are not shown, since they have nothing to list. It shows Vista's logo, says what Vista does in one sentence, offers **Open Folder** as the primary action, and explains workspaces in the sentence [Workspaces](#workspaces) gives. Below it, **Recent workspaces** lists each remembered workspace with its icon, name, and folders; choosing one opens it, as [Reopening at startup](#reopening-at-startup) describes, and an entry that needs permission on the web says `Click to allow access`. Each entry has **Remove from Recent**, which asks first and says `Vista forgets this workspace and its tabs. Your folders and files aren't changed.` Nothing is offered while a workspace is still being opened or restored; the [loader](../guidelines/brand.md#loop) shows instead. The logo above the sentence plays its [entrance](../guidelines/brand.md#entrance) when the screen appears.
-- **Workspace open, no tabs.** It shows the workspace's name and four next steps, each with its shortcut: Go to file, Create a new file, Show all commands, and Keyboard shortcuts.
+- **No workspace open.** The start screen fills the window; the explorer and rail are not shown, since they have nothing to list. It shows Vista's logo, then a **Start** list with two rows: **Open Folder…**, whose second line says that the folder becomes a workspace and that more folders can be added later, so the user knows what they create before creating it; and **Settings**, with its shortcut. There is no separate "Create workspace" entry, since it would do what Open Folder does. Below it, **Recent workspaces** lists each remembered workspace with its icon tile, name, folders, and when it was last opened (`Today`, `Yesterday`, or the date); choosing one opens it, as [Reopening at startup](#reopening-at-startup) describes, and an entry that needs permission on the web says `Click to allow access`. Each entry has **Remove from Recent**, which asks first and says `Vista forgets this workspace and its tabs. Your folders and files aren't changed.` Nothing is offered while a workspace is still being opened or restored; the [loader](../guidelines/brand.md#loop) shows instead. The logo above the sentence plays its [entrance](../guidelines/brand.md#entrance) when the screen appears.
+- **Workspace open, no tabs.** The frame shows only two faint key hints, `Go to file` and `All commands`, with their shortcuts. They are text, not buttons: every action already has its home in the shell (Go to file in the title bar, new files in the explorer, shortcuts in Settings), and the workspace's name is already in the switcher, so the empty frame repeats none of them.
 
 ### Shell layout
 
