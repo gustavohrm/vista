@@ -152,7 +152,7 @@ function PathText({ location }: { location: DocumentLocation }) {
   }, [hidden, fitKey, maxHidden, location]);
 
   return (
-    <Tooltip text={full} position="top" align="start" className="flex min-w-0">
+    <Tooltip text={full} position="top" className="flex min-w-0">
       {(bubbleId) => (
         <span ref={textRef} aria-describedby={bubbleId} className="text-text-muted min-w-0 truncate">
           {splitFileName(shortenPath(location, hidden), location)}

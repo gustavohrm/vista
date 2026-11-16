@@ -124,7 +124,7 @@ export function CsvTableEditor({ content, onChange }: CsvTableEditorProps) {
                     value={header[colIndex] ?? ""}
                     aria-label={`Column ${colIndex + 1} name`}
                     onChange={(event) => handleCellChange(0, colIndex, event.target.value)}
-                    className="ipt ghost edgeless text-text-strong font-semibold"
+                    className="ipt ghost edgeless inline-field text-text-strong font-semibold"
                   />
                 </th>
               ))}
@@ -184,7 +184,7 @@ export function CsvTableEditor({ content, onChange }: CsvTableEditorProps) {
                         value={row[colIndex] ?? ""}
                         aria-label={`${columnName(colIndex)}, row ${rowIndex}`}
                         onChange={(event) => handleCellChange(rowIndex, colIndex, event.target.value)}
-                        className="ipt ghost edgeless"
+                        className="ipt ghost edgeless inline-field"
                       />
                     </td>
                   ))}

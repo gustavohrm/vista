@@ -114,6 +114,8 @@ const TREE_ROW_ACTIVE_CLASS = "bg-selected text-text-strong font-medium";
 const ROW_ACTIONS_CLASS =
   "absolute top-0 right-6 flex h-7 items-center gap-0.5 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100";
 const NO_KEYS: ReadonlySet<string> = new Set();
+/** How long the panel takes to open or close, matching its `duration-300`, in milliseconds. */
+const SIDEBAR_TRANSITION_MS = 300;
 /**
  * Indent guide beside one child of an expanded directory. It runs the child's full height, and one
  * pixel more to cross the gap to the next child. Beside the last child it stops at the middle of
@@ -193,6 +195,21 @@ export function Sidebar({
     onExpandedKeysChange((prev) => (ancestors.every((key) => prev.has(key)) ? prev : new Set([...prev, ...ancestors])));
   }, [activeFolderId, activePath, onExpandedKeysChange]);
 
+  // The panel clips its content only while closed or on its way open, so the rows don't spill past
+  // its moving edge. Open and settled, it doesn't, so a header tooltip can reach over the frame.
+  const [isSettledOpen, setIsSettledOpen] = useState(isOpen);
+  if (!isOpen && isSettledOpen) {
+    setIsSettledOpen(false);
+  }
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined;
+    }
+    // The transition's end settles it; the timer covers reduced motion, where none runs.
+    const timer = window.setTimeout(() => setIsSettledOpen(true), SIDEBAR_TRANSITION_MS);
+    return () => window.clearTimeout(timer);
+  }, [isOpen]);
+
   const handleSelectFile = (entry: ExplorerEntry) => {
     onSelectFile(entry);
     // Below `md` the panel is a transient overlay, so picking a file dismisses it to reveal the
@@ -258,17 +275,23 @@ export function Sidebar({
         aria-label="File Explorer"
         // Closed, the panel is only slid away or zero wide, so its controls would still take focus.
         inert={!isOpen}
+        onTransitionEnd={(event) => {
+          if (event.target === event.currentTarget && isOpen) {
+            setIsSettledOpen(true);
+          }
+        }}
         // The panel's width animates open and closed while its content keeps the open width, so the
         // rows slide in with the edge instead of rewrapping on every frame.
-        className={`bg-chrome text-text fixed top-11 bottom-0 left-0 z-40 flex w-[85vw] max-w-72 min-w-0 flex-none flex-col overflow-hidden transition-[width,transform] duration-300 ease-(--ease-move) select-none motion-reduce:transition-none md:static md:z-auto md:max-w-none ${
+        className={`bg-chrome text-text fixed top-11 bottom-0 left-0 z-40 flex w-[85vw] max-w-72 min-w-0 flex-none flex-col transition-[width,transform] duration-300 ease-(--ease-move) select-none motion-reduce:transition-none md:static md:z-auto md:max-w-none ${
           isOpen ? "translate-x-0 md:w-64" : "-translate-x-full md:w-0 md:translate-x-0"
-        }`}
+        } ${isOpen && isSettledOpen ? "" : "overflow-hidden"}`}
       >
         <div className="flex min-h-0 w-full flex-1 flex-col md:w-64 md:min-w-64">
           {activities}
-          <div className="flex h-9 flex-none items-center justify-between gap-2 pr-2.5 pl-3">
+          {/* The title sits as far from the rail's glyphs as the last button's glyph sits from the frame. */}
+          <div className="flex h-9 flex-none items-center justify-between gap-2 pr-3.5 pl-[7px]">
             <span className="text-text-muted min-w-0 truncate text-xs font-semibold">Explorer</span>
-            <div className="flex flex-none items-center gap-0.5">
+            <div className="flex flex-none items-center">
               <ExplorerActionButton label="Add Folder to Workspace" onClick={onAddFolder}>
                 <i className="ic-folder-input" aria-hidden="true" />
               </ExplorerActionButton>
@@ -478,14 +501,14 @@ interface ExplorerActionButtonProps {
  */
 function ExplorerActionButton({ label, onClick, children }: ExplorerActionButtonProps) {
   return (
-    <Tooltip text={label} position="bottom" align="end" className="flex flex-none">
+    <Tooltip text={label} position="bottom" className="flex flex-none">
       {(bubbleId) => (
         <button
           type="button"
           aria-label={label}
           aria-describedby={bubbleId}
           onClick={onClick}
-          className="icon-button size-6 text-[15px]"
+          className="icon-button size-7 text-base"
         >
           {children}
         </button>

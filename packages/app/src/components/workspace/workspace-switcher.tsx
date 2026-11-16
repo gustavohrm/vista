@@ -22,11 +22,6 @@ export interface RecentWorkspace {
 /** Space between the switcher button and its menu, in pixels. */
 const MENU_OFFSET_PX = 4;
 
-/** The folder names of a workspace, as the second line of its entry. */
-export function describeRecentFolders(workspace: RecentWorkspace): string | undefined {
-  return workspace.folders?.map((folder) => folder.name).join(", ");
-}
-
 interface WorkspaceSwitcherProps {
   current: RecentWorkspace;
   /** Every remembered workspace, the most recent first, including the current one. */

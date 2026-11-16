@@ -79,7 +79,7 @@ describe("StartScreen", () => {
     }
   });
 
-  it("lists the recent workspaces with their folders, and says which one needs permission", async () => {
+  it("lists the recent workspaces without their folders, and says which one needs permission", async () => {
     const user = userEvent.setup();
     const { onOpenRecent, onRemoveRecent } = renderStartScreen(false, [
       {
@@ -102,7 +102,7 @@ describe("StartScreen", () => {
       },
     ]);
 
-    expect(screen.getByRole("button", { name: "Research" })).toHaveAccessibleDescription("notes, sources Today");
+    expect(screen.getByRole("button", { name: "Research" })).toHaveAccessibleDescription("Today");
     expect(screen.getByRole("button", { name: "Work" })).toHaveAccessibleDescription("Click to allow access");
     await user.click(screen.getByRole("button", { name: "Work" }));
     await user.click(screen.getByRole("button", { name: 'Remove "Research" from Recent' }));
