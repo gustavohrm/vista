@@ -10,34 +10,6 @@ const iconsPlugin = viteIcons({
   families: [lucide],
 });
 
-// Workaround for codenhub/codenhub#561: React wants camelCase SVG attributes in JSX. This also
-// renames them inside strings, which packages/app/src/style.css corrects for the image placeholder.
-const originalTransform = iconsPlugin.transform;
-if (typeof originalTransform === "function") {
-  iconsPlugin.transform = function (code: string, id: string) {
-    const res = (originalTransform as (c: string, i: string) => unknown).call(this, code, id) as
-      | { code?: string }
-      | string
-      | null
-      | undefined;
-    if (!res) {
-      return res;
-    }
-    const str = typeof res === "string" ? res : res.code;
-    if (!str) {
-      return res;
-    }
-    const cleaned = str.replace(/<svg\b[\s\S]*?<\/svg>/gi, (svgBlock: string) =>
-      svgBlock
-        .replaceAll('\\"', '"')
-        .replaceAll('stroke-width="', 'strokeWidth="')
-        .replaceAll('stroke-linecap="', 'strokeLinecap="')
-        .replaceAll('stroke-linejoin="', 'strokeLinejoin="'),
-    );
-    return typeof res === "string" ? cleaned : { ...res, code: cleaned };
-  };
-}
-
 export default defineConfig({
   root: "src",
   build: {

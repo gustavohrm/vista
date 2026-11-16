@@ -11,7 +11,7 @@ catalog:
   "@codemirror/search": 6.7.2
   "@codemirror/state": 6.7.6
   "@codemirror/view": 6.43.15
-  "@codenhub/icons": 0.3.0
+  "@codenhub/icons": 0.4.0
   "@codenhub/styles": 0.7.0
   "@codenhub/theme": 0.2.2
   "@codenhub/toaster": 0.4.0
@@ -79,3 +79,5 @@ allowBuilds:
 # mismatch surfaces before it turns into a failure no one can reproduce. It lives here because pnpm ignores
 # `engine-strict` in .npmrc: checked with pnpm 11.7 and 12.16.
 engineStrict: true
+minimumReleaseAgeExclude:
+  - "@codenhub/icons@0.4.0"
