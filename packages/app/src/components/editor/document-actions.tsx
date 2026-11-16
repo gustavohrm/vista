@@ -1,7 +1,7 @@
 import { motion, useReducedMotion } from "motion/react";
-import { useId, type ReactNode } from "react";
+import { useId, useMemo, type ReactNode } from "react";
 
-import { getViewer } from "../../domain/viewers";
+import { canShowEnriched, getViewer } from "../../domain/viewers";
 import type { ViewMode } from "../../ports";
 import type { OpenDocument } from "../../state/documents";
 import { Tooltip } from "../feedback/tooltip";
@@ -23,7 +23,9 @@ interface DocumentActionsProps {
  */
 export function DocumentActions({ document: doc, onViewModeChange, isFindOpen, onFind }: DocumentActionsProps) {
   const viewer = getViewer(doc.extension);
-  const canToggleView = !doc.isReadOnly && viewer.hasRaw && viewer.enriched !== undefined;
+  // A CSV with too many cells for the table shows only raw, as the status bar notes.
+  const fitsEnriched = useMemo(() => canShowEnriched(doc.extension, doc.content), [doc.content, doc.extension]);
+  const canToggleView = !doc.isReadOnly && viewer.hasRaw && viewer.enriched !== undefined && fitsEnriched;
 
   return (
     // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a row of buttons; a native fieldset would bring browser styling to reset

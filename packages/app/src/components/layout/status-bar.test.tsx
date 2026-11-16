@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { MAX_TABLE_CELLS } from "../../domain/csv";
 import type { DocumentLocation } from "../../domain/document-location";
 import type { OpenDocument } from "../../state/documents";
 import { StatusBar } from "./status-bar";
@@ -56,5 +57,30 @@ describe("StatusBar path", () => {
     // `/home/me/notes/docs/deep.md` is 27 characters, 216px; hiding one segment leaves 23, 184px.
     const text = screen.getByText("deep.md").parentElement as HTMLElement;
     expect(text.textContent).toBe("/home/me/…/docs/deep.md");
+  });
+});
+
+describe("StatusBar notes", () => {
+  const location: DocumentLocation = { segments: ["data.csv"], separator: "/" };
+
+  it("says when a CSV has too many cells for the table", () => {
+    const content = Array.from({ length: MAX_TABLE_CELLS + 1 }, (_, index) => `${index}`).join("\n");
+    render(<StatusBar activeFile={{ ...file, name: "data.csv", extension: "csv", content }} location={location} />);
+
+    expect(screen.getByText("Raw only")).toHaveAttribute(
+      "title",
+      expect.stringContaining(`${MAX_TABLE_CELLS.toLocaleString("en-US")} cells`),
+    );
+  });
+
+  it("says nothing for a CSV the table can show", () => {
+    render(
+      <StatusBar
+        activeFile={{ ...file, name: "data.csv", extension: "csv", content: "a,b\n1,2\n" }}
+        location={location}
+      />,
+    );
+
+    expect(screen.queryByText("Raw only")).not.toBeInTheDocument();
   });
 });

@@ -55,3 +55,38 @@ export function serializeCsv(rows: readonly (readonly string[])[], document: Omi
   const text = Papa.unparse(rows as string[][], options);
   return document.hasTrailingNewline ? text + document.newline : text;
 }
+
+/**
+ * The most cells the table shows. It draws one input per cell, so opening it takes about 160 ms per
+ * 1,000 cells in Chromium (measured 2026-11-16 with the web build: 1.6 s at 10,000 cells, 7.8 s at
+ * 50,000). Past this a file opens in the raw view instead; see the workspaces spec.
+ */
+export const MAX_TABLE_CELLS = 10_000;
+
+/**
+ * Whether the table can show a file: whether it has at most `MAX_TABLE_CELLS` cells, counted as the
+ * first record's fields times the records. It stops counting at the limit, so a large file costs no
+ * more than one at the limit, and a line break inside a quoted cell counts as a record, which errs
+ * toward the raw view.
+ *
+ * @param content - The file's text.
+ * @returns Whether the table can show it.
+ */
+export function fitsTable(content: string): boolean {
+  const first = Papa.parse<string[]>(content, { preview: 1 });
+  const columns = Math.max(1, first.data[0]?.length ?? 1);
+  const maxRecords = Math.floor(MAX_TABLE_CELLS / columns);
+  const newline = first.meta.linebreak || "\n";
+  let records = 1;
+  for (let at = content.indexOf(newline); at !== -1; at = content.indexOf(newline, at + newline.length)) {
+    // A final line break ends the last record rather than starting one.
+    if (at + newline.length === content.length) {
+      break;
+    }
+    records += 1;
+    if (records > maxRecords) {
+      return false;
+    }
+  }
+  return true;
+}

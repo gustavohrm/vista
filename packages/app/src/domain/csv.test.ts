@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseCsv, serializeCsv } from "./csv";
+import { fitsTable, MAX_TABLE_CELLS, parseCsv, serializeCsv } from "./csv";
 
 describe("parseCsv", () => {
   it("does not read the final line break as an empty last record", () => {
@@ -44,5 +44,31 @@ describe("serializeCsv round trips", () => {
     const document = parseCsv(content);
     expect(document.rows[0]).toHaveLength(content.split("\n")[0]!.split(delimiter).length);
     expect(serializeCsv(document.rows, document)).toBe(content);
+  });
+});
+
+/** A CSV of `records` records, the header included, of `columns` short cells each. */
+function csvOf(records: number, columns: number, newline = "\n"): string {
+  return Array.from({ length: records }, (_, r) =>
+    Array.from({ length: columns }, (_, c) => `${r}.${c}`).join(","),
+  ).join(newline);
+}
+
+describe("fitsTable", () => {
+  it("fits a file of exactly the cell limit", () => {
+    expect(fitsTable(csvOf(MAX_TABLE_CELLS / 10, 10))).toBe(true);
+  });
+
+  it("does not fit a file one record over the cell limit", () => {
+    expect(fitsTable(csvOf(MAX_TABLE_CELLS / 10 + 1, 10))).toBe(false);
+  });
+
+  it("counts records by the file's own line break", () => {
+    expect(fitsTable(csvOf(MAX_TABLE_CELLS / 10 + 1, 10, "\r\n"))).toBe(false);
+    expect(fitsTable(csvOf(MAX_TABLE_CELLS / 20, 20, "\r"))).toBe(true);
+  });
+
+  it("fits an empty file", () => {
+    expect(fitsTable("")).toBe(true);
   });
 });

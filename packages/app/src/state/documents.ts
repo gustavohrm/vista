@@ -141,7 +141,9 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
               diskStat: action.file.stat,
               hasBom: action.file.hasBom,
               isReadOnly: action.file.isReadOnly,
-              viewMode: action.file.isReadOnly ? "raw" : doc.viewMode,
+              viewMode: action.file.isReadOnly
+                ? "raw"
+                : resolveViewMode(doc.extension, doc.viewMode, action.file.content),
               externalChange: null,
               revision: doc.revision + 1,
             };
@@ -149,7 +151,7 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
     case "setViewMode":
       return updateDocument(state, action.key, (doc) => ({
         ...doc,
-        viewMode: doc.isReadOnly ? "raw" : resolveViewMode(doc.extension, action.viewMode),
+        viewMode: doc.isReadOnly ? "raw" : resolveViewMode(doc.extension, action.viewMode, doc.content),
       }));
     case "move":
       return moveDocuments(state, action);
@@ -205,7 +207,9 @@ function toOpenDocument({
     content: file.content,
     isDirty: false,
     // Only the raw editor can show a read-only buffer.
-    viewMode: file.isReadOnly ? "raw" : (viewMode ?? getViewer(extension).defaultMode),
+    viewMode: file.isReadOnly
+      ? "raw"
+      : resolveViewMode(extension, viewMode ?? getViewer(extension).defaultMode, file.content),
     diskStat: file.stat,
     hasBom: file.hasBom,
     isReadOnly: file.isReadOnly,

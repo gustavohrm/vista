@@ -1,8 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
+import { MAX_TABLE_CELLS } from "../../domain/csv";
 import { shortenPath, type DocumentLocation } from "../../domain/document-location";
 import { getFileKind } from "../../domain/file-types";
 import { lineSeparatorOf } from "../../domain/line-endings";
+import { canShowEnriched, getViewer } from "../../domain/viewers";
 import type { FileDocument } from "../../ports";
 import type { OpenDocument } from "../../state/documents";
 import type { CursorInfo } from "../editor/raw-editor";
@@ -224,11 +226,25 @@ function PathButton({ label, onClick, children }: { label: string; onClick: () =
   );
 }
 
-/** Says when the buffer can't be saved as is: read-only, or changed or deleted by another program. */
+/**
+ * Says when the buffer can't be saved as is: read-only, or changed or deleted by another program, and
+ * when a CSV has too many cells for the table, which is why it shows no view switch.
+ */
 function DocumentNotes({ file }: { file: OpenDocument }) {
+  const { content, extension } = file;
+  const isRawOnly = useMemo(
+    () => getViewer(extension).enriched === "csv-table" && !canShowEnriched(extension, content),
+    [content, extension],
+  );
   return (
     <>
       {file.isReadOnly && <DocumentNote text="Read-only" title="This file isn't UTF-8 text, so Vista won't save it." />}
+      {!file.isReadOnly && isRawOnly && (
+        <DocumentNote
+          text="Raw only"
+          title={`This file has more than ${MAX_TABLE_CELLS.toLocaleString("en-US")} cells, too many for the table to show quickly, so it opens in the raw view.`}
+        />
+      )}
       {file.externalChange === "changed" && (
         <DocumentNote
           text="Changed on disk"

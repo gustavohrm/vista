@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { MAX_TABLE_CELLS } from "../domain/csv";
 import {
   documentKey,
   documentsReducer,
@@ -400,5 +401,57 @@ describe("restored tabs", () => {
     state = documentsReducer(state, { type: "diskChanged", key, stat: null });
 
     expect(state).toBe(before);
+  });
+});
+
+describe("CSV files too large for the table", () => {
+  /** A CSV with one more record than the table shows, at one column per record. */
+  const tooLarge = Array.from({ length: MAX_TABLE_CELLS + 1 }, (_, index) => `${index}`).join("\n");
+
+  it("opens one in the raw view", () => {
+    const state = documentsReducer(INITIAL_DOCUMENTS_STATE, {
+      type: "open",
+      folderId: WS,
+      path: "big.csv",
+      file: loaded(tooLarge),
+    });
+    expect(state.documents[0]?.viewMode).toBe("raw");
+  });
+
+  it("still opens a small one in the table", () => {
+    const state = documentsReducer(INITIAL_DOCUMENTS_STATE, {
+      type: "open",
+      folderId: WS,
+      path: "small.csv",
+      file: loaded("Name\nAda\n"),
+    });
+    expect(state.documents[0]?.viewMode).toBe("enriched");
+  });
+
+  it("keeps one in the raw view when the table is asked for", () => {
+    let state = documentsReducer(INITIAL_DOCUMENTS_STATE, {
+      type: "open",
+      folderId: WS,
+      path: "big.csv",
+      file: loaded(tooLarge),
+    });
+    state = documentsReducer(state, { type: "setViewMode", key: documentKey(WS, "big.csv"), viewMode: "enriched" });
+    expect(state.documents[0]?.viewMode).toBe("raw");
+  });
+
+  it("moves a tab to the raw view when the file grows past the limit on disk", () => {
+    let state = documentsReducer(INITIAL_DOCUMENTS_STATE, {
+      type: "open",
+      folderId: WS,
+      path: "grows.csv",
+      file: loaded("Name\nAda\n"),
+    });
+    state = documentsReducer(state, {
+      type: "reloaded",
+      key: documentKey(WS, "grows.csv"),
+      expected: STAT,
+      file: loaded(tooLarge, { stat: NEWER_STAT }),
+    });
+    expect(state.documents[0]?.viewMode).toBe("raw");
   });
 });
