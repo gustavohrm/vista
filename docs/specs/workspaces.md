@@ -295,7 +295,7 @@ Edits made in either the Raw view or the rendered view (such as editing a CSV ce
 
 ### Changes on disk
 
-Vista is not the only program that edits a folder: a sync client, a git checkout, or another editor can change a file while its tab is open. A save never overwrites such a change without asking.
+Vista is not the only program that edits a folder: a sync client, a git checkout, or another editor can change a file while its tab is open. A save asks before overwriting such a change, except one landing between the check and the write, as below.
 
 - **Saving checks the version.** Save passes the version the tab last read or wrote, and the host refuses the write when the file on disk no longer matches, or is gone, with a `conflict` error. Vista then asks `"{name}" changed on disk` with **Overwrite** and **Cancel**. Overwrite writes again without the check; Cancel keeps the buffer and its edits as they are.
 - **Returning to Vista checks every open tab.** When the window gains focus or becomes visible, Vista scans every folder of the workspace again, quietly, and compares each open tab with the file on disk. A tab without unsaved edits whose file changed is reloaded in place. A tab with unsaved edits keeps them, and the path bar shows **Changed on disk**; a tab whose file was deleted shows **Deleted on disk** and keeps its buffer; saving it asks the same question, and Overwrite recreates the file. An info toast names the changed file, or counts them, and says that saving will ask before overwriting.
