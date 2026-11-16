@@ -2787,7 +2787,10 @@ describe("App", () => {
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
       await screen.findByRole("button", { name: "Open Folder…" });
 
-      expect(screen.getByRole("link", { name: "Download for Windows" })).toHaveAttribute("href", "/download/windows");
+      expect(await screen.findByRole("link", { name: "Download for Windows" })).toHaveAttribute(
+        "href",
+        "/download/windows",
+      );
 
       await openFolderFromWelcome(user);
       const rail = screen.getByRole("navigation", { name: "Activity bar" });
@@ -2795,6 +2798,25 @@ describe("App", () => {
         "href",
         "/download/windows",
       );
+    });
+
+    it("offers no download on ARM Linux, whose Chromium user agent still says x86_64", async () => {
+      vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/142.0.0.0 Safari/537.36",
+      );
+      const getHighEntropyValues = vi.fn().mockResolvedValue({ architecture: "arm", bitness: "64" });
+      Object.defineProperty(navigator, "userAgentData", { value: { getHighEntropyValues }, configurable: true });
+      try {
+        render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+        await screen.findByRole("button", { name: "Open Folder…" });
+        await waitFor(() => expect(getHighEntropyValues).toHaveBeenCalled());
+        // Let the reported processor reach the screen before checking it offers nothing.
+        await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+
+        expect(screen.queryByRole("link", { name: /Download for/ })).not.toBeInTheDocument();
+      } finally {
+        Reflect.deleteProperty(navigator, "userAgentData");
+      }
     });
 
     it("offers no download in the desktop app", async () => {

@@ -15,6 +15,22 @@ describe("desktopDownloadFor", () => {
     ).toEqual({ label: "Download for Linux", href: "/download/linux" });
   });
 
+  const REDUCED_LINUX_CHROME = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/142.0.0.0 Safari/537.36";
+
+  it("offers the AppImage when the browser reports an x86_64 processor", () => {
+    expect(desktopDownloadFor(REDUCED_LINUX_CHROME, { architecture: "x86", bitness: "64" })).toEqual({
+      label: "Download for Linux",
+      href: "/download/linux",
+    });
+  });
+
+  it.each([
+    ["ARM", { architecture: "arm", bitness: "64" }],
+    ["32-bit x86", { architecture: "x86", bitness: "32" }],
+  ])("offers nothing on %s Linux whose user agent still says x86_64", (_name, cpu) => {
+    expect(desktopDownloadFor(REDUCED_LINUX_CHROME, cpu)).toBeNull();
+  });
+
   it.each([
     ["macOS", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/142.0.0.0 Safari/537.36"],
     ["Android", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 Chrome/142.0.0.0 Mobile Safari/537.36"],

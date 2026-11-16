@@ -41,7 +41,7 @@ import {
 } from "./components/settings/vista-sections";
 import { WorkspaceSection } from "./components/settings/workspace-section";
 import { WorkspaceSwitcher, type FolderStatus, type RecentWorkspace } from "./components/workspace/workspace-switcher";
-import { desktopDownloadFor } from "./domain/desktop-download";
+import { type CpuArchitecture, type DesktopDownload, desktopDownloadFor } from "./domain/desktop-download";
 import { documentLocation } from "./domain/document-location";
 import { imageMimeType, resolveImageSource } from "./domain/image-source";
 import { joinWorkspacePath } from "./domain/path-validation";
@@ -556,10 +556,22 @@ function AppShell({ adapter }: AppProps) {
   );
 
   // The browser offers the desktop app; the desktop app offers nothing.
-  const desktopDownload = useMemo(
-    () => (adapter.platform === "web" ? desktopDownloadFor(navigator.userAgent) : null),
-    [adapter.platform],
-  );
+  const [desktopDownload, setDesktopDownload] = useState<DesktopDownload | null>(null);
+  useEffect(() => {
+    if (adapter.platform !== "web") {
+      return;
+    }
+    let isCancelled = false;
+    void (async () => {
+      const cpu = await readCpuArchitecture();
+      if (!isCancelled) {
+        setDesktopDownload(desktopDownloadFor(navigator.userAgent, cpu));
+      }
+    })();
+    return () => {
+      isCancelled = true;
+    };
+  }, [adapter.platform]);
 
   // Read once, so turning the switch on asks at the next start, not now; About checks on request.
   const checkAtStartupRef = useRef(settings.updates.checkAtStartup);
@@ -2920,4 +2932,28 @@ function describeUnrememberedFolder(workspace: OpenWorkspace, picked: WorkspaceF
 
 function describeUnreadableFile(folderName: string): string {
   return `"${folderName}" has workspace details this version of Vista can't read, so it opened as a plain folder.`;
+}
+
+/** The part of User-Agent Client Hints that reads the processor; only Chromium has it, and TypeScript's DOM types do not. */
+interface NavigatorWithClientHints {
+  userAgentData?: { getHighEntropyValues(hints: string[]): Promise<Partial<CpuArchitecture>> };
+}
+
+/**
+ * Asks the browser for its processor, which Chromium leaves out of its user agent.
+ *
+ * @returns The processor, or null where the browser does not say, such as Firefox or Safari.
+ */
+async function readCpuArchitecture(): Promise<CpuArchitecture | null> {
+  const clientHints = (navigator as NavigatorWithClientHints).userAgentData;
+  if (!clientHints) {
+    return null;
+  }
+  try {
+    const { architecture, bitness } = await clientHints.getHighEntropyValues(["architecture", "bitness"]);
+    // Chromium answers with empty strings where it cannot tell.
+    return architecture && bitness ? { architecture, bitness } : null;
+  } catch {
+    return null;
+  }
 }
