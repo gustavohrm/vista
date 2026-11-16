@@ -91,8 +91,10 @@ export function WorkspaceSection({
   const nameCheck = validateWorkspaceName(nameDraft);
   const folders = workspace.folders ?? [];
   const homeName = folders[0]?.name;
-  // The choice is shown only when there is one: a folder that can't be written offers no other place.
-  const canChooseStorage = homeName !== undefined && (canStoreInFolder || storage === "folder");
+  // The choice is shown only when there is one: a folder that can't be written offers no other place,
+  // and a home folder not reachable yet can neither take the file nor have it deleted.
+  const canChooseStorage =
+    homeName !== undefined && folders[0]?.status === "ready" && (canStoreInFolder || storage === "folder");
 
   return (
     <>

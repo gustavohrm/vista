@@ -168,7 +168,8 @@ function openDocument(
   const existing = state.documents.find((doc) => doc.key === key);
   if (existing?.isPending) {
     const read = toOpenDocument({ folderId, path, file, viewMode: existing.viewMode });
-    return { documents: state.documents.map((doc) => (doc === existing ? read : doc)), activeKey: key };
+    // A pending tab is read once it is shown, so the read only fills it; the user may have moved on.
+    return { ...state, documents: state.documents.map((doc) => (doc === existing ? read : doc)) };
   }
   if (existing) {
     return { ...state, activeKey: key };

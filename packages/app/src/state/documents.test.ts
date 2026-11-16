@@ -382,6 +382,16 @@ describe("restored tabs", () => {
     expect(state.activeKey).toBe(documentKey(WS, "a.md"));
   });
 
+  it("leaves the tab the user switched to active when a pending tab's read finishes", () => {
+    let state = restore();
+    state = documentsReducer(state, { type: "activate", key: documentKey(WS, "a.md") });
+    state = documentsReducer(state, { type: "activate", key: documentKey(WS, "b.md") });
+    state = documentsReducer(state, { type: "open", folderId: WS, path: "a.md", file: loaded("text") });
+
+    expect(state.documents[0]?.isPending).toBe(false);
+    expect(state.activeKey).toBe(documentKey(WS, "b.md"));
+  });
+
   it("ignores edits and disk changes for a tab not read yet", () => {
     const key = documentKey(WS, "a.md");
     let state = restore();
