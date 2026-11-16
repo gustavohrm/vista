@@ -397,6 +397,10 @@ body,
 .markdown-editor .ProseMirror table,
 .csv-table .data-table {
   --ui-corner-surface: 6px;
+  /* The body rests on the frame and the header takes the hover fill. The package's soft table
+     rests on its grey foreground, which in light mode set a grey plate on the white frame. */
+  --ui-surface-ground: var(--color-frame);
+  --table-head-plate: var(--color-hover);
 }
 
 /* A dragged row passes over the others, so its cells are opaque, in the selected fill on the frame. */
