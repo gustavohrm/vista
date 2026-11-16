@@ -28,7 +28,7 @@ export interface WorkspaceNode {
   id: string;
   /** Name of the file or directory. */
   name: string;
-  /** Path relative to the workspace root. */
+  /** Path relative to the root of the folder the tree was read from, with `/` separators. */
   path: string;
   /** Whether this node is a file or directory. */
   kind: "file" | "directory";
@@ -42,7 +42,7 @@ export interface WorkspaceNode {
 
 /** In-memory document buffer representing an open file. */
 export interface FileDocument {
-  /** Path of the file relative to the workspace root. */
+  /** Path of the file relative to the root of the folder it belongs to, with `/` separators. */
   path: string;
   /** File name with extension. */
   name: string;

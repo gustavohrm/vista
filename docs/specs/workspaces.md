@@ -21,7 +21,7 @@ Vista is an Obsidian-, Notion-, and VS Code-inspired personal workspace applicat
 
 A workspace is one or more folders, plus a name, an icon, a colour, and a session that remembers its open tabs. Every open folder belongs to a workspace: there is no separate "folder mode", so the user never has to wonder whether a workspace must be created first. The start screen says this in one sentence before anything is opened: `A workspace is one or more folders. Vista remembers its tabs and its look; your files stay where they are.`
 
-A workspace has no settings of its own. Settings stay global, because a workspace value overriding a global one would leave the user asking which of the two applies. This can be revisited once a setting has a concrete reason to differ per workspace.
+A workspace has no settings of its own, only its details: the name, icon, colour, folders, and where the details are kept, which [Workspace Settings](#workspace-settings) edits. Settings stay global, because a workspace value overriding a global one would leave the user asking which of the two applies. This can be revisited once a setting has a concrete reason to differ per workspace.
 
 ### Opening a folder
 
@@ -94,7 +94,7 @@ Adding a folder to the current workspace is not in this menu: it is a change to 
 
 - **Name**, **Icon** from a fixed set, and **Colour** from the design-system palette. The icons are `folder` (the default), `book-open`, `notebook-pen`, `briefcase`, `code`, `house`, `star`, `heart`, `flask-conical`, `graduation-cap`, `pen-line`, and `globe`; they are a fixed set because an `ic-*` class must appear literally in the code to render. The colours are the palette's hues: `neutral` (the default), `indigo`, `emerald`, `amber`, and `rose`. A name is trimmed, may not be empty, and is at most 80 characters.
 - **Folders**: the list, with **Add Folder…** and a remove button per folder. [Folder rules](#folder-rules) apply.
-- **Where its details are kept**: _On this device_ or _In {home folder}/.vista_, as [Where a workspace's details live](#where-a-workspaces-details-live) describes. The choice is shown only when there is one: for a folder Vista can't write to, the details can only stay on the device, so a choice of one would ask nothing.
+- **Where its details are kept**: _On this device_ or _In {home folder}/.vista_, as [Where a workspace's details live](#where-a-workspaces-details-live) describes. The choice is shown only when there is one: for a folder Vista can't write to, the details can only stay on the device, so a choice of one would ask nothing; and while the home folder waits for permission or is missing, neither choice can be carried out, since each one writes or deletes its file.
 
 ### Reopening at startup
 
@@ -132,7 +132,7 @@ Future versions will expand to `.json`, `.yaml`, canvas representations, and emb
 
 ### CSV table
 
-The table treats the first record as the header: its cells are the column names, edited in place like any other cell, and the rows below are numbered from 1. A line break at the end of the file ends the last record rather than starting an empty one, so the table shows no empty row for it, and the table writes the file back with that final line break and with the file's own line breaks. **Add column**, a plus at the end of the header, adds an empty column after the last one; **Add row**, under the table, adds an empty row after the last one, so each control sits where its result appears. Cells use the interface's 13px text, as in a spreadsheet, not the document's reading size. A row moves by dragging its number, which turns into a grip on hover: the row follows the pointer up and down the table and the rows it passes slide aside, as tabs do, and Escape puts it back; with the number focused, Shift+Up and Shift+Down move it one place. The header stays the first record. The table sits 6px from the frame's left edge, in line with the first tab, and 6px below the tabs, the same gap the tabs keep from the frame's edge; it takes a control's 6px corner rather than the package's larger surface corner.
+The table treats the first record as the header: its cells are the column names, edited in place like any other cell, and the rows below are numbered from 1. A line break at the end of the file ends the last record rather than starting an empty one, so the table shows no empty row for it, and the table writes the file back with that final line break and with the file's own line breaks and field separator, such as `;` or a tab. **Add column**, a plus at the end of the header, adds an empty column after the last one; **Add row**, under the table, adds an empty row after the last one, so each control sits where its result appears. Cells use the interface's 13px text, as in a spreadsheet, not the document's reading size. A row moves by dragging its number, which turns into a grip on hover: the row follows the pointer up and down the table and the rows it passes slide aside, as tabs do, and Escape puts it back; with the number focused, Shift+Up and Shift+Down move it one place. The header stays the first record. The table sits 6px from the frame's left edge, in line with the first tab, and 6px below the tabs, the same gap the tabs keep from the frame's edge; it takes a control's 6px corner rather than the package's larger surface corner.
 
 ### Markdown WYSIWYG editing
 
