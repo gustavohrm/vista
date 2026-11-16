@@ -1,9 +1,9 @@
 import type { CSSProperties, ReactNode } from "react";
 
-import type { WorkspaceColor, WorkspaceIcon } from "../../domain/workspaces";
+import { isPaletteColor, type PaletteColor, type WorkspaceColor, type WorkspaceIcon } from "../../domain/workspaces";
 
 // Each hue reads on both themes: the darker step on light backgrounds, the lighter one on dark.
-const COLOR_STYLES: Record<WorkspaceColor, CSSProperties | undefined> = {
+const COLOR_STYLES: Record<PaletteColor, CSSProperties | undefined> = {
   neutral: undefined,
   indigo: { color: "light-dark(var(--color-indigo-600), var(--color-indigo-300))" },
   emerald: { color: "light-dark(var(--color-emerald-700), var(--color-emerald-300))" },
@@ -24,7 +24,7 @@ interface WorkspaceGlyphProps {
  * rewrites literal `ic-*` classes.
  */
 export function WorkspaceGlyph({ icon, color, isTile = false, className = "" }: WorkspaceGlyphProps) {
-  const style = COLOR_STYLES[color];
+  const style = isPaletteColor(color) ? COLOR_STYLES[color] : customColorStyle(color);
   const tone = style ? "" : "text-text-secondary";
   // The tile's fill is the icon's own colour, faded, so each colour needs no second value.
   const tile = isTile
@@ -61,4 +61,14 @@ export function WorkspaceGlyph({ icon, color, isTile = false, className = "" }: 
     case "globe":
       return wrap(<i className="ic-globe" aria-hidden="true" />);
   }
+}
+
+/**
+ * A picked colour, shaded the way the palette's steps are: toward black on light backgrounds and
+ * toward white on dark ones, so a very light or very dark pick still reads on both themes.
+ */
+function customColorStyle(color: WorkspaceColor): CSSProperties {
+  return {
+    color: `light-dark(color-mix(in oklab, ${color} 80%, black), color-mix(in oklab, ${color} 70%, white))`,
+  };
 }

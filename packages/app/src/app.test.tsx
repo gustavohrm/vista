@@ -1024,6 +1024,29 @@ describe("App", () => {
       expect(storedWorkspace()).toMatchObject({ icon: "book-open", color: "rose" });
     });
 
+    it("takes a custom colour once the picker commits it, and leaves the palette's swatches unchosen", async () => {
+      const user = userEvent.setup();
+      const { capability } = createFoldersCapability(storedFolders());
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("plan.txt");
+      const dialog = await openWorkspaceSettings(user);
+      const picker = within(dialog).getByLabelText("Custom colour");
+
+      // Moving across the picker previews the colour without saving it.
+      fireEvent.input(picker, { target: { value: "#3a7bd5" } });
+      expect(storedWorkspace().color).not.toBe("#3a7bd5");
+
+      fireEvent.change(picker, { target: { value: "#3A7BD5" } });
+
+      expect(storedWorkspace().color).toBe("#3a7bd5");
+      for (const radio of within(dialog).getAllByRole("radio", { name: /^(Neutral|Indigo|Emerald|Amber|Rose)$/ })) {
+        expect(radio).not.toBeChecked();
+      }
+
+      await user.click(within(dialog).getByRole("radio", { name: "Rose" }));
+      expect(storedWorkspace().color).toBe("rose");
+    });
+
     it("lists the folders, and removes one after asking", async () => {
       const user = userEvent.setup();
       const { capability } = createFoldersCapability(storedFolders());
