@@ -32,11 +32,17 @@ interface TooltipProps {
   children: (bubbleId: string) => ReactNode;
 }
 
+/**
+ * Where the bubble opens, and a strip across the gap to the trigger: the bubble keeps the pointer, so
+ * it stays while the pointer moves onto it, and the strip keeps it open on the way. The strip covers
+ * only the gap, 7px past the bubble's padding to clear its 1px border, never the trigger, so it
+ * takes no click meant for the control.
+ */
 const SIDE_CLASS = {
-  top: "bottom-full mb-1.5",
-  bottom: "top-full mt-1.5",
-  left: "right-full mr-1.5 top-1/2 -translate-y-1/2 origin-right",
-  right: "left-full ml-1.5 top-1/2 -translate-y-1/2 origin-left",
+  top: "bottom-full mb-1.5 before:top-full before:inset-x-0 before:h-[7px]",
+  bottom: "top-full mt-1.5 before:bottom-full before:inset-x-0 before:h-[7px]",
+  left: "right-full mr-1.5 top-1/2 -translate-y-1/2 origin-right before:left-full before:inset-y-0 before:w-[7px]",
+  right: "left-full ml-1.5 top-1/2 -translate-y-1/2 origin-left before:right-full before:inset-y-0 before:w-[7px]",
 } as const;
 
 const ALIGN_CLASS = {
@@ -53,7 +59,8 @@ const ORIGIN_CLASS = {
 /**
  * A control's name in a small bubble beside it. It shows after the pointer rests on the control
  * for a moment, or at once when the previous tooltip has just hidden, and at once when keyboard
- * focus reaches the control, so keyboard users see the names of icon-only buttons too. A click or
+ * focus reaches the control, so keyboard users see the names of icon-only buttons too. It stays while
+ * the pointer is on the bubble. A click or
  * Escape hides it until the pointer enters again or focus leaves, so a clicked button doesn't keep
  * its bubble. It grows in from the control and is instant with reduced motion. The bubble is always
  * in the document, so the trigger's `aria-describedby` names it whether or not it shows.
@@ -111,6 +118,24 @@ export function Tooltip({ text, shortcut, position, align = "center", className,
     hide();
   };
 
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined;
+    }
+    // A bubble the pointer opened while focus is elsewhere, such as in the editor, gets no key events
+    // of its own, and Escape still has to hide it. The key is left to its target as well.
+    const handleDocumentKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        isDismissedRef.current = true;
+        window.clearTimeout(timerRef.current);
+        lastHiddenAt = Date.now();
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("keydown", handleDocumentKeyDown);
+    return () => document.removeEventListener("keydown", handleDocumentKeyDown);
+  }, [isOpen]);
+
   const handleKeyDown = (event: KeyboardEvent<HTMLSpanElement>) => {
     if (event.key === "Escape") {
       dismiss();
@@ -137,7 +162,7 @@ export function Tooltip({ text, shortcut, position, align = "center", className,
       <span
         role="tooltip"
         id={bubbleId}
-        className={`bg-pop border-line-strong text-text-strong shadow-float pointer-events-none absolute z-50 flex min-h-6 w-max max-w-[min(48rem,calc(100vw-2rem))] items-center gap-2 rounded-md border px-2 py-0.5 text-xs leading-4 font-normal break-all whitespace-normal transition-[opacity,scale,visibility] ease-(--ease-enter) motion-reduce:transition-none ${side} ${placement} ${
+        className={`bg-pop border-line-strong text-text-strong shadow-float absolute z-50 flex min-h-6 w-max max-w-[min(48rem,calc(100vw-2rem))] items-center gap-2 rounded-md border px-2 py-0.5 text-xs leading-4 font-normal break-all whitespace-normal transition-[opacity,scale,visibility] ease-(--ease-enter) before:absolute before:content-[''] motion-reduce:transition-none ${side} ${placement} ${
           isOpen ? "visible scale-100 opacity-100 duration-150" : "invisible scale-96 opacity-0 duration-100"
         }`}
       >

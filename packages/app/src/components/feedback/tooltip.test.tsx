@@ -104,6 +104,16 @@ describe("Tooltip", () => {
     expect(wrapper).not.toHaveAttribute("data-tooltip-open");
   });
 
+  it("hides on Escape while the pointer shows it and focus is elsewhere, such as in the editor", () => {
+    const { wrapper } = renderTooltip();
+    fireEvent.pointerEnter(wrapper);
+    act(() => vi.advanceTimersByTime(TOOLTIP_DELAY_MS));
+
+    fireEvent.keyDown(document.body, { key: "Escape" });
+
+    expect(wrapper).not.toHaveAttribute("data-tooltip-open");
+  });
+
   it("does not show on focus that came from a click", () => {
     const { button, wrapper } = renderTooltip();
     vi.spyOn(button, "matches").mockReturnValue(false);
