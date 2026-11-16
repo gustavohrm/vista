@@ -2886,6 +2886,20 @@ describe("App", () => {
       expect(within(statusBar()).queryByRole("button", { name: /^Reveal/ })).not.toBeInTheDocument();
       await user.click(within(statusBar()).getByRole("button", { name: "Copy Relative Path" }));
       expect(writeText).toHaveBeenCalledWith("data.csv");
+      expect(within(statusBar()).getByRole("status")).toHaveTextContent("Copied");
+    });
+
+    it("does not report a copy that failed", async () => {
+      const user = userEvent.setup();
+      vi.spyOn(navigator.clipboard, "writeText").mockRejectedValue(new Error("denied"));
+      vi.spyOn(console, "error").mockImplementation(() => undefined);
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      await user.click(screen.getByText("data.csv"));
+
+      await user.click(within(statusBar()).getByRole("button", { name: "Copy Relative Path" }));
+      expect(await screen.findByText("Couldn't copy to the clipboard.")).toBeInTheDocument();
+      expect(within(statusBar()).getByRole("status")).toHaveTextContent("");
     });
 
     it("shows the active file's full path on desktop, copies it, and reveals the file", async () => {

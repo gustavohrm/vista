@@ -1658,12 +1658,14 @@ function AppShell({ adapter }: AppProps) {
   }, []);
 
   const copyText = useCallback(
-    async (text: string) => {
+    async (text: string): Promise<boolean> => {
       try {
         await navigator.clipboard.writeText(text);
+        return true;
       } catch (err) {
         console.error("Failed to copy to the clipboard:", err);
         toast.show({ kind: "error", text: "Couldn't copy to the clipboard." });
+        return false;
       }
     },
     [toast],
@@ -1675,11 +1677,9 @@ function AppShell({ adapter }: AppProps) {
   const copyFullPath = useMemo(
     () =>
       adapter.platform === "native"
-        ? (entry: FolderEntryRef) => {
+        ? (entry: FolderEntryRef): Promise<boolean> => {
             const folder = readyFolder(entry.folderId);
-            if (folder) {
-              void copyText(joinAbsolutePath(folder.rootPath, entry.path));
-            }
+            return folder ? copyText(joinAbsolutePath(folder.rootPath, entry.path)) : Promise.resolve(false);
           }
         : undefined,
     [adapter.platform, copyText, readyFolder],
@@ -2301,7 +2301,7 @@ function AppShell({ adapter }: AppProps) {
                   activeFile={shownDocument}
                   location={activeLocation}
                   copyPathLabel={adapter.platform === "native" ? "Copy Path" : "Copy Relative Path"}
-                  onCopyPath={() => (copyFullPath ? copyFullPath(shownDocument) : void copyText(shownDocument.path))}
+                  onCopyPath={() => (copyFullPath ? copyFullPath(shownDocument) : copyText(shownDocument.path))}
                   onReveal={revealEntry ? () => void revealEntry(shownDocument) : undefined}
                   cursor={activeCursor}
                   vimMode={activeVimMode}

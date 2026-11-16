@@ -39,6 +39,26 @@
   @apply border-line bg-hover text-text-muted inline-flex h-5 items-center rounded border px-1.5 font-sans text-[11px] leading-none font-medium whitespace-nowrap;
 }
 
+/* An icon-only button in the shell's toolbars: the explorer, tabs row, title bar, status bar, and
+   find bar. Vista's own rather than the package's `.btn icon`, whose padding leaves a small icon in
+   a large hover square; here the icon fills more of the same box. Size and icon size are set where
+   it is used (`size-7 text-base`, `size-6 text-[15px]`, `size-5 text-[13px]`), so they never compete
+   with these rules. A pressed toggle, or one whose menu is open, keeps the selected fill. */
+@utility icon-button {
+  @apply text-text-muted hover:bg-hover hover:text-text aria-expanded:bg-selected aria-expanded:text-text-strong aria-pressed:bg-selected aria-pressed:text-text-strong inline-flex flex-none cursor-pointer items-center justify-center rounded-md transition-colors duration-100 outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] disabled:pointer-events-none disabled:opacity-40;
+}
+
+/* The primary button: ink on light grounds, Daylight with ink text on dark ones, where Daylight is
+   strongest and the one action per view is the right place to spend it. Scoped to the button: the
+   package derives the focus ring and checkboxes from `--color-primary`, which stay neutral.
+   Unlayered, so it wins over the package's layered `.primary` intent. */
+.btn.primary {
+  --intent-color: light-dark(var(--color-neutral-950), var(--color-daylight));
+  --intent-hover: light-dark(var(--color-neutral-700), #d6f670);
+  --intent-contrast: light-dark(var(--color-neutral-50), var(--color-neutral-950));
+  --intent-border: var(--intent-color);
+}
+
 ::selection {
   background-color: var(--color-highlight);
 }
@@ -174,25 +194,6 @@ body,
    cell padding would double it and make every row as tall as a document table row. */
 .csv-table .data-table tbody td {
   padding: 0;
-}
-
-/* Edge-aligned variants of the design system's bottom tooltip, for controls near the left or right
-   edge of the window. The package only centers a bottom bubble, which would overflow the edge, and
-   a side bubble would cover the neighbouring buttons while it lingers. They set the same
-   positioning custom properties the package's own `data-tooltip-position` rules set. Unlayered, so
-   they win over the package's layered rules. */
-.tooltip.tooltip-start[data-tooltip-position="bottom"] {
-  --tooltip-left: 0;
-  --tooltip-right: auto;
-  --tooltip-transform: translate(0, 100%);
-  --tooltip-origin: top left;
-}
-
-.tooltip.tooltip-end[data-tooltip-position="bottom"] {
-  --tooltip-left: auto;
-  --tooltip-right: 0;
-  --tooltip-transform: translate(0, 100%);
-  --tooltip-origin: top right;
 }
 
 /* Find matches in rendered views. Text matches are painted with the CSS Custom Highlight API, so
@@ -338,6 +339,19 @@ body,
   }
 }
 
+/* A menu or popover coming out of the control or point that opened it. Its origin is set where it
+   is used. Closing is instant: the choice is made, and the result should follow at once. */
+.vista-pop {
+  animation: vista-pop 150ms var(--ease-enter) both;
+}
+
+@keyframes vista-pop {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
 @keyframes vista-appear {
   from {
     opacity: 0;
@@ -353,6 +367,7 @@ body,
 /* Reduced motion: the entrance shows its last frame at once, and the loader pulses in place, since
    it still has to show that something is happening. */
 @media (prefers-reduced-motion: reduce) {
+  .vista-pop,
   .vista-logo[data-motion="enter"] .vista-logo-arm,
   .vista-logo[data-motion="enter"] .vista-logo-rise,
   .vista-logo[data-motion="enter"] .vista-logo-letter {

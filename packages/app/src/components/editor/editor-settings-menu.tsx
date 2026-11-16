@@ -64,7 +64,7 @@ export function EditorSettingsMenu({ settings, onChange, onOpenSettings }: Edito
             aria-haspopup="menu"
             aria-expanded={anchor !== null}
             aria-describedby={bubbleId}
-            className={anchor ? "btn soft icon sm" : "btn ghost icon sm"}
+            className="icon-button size-7 text-base"
           >
             <i className="ic-settings-2" aria-hidden="true" />
           </button>

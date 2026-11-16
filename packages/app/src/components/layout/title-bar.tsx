@@ -48,7 +48,7 @@ export function TitleBar({
                 aria-label={explorerLabel}
                 aria-describedby={bubbleId}
                 aria-pressed={isSidebarOpen}
-                className={isSidebarOpen ? "btn soft icon sm" : "btn ghost icon sm"}
+                className="icon-button size-7 text-base"
               >
                 <i className="ic-menu" aria-hidden="true" />
               </button>

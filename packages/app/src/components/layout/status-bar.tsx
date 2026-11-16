@@ -9,8 +9,7 @@ import type { CursorInfo } from "../editor/raw-editor";
 import { Tooltip } from "../feedback/tooltip";
 
 /** Icon buttons sized to fit the bar's 30px height. */
-const PATH_BUTTON_CLASS =
-  "btn ghost icon sm size-6! min-h-0! min-w-0! p-0! text-xs text-text-faint hover:text-text [--ui-radius:6px]";
+const PATH_BUTTON_CLASS = "icon-button size-6 text-sm";
 
 interface StatusBarProps {
   /** Currently active file document, if one is open. */
@@ -18,7 +17,7 @@ interface StatusBarProps {
   /** Where the active file is, shown on the left. */
   location?: DocumentLocation | null;
   /** Copies the active file's path: the full path on desktop, the path within its folder on the web. */
-  onCopyPath?: () => void;
+  onCopyPath?: () => Promise<boolean>;
   /** Names the copy button after what it copies. */
   copyPathLabel?: "Copy Path" | "Copy Relative Path";
   /** Shows the active file in the operating system's file manager, where the host has one. */
@@ -59,11 +58,7 @@ export function StatusBar({
         // The path comes first, so it keeps most of a narrow bar and the facts scroll instead.
         <div className="flex max-w-[65%] min-w-0 flex-none items-center gap-1 whitespace-nowrap">
           <PathText location={location} />
-          {onCopyPath && (
-            <PathButton label={copyPathLabel} onClick={onCopyPath}>
-              <i className="ic-copy" aria-hidden="true" />
-            </PathButton>
-          )}
+          {onCopyPath && <CopyPathButton label={copyPathLabel} onCopy={onCopyPath} />}
           {onReveal && (
             <PathButton label="Reveal in File Explorer" onClick={onReveal}>
               <i className="ic-folder-open" aria-hidden="true" />
@@ -151,6 +146,41 @@ function splitFileName(path: string, location: DocumentLocation): ReactNode {
     <>
       {path.slice(0, path.length - name.length)}
       <span className="text-text-strong font-medium">{name}</span>
+    </>
+  );
+}
+
+/** How long the copy button shows its check after a copy, in milliseconds. */
+export const COPIED_MS = 1500;
+
+/**
+ * The copy button. After a copy that worked it shows a check for a moment, and says "Copied" to
+ * assistive technology, so the copy is confirmed where it was asked for; a failed copy says so in
+ * a toast instead and keeps the copy icon.
+ */
+function CopyPathButton({ label, onCopy }: { label: string; onCopy: () => Promise<boolean> }) {
+  const [isCopied, setIsCopied] = useState(false);
+  const timerRef = useRef(0);
+  useEffect(() => () => window.clearTimeout(timerRef.current), []);
+
+  const handleClick = async () => {
+    if (await onCopy()) {
+      window.clearTimeout(timerRef.current);
+      setIsCopied(true);
+      timerRef.current = window.setTimeout(() => setIsCopied(false), COPIED_MS);
+    }
+  };
+
+  return (
+    <>
+      <PathButton label={label} onClick={() => void handleClick()}>
+        {isCopied ? (
+          <i className="ic-check vista-pop text-text-strong" aria-hidden="true" />
+        ) : (
+          <i className="ic-copy" aria-hidden="true" />
+        )}
+      </PathButton>
+      <output className="visually-hidden">{isCopied ? "Copied" : ""}</output>
     </>
   );
 }

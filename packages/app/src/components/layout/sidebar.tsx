@@ -268,10 +268,10 @@ export function Sidebar({
             <span className="text-text-muted min-w-0 truncate text-xs font-semibold">Explorer</span>
             <div className="flex flex-none items-center gap-0.5">
               <ExplorerActionButton label="Add Folder to Workspace" onClick={onAddFolder}>
-                <i className="ic-folder-input text-sm" aria-hidden="true" />
+                <i className="ic-folder-input" aria-hidden="true" />
               </ExplorerActionButton>
               <ExplorerActionButton label="Collapse All" onClick={handleCollapseAll}>
-                <i className="ic-chevrons-down-up text-sm" aria-hidden="true" />
+                <i className="ic-chevrons-down-up" aria-hidden="true" />
               </ExplorerActionButton>
             </div>
           </div>
@@ -483,7 +483,7 @@ function ExplorerActionButton({ label, onClick, children }: ExplorerActionButton
           aria-label={label}
           aria-describedby={bubbleId}
           onClick={onClick}
-          className="btn ghost icon sm text-text-muted"
+          className="icon-button size-6 text-[15px]"
         >
           {children}
         </button>
@@ -757,10 +757,10 @@ function FolderRowActions({ onNewEntry }: FolderRowActionsProps) {
   return (
     <div className={ROW_ACTIONS_CLASS}>
       <ExplorerActionButton label="New File" onClick={() => onNewEntry("file")}>
-        <i className="ic-file-plus text-xs" aria-hidden="true" />
+        <i className="ic-file-plus" aria-hidden="true" />
       </ExplorerActionButton>
       <ExplorerActionButton label="New Folder" onClick={() => onNewEntry("directory")}>
-        <i className="ic-folder-plus text-xs" aria-hidden="true" />
+        <i className="ic-folder-plus" aria-hidden="true" />
       </ExplorerActionButton>
     </div>
   );

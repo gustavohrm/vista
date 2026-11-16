@@ -392,7 +392,7 @@ function Tab({
           aria-label={`Close ${label}`}
           tabIndex={isActive ? 0 : -1}
           onClick={onClose}
-          className="btn ghost icon sm mr-1 size-5! min-h-0! min-w-0! flex-none p-0! text-[11px] [--ui-radius:4px]"
+          className="icon-button mr-1 size-5 rounded-[4px] text-[13px]"
         >
           {doc.isDirty ? (
             <>

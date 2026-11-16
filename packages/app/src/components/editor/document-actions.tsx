@@ -1,7 +1,6 @@
 import { motion, useReducedMotion } from "motion/react";
 import { useId, type ReactNode } from "react";
 
-import { formatShortcut } from "../../commands/shortcuts";
 import type { EditorSettings } from "../../domain/settings";
 import { getViewer } from "../../domain/viewers";
 import type { ViewMode } from "../../ports";
@@ -47,14 +46,14 @@ export function DocumentActions({
       {canToggleView && viewer.enriched !== undefined && (
         <ViewModeToggle viewMode={doc.viewMode} enriched={viewer.enriched} onViewModeChange={onViewModeChange} />
       )}
-      <Tooltip text={`Find (${formatShortcut("Mod+F")})`} position="bottom" align="end">
+      <Tooltip text="Find" shortcut="Mod+F" position="bottom" align="end">
         {(bubbleId) => (
           <button
             type="button"
             onClick={onFind}
             aria-label="Find"
             aria-describedby={bubbleId}
-            className={isFindOpen ? "btn soft icon sm" : "btn ghost icon sm"}
+            className={`icon-button size-7 text-base ${isFindOpen ? "bg-selected text-text-strong" : ""}`}
           >
             <i className="ic-search" aria-hidden="true" />
           </button>

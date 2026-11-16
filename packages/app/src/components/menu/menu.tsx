@@ -196,8 +196,13 @@ export function Menu({ label, items, x, y, onClose, returnFocusTo, ignorePointer
       onPointerMove={handlePointerMove}
       onPointerLeave={clearPointerHighlight}
       onContextMenu={(event) => event.preventDefault()}
-      style={{ top: position.top, left: position.left }}
-      className="card soft floating fixed z-50 flex max-h-[calc(100vh-16px)] min-w-48 flex-col overflow-y-auto p-1 text-[13px] [--ui-radius-surface:8px]"
+      // Grows from the point it was opened at, even when the viewport edge pushed it aside.
+      style={{
+        top: position.top,
+        left: position.left,
+        transformOrigin: `${x - position.left}px ${y - position.top}px`,
+      }}
+      className="vista-pop card soft floating fixed z-50 flex max-h-[calc(100vh-16px)] min-w-48 flex-col overflow-y-auto p-1 text-[13px] [--ui-radius-surface:8px]"
     >
       {items.map((item, index) =>
         item === MENU_SEPARATOR ? (
