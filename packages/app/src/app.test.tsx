@@ -2781,18 +2781,17 @@ describe("App", () => {
       vi.restoreAllMocks();
     });
 
-    it("offers the desktop app in the browser, on the start screen and in About", async () => {
+    it("offers the desktop app in the browser, on the start screen and then in the rail", async () => {
       const user = userEvent.setup();
       vi.spyOn(navigator, "userAgent", "get").mockReturnValue(WINDOWS_CHROME);
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
       await screen.findByRole("button", { name: "Open Folder…" });
 
-      expect(screen.getByRole("link", { name: /Download for Windows/ })).toHaveAttribute("href", "/download/windows");
+      expect(screen.getByRole("link", { name: "Download for Windows" })).toHaveAttribute("href", "/download/windows");
 
-      await user.keyboard("{Control>},{/Control}");
-      const dialog = await screen.findByRole("region", { name: "Settings" });
-      await user.click(within(dialog).getByRole("button", { name: "About" }));
-      expect(within(dialog).getByRole("link", { name: "Download for Windows" })).toHaveAttribute(
+      await openFolderFromWelcome(user);
+      const rail = screen.getByRole("navigation", { name: "Activity bar" });
+      expect(within(rail).getByRole("link", { name: "Download Vista for Windows" })).toHaveAttribute(
         "href",
         "/download/windows",
       );

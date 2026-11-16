@@ -2366,6 +2366,7 @@ function AppShell({ adapter }: AppProps) {
                 onShowExplorer={showExplorer}
                 isSettingsOpen={settingsSection !== null}
                 onToggleSettings={toggleSettings}
+                desktopDownload={desktopDownload}
               />
             </ShellReveal>
           )}
@@ -2373,7 +2374,11 @@ function AppShell({ adapter }: AppProps) {
             <ShellReveal key="explorer" axis="width">
               <Sidebar
                 activities={
-                  <DrawerActivities isSettingsOpen={settingsSection !== null} onToggleSettings={toggleSettings} />
+                  <DrawerActivities
+                    isSettingsOpen={settingsSection !== null}
+                    onToggleSettings={toggleSettings}
+                    desktopDownload={desktopDownload}
+                  />
                 }
                 folders={explorerFolders}
                 activeEntry={
@@ -2447,7 +2452,6 @@ function AppShell({ adapter }: AppProps) {
                     platform={adapter.platform}
                     version={APP_VERSION}
                     onCheckForUpdates={adapter.updater ? () => checkForUpdates({ isRequested: true }) : undefined}
-                    desktopDownload={desktopDownload}
                     settings={settings}
                     onChange={updateSettings}
                   />

@@ -30,7 +30,7 @@ interface StartScreenProps {
   onRemoveRecent: (workspaceId: string) => void;
   /** Key hints shown while a workspace is open and no file is. */
   hints: readonly StartHint[];
-  /** The desktop installer to offer in the browser, or null where there is none to offer. */
+  /** The desktop installer to offer in the browser, standing in for the rail's link, or null where there is none. */
   desktopDownload?: DesktopDownload | null;
 }
 
@@ -42,8 +42,8 @@ const HEADING_CLASS = "text-text-faint text-xs font-medium";
 
 /**
  * Fills the editor area while no file is open. While a folder is being opened or restored it shows
- * the loader. Without a workspace it shows the logo, the Start list (Open Folder, Settings, and in
- * the browser the desktop download), and the recent workspaces. With a workspace it shows only a few key hints: every action already has
+ * the loader. Without a workspace it shows the logo, the Start list (Open Folder, then Settings and
+ * in the browser the desktop download, which stand in for the rail it hides), and the recent workspaces. With a workspace it shows only a few key hints: every action already has
  * its home in the shell, so the empty frame repeats none of them.
  *
  * @param props - StartScreen properties.
@@ -114,7 +114,6 @@ export function StartScreen({
                 <a href={desktopDownload.href} className={ROW_CLASS}>
                   <i className="ic-monitor-down text-text-muted flex-none text-base" aria-hidden="true" />
                   <span className="text-text-strong flex-1">{desktopDownload.label}</span>
-                  <span className="text-text-faint flex-none text-xs">Desktop app</span>
                 </a>
               </li>
             )}
