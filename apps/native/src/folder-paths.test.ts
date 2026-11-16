@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  joinFolderPath,
   folderNameFromPath,
   normalizeFolderPath,
   relateFolderPaths,
@@ -97,5 +98,17 @@ describe("folderNameFromPath", () => {
     ["/", "Workspace"],
   ])("names %s %s", (path, name) => {
     expect(folderNameFromPath(path)).toBe(name);
+  });
+});
+
+describe("joinFolderPath", () => {
+  it("joins with one separator", () => {
+    expect(joinFolderPath("/home/me/notes/", "/docs/a.md")).toBe("/home/me/notes/docs/a.md");
+    expect(joinFolderPath("C:\\Users\\me\\notes\\", "docs/a.md")).toBe("C:\\Users\\me\\notes/docs/a.md");
+  });
+
+  it("keeps a backslash that ends a POSIX folder or entry name", () => {
+    expect(joinFolderPath("/home/me/name\\", "child")).toBe("/home/me/name\\/child");
+    expect(joinFolderPath("/home/me", "\\leading")).toBe("/home/me/\\leading");
   });
 });

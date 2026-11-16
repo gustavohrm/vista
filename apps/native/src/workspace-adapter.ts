@@ -23,6 +23,7 @@ import {
 
 import {
   folderNameFromPath,
+  joinFolderPath,
   normalizeFolderPath,
   relateFolderPaths,
   relativeFolderPath,
@@ -95,12 +96,6 @@ function folderAt(id: string, folderPath: string): WorkspaceFolder {
 // The file manager is given the separators the platform uses.
 function toPlatformPath(fullPath: string): string {
   return /^([A-Za-z]:|\\|\/\/)/.test(fullPath) ? fullPath.replace(/\//g, "\\") : fullPath;
-}
-
-function joinPath(base: string, part: string): string {
-  const cleanBase = base.replace(/[\\/]+$/, "");
-  const cleanPart = part.replace(/^[\\/]+/, "");
-  return `${cleanBase}/${cleanPart}`;
 }
 
 function sortNodes(nodes: WorkspaceNode[]): WorkspaceNode[] {
@@ -189,7 +184,7 @@ export function createNativeWorkspaceAdapter(): WorkspaceCapability {
           const childRelativePath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
           if (entry.isDirectory) {
             try {
-              const children = await scanDirectory(joinPath(fullPath, entry.name), childRelativePath);
+              const children = await scanDirectory(joinFolderPath(fullPath, entry.name), childRelativePath);
               return { id: childRelativePath, name: entry.name, path: childRelativePath, kind: "directory", children };
             } catch (err) {
               // Shown, not skipped, so the user knows the folder exists and why its files are missing.
@@ -269,7 +264,7 @@ export function createNativeWorkspaceAdapter(): WorkspaceCapability {
     relativeLocation: async (from, to) => relativeFolderPath(from.rootPath, to.rootPath),
 
     async reveal(folder: WorkspaceFolder, path: string): Promise<void> {
-      const fullPath = path === "" ? normalizeFolderPath(folder.rootPath) : joinPath(folder.rootPath, path);
+      const fullPath = path === "" ? normalizeFolderPath(folder.rootPath) : joinFolderPath(folder.rootPath, path);
       await revealItemInDir(toPlatformPath(fullPath));
     },
 
@@ -277,12 +272,12 @@ export function createNativeWorkspaceAdapter(): WorkspaceCapability {
     readTree: (folder) => scanDirectory(folder.rootPath, ""),
 
     async stat(folder: WorkspaceFolder, path: string): Promise<FileStat | null> {
-      const current = await statFile(joinPath(folder.rootPath, path));
+      const current = await statFile(joinFolderPath(folder.rootPath, path));
       return current ? { size: current.size, modifiedAt: current.modifiedAt } : null;
     },
 
     async readFile(folder: WorkspaceFolder, path: string): Promise<FileContents> {
-      const fullPath = joinPath(folder.rootPath, path);
+      const fullPath = joinFolderPath(folder.rootPath, path);
       // Stated before reading: a change in between then reads as newer than this version and is
       // noticed on the next check, rather than hidden behind a version that matches it.
       const current = await statFile(fullPath);
@@ -299,7 +294,7 @@ export function createNativeWorkspaceAdapter(): WorkspaceCapability {
       bytes: Uint8Array<ArrayBuffer>,
       options?: { expected?: FileStat },
     ): Promise<FileStat> {
-      const fullPath = joinPath(folder.rootPath, path);
+      const fullPath = joinFolderPath(folder.rootPath, path);
       const current = await statFile(fullPath);
       const expected = options?.expected;
       if (expected && (!current || current.size !== expected.size || current.modifiedAt !== expected.modifiedAt)) {
@@ -338,7 +333,7 @@ export function createNativeWorkspaceAdapter(): WorkspaceCapability {
     },
 
     async createFile(folder: WorkspaceFolder, path: string): Promise<void> {
-      const fullPath = joinPath(folder.rootPath, path);
+      const fullPath = joinFolderPath(folder.rootPath, path);
       if (await exists(fullPath)) {
         throw new Error(`"${path.split("/").pop()}" already exists.`);
       }
@@ -348,7 +343,7 @@ export function createNativeWorkspaceAdapter(): WorkspaceCapability {
     },
 
     async createDirectory(folder: WorkspaceFolder, path: string): Promise<void> {
-      const fullPath = joinPath(folder.rootPath, path);
+      const fullPath = joinFolderPath(folder.rootPath, path);
       if (await exists(fullPath)) {
         throw new Error(`"${path.split("/").pop()}" already exists.`);
       }
@@ -356,8 +351,8 @@ export function createNativeWorkspaceAdapter(): WorkspaceCapability {
     },
 
     async move(folder: WorkspaceFolder, fromPath: string, toPath: string): Promise<void> {
-      const fullFromPath = joinPath(folder.rootPath, fromPath);
-      const fullToPath = joinPath(folder.rootPath, toPath);
+      const fullFromPath = joinFolderPath(folder.rootPath, fromPath);
+      const fullToPath = joinFolderPath(folder.rootPath, toPath);
       // `rename` silently replaces an existing destination rather than failing, so the
       // collision check has to happen explicitly here to honor the contract.
       if (await exists(fullToPath)) {
@@ -367,7 +362,7 @@ export function createNativeWorkspaceAdapter(): WorkspaceCapability {
     },
 
     async remove(folder: WorkspaceFolder, path: string): Promise<void> {
-      await removeEntry(joinPath(folder.rootPath, path), { recursive: true });
+      await removeEntry(joinFolderPath(folder.rootPath, path), { recursive: true });
     },
   };
 }

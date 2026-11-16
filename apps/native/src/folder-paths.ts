@@ -91,3 +91,14 @@ export function relativeFolderPath(from: string, to: string): string | null {
 export function folderNameFromPath(folderPath: string): string {
   return splitRoot(folderPath).segments.pop() ?? "Workspace";
 }
+
+/**
+ * Joins a folder path and a path inside it with one `/`. Only a Windows path treats a backslash as a
+ * separator to trim; in a POSIX path it is part of a name, even at its end.
+ */
+export function joinFolderPath(base: string, part: string): string {
+  const isWindows = /^([A-Za-z]:|\\\\|\/\/)/.test(base);
+  const trailing = isWindows ? /[\\/]+$/ : /\/+$/;
+  const leading = isWindows ? /^[\\/]+/ : /^\/+/;
+  return `${base.replace(trailing, "")}/${part.replace(leading, "")}`;
+}
