@@ -1749,6 +1749,8 @@ function AppShell({ adapter }: AppProps) {
   }, []);
 
   const requestNewEntry = useCallback((kind: NewEntryRequest["kind"]) => {
+    // The name is typed in the explorer, so it comes back from behind Settings, as `showExplorer` does.
+    setSettingsSection(null);
     setIsSidebarOpen(true);
     setNewEntryRequest((previous) => ({ kind, serial: (previous?.serial ?? 0) + 1 }));
   }, []);

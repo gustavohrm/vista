@@ -109,10 +109,16 @@ export function Tooltip({ text, shortcut, position, className, children }: Toolt
     if (!isOpen || !isHorizontal || !wrapper || !bubble) {
       return;
     }
-    const trigger = wrapper.getBoundingClientRect();
-    // `offsetWidth` ignores the scale the bubble grows from, so it is the width it settles at.
-    const left = placeBubble(trigger, bubble.offsetWidth, document.documentElement.clientWidth) - trigger.left;
-    setPlacement({ left, originX: trigger.width / 2 - left });
+    const place = () => {
+      const trigger = wrapper.getBoundingClientRect();
+      // `offsetWidth` ignores the scale the bubble grows from, so it is the width it settles at.
+      const left = placeBubble(trigger, bubble.offsetWidth, document.documentElement.clientWidth) - trigger.left;
+      setPlacement({ left, originX: trigger.width / 2 - left });
+    };
+    place();
+    // A resized window can move the control or narrow the room beside it while the bubble shows.
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
   }, [isOpen, isHorizontal, text, shortcut]);
   const isDismissedRef = useRef(false);
   const timerRef = useRef(0);

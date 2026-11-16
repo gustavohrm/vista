@@ -3177,6 +3177,25 @@ describe("App", () => {
       expect(mockWorkspace.createFile).toHaveBeenCalledWith(expect.objectContaining({ id: "workspace-1" }), "todo.md");
     });
 
+    it("closes Settings to show the explorer when New File runs from it", async () => {
+      const viewport = stubViewport(true);
+      try {
+        const user = userEvent.setup();
+        render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+        await openFolderFromWelcome(user);
+        const rail = screen.getByRole("navigation", { name: "Activity bar" });
+        await user.click(within(rail).getByRole("button", { name: "Settings" }));
+
+        await runFromPalette(user, "File: New File");
+
+        expect(screen.queryByRole("region", { name: "Settings" })).not.toBeInTheDocument();
+        expect(explorerPanel()).not.toHaveAttribute("inert");
+        expect(await screen.findByRole("textbox", { name: "Entry name" })).toBeVisible();
+      } finally {
+        viewport.restore();
+      }
+    });
+
     it("toggles word wrap from the palette and with Alt+Z", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
