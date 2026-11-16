@@ -63,12 +63,17 @@ export function WorkspaceGlyph({ icon, color, isTile = false, className = "" }: 
   }
 }
 
+/** OKLCH lightness bounds that keep a custom glyph at 3:1 or more against the light and dark surfaces. */
+const MAX_LIGHTNESS_ON_LIGHT = 0.6;
+const MIN_LIGHTNESS_ON_DARK = 0.62;
+
 /**
  * A picked colour, shaded the way the palette's steps are: toward black on light backgrounds and
- * toward white on dark ones, so a very light or very dark pick still reads on both themes.
+ * toward white on dark ones. Its lightness is then capped on light backgrounds and floored on dark
+ * ones, so even white or black keeps at least 3:1 against the surface.
  */
 function customColorStyle(color: WorkspaceColor): CSSProperties {
-  return {
-    color: `light-dark(color-mix(in oklab, ${color} 80%, black), color-mix(in oklab, ${color} 70%, white))`,
-  };
+  const light = `oklch(from color-mix(in oklab, ${color} 80%, black) min(l, ${MAX_LIGHTNESS_ON_LIGHT}) c h)`;
+  const dark = `oklch(from color-mix(in oklab, ${color} 70%, white) max(l, ${MIN_LIGHTNESS_ON_DARK}) c h)`;
+  return { color: `light-dark(${light}, ${dark})` };
 }

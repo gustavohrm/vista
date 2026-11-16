@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { EditorSettings } from "../../domain/settings";
 import { Tooltip } from "../feedback/tooltip";
 import { Menu, MENU_SEPARATOR, type MenuEntry } from "../menu/menu";
+import { EDITOR_OPTIONS } from "../settings/vista-sections";
 
 /** Space between the button and its menu, in pixels. */
 const MENU_GAP_PX = 4;
@@ -13,13 +14,6 @@ interface EditorSettingsMenuProps {
   /** Opens the Editor section of Settings, from the menu's last item. */
   onOpenSettings: () => void;
 }
-
-const SETTING_LABELS: { name: keyof EditorSettings; label: string }[] = [
-  { name: "lineNumbers", label: "Line numbers" },
-  { name: "wordWrap", label: "Word wrap" },
-  { name: "minimap", label: "Minimap" },
-  { name: "vim", label: "Vim mode" },
-];
 
 /**
  * Gear button that opens the raw editor's settings as a menu of check items, followed by All
@@ -39,12 +33,12 @@ export function EditorSettingsMenu({ settings, onChange, onOpenSettings }: Edito
       return;
     }
     const rect = button.getBoundingClientRect();
-    // The menu keeps itself inside the viewport, so it ends up right-aligned under the button.
+    // The menu opens at the button's left edge and moves inward only when it would overflow the viewport.
     setAnchor({ x: rect.left, y: rect.bottom + MENU_GAP_PX });
   };
 
   const items: MenuEntry[] = [
-    ...SETTING_LABELS.map(({ name, label }) => ({
+    ...EDITOR_OPTIONS.map(({ name, label }) => ({
       label,
       checked: settings[name],
       onSelect: () => onChange({ [name]: !settings[name] }),

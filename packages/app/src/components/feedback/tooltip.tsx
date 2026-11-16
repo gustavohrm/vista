@@ -113,7 +113,7 @@ export function Tooltip({ text, shortcut, position, className, children }: Toolt
     // `offsetWidth` ignores the scale the bubble grows from, so it is the width it settles at.
     const left = placeBubble(trigger, bubble.offsetWidth, document.documentElement.clientWidth) - trigger.left;
     setPlacement({ left, originX: trigger.width / 2 - left });
-  }, [isOpen, isHorizontal, text]);
+  }, [isOpen, isHorizontal, text, shortcut]);
   const isDismissedRef = useRef(false);
   const timerRef = useRef(0);
 

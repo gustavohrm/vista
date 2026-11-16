@@ -109,27 +109,7 @@ dialog::backdrop {
    19px title, 44px buttons, a blurred backdrop, and no edge. These give it the same floating
    surface and the sizes of Vista's own dialog (`unsaved-changes-dialog.tsx`). Its rules are
    `:where`, so these win without `!important`. */
-dialog[data-toast-instance].toast-/* A field edited in place, such as a CSV cell or a name in the explorer. Focused, it keeps the
-   size and corner of the text it replaces and shows only a hairline over the hover fill, instead of
-   the package's 3px focus ring, which made a cell look like a form field. An invalid name takes the
-   hairline in red. Unlayered, so it wins over the package's layered ring. */
-.ipt.inline-field {
-  border-radius: 4px;
-}
-
-.ipt.inline-field:focus-visible {
-  outline: 1px solid var(--color-line-strong);
-  outline-offset: -1px;
-  background-color: var(--color-hover);
-  box-shadow: none;
-}
-
-.ipt.inline-field[aria-invalid="true"] {
-  outline: 1px solid var(--color-destructive);
-  outline-offset: -1px;
-}
-
-dialog::backdrop {
+dialog[data-toast-instance].toast-dialog::backdrop {
   background-color: var(--color-scrim);
   backdrop-filter: none;
 }
