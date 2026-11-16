@@ -19,22 +19,36 @@ export function SectionHeading({ title, lead }: { title: string; lead: string })
  * A heading for a group inside a section.
  *
  * @param props - The heading's id, for the group it names; whether it opens the section, right under
- *   the lead, which already sets the space above it; and its text.
+ *   the lead, which already sets the space above it; its text; and an optional action for the group,
+ *   such as an icon button that adds to it, at the row's right end.
  * @returns Heading element.
  */
 export function GroupHeading({
   id,
   isFirst = false,
+  action,
   children,
 }: {
   id?: string;
   isFirst?: boolean;
+  action?: ReactNode;
   children: ReactNode;
 }) {
-  return (
-    <h3 id={id} className={`text-text-strong mb-2.5 text-[13px] font-semibold ${isFirst ? "" : "mt-8"}`}>
+  const spacing = `mb-2.5 ${isFirst ? "" : "mt-8"}`;
+  const heading = (
+    <h3 id={id} className={`text-text-strong text-[13px] font-semibold ${action ? "" : spacing}`}>
       {children}
     </h3>
+  );
+  if (!action) {
+    return heading;
+  }
+  // The action's box overhangs the row, so the heading's text keeps the same place as without one.
+  return (
+    <div className={`flex h-5 items-center justify-between ${spacing}`}>
+      {heading}
+      {action}
+    </div>
   );
 }
 

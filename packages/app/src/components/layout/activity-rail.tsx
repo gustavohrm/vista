@@ -1,11 +1,13 @@
-import type { ReactNode } from "react";
+import { motion, useAnimate, useReducedMotion } from "motion/react";
+import { useId, type ReactNode } from "react";
 
 import { Tooltip } from "../feedback/tooltip";
 
 interface ActivityRailProps {
-  /** Whether the explorer is shown. */
-  isExplorerOpen: boolean;
-  onToggleExplorer: () => void;
+  /** Whether the frame shows the workspace's files rather than Settings, which marks Explorer as the current place, whether or not its panel is collapsed. */
+  isExplorerCurrent: boolean;
+  /** Shows the explorer, closing Settings if it is open. */
+  onShowExplorer: () => void;
   /** Whether Settings is shown, which presses the gear. */
   isSettingsOpen: boolean;
   onToggleSettings: () => void;
@@ -13,26 +15,30 @@ interface ActivityRailProps {
 
 /**
  * The narrow column at the left edge, from `md` up: Explorer, the Search and Graph places that are
- * still to come, and the Settings gear at its foot. Below `md` the explorer drawer carries the same
- * actions through `DrawerActivities`.
+ * still to come, and the Settings gear at its foot. One background marks the place the frame shows,
+ * so one button is always marked, and slides from one button to the other as it changes. Explorer only goes
+ * to the explorer, never hides it; the title bar's panel toggle does that. Below `md` the explorer
+ * drawer carries the same actions through `DrawerActivities`.
  *
  * @param props - ActivityRail properties.
  * @returns Rail element.
  */
 export function ActivityRail({
-  isExplorerOpen,
-  onToggleExplorer,
+  isExplorerCurrent,
+  onShowExplorer,
   isSettingsOpen,
   onToggleSettings,
 }: ActivityRailProps) {
+  const indicatorId = useId();
   return (
-    <nav aria-label="Activity bar" className="hidden w-12 flex-none flex-col items-center gap-1 pt-1 pb-2 md:flex">
+    <nav aria-label="Activity bar" className="hidden w-11 flex-none flex-col items-center gap-1 pt-1 pb-2 md:flex">
       <RailButton
         label="Explorer"
         tooltip="Explorer"
         position="right"
-        onClick={onToggleExplorer}
-        isPressed={isExplorerOpen}
+        onClick={onShowExplorer}
+        isCurrent={isExplorerCurrent}
+        indicatorId={indicatorId}
       >
         <i className="ic-files" aria-hidden="true" />
       </RailButton>
@@ -44,6 +50,7 @@ export function ActivityRail({
         position="right"
         onClick={onToggleSettings}
         isPressed={isSettingsOpen}
+        indicatorId={indicatorId}
       >
         <i className="ic-settings" aria-hidden="true" />
       </RailButton>
@@ -104,32 +111,81 @@ interface RailButtonProps {
   onClick?: () => void;
   /** Whether the toggle is on. Omitted for a button that is not a toggle. */
   isPressed?: boolean;
+  /** Whether the button's place is shown, for a button that goes to a place rather than toggling it. */
+  isCurrent?: boolean;
+  /** Shared by the buttons whose one background slides between them; without it the background just shows. */
+  indicatorId?: string;
   children: ReactNode;
 }
 
-function RailButton({ label, tooltip, position, onClick, isPressed, children }: RailButtonProps) {
+function RailButton({
+  label,
+  tooltip,
+  position,
+  onClick,
+  isPressed,
+  isCurrent,
+  indicatorId,
+  children,
+}: RailButtonProps) {
+  const isReduced = useReducedMotion() ?? false;
+  const isActive = isPressed === true || isCurrent === true;
   return (
-    <Tooltip
-      text={tooltip}
-      position={position}
-      align={position === "bottom" ? "start" : "center"}
-      className="flex flex-none"
-    >
+    <Tooltip text={tooltip} position={position} className="flex flex-none">
       {(bubbleId) => (
         <button
           type="button"
           aria-label={label}
           aria-describedby={bubbleId}
           aria-pressed={isPressed}
+          aria-current={isCurrent ? "true" : undefined}
           aria-disabled={onClick ? undefined : true}
           onClick={onClick}
-          className={`flex size-[34px] items-center justify-center rounded-lg text-lg transition-colors duration-100 focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] focus-visible:outline-none ${
-            isPressed ? "bg-selected text-text-strong" : "text-text-faint"
-          } ${onClick ? "hover:bg-hover hover:text-text" : "opacity-50"}`}
+          className={`relative flex size-[34px] items-center justify-center rounded-lg text-lg transition-colors duration-100 focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] focus-visible:outline-none ${
+            isActive ? "text-text-strong" : "text-text-faint"
+          } ${onClick ? `hover:text-text ${isActive ? "" : "hover:bg-hover"}` : "opacity-50"}`}
         >
-          {children}
+          {isActive && <RailIndicator layoutId={indicatorId} isReduced={isReduced} />}
+          <span className="relative flex">{children}</span>
         </button>
       )}
     </Tooltip>
+  );
+}
+
+/**
+ * How the marked button's background travels, which a spring carries. On the way it draws in to a
+ * small round drop and stretches a little along its path, then swells just past its size as it
+ * lands and settles, so it reads as one fluid thing moving rather than a box sliding.
+ */
+const INDICATOR_TRAVEL = { type: "spring", visualDuration: 0.5, bounce: 0.18 } as const;
+const INDICATOR_DROP = {
+  scaleX: [1, 0.42, 0.42, 1.08, 1],
+  scaleY: [1, 0.5, 0.62, 1.04, 1],
+  borderRadius: ["8px", "17px", "17px", "10px", "8px"],
+};
+const INDICATOR_DROP_TIMING = { duration: 0.6, times: [0, 0.22, 0.6, 0.82, 1], ease: "easeInOut" as const };
+
+/**
+ * The background behind the marked rail button. The outer element moves between buttons; the inner
+ * one, which is the fill, changes shape only while that move runs, so a background that simply
+ * appears, such as on first showing, doesn't wobble.
+ */
+function RailIndicator({ layoutId, isReduced }: { layoutId?: string; isReduced: boolean }) {
+  const [fill, animate] = useAnimate<HTMLSpanElement>();
+  return (
+    <motion.span
+      layoutId={layoutId}
+      transition={isReduced ? { duration: 0 } : INDICATOR_TRAVEL}
+      onLayoutAnimationStart={() => {
+        if (!isReduced && fill.current) {
+          void animate(fill.current, INDICATOR_DROP, INDICATOR_DROP_TIMING);
+        }
+      }}
+      aria-hidden="true"
+      className="absolute inset-0"
+    >
+      <span ref={fill} className="bg-selected absolute inset-0 rounded-lg" />
+    </motion.span>
   );
 }

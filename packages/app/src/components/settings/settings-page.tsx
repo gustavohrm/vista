@@ -75,7 +75,7 @@ export function SettingsPage({ section, onSectionChange, workspace, onClose, chi
     >
       <header className="border-line flex h-10 flex-none items-center border-b pr-1.5 pl-4">
         <h1 className="text-text-strong flex-1 text-[13px] font-semibold">Settings</h1>
-        <Tooltip text="Close" shortcut="Escape" position="bottom" align="end">
+        <Tooltip text="Close" shortcut="Escape" position="bottom">
           {(tooltipId) => (
             <button
               type="button"

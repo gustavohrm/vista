@@ -8,6 +8,7 @@ import {
 import { Annotation, Compartment, EditorState, Prec, Transaction } from "@codemirror/state";
 import type { Extension, StateEffect } from "@codemirror/state";
 import {
+  Decoration,
   drawSelection,
   EditorView,
   highlightActiveLine,
@@ -108,7 +109,8 @@ const editorTheme = EditorView.theme({
   ".cm-line": { padding: "0 1.5rem 0 0.75rem" },
   ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--color-text)" },
   "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
-    { backgroundColor: "var(--color-highlight)" },
+    { backgroundColor: "var(--color-selection)" },
+  ".cm-selectedText": { color: "var(--color-selection-text)" },
   // The current line is marked by its number alone; a fill under it competed with the selection.
   ".cm-activeLine": { backgroundColor: "transparent" },
   ".cm-gutters": {
@@ -122,6 +124,20 @@ const editorTheme = EditorView.theme({
   ".cm-searchMatch": { backgroundColor: "var(--color-highlight-soft)" },
   ".cm-searchMatch.cm-searchMatch-selected": { backgroundColor: "var(--color-highlight)" },
 });
+
+const selectedTextMark = Decoration.mark({ class: "cm-selectedText" });
+
+/**
+ * Sets selected text in the selection's ink. CodeMirror draws the selection in a layer behind the
+ * text, so the text keeps its own colour unless it is marked, and on the solid Daylight fill the
+ * interface's light text would not read.
+ */
+const selectedText = EditorView.decorations.compute(["selection"], (state) =>
+  Decoration.set(
+    state.selection.ranges.filter((range) => !range.empty).map((range) => selectedTextMark.range(range.from, range.to)),
+    true,
+  ),
+);
 
 /**
  * Plain-text editor for every file type, built on CodeMirror 6. One editor instance serves every
@@ -263,6 +279,7 @@ function createEditorState(content: string): EditorState {
       compartments.readOnly.of([]),
       history(),
       drawSelection(),
+      selectedText,
       highlightActiveLine(),
       highlightSelectionMatches(),
       hiddenSearchPanel,

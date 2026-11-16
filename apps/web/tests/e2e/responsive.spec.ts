@@ -65,12 +65,14 @@ test.describe("responsive shell at mobile width", () => {
 });
 
 test.describe("responsive shell at desktop width", () => {
-  test("shows the rail, whose Explorer button toggles the explorer column", async ({ page }) => {
+  test("shows the rail, and toggles the explorer column from the title bar", async ({ page }) => {
     await openFixtureVault(page);
 
     const rail = page.getByRole("navigation", { name: "Activity bar" });
     const explorer = page.getByRole("navigation", { name: "File Explorer" });
-    const toggle = rail.getByRole("button", { name: "Explorer" });
+    const railExplorer = rail.getByRole("button", { name: "Explorer" });
+    const toggle = page.getByRole("button", { name: "Toggle Explorer" });
+    await expect(railExplorer).toHaveAttribute("aria-current", "true");
     await expect(toggle).toHaveAttribute("aria-pressed", "true");
     await expect(rail.getByRole("button", { name: "Settings" })).toBeVisible();
     // The title bar's drawer button and the drawer's own actions are for narrow screens only.
@@ -80,7 +82,7 @@ test.describe("responsive shell at desktop width", () => {
     await expect
       .poll(async () => {
         const railBox = await rail.boundingBox();
-        return (await explorer.boundingBox())?.x === (railBox?.x ?? 0) + (railBox?.width ?? 0) && railBox?.width === 48;
+        return (await explorer.boundingBox())?.x === (railBox?.x ?? 0) + (railBox?.width ?? 0) && railBox?.width === 44;
       })
       .toBe(true);
 
@@ -90,7 +92,11 @@ test.describe("responsive shell at desktop width", () => {
     // The column collapses its width via a CSS transition, so poll until it settles.
     await expect.poll(async () => (await explorer.boundingBox())?.width).toBe(0);
 
-    await toggle.click();
+    // Explorer stays marked: the frame still shows the workspace's files.
+    await expect(railExplorer).toHaveAttribute("aria-current", "true");
+
+    // The rail's Explorer button only goes to the explorer, so it brings the column back.
+    await railExplorer.click();
 
     await expect(toggle).toHaveAttribute("aria-pressed", "true");
     await expect.poll(async () => (await explorer.boundingBox())?.width).toBeGreaterThan(0);

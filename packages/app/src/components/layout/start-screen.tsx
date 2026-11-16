@@ -5,7 +5,7 @@ import { formatShortcut } from "../../commands";
 import { LOGO_WRITE_MS, LogoWrite } from "../brand/logo-write";
 import { VistaLoader, VistaLogo } from "../brand/vista-logo";
 import { WorkspaceGlyph } from "../workspace/workspace-glyph";
-import { describeRecentFolders, type RecentWorkspace } from "../workspace/workspace-switcher";
+import type { RecentWorkspace } from "../workspace/workspace-switcher";
 
 /** A key hint on the empty frame of an open workspace: what a shortcut does, and the shortcut. */
 export interface StartHint {
@@ -265,7 +265,8 @@ function RecentEntry({ workspace, onOpen, onRemove }: RecentEntryProps) {
   const descriptionId = useId();
   const dateId = useId();
   const needsPermission = workspace.folders?.some((folder) => folder.status === "needs-permission") ?? false;
-  const description = needsPermission ? "Click to allow access" : describeRecentFolders(workspace);
+  // The folders are not listed: the name usually is the folder's, and Settings lists them.
+  const description = needsPermission ? "Click to allow access" : undefined;
   const lastOpened =
     workspace.lastOpenedAt !== undefined && workspace.lastOpenedAt > 0
       ? formatLastOpened(workspace.lastOpenedAt)

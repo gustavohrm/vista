@@ -832,18 +832,80 @@ describe("App", () => {
       expect(screen.queryByRole("button", { name: /explorer$/ })).not.toBeInTheDocument();
     });
 
-    it("shows or hides the explorer from its Explorer button", async () => {
+    it("goes to the explorer from its Explorer button, which never hides it and stays marked while it is collapsed", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
       await openFolderFromWelcome(user);
       const rail = screen.getByRole("navigation", { name: "Activity bar" });
       const explorer = within(rail).getByRole("button", { name: "Explorer" });
-      expect(explorer).toHaveAttribute("aria-pressed", "true");
+      expect(explorer).toHaveAttribute("aria-current", "true");
 
       await user.click(explorer);
+      expect(explorer).toHaveAttribute("aria-current", "true");
+      expect(explorerPanel()).not.toHaveAttribute("inert");
 
-      expect(explorer).toHaveAttribute("aria-pressed", "false");
-      expect(screen.getByRole("button", { name: "Open explorer" })).toBeInTheDocument();
+      // The rail marks what the frame shows, the workspace's files, whether or not the panel shows.
+      await user.click(screen.getByRole("button", { name: "Toggle Explorer" }));
+      expect(explorer).toHaveAttribute("aria-current", "true");
+      expect(explorerPanel()).toHaveAttribute("inert");
+
+      await user.click(explorer);
+      expect(explorer).toHaveAttribute("aria-current", "true");
+      expect(explorerPanel()).not.toHaveAttribute("inert");
+      expect(screen.getByRole("button", { name: "Toggle Explorer" })).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("puts Settings in the explorer's place, and brings the explorer back as Settings closes", async () => {
+      const viewport = stubViewport(true);
+      try {
+        const user = userEvent.setup();
+        render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+        await openFolderFromWelcome(user);
+        const rail = screen.getByRole("navigation", { name: "Activity bar" });
+        const explorer = within(rail).getByRole("button", { name: "Explorer" });
+        const settings = within(rail).getByRole("button", { name: "Settings" });
+
+        await user.click(settings);
+
+        expect(explorer).not.toHaveAttribute("aria-current");
+        expect(explorerPanel()).toHaveAttribute("inert");
+        expect(screen.getByRole("button", { name: "Toggle Explorer" })).toHaveAttribute("aria-disabled", "true");
+
+        // Closing Settings from its own button brings the explorer back as it was.
+        await user.click(settings);
+        expect(explorer).toHaveAttribute("aria-current", "true");
+        expect(explorerPanel()).not.toHaveAttribute("inert");
+
+        await user.click(settings);
+        await user.click(explorer);
+
+        expect(screen.queryByRole("region", { name: "Settings" })).not.toBeInTheDocument();
+        expect(explorer).toHaveAttribute("aria-current", "true");
+        expect(explorerPanel()).not.toHaveAttribute("inert");
+      } finally {
+        viewport.restore();
+      }
+    });
+
+    it("toggles the status bar from the title bar, only while there is a document for it", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      const toggle = screen.getByRole("button", { name: "Toggle Status Bar" });
+      expect(toggle).toHaveAttribute("aria-disabled", "true");
+      await user.click(toggle);
+
+      await user.click(screen.getByText("readme.md"));
+      expect(await screen.findByRole("contentinfo", { name: "Status Bar" })).toBeInTheDocument();
+      expect(toggle).toHaveAttribute("aria-pressed", "true");
+      expect(toggle).not.toHaveAttribute("aria-disabled");
+
+      await user.click(toggle);
+      expect(toggle).toHaveAttribute("aria-pressed", "false");
+      await waitFor(() => expect(screen.queryByRole("contentinfo", { name: "Status Bar" })).not.toBeInTheDocument());
+
+      await user.click(toggle);
+      expect(statusBar()).toBeInTheDocument();
     });
 
     it("shows Search and Graph as coming soon, doing nothing when chosen", async () => {
@@ -1088,7 +1150,7 @@ describe("App", () => {
       await findFileRows("a.txt");
       const dialog = await openWorkspaceSettings(user);
 
-      await user.click(within(dialog).getByRole("button", { name: "Add Folder to Workspace…" }));
+      await user.click(within(dialog).getByRole("button", { name: "Add Folder to Workspace" }));
 
       await waitFor(() =>
         expect(
@@ -1818,15 +1880,14 @@ describe("App", () => {
       expect(await screen.findByRole("textbox", { name: "Raw text content of a.txt" })).toBeInTheDocument();
     });
 
-    it("lists every remembered workspace on the start screen with its folders", async () => {
+    it("lists every remembered workspace on the start screen, without its folders", async () => {
       const { capability } = twoWorkspaces(null);
       render(<App adapter={{ platform: "web", workspace: capability }} />);
 
       expect(await screen.findByRole("heading", { name: "Recent workspaces" })).toBeInTheDocument();
-      await waitFor(() =>
-        expect(screen.getByRole("button", { name: "Research" })).toHaveAccessibleDescription(/^notes/),
-      );
-      expect(screen.getByRole("button", { name: "Work" })).toHaveAccessibleDescription(/^sources/);
+      const research = await screen.findByRole("button", { name: "Research" });
+      expect(research).not.toHaveAccessibleDescription(/notes/);
+      expect(screen.getByRole("button", { name: "Work" })).not.toHaveAccessibleDescription(/sources/);
       expect(capability.restoreFolder).not.toHaveBeenCalledWith(expect.anything(), { interactive: true });
     });
 
@@ -2079,6 +2140,32 @@ describe("App", () => {
       const textActions = screen.getByRole("group", { name: "Document actions" });
       expect(within(textActions).queryByRole("group", { name: "Document view mode" })).not.toBeInTheDocument();
       expect(within(textActions).getByRole("button", { name: "Find" })).toBeInTheDocument();
+    });
+
+    it("shows the editor settings gear only while the raw editor shows, and toggles a setting from it", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      await user.click(screen.getByText("readme.md"));
+      await screen.findByRole("heading", { name: "Hello Vista" });
+      const actions = screen.getByRole("group", { name: "Document actions" });
+      expect(within(actions).queryByRole("button", { name: "Editor settings" })).not.toBeInTheDocument();
+
+      await user.click(within(actions).getByRole("button", { name: "Raw" }));
+      await screen.findByRole("textbox", { name: /Raw text content of readme\.md/ });
+      expect(document.querySelector(".cm-lineNumbers")).toBeInTheDocument();
+      await user.click(await within(actions).findByRole("button", { name: "Editor settings" }));
+      await user.click(
+        within(screen.getByRole("menu", { name: "Editor settings" })).getByRole("menuitemcheckbox", {
+          name: "Line numbers",
+        }),
+      );
+
+      expect(document.querySelector(".cm-lineNumbers")).not.toBeInTheDocument();
+      await user.click(within(actions).getByRole("button", { name: "Rich text" }));
+      await waitFor(() =>
+        expect(within(actions).queryByRole("button", { name: "Editor settings" })).not.toBeInTheDocument(),
+      );
     });
 
     it("shows no view switch for a read-only file, which only opens raw", async () => {

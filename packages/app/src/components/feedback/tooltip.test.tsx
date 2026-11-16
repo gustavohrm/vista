@@ -1,11 +1,11 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { Tooltip, TOOLTIP_DELAY_MS } from "./tooltip";
+import { placeBubble, Tooltip, TOOLTIP_DELAY_MS } from "./tooltip";
 
 function renderTooltip() {
   render(
-    <Tooltip text="Save" shortcut="Mod+S" position="bottom" align="end">
+    <Tooltip text="Save" shortcut="Mod+S" position="bottom">
       {(bubbleId) => (
         <button type="button" aria-label="Save file" aria-describedby={bubbleId}>
           S
@@ -121,5 +121,25 @@ describe("Tooltip", () => {
     fireEvent.focus(button);
 
     expect(wrapper).not.toHaveAttribute("data-tooltip-open");
+  });
+});
+
+describe("placeBubble", () => {
+  const VIEWPORT = 1000;
+
+  it("centers a bubble that fits, even on a control near the edge", () => {
+    // A 40px bubble over a 28px button 4px from the left edge still fits centered.
+    expect(placeBubble({ left: 20, width: 28 }, 40, VIEWPORT)).toBe(14);
+    expect(placeBubble({ left: 940, width: 28 }, 40, VIEWPORT)).toBe(934);
+  });
+
+  it("lines a bubble up with the control's edge when a centered one would cross the window's", () => {
+    expect(placeBubble({ left: 4, width: 28 }, 120, VIEWPORT)).toBe(4);
+    expect(placeBubble({ left: 968, width: 28 }, 120, VIEWPORT)).toBe(876);
+  });
+
+  it("keeps a bubble wider than the room beside its control inside the window", () => {
+    expect(placeBubble({ left: 600, width: 28 }, 900, VIEWPORT)).toBe(92);
+    expect(placeBubble({ left: 300, width: 28 }, 980, VIEWPORT)).toBe(8);
   });
 });

@@ -12,6 +12,7 @@ import {
   type WorkspaceStorage,
 } from "../../domain/workspaces";
 import type { WorkspaceDetails } from "../../state/workspaces";
+import { Tooltip } from "../feedback/tooltip";
 import { WorkspaceGlyph } from "../workspace/workspace-glyph";
 import type { RecentWorkspace } from "../workspace/workspace-switcher";
 import { GroupHeading, SectionHeading, SettingsGroup, SettingsRow } from "./settings-parts";
@@ -177,7 +178,26 @@ export function WorkspaceSection({
         </SettingsRow>
       </SettingsGroup>
 
-      <GroupHeading id={`${idPrefix}-folders`}>Folders</GroupHeading>
+      <GroupHeading
+        id={`${idPrefix}-folders`}
+        action={
+          <Tooltip text="Add Folder to Workspace" position="bottom" className="-mr-1.5 flex flex-none">
+            {(bubbleId) => (
+              <button
+                type="button"
+                onClick={onAddFolder}
+                aria-label="Add Folder to Workspace"
+                aria-describedby={bubbleId}
+                className="icon-button size-7 text-base"
+              >
+                <i className="ic-plus" aria-hidden="true" />
+              </button>
+            )}
+          </Tooltip>
+        }
+      >
+        Folders
+      </GroupHeading>
       <SettingsGroup labelledBy={`${idPrefix}-folders`}>
         <ul>
           {folders.map((folder) => (
@@ -202,10 +222,6 @@ export function WorkspaceSection({
           ))}
         </ul>
       </SettingsGroup>
-      <button type="button" onClick={onAddFolder} className="btn sm mt-3">
-        <i className="ic-folder-plus" aria-hidden="true" />
-        Add Folder to Workspace…
-      </button>
 
       {canChooseStorage && (
         <>

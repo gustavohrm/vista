@@ -241,7 +241,7 @@ interface BarButtonProps {
 function BarButton({ label, icon, onClick, pressed, expanded, disabled, isInField }: BarButtonProps) {
   const size = isInField ? "size-6 rounded-[4px] text-[15px]" : "size-7 text-base";
   return (
-    <Tooltip text={label} position="bottom" align="end" className="flex flex-none">
+    <Tooltip text={label} position="bottom" className="flex flex-none">
       {(bubbleId) => (
         <button
           type="button"
