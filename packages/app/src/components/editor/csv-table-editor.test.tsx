@@ -39,6 +39,17 @@ describe("CsvTableEditor", () => {
     expect(onChange).toHaveBeenLastCalledWith("Name,Age,\nAda,36,\n,,\n");
   });
 
+  it("keeps a row added to a one-column file with no final line break once the content comes back", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { rerender } = render(<CsvTableEditor content={"Name\nAda"} onChange={onChange} />);
+
+    await user.click(screen.getByRole("button", { name: "Add row" }));
+    rerender(<CsvTableEditor content={onChange.mock.lastCall?.[0] as string} onChange={onChange} />);
+
+    expect(screen.getAllByRole("row")).toHaveLength(3);
+  });
+
   it("moves a row with Shift and the arrow keys from its number, keeping the header first", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();

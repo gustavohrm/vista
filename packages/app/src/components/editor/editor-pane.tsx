@@ -143,7 +143,9 @@ export function EditorPane({
                 loadImage={loadImage}
               />
             ) : (
-              <CsvTableEditor content={doc.content} onChange={onContentChange} />
+              // One table per tab: a row drag lands its move after the row slides into place, and a table
+              // shared between tabs would make that move in whichever tab shows by then.
+              <CsvTableEditor key={doc.key} content={doc.content} onChange={onContentChange} />
             )}
           </div>
         )}
