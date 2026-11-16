@@ -40,7 +40,7 @@ export function DocumentActions({ document: doc, onViewModeChange, isFindOpen, o
             aria-describedby={bubbleId}
             className={`icon-button size-7 text-base ${isFindOpen ? "bg-selected text-text-strong" : ""}`}
           >
-            <i className="ic-search" aria-hidden="true" />
+            <i className="ic-text-search" aria-hidden="true" />
           </button>
         )}
       </Tooltip>

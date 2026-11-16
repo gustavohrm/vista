@@ -190,6 +190,8 @@ From top to bottom, the window holds:
 - **Tabs row** above the document: the tabs, then, at the right end, the view switch and **Find**. These act on the active tab, so they sit on the row that chooses it. There is no Save button: saving is `Ctrl+S`, and the dot in the tab shows unsaved edits.
 - **Path and status bar** at the bottom, as [Path and status bar](#path-and-status-bar) describes.
 
+Three actions look for something, and each has its own icon so one is never taken for another: Go to file, in the title bar and wherever else it is offered, shows a page under a magnifier; Find, in the tabs row, shows lines of text under one; and the rail's Search, for searching the whole workspace, has the plain magnifier.
+
 The tabs row and the document sit together in one frame, a lighter panel with a hairline border and rounded corners, and the title bar, rail, explorer, and status bar sit on the darker ground around it, so the document is what stands forward. Each boundary is drawn once: the frame's edge separates it from everything else, and nothing inside the shell adds a second line.
 
 Shortcuts are written with spaced plus signs, as in `Ctrl + P` and `Ctrl + Shift + S`, wherever the interface shows one: the title bar, the palette, menus, tooltips, and Settings. The spaces keep the keys apart at small sizes, where `Ctrl+Shift+S` runs together.

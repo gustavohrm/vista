@@ -67,7 +67,7 @@ export function TitleBar({
         aria-label="Go to file"
         className="text-text-muted hover:border-line-strong hover:text-text md:border-line md:bg-frame flex h-[30px] flex-none items-center justify-start gap-2 rounded-md px-2 text-[13px] transition-colors duration-100 md:w-80 md:border lg:w-[460px]"
       >
-        <i className="ic-search text-text-faint text-sm" aria-hidden="true" />
+        <i className="ic-file-search text-text-faint text-sm" aria-hidden="true" />
         <span className="hidden flex-1 text-left md:inline">Go to file</span>
         <kbd aria-hidden="true" className="shortcut-key hidden md:inline-flex">
           {formatShortcut(goToFileShortcut)}

@@ -186,7 +186,7 @@ export function GoToDialog({
           {isCommandMode ? (
             <i className="ic-terminal text-text-secondary text-sm" aria-hidden="true" />
           ) : (
-            <i className="ic-search text-text-secondary text-sm" aria-hidden="true" />
+            <i className="ic-file-search text-text-secondary text-sm" aria-hidden="true" />
           )}
           <input
             ref={inputRef}
@@ -197,7 +197,7 @@ export function GoToDialog({
             aria-controls={listId}
             aria-autocomplete="list"
             aria-activedescendant={activeIndex < resultCount ? optionId(activeIndex) : undefined}
-            placeholder="Search files by name"
+            placeholder="Type a file name, or :line"
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);

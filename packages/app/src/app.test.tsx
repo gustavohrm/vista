@@ -2342,7 +2342,7 @@ describe("App", () => {
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
       const editor = await makeReadmeDirty(user);
 
-      await user.click(screen.getByRole("button", { name: "Go to file" }));
+      await user.click(within(screen.getByRole("banner")).getByRole("button", { name: "Go to file" }));
       await user.keyboard(">undo{Enter}");
 
       await waitFor(() => expect(rawEditorText(editor)).not.toBe(EDITED_README_CONTENT));
@@ -2379,7 +2379,7 @@ describe("App", () => {
       fireEvent(screen.getByRole("dialog", { name: "Go to file" }), new Event("cancel", { cancelable: true }));
 
       await openFolderFromWelcome(user);
-      await user.click(screen.getByRole("button", { name: "Go to file" }));
+      await user.click(within(screen.getByRole("banner")).getByRole("button", { name: "Go to file" }));
       expect(screen.getByRole("combobox", { name: "Go to file, or :line:column" })).toHaveValue("");
     });
   });
@@ -2392,7 +2392,7 @@ describe("App", () => {
       const main = screen.getByRole("main");
 
       expect(within(main).getByRole("heading", { name: "My Notes" })).toBeInTheDocument();
-      await user.click(within(main).getByRole("button", { name: "Search files" }));
+      await user.click(within(main).getByRole("button", { name: /^Go to file/ }));
       // jsdom does not turn Escape into the dialog's cancel event.
       fireEvent(screen.getByRole("dialog", { name: "Go to file" }), new Event("cancel", { cancelable: true }));
 
@@ -2408,7 +2408,7 @@ describe("App", () => {
       await user.click(screen.getByText("readme.md"));
 
       await screen.findByRole("heading", { name: "Hello Vista" });
-      expect(screen.queryByRole("button", { name: "Search files" })).not.toBeInTheDocument();
+      expect(within(screen.getByRole("main")).queryByRole("button", { name: /^Go to file/ })).not.toBeInTheDocument();
     });
   });
 

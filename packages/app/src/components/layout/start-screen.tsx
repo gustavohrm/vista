@@ -8,7 +8,7 @@ import { describeRecentFolders, type RecentWorkspace } from "../workspace/worksp
 /** One suggested next step on the start screen. */
 export interface StartAction {
   label: string;
-  /** Icon element, such as `<i className="ic-search" aria-hidden="true" />`. */
+  /** Icon element, such as `<i className="ic-file-search" aria-hidden="true" />`. */
   icon: ReactNode;
   /** Shortcut shown beside the label, such as "Mod+P". Display only. */
   shortcut?: string;

@@ -2132,8 +2132,8 @@ function AppShell({ adapter }: AppProps) {
   const startActions = useMemo<StartAction[]>(
     () => [
       {
-        label: "Search files",
-        icon: <i className="ic-search" aria-hidden="true" />,
+        label: "Go to file",
+        icon: <i className="ic-file-search" aria-hidden="true" />,
         shortcut: GO_TO_FILE_SHORTCUT,
         onSelect: () => setGoToQuery(""),
       },
