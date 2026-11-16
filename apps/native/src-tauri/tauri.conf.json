@@ -37,6 +37,12 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"]
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "homepage": "https://vista.coden.dev",
+    "category": "Productivity",
+    "shortDescription": "Your files are the view.",
+    "longDescription": "Vista opens a folder you already have and shows what is in it: Markdown as documents, CSV as tables.",
+    "license": "Apache-2.0",
+    "licenseFile": "../../../LICENSE"
   }
 }

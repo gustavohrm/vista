@@ -50,7 +50,17 @@ The URL assumes the consumer serves the file at that path; where it goes is the 
 | `assets/favicon/favicon.svg`     | Same artwork as `app-icon-small.svg`                                | Favicon for browsers that take SVG.                                  |
 | `assets/favicon/favicon.ico`     | 16, 24, 32 from the small version; 48, 64, 256 from the regular one | Favicon for browsers without SVG favicons, and the Windows app icon. |
 
-The web host links both favicons from `apps/web/src/index.html`, the ICO with `sizes="any"` before the SVG, so a browser that takes SVG uses it and any other falls back to the ICO. Vite copies both into the build.
+The web host serves both favicons at the site's root, `/favicon.ico` and `/favicon.svg`, from copies in `apps/web/src/public/`, and links them from `apps/web/src/index.html`, the ICO with `sizes="any"` before the SVG, so a browser that takes SVG uses it and any other falls back to the ICO. They are copies at fixed paths, not links into `assets/`, because browsers and crawlers ask for `/favicon.ico` without reading the page, and the Vite dev server doesn't rewrite a link that leaves its root, so the favicon was missing in development. `apps/web/src/public-assets.test.ts` fails when a copy differs from its source here, so change the source and copy it over.
+
+The same folder holds the icons the web app manifest (`manifest.webmanifest`) and iOS use, rendered from `assets/icon/app-icon.png`:
+
+| File                                       | Content                                                  | Use                                                    |
+| ------------------------------------------ | -------------------------------------------------------- | ------------------------------------------------------ |
+| `apps/web/src/public/icon-192.png`         | `app-icon.png` at 192 px, transparent corners            | Manifest icon, for installing the app.                 |
+| `apps/web/src/public/icon-512.png`         | `app-icon.png` at 512 px, transparent corners            | Manifest icon, and install splash.                     |
+| `apps/web/src/public/apple-touch-icon.png` | `app-icon.png` at 180 px on the ink plate colour, square | Home screen icon on iOS, which rounds its own corners. |
+
+Render them again whenever `app-icon.png` changes, scaling it down with Lanczos resampling; the touch icon is laid over `#0a0a0a`, since iOS shows transparency as black.
 
 ### Regenerating the app icons
 
@@ -103,7 +113,7 @@ The application does not load these files. It draws the same logo and loader inl
 | ---------------------------- | --------------------------------------------------------- | ------------------------------ |
 | `assets/social/og-image.png` | The brand idea, the horizon bar, and the logo, 1200 × 630 | Link previews for the web app. |
 
-No page references it yet: adding the Open Graph tags to the web host is a separate change.
+The web host serves a copy at `/og-image.png`, which its Open Graph and Twitter tags in `apps/web/src/index.html` name by absolute URL, as link previews require. The tags reuse the image's own words: its headline as the title and its line as the description.
 
 ## Fonts
 
