@@ -14,3 +14,19 @@ export function isDesktopViewport(): boolean {
   }
   return window.matchMedia(DESKTOP_BREAKPOINT_QUERY).matches;
 }
+
+/**
+ * Calls `onChange` each time the viewport crosses the shared `md` breakpoint, with whether it is
+ * now at or above it. Does nothing where `matchMedia` isn't available.
+ *
+ * @returns A function that stops listening.
+ */
+export function onDesktopViewportChange(onChange: (isDesktop: boolean) => void): () => void {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return () => undefined;
+  }
+  const query = window.matchMedia(DESKTOP_BREAKPOINT_QUERY);
+  const listener = (event: MediaQueryListEvent) => onChange(event.matches);
+  query.addEventListener("change", listener);
+  return () => query.removeEventListener("change", listener);
+}

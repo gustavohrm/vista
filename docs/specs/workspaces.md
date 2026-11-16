@@ -191,7 +191,7 @@ From top to bottom, the window holds:
 
 - **Title bar**: the [workspace switcher](#workspace-switcher) on the left and the go-to-file field in the middle. There is no menu bar, as [Commands and menus](#commands-and-menus) explains. With no workspace open, both would be empty or useless, so the title bar is not shown and the start screen takes the window.
 - **Left rail**: a narrow column of icon buttons. **Explorer** shows or hides the explorer. **Search** and **Graph** are shown disabled with the tooltip `Coming soon`, so the places those features will take are already where users will look for them. The **Settings** gear sits at the bottom, pressed while Settings shows.
-- **Explorer**, beside the rail: the workspace's folders, as [File and folder management](#file-and-folder-management) describes.
+- **Explorer**, beside the rail: the workspace's folders, as [File and folder management](#file-and-folder-management) describes. Below `md` it is a drawer over the document. When the window narrows past `md`, the explorer closes, so resizing never leaves the document covered; when it widens again, the explorer is open or closed as the user last left it at that width, whatever the drawer did in between.
 - **Tabs row** above the document: the tabs, then, at the right end, the view switch and **Find**. These act on the active tab, so they sit on the row that chooses it. There is no Save button: saving is `Ctrl+S`, and the dot in the tab shows unsaved edits.
 - **Path and status bar** at the bottom, as [Path and status bar](#path-and-status-bar) describes.
 

@@ -226,6 +226,30 @@ function getTab(name: string): HTMLElement {
   return screen.getByRole("tab", { name: new RegExp(`^${name.replaceAll(".", "\\.")}`) });
 }
 
+/** Replaces `matchMedia` with one whose `md` breakpoint the test moves the window across. */
+function stubViewport(isWide: boolean) {
+  const listeners = new Set<(event: MediaQueryListEvent) => void>();
+  const query = {
+    matches: isWide,
+    media: "(min-width: 768px)",
+    addEventListener: (_type: string, listener: (event: MediaQueryListEvent) => void) => listeners.add(listener),
+    removeEventListener: (_type: string, listener: (event: MediaQueryListEvent) => void) => listeners.delete(listener),
+  };
+  const original = window.matchMedia;
+  window.matchMedia = (() => query) as unknown as typeof window.matchMedia;
+  return {
+    setWide(wide: boolean) {
+      query.matches = wide;
+      for (const listener of listeners) {
+        listener({ matches: wide } as MediaQueryListEvent);
+      }
+    },
+    restore() {
+      window.matchMedia = original;
+    },
+  };
+}
+
 describe("App", () => {
   describe("workspaces with several folders", () => {
     it("shows a root row for each folder and saves a file to the folder it came from", async () => {
@@ -585,6 +609,32 @@ describe("App", () => {
     await user.click(toggleBtn);
 
     expect(screen.getByRole("button", { name: "Close explorer" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("closes the explorer as the window narrows past md, and restores it as it widens again", async () => {
+    const viewport = stubViewport(true);
+    try {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      expect(screen.getByRole("button", { name: "Close explorer" })).toBeInTheDocument();
+
+      // Narrowing turns the open column into a drawer, which would cover the document.
+      act(() => viewport.setWide(false));
+      expect(screen.getByRole("button", { name: "Open explorer" })).toBeInTheDocument();
+
+      act(() => viewport.setWide(true));
+      expect(screen.getByRole("button", { name: "Close explorer" })).toBeInTheDocument();
+
+      // A column the user closed stays closed, whatever the drawer did while the window was narrow.
+      await user.click(screen.getByRole("button", { name: "Close explorer" }));
+      act(() => viewport.setWide(false));
+      await user.click(screen.getByRole("button", { name: "Open explorer" }));
+      act(() => viewport.setWide(true));
+      expect(screen.getByRole("button", { name: "Open explorer" })).toBeInTheDocument();
+    } finally {
+      viewport.restore();
+    }
   });
 
   it("closes the mobile explorer drawer after selecting a file", async () => {

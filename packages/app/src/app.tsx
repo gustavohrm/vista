@@ -46,7 +46,7 @@ import { joinWorkspacePath } from "./domain/path-validation";
 import { BYTES_PER_MB } from "./domain/settings";
 import { decodeText, encodeText } from "./domain/text-codec";
 import { getViewer } from "./domain/viewers";
-import { isDesktopViewport } from "./domain/viewport";
+import { isDesktopViewport, onDesktopViewportChange } from "./domain/viewport";
 import {
   HOME_FOLDER_LOCATION,
   parseWorkspaceFile,
@@ -166,6 +166,24 @@ function AppShell({ adapter }: AppProps) {
   // Defaults to open at `md` and above (a persistent column there) and closed below it (a
   // transient overlay drawer), matching the breakpoint Sidebar itself switches behavior at.
   const [isSidebarOpen, setIsSidebarOpen] = useState(isDesktopViewport);
+  const isSidebarOpenRef = useRef(isSidebarOpen);
+  isSidebarOpenRef.current = isSidebarOpen;
+  // Whether the explorer column was open when the window was last at `md` or wider. Narrowing
+  // past `md` would turn an open column into a drawer over the document, so the explorer closes
+  // then, and widening brings back the column as the user left it, whatever the drawer did since.
+  const isColumnOpenRef = useRef(isSidebarOpen);
+  useEffect(
+    () =>
+      onDesktopViewportChange((isDesktop) => {
+        if (isDesktop) {
+          setIsSidebarOpen(isColumnOpenRef.current);
+        } else {
+          isColumnOpenRef.current = isSidebarOpenRef.current;
+          setIsSidebarOpen(false);
+        }
+      }),
+    [],
+  );
   // The folders of each workspace other than the open one, as last seen, by workspace id.
   const [recentFolders, setRecentFolders] = useState<ReadonlyMap<string, RecentWorkspace["folders"]>>(() => new Map());
   const [workspaceStore] = useState(() =>
