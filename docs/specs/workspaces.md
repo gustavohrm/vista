@@ -116,17 +116,17 @@ The shared app stores workspaces and sessions in `localStorage`, beside `vista.s
 
 A list Vista can only partly read, such as one that is not valid JSON or holds a workspace without folders, is copied to `vista.workspaces.damaged` before Vista first saves over it, and is not saved over when the copy can't be written. A stored value that is missing, of the wrong type, or out of range falls back field by field, as [Editor settings](#editor-settings) describes for settings, so one bad field does not lose a workspace. When the store can't be read, Vista starts with no remembered workspaces; when it can't be written, the current session still works but is not remembered.
 
-**Migration.** Vista 0.0.1 remembered a single folder instead of workspaces. At the first start of a later version, the folder it remembered (IndexedDB key `lastFolder` in store `workspace` on web, `localStorage` key `vista.lastFolder` on native) becomes a one-folder workspace on the device, and the old key is removed. Each host moves that folder into its new store under the id `last-folder` (`LEGACY_FOLDER_ID`), which the shared app restores once, before any workspace is stored. A folder that is already gone is forgotten instead, with the info toast `Couldn't reopen "{name}". It may have been moved or deleted.`, since a workspace for it could never open.
+**Migration.** The `v0.0.1` release remembered a single folder instead of workspaces. At the first start of a build with workspaces, the folder it remembered (IndexedDB key `lastFolder` in store `workspace` on web, `localStorage` key `vista.lastFolder` on native) becomes a one-folder workspace on the device, and the old key is removed. Each host moves that folder into its new store under the id `last-folder` (`LEGACY_FOLDER_ID`), which the shared app restores once, before any workspace is stored. A folder that is already gone is forgotten instead, with the info toast `Couldn't reopen "{name}". It may have been moved or deleted.`, since a workspace for it could never open.
 
 ## Supported formats & view modes
 
 Vista opens `.txt`, `.md` (and `.markdown`), and `.csv` files:
 
-| Format | Raw View                   | Enriched View                                                                     |
-| :----- | :------------------------- | :-------------------------------------------------------------------------------- |
-| `.txt` | Plain-text editor          | None; plain text has only the raw view                                            |
-| `.md`  | Plain-text Markdown editor | WYSIWYG editable rendering (Milkdown), styled against `@codenhub/styles` tokens   |
-| `.csv` | Plain-text CSV editor      | Interactive data table with in-place cell editing; the first record is the header |
+| Format             | Raw View                   | Enriched View                                                                     |
+| :----------------- | :------------------------- | :-------------------------------------------------------------------------------- |
+| `.txt`             | Plain-text editor          | None; plain text has only the raw view                                            |
+| `.md`, `.markdown` | Plain-text Markdown editor | WYSIWYG editable rendering (Milkdown), styled against `@codenhub/styles` tokens   |
+| `.csv`             | Plain-text CSV editor      | Interactive data table with in-place cell editing; the first record is the header |
 
 Other formats are planned, as the [roadmap](../roadmap.md) records.
 
@@ -163,7 +163,7 @@ The gear at the bottom of the left rail, or `Ctrl+,`, opens Settings, the one ho
 
 Settings opens at the current workspace's section, or at Appearance with no workspace open. Its sections are listed on the left, below `md` in a row across the top, in two groups by where they apply: **Workspace**, with the current workspace's section, and **Vista**, whose sections apply in every workspace. Each section starts with its name and one sentence that says where it applies. Settings are rows in hairline groups, the name and description on the left and the control on the right; an on-off setting is a switch. The Vista sections are:
 
-- **Appearance**: the theme, as _System_, _Light_, or _Dark_. _System_ follows the operating system and changes with it. The choice is stored by `@codenhub/theme` under `vista-theme`; the default is _Dark_. There is no theme button in the title bar, so the theme has one home.
+- **Appearance**: the theme, as _System_, _Light_, or _Dark_. _System_ follows the operating system and changes with it. The choice is stored by `@codenhub/theme` under `vista-theme`; the default is _System_. There is no theme button in the title bar, so the theme has one home.
 - **Editor**: the four editor switches.
 - **Files**: **Largest file to open (MB)**, described below.
 - **Keyboard Shortcuts**: every command that has a key, by category.

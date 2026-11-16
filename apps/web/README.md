@@ -28,7 +28,7 @@ pnpm --filter=@vista/web exec playwright install chromium
 pnpm --filter=@vista/web test:e2e
 ```
 
-The browser suite in `tests/e2e/` builds the frontend, starts an isolated local Wrangler server on port 8799 with inspector port 9249, and tests the production output in Chromium. Those ports must be free. It covers startup and styles on a nested URL and after reload, tabs, the path bar, the editor chrome, menus and Markdown images, the CSV table, the responsive layout, and creating, renaming, and deleting files. Automation cannot drive the native folder picker, so the suite opens its fixture folders through the `webkitdirectory` fallback. Every test fails on a JavaScript error or a content security policy violation.
+The browser suite in `tests/e2e/` builds the frontend, starts an isolated local Wrangler server on port 8799 with inspector port 9249, and tests the production output in Chromium. Those ports must be free. It covers startup and styles on a nested URL and after reload, tabs, the path bar, the editor chrome, menus and Markdown images, the CSV table, the responsive layout, and creating, renaming, and deleting files. Automation cannot drive the native folder picker, so the suite opens its fixture folders through the `webkitdirectory` fallback. Every test fails on a content security policy violation, through the shared fixture in `tests/e2e/test.ts`; the startup test also fails on a JavaScript error.
 
 ## Deployment
 

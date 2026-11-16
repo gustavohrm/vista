@@ -2,7 +2,7 @@
 
 Vista is a multi-platform workspace for managing notes and personal data: a lightweight middle ground between Notion, Obsidian, and VS Code that operates directly on local folders.
 
-A workspace is one or more local folders with a name, an icon, a colour, and a session that remembers its tabs. Vista shows the folders' files, edits Markdown in a rich-text editor or as raw text, edits CSV as a table or as raw text, edits plain text, and creates, renames, moves, and deletes files and folders. It saves only when asked, and never overwrites a change made on disk without asking. It runs in the browser and as a desktop app for Windows and Linux, which updates itself. Desktop Chrome and Edge, and Windows, are the verified targets; the Android and iOS builds are prepared but have no folder access yet.
+A workspace is one or more local folders with a name, an icon, a colour, and a session that remembers its tabs. Vista shows the folders' files, edits Markdown in a rich-text editor or as raw text, edits CSV as a table or as raw text, edits plain text, and creates, renames, moves, and deletes files and folders. It saves only when asked, and asks before overwriting a file that changed on disk since Vista read it, except for a change landing in the instant between that check and the write, as [Changes on disk](docs/specs/workspaces.md#changes-on-disk) records. It runs in the browser and as a desktop app for Windows and Linux, which updates itself. Desktop Chrome and Edge, and Windows, are the verified targets; the Android and iOS builds are prepared but have no folder access yet.
 
 Workspace search, a graph view with backlinks, and data export are planned, as the [roadmap](docs/roadmap.md) records.
 

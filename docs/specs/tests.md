@@ -38,7 +38,7 @@ Manual usage scenarios, such as running the dev server during development, are o
 - A suite SHOULD cover every engine its users run, because catching what one engine does differently is what the suite is for. The suite runs Chromium only today, as [Not covered by automated tests](#not-covered-by-automated-tests) records.
 - Visual regression tests are added for a component with an agreed visual design, not for an interface still changing. There are none: the startup test checks computed styles instead of comparing snapshots.
 
-The web host's browser suite builds the frontend and serves it with local Wrangler, so it runs through the deployment runtime. It covers startup, styles, direct navigation, and reload, and the user journeys the [web host's README](../../apps/web/README.md#tests) lists. Every test fails on a JavaScript error or a content security policy violation. Chromium covers the desktop Chrome and Edge web target.
+The web host's browser suite builds the frontend and serves it with local Wrangler, so it runs through the deployment runtime. It covers startup, styles, direct navigation, and reload, and the user journeys the [web host's README](../../apps/web/README.md#tests) lists. Every test fails on a content security policy violation, through the shared fixture in `tests/e2e/test.ts`; the startup test also fails on a JavaScript error. Chromium covers the desktop Chrome and Edge web target.
 
 ## Coverage
 
@@ -54,4 +54,4 @@ These areas have no automated test. They are verified by hand, or not verified a
 - **File System Access in the browser.** The browser suite in `apps/web/tests/e2e/workspace-crud-fallback.spec.ts` forces the `webkitdirectory` fallback, because automation cannot drive the native folder picker. The primary File System Access path, including permission prompts and reopening remembered folders, is checked by hand. That includes reopening a workspace of several folders, and whether one click can grant access to several of them, which [Reopening at startup](workspaces.md#reopening-at-startup) depends on.
 - **Other browsers.** The browser suite runs Chromium only. Firefox and Safari are not covered.
 - **Mobile.** Android and iOS are not supported, so nothing is tested there.
-- **Packaging.** Installing, signing, and automatic updates are checked by hand, not by a test. The release scripts in `scripts/` that write the manifest and prune old releases have unit tests.
+- **Packaging.** Installing, signing, and the packaged update are checked by hand, not by a test. The shared app's update check, install, and failure handling have unit tests in `packages/app/src/app.test.tsx`, against a fake updater. The release scripts in `scripts/` that write the manifest and prune old releases have unit tests.

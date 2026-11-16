@@ -8,11 +8,14 @@ scope: Repo-wide direction for Vista, limited to work already stated in the repo
 
 ## Purpose
 
-Durable direction for Vista: what is planned, what is possible later, and what has been ruled out. Every entry below is taken from a document in this repository, and the source is cited. Nothing here is a new commitment. What Vista does today is in [Workspaces](specs/workspaces.md), not here.
+Durable direction for Vista: the current focus, what is planned, what is possible later, and what has been ruled out. Every entry below is taken from a document in this repository, and the source is cited. Nothing here is a new commitment. What Vista does today is in [Workspaces](specs/workspaces.md), not here.
+
+## Current Focus
+
+- **Opt-in update checks on desktop.** The desktop app checks for updates at every startup with no way to turn it off, which the security guidelines record as a temporary exception to their rule on outbound calls. Update checks become opt-in, tracked in [issue #34](https://github.com/gustavohrm/vista/issues/34). Source: `docs/guidelines/security.md`, "Outbound calls and dependencies".
 
 ## Planned
 
-- **Opt-in update checks on desktop.** The desktop app checks for updates at every startup with no way to turn it off, which the security guidelines record as a temporary exception to their rule on outbound calls. Update checks become opt-in. Source: `docs/guidelines/security.md`, "Outbound calls and dependencies".
 - **Workspace search.** Searching inside file contents, in its own view behind the left rail's **Search** button, which is shown disabled with `Coming soon`. Finding a file by name is already the go-to picker. Source: `docs/specs/workspaces.md`, "Shell layout" and "Go to file and line".
 - **Graph view and backlinks.** The rail's **Graph** button is shown disabled with `Coming soon`. Sources: `docs/specs/workspaces.md`, "Shell layout"; `README.md`.
 - **Data export.** Source: `README.md`.

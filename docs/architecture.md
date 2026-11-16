@@ -28,7 +28,7 @@ The shared app owns capability interfaces; each host constructs and injects its 
 
 ## Platform scope
 
-The supported targets are the web app in current desktop Chrome and Edge, and the Windows native app. Linux is the second desktop platform: CI builds its installers and lints its Rust on every change, as [CI](ci.md#jobs) describes. macOS is not built or tested. The web host operates on user-selected existing folders via the File System Access API, rather than substituting browser-private storage. Folder access requires a secure context, supported File System Access APIs, and user-granted permissions; other browsers fall back to a `webkitdirectory` input, as [Workspaces](specs/workspaces.md#platform-specific-implementations) describes. The native host uses Tauri's dialog and filesystem plugins.
+The supported targets are the web app in current desktop Chrome and Edge, and the Windows native app. Linux is the second desktop platform: CI builds its installers and lints its Rust on every change, as [CI](ci.md#jobs) describes. macOS is not built or tested. The web host operates on user-selected existing folders via the File System Access API, rather than substituting browser-private storage. Writing in place and remembering folders require a secure context, the File System Access API, and user-granted permissions; other browsers fall back to a `webkitdirectory` input, which opens a folder for the session only and saves by downloading a file, as [Workspaces](specs/workspaces.md#platform-specific-implementations) describes. The native host uses Tauri's dialog and filesystem plugins.
 
 Android and iOS are planned targets of the same Tauri host. The native host's README documents their project initialization and toolchain prerequisites; they have no folder access yet, and mobile builds and folder-access semantics require validation on those platforms before support is claimed. A shared web UI does not imply identical filesystem access across platforms.
 
@@ -48,7 +48,7 @@ Controls and surfaces use the `@codenhub/styles` component classes wherever one 
 
 ### Theming
 
-`@codenhub/theme` (`packages/app/src/theme/theme-manager.ts`) sets the appearance: light, dark, or following the operating system, stored under `vista-theme` and dark by default, as [Settings](specs/workspaces.md#settings) describes. Colours are `light-dark()` tokens. The palette and the component tokens come from `@codenhub/styles`; `style.css` adds Vista's own tokens (the chrome and frame grounds, lines, the floating surface, and Daylight for selection and find matches, as the [brand guidelines](guidelines/brand.md#colours) describe) and sets a few of the package's tokens, such as the muted and faint text colours and the primary colour, rather than restating colours in components.
+`@codenhub/theme` (`packages/app/src/theme/theme-manager.ts`) sets the appearance: light, dark, or following the operating system, stored under `vista-theme` and following the operating system by default, as [Settings](specs/workspaces.md#settings) describes. Colours are `light-dark()` tokens. The palette and the component tokens come from `@codenhub/styles`; `style.css` adds Vista's own tokens (the chrome and frame grounds, lines, the floating surface, and Daylight for selection and find matches, as the [brand guidelines](guidelines/brand.md#colours) describe) and sets a few of the package's tokens, such as the muted and faint text colours and the primary colour, rather than restating colours in components.
 
 ### Toasts and confirmations
 
