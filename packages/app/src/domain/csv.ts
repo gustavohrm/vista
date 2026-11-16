@@ -6,6 +6,8 @@ export interface CsvDocument {
   rows: string[][];
   /** The record separator the file uses, which is written back. */
   newline: string;
+  /** The field separator the file was read with, such as `;` or a tab, which is written back. */
+  delimiter: string;
   /** Whether the file ends with a line break, which is kept when the table rewrites it. */
   hasTrailingNewline: boolean;
 }
@@ -27,7 +29,12 @@ export function parseCsv(content: string): CsvDocument {
   }
   // Papa writes CRLF by default. Writing back the record separator it detected, which ignores line
   // breaks inside quoted cells, stops one cell edit from rewriting every line.
-  return { rows: rows.length === 0 ? [[""]] : rows, newline: result.meta.linebreak, hasTrailingNewline };
+  return {
+    rows: rows.length === 0 ? [[""]] : rows,
+    newline: result.meta.linebreak,
+    delimiter: result.meta.delimiter,
+    hasTrailingNewline,
+  };
 }
 
 /**
@@ -38,6 +45,13 @@ export function parseCsv(content: string): CsvDocument {
  * @returns The CSV text.
  */
 export function serializeCsv(rows: readonly (readonly string[])[], document: Omit<CsvDocument, "rows">): string {
-  const text = Papa.unparse(rows as string[][], { newline: document.newline });
+  const options = { newline: document.newline, delimiter: document.delimiter };
+  const last = rows.at(-1);
+  if (!document.hasTrailingNewline && rows.length > 1 && last?.length === 1 && last[0] === "") {
+    // An empty last record would be written as nothing, and the line break before it would read back
+    // as the file's final one, losing the record. A quoted empty field keeps it.
+    return Papa.unparse(rows.slice(0, -1) as string[][], options) + document.newline + '""';
+  }
+  const text = Papa.unparse(rows as string[][], options);
   return document.hasTrailingNewline ? text + document.newline : text;
 }

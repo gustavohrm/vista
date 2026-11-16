@@ -30,12 +30,13 @@ describe("CsvTableEditor", () => {
   it("adds a row under the last one and a column after the last one", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    render(<CsvTableEditor content={"Name,Age\nAda,36\n"} onChange={onChange} />);
+    const { rerender } = render(<CsvTableEditor content={"Name,Age\nAda,36\n"} onChange={onChange} />);
 
     await user.click(screen.getByRole("button", { name: "Add row" }));
     expect(onChange).toHaveBeenLastCalledWith("Name,Age\nAda,36\n,\n");
+    rerender(<CsvTableEditor content={"Name,Age\nAda,36\n,\n"} onChange={onChange} />);
     await user.click(screen.getByRole("button", { name: "Add column" }));
-    expect(onChange).toHaveBeenLastCalledWith("Name,Age,\nAda,36,\n");
+    expect(onChange).toHaveBeenLastCalledWith("Name,Age,\nAda,36,\n,,\n");
   });
 
   it("moves a row with Shift and the arrow keys from its number, keeping the header first", async () => {

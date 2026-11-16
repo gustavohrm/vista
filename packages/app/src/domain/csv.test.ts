@@ -28,3 +28,21 @@ describe("serializeCsv", () => {
     },
   );
 });
+
+describe("serializeCsv round trips", () => {
+  it("keeps an empty last record of a one-column file with no final line break", () => {
+    const document = parseCsv("Name");
+    const text = serializeCsv([["Name"], [""]], document);
+    expect(parseCsv(text).rows).toEqual([["Name"], [""]]);
+  });
+
+  it.each([
+    ["a;b;c\n1;2;3\n4;5;6\n", ";"],
+    ["a\tb\n1\t2", "\t"],
+    ["a|b\n1|2", "|"],
+  ])("writes %j back with the delimiter it was read with", (content, delimiter) => {
+    const document = parseCsv(content);
+    expect(document.rows[0]).toHaveLength(content.split("\n")[0]!.split(delimiter).length);
+    expect(serializeCsv(document.rows, document)).toBe(content);
+  });
+});
