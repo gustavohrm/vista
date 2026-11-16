@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -47,7 +47,14 @@ describe("Menu", () => {
   it("shows a chosen option with its icon and a second line, keeping items with the same label apart", () => {
     renderMenu({
       items: [
-        { id: "w1", label: "Notes", description: "notes, sources", selected: true, icon: <i />, onSelect: vi.fn() },
+        {
+          id: "w1",
+          label: "Notes",
+          description: "notes, sources",
+          selected: true,
+          icon: <i data-testid="notes-icon" />,
+          onSelect: vi.fn(),
+        },
         { id: "w2", label: "Notes", description: "archive", selected: false, onSelect: vi.fn() },
       ],
     });
@@ -55,6 +62,7 @@ describe("Menu", () => {
     const [chosen, other] = screen.getAllByRole("menuitemradio", { name: "Notes" });
     expect(chosen).toBeChecked();
     expect(chosen).toHaveAccessibleDescription("notes, sources");
+    expect(within(chosen as HTMLElement).getByTestId("notes-icon")).toBeInTheDocument();
     expect(other).not.toBeChecked();
     expect(other).toHaveAccessibleDescription("archive");
   });

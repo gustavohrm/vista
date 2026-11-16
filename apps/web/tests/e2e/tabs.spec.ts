@@ -52,9 +52,10 @@ test.describe("tabs", () => {
     await openFromPicker(page, "badge.svg");
     const notes = await page.getByRole("tab", { name: "notes.md" }).boundingBox();
 
-    // Between notes.md and badge.svg.
-    await pressOnTab(page, "gallery.md");
-    await page.mouse.move(notes!.x + notes!.width + 12, notes!.y + notes!.height / 2, { steps: 8 });
+    // Between notes.md and badge.svg: the dragged tab's trailing edge just past notes.md, so it has
+    // passed notes.md's centre and not badge.svg's.
+    const gallery = await pressOnTab(page, "gallery.md");
+    await page.mouse.move(notes!.x + notes!.width + 1 - gallery.width / 2, notes!.y + notes!.height / 2, { steps: 8 });
     await expect(draggedTab(page)).toBeVisible();
     // notes.md has slid left into the place gallery.md left.
     await expect

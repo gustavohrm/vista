@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { Tooltip, TOOLTIP_DELAY_MS } from "./tooltip";
 
@@ -18,13 +18,18 @@ function renderTooltip() {
 }
 
 describe("Tooltip", () => {
-  beforeEach(() => {
+  // One fake clock for the whole suite: the skip-delay window is shared by every tooltip, so a
+  // clock that restarted per test could put the last hide in the next test's future.
+  beforeAll(() => {
     vi.useFakeTimers();
   });
 
   afterEach(() => {
     // Lets the skip-delay window of one test run out before the next starts.
     act(() => vi.advanceTimersByTime(1000));
+  });
+
+  afterAll(() => {
     vi.useRealTimers();
   });
 
@@ -86,6 +91,16 @@ describe("Tooltip", () => {
     expect(wrapper).toHaveAttribute("data-tooltip-open");
 
     fireEvent.keyDown(button, { key: "Escape" });
+    expect(wrapper).not.toHaveAttribute("data-tooltip-open");
+  });
+
+  it("does not show after Escape pressed while the pointer rests on the control", () => {
+    const { button, wrapper } = renderTooltip();
+
+    fireEvent.pointerEnter(wrapper);
+    fireEvent.keyDown(button, { key: "Escape" });
+    act(() => vi.advanceTimersByTime(TOOLTIP_DELAY_MS));
+
     expect(wrapper).not.toHaveAttribute("data-tooltip-open");
   });
 
