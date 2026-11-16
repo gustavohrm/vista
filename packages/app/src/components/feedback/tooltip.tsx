@@ -137,7 +137,7 @@ export function Tooltip({ text, shortcut, position, align = "center", className,
       <span
         role="tooltip"
         id={bubbleId}
-        className={`bg-frame border-line-strong text-text-strong pointer-events-none absolute z-50 flex min-h-6 w-max max-w-[min(48rem,calc(100vw-2rem))] items-center gap-2 rounded-md border px-2 py-0.5 text-xs leading-4 font-normal break-all whitespace-normal shadow-[0_2px_8px_rgb(0_0_0/0.12)] transition-[opacity,scale,visibility] ease-(--ease-enter) motion-reduce:transition-none ${side} ${placement} ${
+        className={`bg-pop border-line-strong text-text-strong shadow-float pointer-events-none absolute z-50 flex min-h-6 w-max max-w-[min(48rem,calc(100vw-2rem))] items-center gap-2 rounded-md border px-2 py-0.5 text-xs leading-4 font-normal break-all whitespace-normal transition-[opacity,scale,visibility] ease-(--ease-enter) motion-reduce:transition-none ${side} ${placement} ${
           isOpen ? "visible scale-100 opacity-100 duration-150" : "invisible scale-96 opacity-0 duration-100"
         }`}
       >

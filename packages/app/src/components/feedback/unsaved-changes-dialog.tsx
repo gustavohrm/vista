@@ -72,18 +72,18 @@ export function UnsavedChangesDialog({ fileNames, onChoose }: UnsavedChangesDial
       aria-describedby={descriptionId}
       onCancel={handleCancel}
       onClick={handleBackdropClick}
-      className="card soft floating flush w-[min(24rem,calc(100vw-2rem))] backdrop:bg-black/50 backdrop:backdrop-blur-sm"
+      className="card soft floating flush w-[min(24rem,calc(100vw-2rem))] [--ui-radius-surface:12px]"
     >
       <div className="flex flex-col gap-4 p-5">
         <div className="flex flex-col gap-1.5">
-          <h2 id={titleId} className="text-title-sm text-text-strong">
+          <h2 id={titleId} className="text-text-strong text-[15px] leading-snug font-semibold">
             {title}
           </h2>
-          <p id={descriptionId} className="text-body text-text-secondary">
+          <p id={descriptionId} className="text-text-muted text-[13px] leading-normal">
             Your changes will be lost if you don&apos;t save them.
           </p>
           {!isSingle && (
-            <ul className="text-body text-text max-h-40 list-inside list-disc overflow-y-auto">
+            <ul className="text-text max-h-40 list-inside list-disc overflow-y-auto text-[13px]">
               {fileNames.map((name, index) => (
                 // oxlint-disable-next-line react/no-array-index-key -- names can repeat across folders, so the position keeps keys unique
                 <li key={`${index}:${name}`}>{name}</li>

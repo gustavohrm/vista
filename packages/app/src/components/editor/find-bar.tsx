@@ -122,7 +122,7 @@ export function FindBar({ getTarget, targetKey, content, canReplace, mode, focus
             onKeyDown={handleFindKeyDown}
             className="ipt min-w-0 flex-1 text-[13px]"
           />
-          <output className="text-text-secondary flex-none px-1 text-xs whitespace-nowrap tabular-nums">
+          <output className="text-text-muted flex-none px-1 text-xs whitespace-nowrap tabular-nums">
             {describeResult(query, result)}
           </output>
           <BarButton

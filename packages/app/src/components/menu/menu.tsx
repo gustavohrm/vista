@@ -223,8 +223,8 @@ export function Menu({ label, items, x, y, onClose, returnFocusTo, ignorePointer
 }
 
 function MenuSeparator() {
-  // oxlint-disable-next-line jsx-a11y/control-has-associated-label, jsx-a11y/prefer-tag-over-role -- a styled divider with no label, not a control; `divider` styles a div, and a native hr would bring browser styling the class does not reset
-  return <div role="separator" className="divider my-1 [--divider-color:var(--color-surface)]" />;
+  // oxlint-disable-next-line jsx-a11y/control-has-associated-label, jsx-a11y/prefer-tag-over-role -- a hairline with no label, not a control; a native hr would bring browser borders and margins to reset
+  return <div role="separator" className="bg-line -mx-1 my-1 h-px flex-none" />;
 }
 
 interface MenuItemButtonProps {
@@ -252,7 +252,7 @@ function MenuItemButton({ item, hasIconColumn, onChoose }: MenuItemButtonProps) 
       onClick={onChoose}
       // Focus is the one highlight: the menu moves it under the pointer, and there is no separate
       // hover fill to add to it.
-      className={`focus:bg-surface flex min-h-7 w-full flex-none cursor-pointer items-center gap-2 rounded px-2 text-left outline-none ${
+      className={`focus:bg-selected flex min-h-7 w-full flex-none cursor-pointer items-center gap-2 rounded px-2 text-left outline-none ${
         item.destructive ? "text-destructive" : "text-text"
       } ${item.disabled ? "pointer-events-none opacity-40" : ""}`}
     >
@@ -266,14 +266,14 @@ function MenuItemButton({ item, hasIconColumn, onChoose }: MenuItemButtonProps) 
       ) : (
         <span className="flex min-w-0 flex-1 flex-col py-1 text-left">
           <span className="truncate">{item.label}</span>
-          <span id={descriptionId} aria-hidden="true" className="text-text-secondary truncate text-xs">
+          <span id={descriptionId} aria-hidden="true" className="text-text-muted truncate text-xs">
             {item.description}
           </span>
         </span>
       )}
       {item.selected && <i className="ic-check ml-4 flex-none text-sm" aria-hidden="true" />}
       {item.shortcut && (
-        <kbd aria-hidden="true" className="text-text-secondary ml-6 flex-none font-sans text-xs">
+        <kbd aria-hidden="true" className="text-text-faint ml-6 flex-none font-sans text-xs">
           {formatShortcut(item.shortcut)}
         </kbd>
       )}

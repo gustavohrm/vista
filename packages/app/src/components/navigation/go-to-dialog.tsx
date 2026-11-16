@@ -166,7 +166,7 @@ export function GoToDialog({
   const optionId = (index: number) => `${listId}-${index}`;
   const optionClass = (index: number) =>
     `flex h-8 cursor-pointer items-center gap-2 rounded-md px-2.5 text-[13px] ${
-      index === activeIndex ? "bg-surface" : ""
+      index === activeIndex ? "bg-selected" : ""
     }`;
 
   return (
@@ -179,14 +179,14 @@ export function GoToDialog({
         onClose();
       }}
       onClick={handleBackdropClick}
-      className="card soft floating flush mx-auto mt-[12vh] w-[min(38rem,calc(100vw-2rem))] backdrop:bg-black/40"
+      className="card soft floating flush mx-auto mt-[12vh] w-[min(38rem,calc(100vw-2rem))] overflow-hidden [--ui-radius-surface:12px]"
     >
       <div className="flex flex-col">
-        <div className="border-surface flex items-center gap-2 border-b px-3.5">
+        <div className="border-line flex items-center gap-2.5 border-b px-4">
           {isCommandMode ? (
-            <i className="ic-terminal text-text-secondary text-sm" aria-hidden="true" />
+            <i className="ic-terminal text-text-faint text-[15px]" aria-hidden="true" />
           ) : (
-            <i className="ic-file-search text-text-secondary text-sm" aria-hidden="true" />
+            <i className="ic-file-search text-text-faint text-[15px]" aria-hidden="true" />
           )}
           <input
             ref={inputRef}
@@ -204,11 +204,11 @@ export function GoToDialog({
               setActiveIndex(0);
             }}
             onKeyDown={handleKeyDown}
-            className="text-text placeholder:text-text-secondary h-12 min-w-0 flex-1 bg-transparent text-sm outline-none"
+            className="text-text-strong placeholder:text-text-faint h-12 min-w-0 flex-1 bg-transparent text-sm outline-none"
           />
         </div>
         {isLineInCurrentFile ? (
-          <p className="text-text-secondary px-4 py-3 text-[13px]">
+          <p className="text-text-muted px-4 py-3 text-[13px]">
             {describeLineTarget(hasCurrentFile, target.line, target.column)}
           </p>
         ) : (
@@ -217,7 +217,7 @@ export function GoToDialog({
             // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a combobox's popup listbox; a native select can't hold rich options or follow the field's arrow keys
             role="listbox"
             aria-label={isCommandMode ? "Commands" : "Files"}
-            className="max-h-80 overflow-y-auto p-1.5"
+            className="max-h-80 scroll-py-1.5 overflow-y-auto p-1.5"
           >
             {isCommandMode
               ? commandMatches.map((match, index) => {
@@ -241,7 +241,7 @@ export function GoToDialog({
                       <span className="text-text min-w-0 flex-1 truncate">
                         <Highlighted text={title} from={0} to={title.length} positions={match.positions} />
                       </span>
-                      {command.isChecked && <i className="ic-check text-text-secondary text-sm" aria-hidden="true" />}
+                      {command.isChecked && <i className="ic-check text-text-muted text-sm" aria-hidden="true" />}
                       {shortcut && <kbd className="shortcut-key flex-none">{formatShortcut(shortcut)}</kbd>}
                     </div>
                   );
@@ -263,7 +263,7 @@ export function GoToDialog({
                   </div>
                 ))}
             {resultCount === 0 && (
-              <p className="text-text-secondary px-2.5 py-2 text-[13px]">
+              <p className="text-text-muted px-2.5 py-2 text-[13px]">
                 {isCommandMode
                   ? "No matching commands."
                   : files.length === 0
@@ -273,7 +273,7 @@ export function GoToDialog({
             )}
           </div>
         )}
-        <div className="text-text-secondary flex items-center gap-4 px-3.5 pt-1 pb-2.5 text-xs">
+        <div className="border-line text-text-faint flex h-9 items-center gap-4 border-t px-4 text-xs">
           <span className="flex items-center gap-1.5">
             <kbd className="shortcut-key">↑</kbd>
             <kbd className="shortcut-key">↓</kbd>
@@ -354,12 +354,12 @@ function MatchedPath({ match }: { match: FileMatch }) {
   const extension = extensionStart > nameStart ? path.slice(extensionStart + 1).toLowerCase() : "";
   return (
     <>
-      <FileIcon extension={extension} className="text-text-secondary flex-none text-sm" />
+      <FileIcon extension={extension} className="text-text-faint flex-none text-sm" />
       <span className="text-text flex-none truncate">
         <Highlighted text={path} from={nameStart} to={path.length} positions={positions} />
       </span>
       {nameStart > 0 && (
-        <span className="text-text-secondary min-w-0 truncate text-xs">
+        <span className="text-text-faint min-w-0 truncate text-xs">
           <Highlighted text={path} from={0} to={nameStart - 1} positions={positions} />
         </span>
       )}
