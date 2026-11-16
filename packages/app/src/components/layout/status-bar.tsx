@@ -118,15 +118,36 @@ function PathText({ location }: { location: DocumentLocation }) {
     return () => observer.disconnect();
   }, []);
 
-  // Runs before paint, so each segment hidden while the text overflows never shows. Each pass hides
-  // one more, and stops once the text fits or only the first segment and the file name are left.
+  // Runs before paint, so a path that overflows never shows. The shorter candidates are measured in a
+  // hidden copy of the text, one more segment hidden each time, and only the first that fits is
+  // rendered: rendering each candidate in turn would be one nested update per segment, and React
+  // stops a path deeper than about 50 folders with "Maximum update depth exceeded". The search
+  // stops at the first segment and the file name.
   const maxHidden = location.segments.length - 2;
   useLayoutEffect(() => {
     const text = textRef.current;
-    if (text && text.scrollWidth > text.clientWidth && hidden < maxHidden) {
-      setHidden(hidden + 1);
+    if (!text || text.scrollWidth <= text.clientWidth || hidden >= maxHidden) {
+      return;
     }
-  }, [hidden, fitKey, maxHidden]);
+    const probe = text.cloneNode(true) as HTMLSpanElement;
+    const name = probe.lastElementChild;
+    probe.removeAttribute("aria-describedby");
+    probe.setAttribute("aria-hidden", "true");
+    Object.assign(probe.style, { position: "absolute", visibility: "hidden", width: `${text.clientWidth}px` });
+    text.after(probe);
+    let fits = maxHidden;
+    for (let candidate = hidden + 1; candidate < maxHidden; candidate += 1) {
+      const path = shortenPath(location, candidate);
+      const prefix = document.createTextNode(path.slice(0, path.length - (name?.textContent?.length ?? 0)));
+      probe.replaceChildren(...(name ? [prefix, name] : [prefix]));
+      if (probe.scrollWidth <= probe.clientWidth) {
+        fits = candidate;
+        break;
+      }
+    }
+    probe.remove();
+    setHidden(fits);
+  }, [hidden, fitKey, maxHidden, location]);
 
   return (
     <Tooltip text={full} position="top" align="start" className="flex min-w-0">

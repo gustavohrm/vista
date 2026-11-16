@@ -22,8 +22,11 @@ export function documentLocation(
   if (!hasPathOnDisk) {
     return { segments: [folder.name, ...pathSegments], separator: " / " };
   }
-  const separator = folder.rootPath.includes("\\") ? "\\" : "/";
-  const root = folder.rootPath.replace(/[\\/]+$/, "");
+  // Only a Windows path, with a drive letter or a UNC prefix, uses backslashes as separators. In a
+  // POSIX path a backslash is a character of a name, as in `/vault/notes\archive`.
+  const isWindows = /^[A-Za-z]:[\\/]|^\\\\/.test(folder.rootPath);
+  const separator = isWindows && folder.rootPath.includes("\\") ? "\\" : "/";
+  const root = folder.rootPath.replace(isWindows ? /[\\/]+$/ : /\/+$/, "");
   return { segments: [...root.split(separator), ...pathSegments], separator };
 }
 
