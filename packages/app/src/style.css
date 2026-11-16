@@ -191,18 +191,21 @@ body,
 }
 
 .markdown-editor .ProseMirror li[data-item-type="task"][data-checked="true"] > .task-list-item-content {
-  color: var(--color-text-secondary);
+  color: var(--color-text-faint);
   text-decoration: line-through;
 }
 
 /* Rich-text elements that Milkdown renders, so markup cannot carry package classes. `/tw/native`
-   is not imported here: its bare-element mappings are global and would restyle the whole app. */
+   is not imported here: its bare-element mappings are global and would restyle the whole app.
+   The document reads as a page: a 700px column of 16px text at 1.65, under headings that are
+   tighter and heavier than the text. */
 .markdown-editor .ProseMirror {
-  @apply text-text mx-auto max-w-3xl leading-relaxed outline-none;
+  @apply text-text mx-auto max-w-[700px] text-base leading-[1.65] outline-none;
 }
 
+/* The underline is faint, so a link reads as text that can be followed rather than as a rule. */
 .markdown-editor .ProseMirror a {
-  @apply text-text-strong underline;
+  @apply text-text-strong decoration-text-faint underline underline-offset-3;
 }
 
 .markdown-editor .ProseMirror .markdown-image img {
@@ -228,33 +231,36 @@ body,
 }
 
 .markdown-editor .ProseMirror h1 {
-  @apply text-title text-text-strong mb-4;
+  @apply text-text-strong mb-4 text-[32px] leading-[1.2] font-bold tracking-[-0.02em];
 }
 
-/* No package step sits between `text-title` (text-3xl) and `text-title-sm` (text-xl), so h2 keeps
-   its own size. */
 .markdown-editor .ProseMirror h2 {
-  @apply text-text-strong mt-6 mb-3 text-2xl font-semibold;
+  @apply text-text-strong mt-8 mb-2.5 text-xl leading-[1.3] font-[650] tracking-[-0.01em];
 }
 
 .markdown-editor .ProseMirror h3 {
-  @apply text-title-sm text-text-strong mt-4 mb-2;
+  @apply text-text-strong mt-6 mb-2 text-[17px] leading-[1.4] font-semibold;
+}
+
+/* A heading that opens the document needs no space above it. */
+.markdown-editor .ProseMirror > :first-child {
+  @apply mt-0;
 }
 
 .markdown-editor .ProseMirror p {
-  @apply mb-4;
+  @apply mb-3.5;
 }
 
 .markdown-editor .ProseMirror ul {
-  @apply mb-4 list-disc pl-6;
+  @apply mb-3.5 list-disc pl-6;
 }
 
 .markdown-editor .ProseMirror ol {
-  @apply mb-4 list-decimal pl-6;
+  @apply mb-3.5 list-decimal pl-6;
 }
 
 .markdown-editor .ProseMirror li {
-  @apply mb-1;
+  @apply mb-1.5;
 }
 
 /* A paragraph inside a list item sits on the item's own line, so it drops the paragraph gap. */
@@ -262,14 +268,15 @@ body,
   @apply mb-0;
 }
 
+/* A quotation is set off by a rule and a quieter colour, not a box. */
 .markdown-editor .ProseMirror blockquote {
-  @apply quote;
-
-  margin-block: 1rem;
+  @apply border-line-strong text-text-muted my-4.5 border-l-3 pl-4;
 }
 
+/* Inline code sits on the hover fill, a step smaller than the text so the monospace face, which
+   runs large, matches its height. */
 .markdown-editor .ProseMirror code {
-  @apply code;
+  @apply bg-hover rounded px-[5px] py-px font-mono text-[13.5px];
 }
 
 .markdown-editor .ProseMirror pre {
@@ -284,8 +291,14 @@ body,
   @apply data-table mb-4;
 }
 
-/* The table takes a control's corner, as the tabs above it do, rather than the package's larger
+/* Milkdown wraps each cell's text in a paragraph, whose gap would double every row's height. */
+.markdown-editor .ProseMirror :is(th, td) > p {
+  @apply mb-0;
+}
+
+/* Tables take a control's corner, as the tabs above them do, rather than the package's larger
    surface corner, which read rounder than everything else in the frame. */
+.markdown-editor .ProseMirror table,
 .csv-table .data-table {
   --ui-corner-surface: 6px;
 }

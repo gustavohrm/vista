@@ -103,17 +103,21 @@ const editorTheme = EditorView.theme({
   "&.cm-focused": { outline: "none" },
   ".cm-scroller": { fontFamily: "var(--font-mono)", lineHeight: "1.625" },
   ".cm-content": { padding: "1rem 0", caretColor: "var(--color-text)" },
-  ".cm-line": { padding: "0 1rem" },
+  // The text starts a gutter's width in from the numbers, and the numbers well in from the frame's
+  // edge, so neither reads as pressed against the other.
+  ".cm-line": { padding: "0 1.5rem 0 0.75rem" },
   ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--color-text)" },
   "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
     { backgroundColor: "var(--color-highlight)" },
-  ".cm-activeLine": { backgroundColor: "var(--color-hover)" },
+  // The current line is marked by its number alone; a fill under it competed with the selection.
+  ".cm-activeLine": { backgroundColor: "transparent" },
   ".cm-gutters": {
     backgroundColor: "var(--color-frame)",
     color: "var(--color-text-faint)",
     border: "none",
   },
   ".cm-activeLineGutter": { backgroundColor: "transparent", color: "var(--color-text)" },
+  ".cm-lineNumbers .cm-gutterElement": { padding: "0 0.5rem 0 1.25rem" },
   ".cm-selectionMatch": { backgroundColor: "var(--color-selected)" },
   ".cm-searchMatch": { backgroundColor: "var(--color-highlight-soft)" },
   ".cm-searchMatch.cm-searchMatch-selected": { backgroundColor: "var(--color-highlight)" },
