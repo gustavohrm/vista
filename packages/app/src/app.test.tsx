@@ -2,7 +2,7 @@ import { EditorView } from "@codemirror/view";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { StrictMode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { version as APP_VERSION } from "../package.json";
 import { App } from "./app";
@@ -2776,6 +2776,10 @@ describe("App", () => {
   describe("start screen", () => {
     const WINDOWS_CHROME =
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/142.0.0.0 Safari/537.36";
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
 
     it("offers the desktop app in the browser, on the start screen and in About", async () => {
       const user = userEvent.setup();
