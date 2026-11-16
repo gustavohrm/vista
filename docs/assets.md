@@ -114,4 +114,4 @@ Schibsted Grotesk is the brand typeface, for the wordmark and display lines on b
 | `assets/fonts/schibsted-grotesk/SchibstedGrotesk-Variable.ttf` | TTF, variable, weights 400–900 |
 | `assets/fonts/schibsted-grotesk/LICENSE.txt`                   | License                        |
 
-Schibsted Grotesk is © 2023 The Schibsted-Grotesk Project Authors, under the SIL Open Font License 1.1. Keep `LICENSE.txt` with the file when bundling or redistributing it. Inter, the other typeface the brand names, is not bundled here; it is available from <https://rsms.me/inter/> under the same license.
+Schibsted Grotesk is © 2023 The Schibsted-Grotesk Project Authors, under the SIL Open Font License 1.1. Keep `LICENSE.txt` with the file when bundling or redistributing it. Inter, the other typeface the brand names, is not kept here: the application takes it from the `@fontsource-variable/inter` package, which carries its license, and it is available from <https://rsms.me/inter/> under the same license.

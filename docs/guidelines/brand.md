@@ -159,7 +159,7 @@ Rejected marks:
 
 **Daylight is Vista's colour.** It is the light seen through the opening, and a highlighter's colour, the one colour people add to plain text. It also sets Vista apart in a category of purple, blue, teal, green, red, and black and white, and from Haku and Coden, which are monochrome.
 
-Vista will offer several interface themes. Daylight is Vista's own theme and identity; a monochrome theme and others will sit beside it. Today the interface has a light and a dark appearance, set through `@codenhub/theme` with the `@codenhub/styles` palette, and neither uses Daylight yet; the logo and loader the interface shows are the one exception, as [Motion](#motion) describes. Brand surfaces, which are the logo, the app icon, a website, and release notes, always use Daylight.
+Vista will offer several interface themes. Daylight is Vista's own theme and identity; a monochrome theme and others will sit beside it. Today the interface has a light and a dark appearance, set through `@codenhub/theme` with the `@codenhub/styles` palette. Both use Daylight where a highlighter would: selected text and find matches, at 75% on light grounds and 35% on dark ones, with the current match full and the others soft. The dark appearance also fills its primary buttons with Daylight, with ink text; the light one fills them with ink, since Daylight on paper is invisible. The logo and loader the interface shows also carry it, as [Motion](#motion) describes. Brand surfaces, which are the logo, the app icon, a website, and release notes, always use Daylight.
 
 The neutrals are the `@codenhub/styles` palette's, so the brand and the interface share them. OKLCH values are the source; hex and RGB are their sRGB conversions.
 
@@ -201,7 +201,7 @@ Daylight on a bright ground is invisible, which is why `daylight-deep` exists: i
 | Schibsted Grotesk | Brand: the wordmark and display lines on brand surfaces.           | SIL OFL 1.1 | Inter SemiBold.                       |
 | Inter             | Everything else on brand surfaces: body, captions, interface text. | SIL OFL 1.1 | Segoe UI, then the system sans-serif. |
 
-Schibsted Grotesk was drawn for a news publisher: sturdy at display sizes, with a pointed `v` and flat-cut terminals that match the mark. It is bundled under `assets/fonts/`. Inter is the Coden family's interface typeface. The application does not bundle either yet: its interface uses the `--font-default` of `@codenhub/styles`, which resolves to the system font. Bundling Inter is a separate decision for the interface, not made here.
+Schibsted Grotesk was drawn for a news publisher: sturdy at display sizes, with a pointed `v` and flat-cut terminals that match the mark. It is bundled under `assets/fonts/`. Inter is the Coden family's interface typeface. The application bundles Inter, the variable version from `@fontsource-variable/inter`, as its interface face, so text looks the same on every system and at the 12 to 13 px the shell is mostly set in, where Inter was drawn to stay clear. It falls back to Segoe UI, then the system sans-serif. Schibsted Grotesk stays off the interface: the wordmark there is the logo's own drawing.
 
 Type scale for brand surfaces:
 
@@ -237,7 +237,7 @@ The bar is never stretched or squeezed. It moves only inside a clip shaped like 
 
 The entrance plays once, where the logo first appears. There are two, one for each kind of surface.
 
-**Single stroke**, 2.4 s, for brand surfaces: a website's first view, the opening of a video, a launch post. The V comes alone. A Daylight stroke leaves its opening and writes **ista** in one line, like a highlighter, with each letter appearing as the stroke passes over it. It sweeps back along the horizon line and docks in the V as the bar, which settles with a 1.5-unit dip that the V shares.
+**Single stroke**, 2.4 s, for brand surfaces: a website's first view, the opening of a video, a launch post, and the app's first start screen in a run, where the logo writes itself at twice its size in the middle of the window and then settles into its place. The V comes alone. A Daylight stroke leaves its opening and writes **ista** in one line, like a highlighter, with each letter appearing as the stroke passes over it. It sweeps back along the horizon line and docks in the V as the bar, which settles with a 1.5-unit dip that the V shares.
 
 | Part   | Movement                                                    | Start    | Ends     |
 | ------ | ----------------------------------------------------------- | -------- | -------- |
@@ -246,7 +246,7 @@ The entrance plays once, where the logo first appears. There are two, one for ea
 | Stroke | Returns along the horizon line into the opening             | 1,560 ms | 1,960 ms |
 | Bar    | Replaces the stroke; the bar and V dip 1.5 units and return | 1,940 ms | 2,300 ms |
 
-**The opening**, 1.4 s, in the app, where a person is waiting to start work: the arms draw down to the point, the bar rises up the opening and widens with it into place, and the letters slide out from behind the right arm.
+**The opening**, 1.4 s, for an in-app place where a person is waiting to start work and Single stroke would be too long; the start screen used it until it took Single stroke: the arms draw down to the point, the bar rises up the opening and widens with it into place, and the letters slide out from behind the right arm.
 
 | Part    | Movement                                                                    | Start  | Duration |
 | ------- | --------------------------------------------------------------------------- | ------ | -------- |
@@ -263,7 +263,7 @@ The mark alone plays the first two rows and ends at 1 s. Movements ease out on `
 ### Rules
 
 - **Reduced motion.** When the person has asked for reduced motion, the entrance shows its last frame at once, and the loader's bar pulses between full and 35% opacity in place, since it still has to show that something is happening.
-- **One at a time.** One animated logo per view. The logo does not move again once it has entered.
+- **One at a time.** One animated logo per view. The logo does not move again once it has entered, except for the start screen's settle into place, which ends its entrance and plays once with it.
 - **No new movements.** No bounce, spin, flip, or 3D. The bar leaves the V only as the stroke in Single stroke, which ends with it back in place; it is never recoloured.
 - **Colour.** Animated files follow the same versions as the still ones, and the in-app logo and loader take Daylight deep on bright grounds and Daylight on dark ones.
 

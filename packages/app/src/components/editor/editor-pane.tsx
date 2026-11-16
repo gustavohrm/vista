@@ -2,13 +2,10 @@ import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { EditorSettings } from "../../domain/settings";
 import { getViewer } from "../../domain/viewers";
-import type { ViewMode } from "../../ports";
 import type { OpenDocument } from "../../state/documents";
-import { Tooltip } from "../feedback/tooltip";
 import { Menu, type MenuEntry } from "../menu/menu";
 import { CsvTableEditor } from "./csv-table-editor";
 import { createDomFindTarget } from "./dom-find";
-import { EditorSettingsMenu } from "./editor-settings-menu";
 import { FindBar, type FindMode } from "./find-bar";
 import type { FindTarget } from "./find-target";
 import { MarkdownEditor } from "./markdown-editor";
@@ -26,7 +23,6 @@ interface EditorPaneProps {
   platform: string;
   /** The active tab's document, or null when no tab is open. */
   document: OpenDocument | null;
-  onViewModeChange: (mode: ViewMode) => void;
   onContentChange: (newContent: string) => void;
   /** Called with the active tab's key when its raw editor cursor or selection moves. */
   onCursorChange: (key: string, cursor: CursorInfo) => void;
@@ -37,11 +33,8 @@ interface EditorPaneProps {
   /** App command shortcuts that the raw editor leaves to the commands layer. */
   reservedShortcuts: readonly string[];
   editorSettings: EditorSettings;
-  onEditorSettingsChange: (changes: Partial<EditorSettings>) => void;
   /** The open find bar, or null when it is closed. */
   find: FindRequest | null;
-  /** Opens the find bar, from the header's find button. */
-  onFind: () => void;
   onFindClose: () => void;
   /** A position in the active document to move the raw editor's cursor to. */
   pendingJump: EditorPosition | null;
@@ -54,20 +47,17 @@ interface EditorPaneProps {
   emptyState?: ReactNode;
 }
 
-/** Hosts the document header, the find bar, and the active document's editor. */
+/** Hosts the find bar and the active document's editor. */
 export function EditorPane({
   platform,
   document: doc,
-  onViewModeChange,
   onContentChange,
   onCursorChange,
   onVimModeChange,
   rawEditorStates,
   reservedShortcuts,
   editorSettings,
-  onEditorSettingsChange,
   find,
-  onFind,
   onFindClose,
   pendingJump,
   onJumpApplied,
@@ -90,44 +80,14 @@ export function EditorPane({
 
   if (!doc) {
     return (
-      <main
-        role="main"
-        data-platform={platform}
-        className="bg-background text-text flex min-h-0 flex-1 flex-col overflow-hidden"
-      >
+      <main role="main" data-platform={platform} className="text-text flex min-h-0 flex-1 flex-col overflow-hidden">
         {emptyState}
       </main>
     );
   }
 
-  const viewer = getViewer(doc.extension);
-  const canToggleView = !doc.isReadOnly && viewer.hasRaw && viewer.enriched !== undefined;
-
   return (
-    <main role="main" data-platform={platform} className="bg-background text-text flex flex-1 flex-col overflow-hidden">
-      <header className="bg-background flex h-10 flex-none items-center justify-between gap-3 pr-2 pl-3 sm:pl-4">
-        <DocumentBreadcrumb file={doc} />
-        <div className="flex flex-none items-center gap-1">
-          {canToggleView && viewer.enriched !== undefined && (
-            <ViewModeToggle viewMode={doc.viewMode} enriched={viewer.enriched} onViewModeChange={onViewModeChange} />
-          )}
-          <Tooltip text="Find (Ctrl+F)" position="bottom" align="end">
-            {(bubbleId) => (
-              <button
-                type="button"
-                onClick={onFind}
-                aria-label="Find"
-                aria-describedby={bubbleId}
-                className={find ? "btn soft icon sm" : "btn ghost icon sm"}
-              >
-                <i className="ic-search" aria-hidden="true" />
-              </button>
-            )}
-          </Tooltip>
-          <EditorSettingsMenu settings={editorSettings} onChange={onEditorSettingsChange} />
-        </div>
-      </header>
-
+    <main role="main" data-platform={platform} className="text-text flex flex-1 flex-col overflow-hidden">
       <div
         className="relative flex-1 overflow-hidden"
         onContextMenu={(event) => {
@@ -183,7 +143,9 @@ export function EditorPane({
                 loadImage={loadImage}
               />
             ) : (
-              <CsvTableEditor content={doc.content} onChange={onContentChange} />
+              // One table per tab: a row drag lands its move after the row slides into place, and a table
+              // shared between tabs would make that move in whichever tab shows by then.
+              <CsvTableEditor key={doc.key} content={doc.content} onChange={onContentChange} />
             )}
           </div>
         )}
@@ -198,156 +160,5 @@ export function EditorPane({
         />
       )}
     </main>
-  );
-}
-
-interface DocumentBreadcrumbProps {
-  /** Document whose path is shown. */
-  file: OpenDocument;
-}
-
-/**
- * Shows the document's location as a breadcrumb trail. Only the nearest folder stays visible on
- * narrow screens, so the file name keeps its room.
- *
- * @param props - DocumentBreadcrumb properties.
- * @returns Breadcrumb navigation element.
- */
-function DocumentBreadcrumb({ file }: DocumentBreadcrumbProps) {
-  const folderNames = file.path.split("/").slice(0, -1);
-
-  return (
-    <nav aria-label="Breadcrumb" className="min-w-0 flex-1 overflow-hidden">
-      <ol className="flex min-w-0 items-center gap-1 text-[13px]">
-        {folderNames.map((folderName, index) => {
-          const isNearestFolder = index === folderNames.length - 1;
-          return (
-            <li
-              key={folderNames.slice(0, index + 1).join("/")}
-              className={`text-text-secondary min-w-0 items-center gap-1 ${isNearestFolder ? "flex" : "hidden sm:flex"}`}
-            >
-              <span className="min-w-0 truncate">{folderName}</span>
-              <i className="ic-chevron-right text-text-secondary shrink-0 text-[10px]" aria-hidden="true" />
-            </li>
-          );
-        })}
-        <li aria-current="page" className="text-text flex min-w-0 items-center gap-1.5 font-medium">
-          <FileTypeIcon extension={file.extension} />
-          <span className="min-w-0 truncate">{file.name}</span>
-          {file.isDirty && (
-            <>
-              <span
-                title="Unsaved changes"
-                className="bg-text-secondary inline-block size-1.5 flex-none rounded-full"
-              />
-              <span className="visually-hidden">Unsaved changes</span>
-            </>
-          )}
-        </li>
-        {file.isReadOnly && (
-          <DocumentNote text="Read-only" title="This file isn't UTF-8 text, so Vista won't save it." />
-        )}
-        {file.externalChange === "changed" && (
-          <DocumentNote
-            text="Changed on disk"
-            title="Another program changed this file. Saving asks before overwriting it."
-          />
-        )}
-        {file.externalChange === "deleted" && (
-          <DocumentNote
-            text="Deleted on disk"
-            title="Another program deleted this file. Saving asks before creating it again."
-          />
-        )}
-      </ol>
-    </nav>
-  );
-}
-
-function DocumentNote({ text, title }: { text: string; title: string }) {
-  return (
-    <li className="text-text-secondary flex-none text-xs" title={title}>
-      {text}
-    </li>
-  );
-}
-
-interface FileTypeIconProps {
-  /** Normalized extension of the document. */
-  extension: string;
-}
-
-/**
- * Renders the icon representing a document's file type in the breadcrumb.
- *
- * @param props - FileTypeIcon properties.
- * @returns Icon element for the file type.
- */
-function FileTypeIcon({ extension }: FileTypeIconProps) {
-  if (extension === "csv") {
-    return <i className="ic-file-spreadsheet text-text-secondary shrink-0 text-xs" aria-hidden="true" />;
-  }
-  return <i className="ic-file-text text-text-secondary shrink-0 text-xs" aria-hidden="true" />;
-}
-
-/** Buttons of the view switch: smaller than a header button, so the group around them is as tall as one. */
-const VIEW_BUTTON_CLASS = "size-7! min-h-0! min-w-0! p-0! [--ui-radius:4px]";
-
-/** The tinted box that makes the two view buttons read as one control. */
-const VIEW_GROUP_CLASS = "bg-surface/60 mr-1 flex flex-none items-center gap-0.5 rounded-md p-0.5";
-
-interface ViewModeToggleProps {
-  /** Currently selected presentation mode. */
-  viewMode: ViewMode;
-  /** Which enriched presentation the format has, which picks its icon and name. */
-  enriched: "markdown" | "csv-table";
-  /** Callback fired when the user selects a presentation mode. */
-  onViewModeChange: (mode: ViewMode) => void;
-}
-
-/**
- * Two icon buttons for switching between the enriched and raw presentations, named in tooltips.
- *
- * @param props - ViewModeToggle properties.
- * @returns The pair of toggle buttons.
- */
-function ViewModeToggle({ viewMode, enriched, onViewModeChange }: ViewModeToggleProps) {
-  const enrichedLabel = enriched === "markdown" ? "Rich text" : "Table";
-  return (
-    // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a plain row of two toggles; a native fieldset would bring browser styling to reset
-    <div role="group" aria-label="Document view mode" className={VIEW_GROUP_CLASS}>
-      <Tooltip text={enrichedLabel} position="bottom" align="end">
-        {(bubbleId) => (
-          <button
-            type="button"
-            onClick={() => onViewModeChange("enriched")}
-            aria-label={enrichedLabel}
-            aria-describedby={bubbleId}
-            aria-pressed={viewMode === "enriched"}
-            className={`btn icon sm ${VIEW_BUTTON_CLASS} ${viewMode === "enriched" ? "soft" : "ghost"}`}
-          >
-            {enriched === "markdown" ? (
-              <i className="ic-eye" aria-hidden="true" />
-            ) : (
-              <i className="ic-table" aria-hidden="true" />
-            )}
-          </button>
-        )}
-      </Tooltip>
-      <Tooltip text="Raw" position="bottom" align="end">
-        {(bubbleId) => (
-          <button
-            type="button"
-            onClick={() => onViewModeChange("raw")}
-            aria-label="Raw"
-            aria-describedby={bubbleId}
-            aria-pressed={viewMode === "raw"}
-            className={`btn icon sm ${VIEW_BUTTON_CLASS} ${viewMode === "raw" ? "soft" : "ghost"}`}
-          >
-            <i className="ic-code" aria-hidden="true" />
-          </button>
-        )}
-      </Tooltip>
-    </div>
   );
 }

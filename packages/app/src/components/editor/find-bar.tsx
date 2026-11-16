@@ -122,7 +122,7 @@ export function FindBar({ getTarget, targetKey, content, canReplace, mode, focus
             onKeyDown={handleFindKeyDown}
             className="ipt min-w-0 flex-1 text-[13px]"
           />
-          <output className="text-text-secondary flex-none px-1 text-xs whitespace-nowrap tabular-nums">
+          <output className="text-text-muted flex-none px-1 text-xs whitespace-nowrap tabular-nums">
             {describeResult(query, result)}
           </output>
           <BarButton
@@ -239,7 +239,7 @@ interface BarButtonProps {
 }
 
 function BarButton({ label, icon, onClick, pressed, expanded, disabled, isInField }: BarButtonProps) {
-  const size = isInField ? "size-6! min-h-0! min-w-0! p-0! [--ui-radius:3px]" : "[--ui-radius:4px]";
+  const size = isInField ? "size-6 rounded-[4px] text-[15px]" : "size-7 text-base";
   return (
     <Tooltip text={label} position="bottom" align="end" className="flex flex-none">
       {(bubbleId) => (
@@ -251,7 +251,7 @@ function BarButton({ label, icon, onClick, pressed, expanded, disabled, isInFiel
           aria-pressed={pressed}
           aria-expanded={expanded}
           aria-describedby={bubbleId}
-          className={`btn icon sm ${pressed || expanded ? "soft" : "ghost"} ${size}`}
+          className={`icon-button ${size}`}
         >
           {icon}
         </button>

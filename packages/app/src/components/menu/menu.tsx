@@ -1,4 +1,13 @@
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 
 import { formatShortcut } from "../../commands";
@@ -8,7 +17,11 @@ const VIEWPORT_MARGIN_PX = 8;
 
 /** One action in a menu. */
 export interface MenuItem {
+  /** Tells items apart when two have the same label; the label otherwise. */
+  id?: string;
   label: string;
+  /** A second, quieter line under the label. */
+  description?: string;
   /**
    * Icon element, such as `<i className="ic-copy" aria-hidden="true" />`. The icon transform only sees
    * a literal `ic-*` class, so callers pass the element rather than its class name.
@@ -19,11 +32,23 @@ export interface MenuItem {
   disabled?: boolean;
   /** Makes the item a checkbox item showing this state. */
   checked?: boolean;
+  /** Makes the item one of a set of options, marked when it is the chosen one; its icon stays. */
+  selected?: boolean;
   destructive?: boolean;
   onSelect: () => void;
 }
 
 export const MENU_SEPARATOR = "separator";
+
+/**
+ * The input the user pressed last, which tells whether a menu opening now was opened with the
+ * keyboard or the pointer. Watched on the whole document, so no caller has to pass it.
+ */
+let lastInput: "keyboard" | "pointer" = "keyboard";
+if (typeof document !== "undefined") {
+  document.addEventListener("keydown", () => (lastInput = "keyboard"), true);
+  document.addEventListener("pointerdown", () => (lastInput = "pointer"), true);
+}
 
 export type MenuEntry = MenuItem | typeof MENU_SEPARATOR;
 
@@ -40,19 +65,17 @@ interface MenuProps {
    * had focus when the menu opened, so an action chosen from the menu runs where the user was.
    */
   returnFocusTo?: Element | null;
-  /** Called with -1 or 1 for ArrowLeft or ArrowRight, so a menu bar can move to the next menu. */
-  onNavigate?: (direction: -1 | 1) => void;
-  /** A pointer down inside this element does not close the menu, such as the menu bar that toggles it. */
+  /** A pointer down inside this element does not close the menu, such as the button that toggles it. */
   ignorePointerDownIn?: Element | null;
 }
 
 /**
- * A floating menu of actions, used by the menu bar and every right-click menu. It takes focus when
- * it opens, moves with the arrow keys, Home, and End, and closes on Escape, Tab, a choice, or a
- * pointer down outside it. Closing by keyboard or by a choice returns focus to where it was, and
+ * A floating menu of actions, used by the button menus and every right-click menu. It takes focus
+ * when it opens, highlighting its first item only when opened with the keyboard, moves with the
+ * arrow keys, Home, and End, and closes on Escape, Tab, a choice, or a pointer down outside it. Closing by keyboard or by a choice returns focus to where it was, and
  * a chosen action runs after that, so editing actions apply to the editor the user was in.
  */
-export function Menu({ label, items, x, y, onClose, returnFocusTo, onNavigate, ignorePointerDownIn }: MenuProps) {
+export function Menu({ label, items, x, y, onClose, returnFocusTo, ignorePointerDownIn }: MenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: x, top: y });
   // Captured during the first render, before the menu takes focus.
@@ -70,10 +93,35 @@ export function Menu({ label, items, x, y, onClose, returnFocusTo, onNavigate, i
     });
   }, [x, y]);
 
+  // The highlight is the focused item. Set when the pointer gave it, so leaving the menu clears it,
+  // and dropped when the keyboard moves it, so leaving then keeps it.
+  const isPointerHighlightRef = useRef(false);
+
   useEffect(() => {
-    // With every item disabled, the menu itself takes focus so its keys still work.
-    (getEnabledItems(menuRef.current)[0] ?? menuRef.current)?.focus();
+    // Opened with the pointer, nothing is highlighted until the pointer moves over an item. With
+    // every item disabled, the menu itself takes focus too, so its keys still work.
+    const firstItem = lastInput === "keyboard" ? getEnabledItems(menuRef.current)[0] : undefined;
+    (firstItem ?? menuRef.current)?.focus();
   }, []);
+
+  const clearPointerHighlight = () => {
+    if (isPointerHighlightRef.current) {
+      isPointerHighlightRef.current = false;
+      menuRef.current?.focus();
+    }
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const item = (event.target as Element).closest<HTMLElement>(ENABLED_ITEM_SELECTOR);
+    if (!item) {
+      clearPointerHighlight();
+      return;
+    }
+    isPointerHighlightRef.current = true;
+    if (document.activeElement !== item) {
+      item.focus();
+    }
+  };
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -105,7 +153,10 @@ export function Menu({ label, items, x, y, onClose, returnFocusTo, onNavigate, i
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const enabledItems = getEnabledItems(menuRef.current);
     const index = enabledItems.indexOf(document.activeElement as HTMLElement);
-    const focusAt = (next: number) => enabledItems[(next + enabledItems.length) % enabledItems.length]?.focus();
+    const focusAt = (next: number) => {
+      isPointerHighlightRef.current = false;
+      enabledItems[(next + enabledItems.length) % enabledItems.length]?.focus();
+    };
     switch (event.key) {
       case "ArrowDown":
         focusAt(index + 1);
@@ -118,13 +169,6 @@ export function Menu({ label, items, x, y, onClose, returnFocusTo, onNavigate, i
         break;
       case "End":
         focusAt(-1);
-        break;
-      case "ArrowLeft":
-      case "ArrowRight":
-        if (!onNavigate) {
-          return;
-        }
-        onNavigate(event.key === "ArrowLeft" ? -1 : 1);
         break;
       case "Escape":
         closeAndReturnFocus();
@@ -149,16 +193,28 @@ export function Menu({ label, items, x, y, onClose, returnFocusTo, onNavigate, i
       aria-label={label}
       tabIndex={-1}
       onKeyDown={handleKeyDown}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={clearPointerHighlight}
       onContextMenu={(event) => event.preventDefault()}
-      style={{ top: position.top, left: position.left }}
-      className="card soft floating fixed z-50 flex max-h-[calc(100vh-16px)] min-w-48 flex-col overflow-y-auto p-1 text-[13px] [--ui-radius-surface:8px]"
+      // Grows from the point it was opened at, even when the viewport edge pushed it aside.
+      style={{
+        top: position.top,
+        left: position.left,
+        transformOrigin: `${x - position.left}px ${y - position.top}px`,
+      }}
+      className="vista-pop card soft floating fixed z-50 flex max-h-[calc(100vh-16px)] min-w-48 flex-col overflow-y-auto p-1 text-[13px] [--ui-radius-surface:8px]"
     >
       {items.map((item, index) =>
         item === MENU_SEPARATOR ? (
           // oxlint-disable-next-line react/no-array-index-key -- separators have no identity besides their position
           <MenuSeparator key={`separator-${index}`} />
         ) : (
-          <MenuItemButton key={item.label} item={item} hasIconColumn={hasIcons} onChoose={() => choose(item)} />
+          <MenuItemButton
+            key={item.id ?? item.label}
+            item={item}
+            hasIconColumn={hasIcons}
+            onChoose={() => choose(item)}
+          />
         ),
       )}
     </div>,
@@ -167,8 +223,8 @@ export function Menu({ label, items, x, y, onClose, returnFocusTo, onNavigate, i
 }
 
 function MenuSeparator() {
-  // oxlint-disable-next-line jsx-a11y/control-has-associated-label, jsx-a11y/prefer-tag-over-role -- a styled divider with no label, not a control; `divider` styles a div, and a native hr would bring browser styling the class does not reset
-  return <div role="separator" className="divider my-1 [--divider-color:var(--color-surface)]" />;
+  // oxlint-disable-next-line jsx-a11y/control-has-associated-label, jsx-a11y/prefer-tag-over-role -- a hairline with no label, not a control; a native hr would bring browser borders and margins to reset
+  return <div role="separator" className="bg-line -mx-1 my-1 h-px flex-none" />;
 }
 
 interface MenuItemButtonProps {
@@ -180,34 +236,44 @@ interface MenuItemButtonProps {
 
 function MenuItemButton({ item, hasIconColumn, onChoose }: MenuItemButtonProps) {
   const isCheckbox = item.checked !== undefined;
+  const isOption = item.selected !== undefined;
   const icon = isCheckbox ? item.checked && <i className="ic-check" /> : item.icon;
+  const descriptionId = useId();
   return (
     <button
       type="button"
-      role={isCheckbox ? "menuitemcheckbox" : "menuitem"}
-      aria-checked={isCheckbox ? item.checked : undefined}
+      role={isCheckbox ? "menuitemcheckbox" : isOption ? "menuitemradio" : "menuitem"}
+      aria-checked={isCheckbox ? item.checked : isOption ? item.selected : undefined}
+      aria-describedby={item.description === undefined ? undefined : descriptionId}
       aria-disabled={item.disabled || undefined}
       aria-keyshortcuts={item.shortcut ? toAriaShortcut(item.shortcut) : undefined}
       data-menu-item
       tabIndex={-1}
       onClick={onChoose}
-      onPointerMove={(event) => {
-        if (!item.disabled && document.activeElement !== event.currentTarget) {
-          event.currentTarget.focus();
-        }
-      }}
-      className={`btn ghost sm min-h-7! w-full justify-start gap-2 px-2! py-0! font-normal outline-none! [--ui-radius:4px] focus:[--ui-fill:12%] ${item.destructive ? "destructive" : ""} ${
-        item.disabled ? "pointer-events-none opacity-40" : ""
-      }`}
+      // Focus is the one highlight: the menu moves it under the pointer, and there is no separate
+      // hover fill to add to it.
+      className={`focus:bg-selected flex min-h-7 w-full flex-none cursor-pointer items-center gap-2 rounded px-2 text-left outline-none ${
+        item.destructive ? "text-destructive" : "text-text"
+      } ${item.disabled ? "pointer-events-none opacity-40" : ""}`}
     >
       {hasIconColumn && (
         <span aria-hidden="true" className="flex w-4 flex-none justify-center text-sm">
           {icon}
         </span>
       )}
-      <span className="flex-1 text-left whitespace-nowrap">{item.label}</span>
+      {item.description === undefined ? (
+        <span className="flex-1 text-left whitespace-nowrap">{item.label}</span>
+      ) : (
+        <span className="flex min-w-0 flex-1 flex-col py-1 text-left">
+          <span className="truncate">{item.label}</span>
+          <span id={descriptionId} aria-hidden="true" className="text-text-muted truncate text-xs">
+            {item.description}
+          </span>
+        </span>
+      )}
+      {item.selected && <i className="ic-check ml-4 flex-none text-sm" aria-hidden="true" />}
       {item.shortcut && (
-        <kbd aria-hidden="true" className="text-text-secondary ml-6 flex-none font-sans text-xs">
+        <kbd aria-hidden="true" className="text-text-faint ml-6 flex-none font-sans text-xs">
           {formatShortcut(item.shortcut)}
         </kbd>
       )}
@@ -223,8 +289,10 @@ function toAriaShortcut(shortcut: string): string {
     .join("+");
 }
 
+const ENABLED_ITEM_SELECTOR = "[data-menu-item]:not([aria-disabled])";
+
 function getEnabledItems(menu: HTMLElement | null): HTMLElement[] {
-  return menu ? [...menu.querySelectorAll<HTMLElement>("[data-menu-item]:not([aria-disabled])")] : [];
+  return menu ? [...menu.querySelectorAll<HTMLElement>(ENABLED_ITEM_SELECTOR)] : [];
 }
 
 /**

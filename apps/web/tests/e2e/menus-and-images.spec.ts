@@ -40,37 +40,66 @@ test.describe("menus and Markdown images", () => {
     await expect(page.getByRole("menuitem", { name: "Rename" }).locator("svg")).toBeVisible();
   });
 
+  test("lights one menu item at a time, following the pointer or the keyboard", async ({ page }) => {
+    await page.getByText("gallery.md").click({ button: "right" });
+    const menu = page.getByRole("menu");
+    const items = menu.getByRole("menuitem");
+    const open = items.filter({ hasText: "Open" });
+    const rename = items.filter({ hasText: "Rename" });
+    const background = (item: typeof open) => item.evaluate((element) => getComputedStyle(element).backgroundColor);
+    const unlit = await background(rename);
+
+    // Opened with the pointer, nothing is lit.
+    await expect.poll(() => background(open)).toBe(unlit);
+
+    await open.hover();
+    const lit = await background(open);
+    expect(lit).not.toBe(unlit);
+
+    // The keyboard moves the one highlight away, though the pointer still rests on Open.
+    await page.keyboard.press("ArrowDown");
+    await expect.poll(() => background(rename)).toBe(lit);
+    await expect.poll(() => background(open)).toBe(unlit);
+
+    // The keyboard moved it since, so leaving keeps it.
+    await page.mouse.move(1, 1);
+    await expect.poll(() => background(rename)).toBe(lit);
+  });
+
   test("lets Tab and Shift+Tab leave a menu in either direction", async ({ page }) => {
     const describeFocus = () =>
       page.evaluate(() => {
         const el = document.activeElement;
         return el ? `${el.tagName}:${el.getAttribute("aria-label") ?? el.textContent?.trim().slice(0, 20)}` : "none";
       });
-    const fileMenu = page.getByRole("menuitem", { name: "File" });
+    // The workspace switcher's menu, which uses the shared menu like every other.
+    const switcher = page.locator('header button[aria-haspopup="menu"]');
+    const menu = page.getByRole("menu");
 
-    await fileMenu.focus();
+    await switcher.focus();
+    const self = await describeFocus();
     await page.keyboard.press("Tab");
     const after = await describeFocus();
-    await fileMenu.focus();
+    await switcher.focus();
     await page.keyboard.press("Shift+Tab");
     const before = await describeFocus();
-    expect(new Set([after, before, "BUTTON:File"]).size).toBe(3);
+    expect(new Set([after, before, self]).size).toBe(3);
 
-    await fileMenu.focus();
+    await switcher.focus();
     await page.keyboard.press("Enter");
-    await expect(page.getByRole("menu", { name: "File" })).toBeVisible();
+    await expect(menu).toBeVisible();
     await page.keyboard.press("Tab");
-    await expect(page.getByRole("menu", { name: "File" })).toBeHidden();
+    await expect(menu).toBeHidden();
     expect(await describeFocus()).toBe(after);
 
-    await fileMenu.focus();
+    await switcher.focus();
     await page.keyboard.press("Enter");
     await page.keyboard.press("Shift+Tab");
-    await expect(page.getByRole("menu", { name: "File" })).toBeHidden();
+    await expect(menu).toBeHidden();
     expect(await describeFocus()).toBe(before);
   });
 
-  test("runs a command from the menu bar and returns focus to the editor", async ({ page }) => {
+  test("runs a command from the palette and returns focus to the editor", async ({ page }) => {
     await page.getByText("notes.md").click();
     await page.getByRole("button", { name: "Raw" }).click();
     const editor = page.getByRole("textbox", { name: "Raw text content of notes.md" });
@@ -78,8 +107,8 @@ test.describe("menus and Markdown images", () => {
     // The click can land on the empty last line, where Select Line selects nothing.
     await page.keyboard.press("Control+Home");
 
-    await page.getByRole("menuitem", { name: "Selection" }).click();
-    await page.getByRole("menuitem", { name: "Select Line" }).click();
+    await page.keyboard.press("Control+Shift+P");
+    await page.getByRole("option", { name: /^Selection: Select Line/ }).click();
 
     await expect(editor).toBeFocused();
     await expect(page.getByRole("contentinfo", { name: "Status Bar" })).toContainText("(15 selected)");

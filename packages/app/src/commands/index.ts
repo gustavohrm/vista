@@ -4,10 +4,19 @@ import { matchesShortcut } from "./shortcuts";
 
 export { formatShortcut } from "./shortcuts";
 
+/**
+ * The groups commands are listed under, in the order the palette and the Keyboard Shortcuts list
+ * show them.
+ */
+export const COMMAND_CATEGORIES = ["Workspace", "File", "Tabs", "Edit", "Selection", "View", "Go", "Settings"] as const;
+
+export type CommandCategory = (typeof COMMAND_CATEGORIES)[number];
+
 /** An action the user can trigger from a shortcut or from the menus. */
 export interface Command {
   id: string;
   label: string;
+  category: CommandCategory;
   shortcut?: string;
   /**
    * A key the focused editor handles itself, shown in menus but not bound by the app, such as
@@ -42,6 +51,16 @@ export function useCommandShortcuts(commands: readonly Command[]): void {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+}
+
+/**
+ * Orders commands by category, keeping their order within each.
+ *
+ * @param commands - Commands in any category order.
+ * @returns A new list, grouped in `COMMAND_CATEGORIES` order.
+ */
+export function sortByCategory<T extends Pick<Command, "category">>(commands: readonly T[]): T[] {
+  return COMMAND_CATEGORIES.flatMap((category) => commands.filter((command) => command.category === category));
 }
 
 /** Runs a command, logging a failure instead of leaving a rejected promise unhandled. */

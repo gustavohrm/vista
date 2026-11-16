@@ -34,6 +34,13 @@ export function matchesShortcut(event: KeyboardEvent, shortcut: string): boolean
   return event.key === parsed.key;
 }
 
+/**
+ * Writes a shortcut for display, such as "Ctrl + Shift + S": Mod shows as Ctrl, and each plus has a
+ * space on either side so the keys read apart.
+ */
 export function formatShortcut(shortcut: string): string {
-  return shortcut.replace("Mod", "Ctrl");
+  // A shortcut whose key is the plus sign itself ends in "++".
+  const isPlusKey = shortcut.endsWith("++");
+  const parts = (isPlusKey ? shortcut.slice(0, -2) : shortcut).split("+").filter((part) => part !== "");
+  return [...parts, ...(isPlusKey ? ["+"] : [])].map((part) => (part === "Mod" ? "Ctrl" : part)).join(" + ");
 }

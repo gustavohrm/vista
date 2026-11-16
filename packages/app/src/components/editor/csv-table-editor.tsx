@@ -1,5 +1,11 @@
-import Papa from "papaparse";
-import { useCallback, useMemo } from "react";
+import { useReducedMotion } from "motion/react";
+import { useCallback, useEffect, useMemo, useRef, type KeyboardEvent } from "react";
+
+import { parseCsv, serializeCsv } from "../../domain/csv";
+import { useReorderDrag } from "../use-reorder-drag";
+
+/** Body rows run down the table; each row carries its index among the records. */
+const ROW_DRAG_OPTIONS = { axis: "y", itemAttribute: "data-row-key" } as const;
 
 interface CsvTableEditorProps {
   /** Raw CSV string content. */
@@ -9,30 +15,27 @@ interface CsvTableEditorProps {
 }
 
 /**
- * Interactive tabular editor for CSV files with in-place cell editing.
+ * Interactive tabular editor for CSV files with in-place cell editing. The first record is the
+ * header, edited in place like any cell. A new column is added from the button at the header's end,
+ * a new row from the button under the last row, where each one appears. A row moves by dragging its
+ * number, or with Shift+Up and Shift+Down while its number has focus; the header stays first.
  *
  * @param props - CsvTableEditor properties.
  * @returns Tabular CSV editing interface.
  */
 export function CsvTableEditor({ content, onChange }: CsvTableEditorProps) {
-  const { parsedData, newline } = useMemo(() => {
-    const result = Papa.parse<string[]>(content, {
-      skipEmptyLines: false,
-    });
-    const rows = result.data.filter((row) => Array.isArray(row));
-    // Papa writes CRLF by default. Writing back the record separator it detected, which ignores line
-    // breaks inside quoted cells, stops one cell edit from rewriting every line.
-    return { parsedData: rows.length === 0 ? [[""]] : rows, newline: result.meta.linebreak };
-  }, [content]);
+  const document = useMemo(() => parseCsv(content), [content]);
+  const { rows } = document;
+  const columnCount = useMemo(() => rows.reduce((max, row) => Math.max(max, row.length), 1), [rows]);
+  const header = rows[0] ?? [];
+  const body = rows.slice(1);
 
-  const maxColumns = useMemo(() => {
-    return parsedData.reduce((max, row) => Math.max(max, row.length), 1);
-  }, [parsedData]);
+  const write = useCallback((nextRows: string[][]) => onChange(serializeCsv(nextRows, document)), [document, onChange]);
 
   const handleCellChange = useCallback(
     (rowIndex: number, colIndex: number, value: string) => {
-      const nextData = parsedData.map((row) => [...row]);
-      const row = nextData[rowIndex];
+      const nextRows = rows.map((row) => [...row]);
+      const row = nextRows[rowIndex];
       if (!row) {
         return;
       }
@@ -40,86 +43,167 @@ export function CsvTableEditor({ content, onChange }: CsvTableEditorProps) {
         row.push("");
       }
       row[colIndex] = value;
-      const unparsed = Papa.unparse(nextData, { newline });
-      onChange(unparsed);
+      write(nextRows);
     },
-    [parsedData, newline, onChange],
+    [rows, write],
   );
 
   const handleAddRow = useCallback(() => {
-    const nextData = [...parsedData.map((row) => [...row]), Array.from({ length: maxColumns }, () => "")];
-    const unparsed = Papa.unparse(nextData, { newline });
-    onChange(unparsed);
-  }, [parsedData, maxColumns, newline, onChange]);
+    write([...rows.map((row) => [...row]), Array.from({ length: columnCount }, () => "")]);
+  }, [rows, columnCount, write]);
 
   const handleAddColumn = useCallback(() => {
-    const nextData = parsedData.map((row) => [...row, ""]);
-    const unparsed = Papa.unparse(nextData, { newline });
-    onChange(unparsed);
-  }, [parsedData, newline, onChange]);
+    write(rows.map((row) => [...row, ...Array.from({ length: columnCount - row.length + 1 }, () => "")]));
+  }, [rows, columnCount, write]);
 
-  // Column header letters (A, B, C, ...)
-  const columnLabels = useMemo(() => {
-    return Array.from({ length: maxColumns }, (_, i) => {
-      let label = "";
-      let n = i;
-      while (n >= 0) {
-        label = String.fromCharCode((n % 26) + 65) + label;
-        n = Math.floor(n / 26) - 1;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // Set when a row is moved from the keyboard, so its handle takes focus again in its new place.
+  const movedRowRef = useRef<number | null>(null);
+  const isReducedMotion = useReducedMotion() ?? false;
+
+  /** Moves the body row at record index `rowIndex` to the place `toIndex` among the body rows. */
+  const moveRow = useCallback(
+    (rowIndex: number, toIndex: number) => {
+      const to = Math.min(Math.max(toIndex + 1, 1), rows.length - 1);
+      const moved = rows[rowIndex];
+      if (rowIndex < 1 || !moved || to === rowIndex) {
+        return false;
       }
-      return label;
-    });
-  }, [maxColumns]);
+      const nextRows = rows.filter((_, index) => index !== rowIndex);
+      nextRows.splice(to, 0, moved);
+      write(nextRows);
+      return true;
+    },
+    [rows, write],
+  );
+
+  const { drag, startDrag } = useReorderDrag(
+    scrollRef,
+    (key, toIndex) => moveRow(Number(key), toIndex),
+    isReducedMotion,
+    ROW_DRAG_OPTIONS,
+  );
+
+  useEffect(() => {
+    const moved = movedRowRef.current;
+    if (moved !== null) {
+      movedRowRef.current = null;
+      scrollRef.current?.querySelector<HTMLElement>(`[data-row-key="${moved}"] [data-row-handle]`)?.focus();
+    }
+  }, [rows]);
+
+  const handleHandleKeyDown = (rowIndex: number, event: KeyboardEvent<HTMLButtonElement>) => {
+    const step = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
+    if (step === 0 || !event.shiftKey) {
+      return;
+    }
+    // Moves the row one place, stopping at the ends of the table.
+    event.preventDefault();
+    const to = rowIndex + step;
+    if (moveRow(rowIndex, to - 1)) {
+      movedRowRef.current = to;
+    }
+  };
+
+  const columnName = (colIndex: number) => header[colIndex]?.trim() || `Column ${colIndex + 1}`;
+  const columns = Array.from({ length: columnCount }, (_, colIndex) => colIndex);
 
   return (
-    <div className="csv-table bg-background text-text flex h-full w-full flex-col">
-      <div data-find-skip className="flex items-center gap-1 px-3 pb-1">
-        <button type="button" onClick={handleAddRow} className="btn ghost sm">
-          <i className="ic-plus text-xs" aria-hidden="true" />
-          Add Row
-        </button>
-        <button type="button" onClick={handleAddColumn} className="btn ghost sm">
-          <i className="ic-plus text-xs" aria-hidden="true" />
-          Add Column
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-auto px-4 pb-4">
-        <div className="table-wrap">
-          <table className="data-table ruled edged">
-            <thead data-find-skip>
-              <tr>
-                <th className="w-16 text-center select-none">#</th>
-                {columnLabels.map((col, idx) => (
-                  <th key={idx} className="min-w-[120px] text-left select-none">
-                    {col}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {parsedData.map((row, rowIndex) => (
-                <tr key={rowIndex}>
+    // No top padding: the tabs row already leaves 6px below its tabs, the same as the 6px at the
+    // frame's edges, so the table sits as far from the tabs as the tabs and table sit from the edge.
+    <div ref={scrollRef} className="csv-table text-text h-full w-full overflow-auto px-1.5 pb-3">
+      <div className="table-wrap w-fit max-w-none">
+        <table className="data-table ruled edged">
+          <thead>
+            <tr>
+              <th data-find-skip aria-label="Row" className="w-12" />
+              {columns.map((colIndex) => (
+                <th key={colIndex} className="min-w-[120px]">
+                  <input
+                    type="text"
+                    value={header[colIndex] ?? ""}
+                    aria-label={`Column ${colIndex + 1} name`}
+                    onChange={(event) => handleCellChange(0, colIndex, event.target.value)}
+                    className="ipt ghost edgeless text-text-strong font-semibold"
+                  />
+                </th>
+              ))}
+              <th data-find-skip className="w-9">
+                <button
+                  type="button"
+                  onClick={handleAddColumn}
+                  aria-label="Add column"
+                  title="Add column"
+                  className="icon-button text-text-muted mx-auto size-6"
+                >
+                  <i className="ic-plus" aria-hidden="true" />
+                </button>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {body.map((row, index) => {
+              const rowIndex = index + 1;
+              const isDragged = drag?.key === String(rowIndex);
+              const offset = drag?.offsets[String(rowIndex)];
+              return (
+                <tr
+                  key={rowIndex}
+                  data-row-key={rowIndex}
+                  data-row-dragging={isDragged ? "" : undefined}
+                  style={offset ? { transform: `translateY(${offset}px)` } : undefined}
+                  // The dragged row stays under the pointer and above the rows it passes; the others,
+                  // and the dragged one once released, slide. Keyboard moves are instant.
+                  className={`group ease-(--ease-move) motion-reduce:transition-none ${
+                    isDragged ? "relative z-10" : ""
+                  } ${drag && (!isDragged || drag.isSettling) ? "transition-transform duration-150" : ""}`}
+                >
                   <td data-find-skip className="select-none">
-                    <span className="block px-3 py-2 text-center font-mono">{rowIndex + 1}</span>
+                    <button
+                      type="button"
+                      data-row-handle
+                      aria-label={`Move row ${rowIndex}`}
+                      title="Drag to move the row, or press Shift + Up or Shift + Down"
+                      onPointerDown={(event) => startDrag(String(rowIndex), event)}
+                      onKeyDown={(event) => handleHandleKeyDown(rowIndex, event)}
+                      className="text-text-faint hover:text-text-muted grid h-8 w-full cursor-grab place-items-center font-mono text-xs outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-inset active:cursor-grabbing"
+                    >
+                      <span className="col-start-1 row-start-1 group-hover:invisible group-data-row-dragging:invisible">
+                        {rowIndex}
+                      </span>
+                      <i
+                        className="ic-grip-vertical invisible col-start-1 row-start-1 text-sm group-hover:visible group-data-row-dragging:visible"
+                        aria-hidden="true"
+                      />
+                    </button>
                   </td>
-                  {Array.from({ length: maxColumns }, (_, colIndex) => (
+                  {columns.map((colIndex) => (
                     <td key={colIndex}>
                       <input
                         type="text"
                         value={row[colIndex] ?? ""}
-                        aria-label={`Row ${rowIndex + 1}, Column ${columnLabels[colIndex]}`}
-                        onChange={(e) => handleCellChange(rowIndex, colIndex, e.target.value)}
+                        aria-label={`${columnName(colIndex)}, row ${rowIndex}`}
+                        onChange={(event) => handleCellChange(rowIndex, colIndex, event.target.value)}
                         className="ipt ghost edgeless"
                       />
                     </td>
                   ))}
+                  <td aria-hidden="true" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
+      <button
+        type="button"
+        onClick={handleAddRow}
+        data-find-skip
+        className="text-text-muted hover:bg-hover hover:text-text mt-1 flex h-8 items-center gap-2 rounded-md px-3 text-[13px] transition-colors duration-100"
+      >
+        <i className="ic-plus" aria-hidden="true" />
+        Add row
+      </button>
     </div>
   );
 }

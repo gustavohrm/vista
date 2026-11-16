@@ -20,6 +20,11 @@ describe("parseGoToQuery", () => {
 });
 
 describe("rankFiles", () => {
+  it("keeps two equal paths apart by where each was listed", () => {
+    expect(rankFiles(["notes / a.md", "notes / a.md"], "a").map((match) => match.index)).toEqual([0, 1]);
+    expect(rankFiles(["b.md", "a.md"], "").map((match) => match.index)).toEqual([1, 0]);
+  });
+
   const paths = ["src/app.tsx", "src/components/tab-strip.tsx", "docs/architecture.md", "README.md"];
 
   it("lists files alphabetically when the query is empty", () => {
@@ -63,6 +68,6 @@ describe("rankFiles", () => {
 
   it("keeps match positions on the original path when lowercasing changes its length", () => {
     // "İ".toLowerCase() is two UTF-16 units, which would shift every later position.
-    expect(rankFiles(["İ.md"], "d")).toEqual([{ path: "İ.md", positions: [3] }]);
+    expect(rankFiles(["İ.md"], "d")).toEqual([{ path: "İ.md", index: 0, positions: [3] }]);
   });
 });

@@ -1,6 +1,6 @@
 ---
 status: DRAFT
-last_updated: 2026-11-13
+last_updated: 2026-11-15
 scope: Repo-wide direction for Vista, limited to work already stated in the repository's docs and READMEs.
 ---
 
@@ -12,18 +12,19 @@ Durable direction for Vista: what is planned, what is possible later, and what h
 
 ## Current Focus
 
+- **Workspaces of several folders and the redesigned shell.** A workspace holds one or more folders, a name and look, and a session, with its details on the device or in a `.vista` folder; the menu bar gives way to a workspace switcher, a left rail, a tabs row, and a path bar. Source: `docs/specs/workspaces.md`, "Workspaces" and "Shell layout".
 - **Releasing the web and desktop apps.** Windows is the primary desktop platform and Linux the second. CI builds the Windows and Linux installers on every change, and a release tag signs and publishes them with the web app, which the desktop updater checks. Source: `docs/ci.md`, "Releases".
 
 ## Planned
 
 - **Mobile folder access (Android and iOS).** Mobile targets remain planned for the Tauri host, but opening, remembering, and restoring folders is desktop-only until mobile folder access and platform permissions are designed and tested. Support is not claimed before validation on those platforms. Sources: `apps/native/README.md` ("Mobile folder access is not supported yet"); `docs/architecture.md` ("remain planned targets").
-- **Backlinks, folder search, and data export.** Listed as planned capabilities. Source: `README.md` ("Planned capabilities include ... backlinks, folder search, and data export").
+- **Backlinks, folder search, and data export.** Listed as planned capabilities. Folder search and a graph view have reserved, disabled places in the left rail. Sources: `README.md` ("Planned capabilities include ... backlinks, folder search, and data export"); `docs/specs/workspaces.md`, "Shell layout".
+- **Moving files between workspace folders.** Moves work within one folder until the host contract gains a copy between folders. Source: `docs/specs/workspaces.md`, "Folder rules".
 - **App-store distribution and operating-system code signing for the native app.** Installers are signed for the updater, not by a code-signing certificate, and are not in any app store. Source: `apps/native/README.md`.
 - **Additional file formats.** Future versions will expand to `.json`, `.yaml`, canvas representations, and embedded graph links. Source: `docs/specs/workspaces.md` ("Future versions will expand to ...").
 
 ## Later / Possible
 
-- **Multi-root workspaces.** Only one folder is active in v1. The capability contract and state models use opaque identifiers and collections so multi-root support is not blocked later. Source: `docs/specs/workspaces.md`. This is a design accommodation, not a commitment.
 - **Feature routing in the web host.** Source: `apps/web/README.md` ("Feature routing is not implemented yet.").
 - **Workspace support in other desktop browsers.** The web host's initial target is current desktop Chrome and Edge. Source: `apps/web/README.md`.
 

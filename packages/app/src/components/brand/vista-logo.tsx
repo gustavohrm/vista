@@ -43,20 +43,21 @@ function useSvgId() {
 
 /**
  * The full logo, which plays its entrance once when it mounts: the arms draw down to the point, the
- * bar rises into the opening, and "ista" slides out from behind the right arm. It carries the name
- * "Vista" as visually hidden text, so it can stand in for the name in a heading.
+ * bar rises into the opening, and "ista" slides out from behind the right arm, unless `hasEntrance`
+ * is false. It carries the name "Vista" as visually hidden text, so it can stand in for the name in a
+ * heading.
  *
- * @param props - The class that sets the logo's size.
+ * @param props - The class that sets the logo's size, and whether it plays its entrance.
  * @returns Logo element.
  */
-export function VistaLogo({ className }: { className?: string }) {
+export function VistaLogo({ className, hasEntrance = true }: { className?: string; hasEntrance?: boolean }) {
   const id = useSvgId();
   return (
     <>
       <svg
         viewBox="-105.64 -77.1 250.93 78.32"
         aria-hidden="true"
-        data-motion="enter"
+        data-motion={hasEntrance ? "enter" : undefined}
         className={className ? `vista-logo ${className}` : "vista-logo"}
       >
         <defs>

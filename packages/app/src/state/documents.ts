@@ -16,11 +16,11 @@ export interface LoadedFile {
 /** What another program did to an open file since Vista last read or wrote it. */
 export type ExternalChange = "changed" | "deleted";
 
-/** An open tab: a document buffer plus which workspace it belongs to and how it is shown. */
+/** An open tab: a document buffer plus which folder it belongs to and how it is shown. */
 export interface OpenDocument extends FileDocument {
-  /** Unique across workspaces, so several roots can have files at the same relative path. */
+  /** Unique across folders, so several folders can have files at the same relative path. */
   key: string;
-  workspaceId: string;
+  folderId: string;
   viewMode: ViewMode;
   /** The version on disk the buffer was last read from or written to. Saving expects it. */
   diskStat: FileStat;
@@ -29,6 +29,15 @@ export interface OpenDocument extends FileDocument {
   externalChange: ExternalChange | null;
   /** Counts reloads from disk, so views that own their copy of the text start over. */
   revision: number;
+  /** A tab restored from the session whose file is read when the tab is first shown; until then it has no content. */
+  isPending: boolean;
+}
+
+/** A tab as a session remembers it. */
+export interface RestoredTab {
+  folderId: string;
+  path: string;
+  viewMode: ViewMode;
 }
 
 export interface DocumentsState {
@@ -37,15 +46,19 @@ export interface DocumentsState {
   activeKey: string | null;
 }
 
-/** A workspace-relative path in one workspace. */
-export interface WorkspaceEntryRef {
-  workspaceId: string;
+/** A path within one folder of the workspace. */
+export interface FolderEntryRef {
+  folderId: string;
   path: string;
 }
 
 export type DocumentsAction =
-  | { type: "open"; workspaceId: string; path: string; file: LoadedFile }
+  | { type: "open"; folderId: string; path: string; file: LoadedFile }
+  // `activeIndex` is into `tabs`, or -1; a tab activated meanwhile stays active.
+  | { type: "restore"; tabs: readonly RestoredTab[]; activeIndex: number }
   | { type: "activate"; key: string }
+  // Moves a tab to `toIndex` in the tab order, kept within the row.
+  | { type: "reorder"; key: string; toIndex: number }
   | { type: "close"; keys: string[] }
   | { type: "edit"; key: string; content: string }
   | { type: "saved"; key: string; content: string; stat: FileStat }
@@ -53,12 +66,12 @@ export type DocumentsAction =
   // `expected` is the version the reload started from; a save during the read makes the result stale.
   | { type: "reloaded"; key: string; expected: FileStat; file: LoadedFile }
   | { type: "setViewMode"; key: string; viewMode: ViewMode }
-  | { type: "move"; workspaceId: string; fromPath: string; toPath: string };
+  | { type: "move"; folderId: string; fromPath: string; toPath: string };
 
 export const INITIAL_DOCUMENTS_STATE: DocumentsState = { documents: [], activeKey: null };
 
-export function documentKey(workspaceId: string, path: string): string {
-  return `${workspaceId}:${path}`;
+export function documentKey(folderId: string, path: string): string {
+  return `${folderId}:${path}`;
 }
 
 export function getActiveDocument(state: DocumentsState): OpenDocument | null {
@@ -66,21 +79,43 @@ export function getActiveDocument(state: DocumentsState): OpenDocument | null {
 }
 
 /** Documents at an entry's path or inside it, in tab order. */
-export function findAffectedDocuments(state: DocumentsState, entry: WorkspaceEntryRef): OpenDocument[] {
-  return state.documents.filter((doc) => doc.workspaceId === entry.workspaceId && isSameOrInside(doc.path, entry.path));
+export function findAffectedDocuments(state: DocumentsState, entry: FolderEntryRef): OpenDocument[] {
+  return state.documents.filter((doc) => doc.folderId === entry.folderId && isSameOrInside(doc.path, entry.path));
+}
+
+function reorderDocument(state: DocumentsState, key: string, toIndex: number): DocumentsState {
+  const fromIndex = state.documents.findIndex((doc) => doc.key === key);
+  const moved = state.documents[fromIndex];
+  const target = Math.min(Math.max(toIndex, 0), state.documents.length - 1);
+  if (!moved || fromIndex === target) {
+    return state;
+  }
+  return { ...state, documents: state.documents.toSpliced(fromIndex, 1).toSpliced(target, 0, moved) };
 }
 
 export function documentsReducer(state: DocumentsState, action: DocumentsAction): DocumentsState {
   switch (action.type) {
     case "open":
       return openDocument(state, action);
+    case "restore":
+      return restoreDocuments(state, action);
     case "activate":
       return state.documents.some((doc) => doc.key === action.key) ? { ...state, activeKey: action.key } : state;
+    case "reorder":
+      return reorderDocument(state, action.key, action.toIndex);
     case "close":
       return closeDocuments(state, new Set(action.keys));
     case "edit":
       return updateDocument(state, action.key, (doc) =>
-        doc.content === action.content || doc.isReadOnly ? doc : { ...doc, content: action.content, isDirty: true },
+        doc.content === action.content || doc.isReadOnly || doc.isPending
+          ? doc
+          : {
+              ...doc,
+              content: action.content,
+              isDirty: true,
+              // An edit can grow a CSV past what the table shows; the tab then moves to the raw view.
+              viewMode: resolveViewMode(doc.extension, doc.viewMode, action.content),
+            },
       );
     case "saved":
       // The buffer may have changed while the write was in flight; only what was written is clean.
@@ -93,7 +128,7 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
     case "diskChanged":
       return updateDocument(state, action.key, (doc) => {
         // A check can finish after a save already recorded the version it saw.
-        if (action.stat !== null && isSameStat(action.stat, doc.diskStat)) {
+        if (doc.isPending || (action.stat !== null && isSameStat(action.stat, doc.diskStat))) {
           return doc;
         }
         const externalChange = action.stat === null ? "deleted" : "changed";
@@ -101,7 +136,7 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
       });
     case "reloaded":
       return updateDocument(state, action.key, (doc) => {
-        if (!isSameStat(action.expected, doc.diskStat)) {
+        if (doc.isPending || !isSameStat(action.expected, doc.diskStat)) {
           return doc;
         }
         return doc.isDirty
@@ -112,7 +147,9 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
               diskStat: action.file.stat,
               hasBom: action.file.hasBom,
               isReadOnly: action.file.isReadOnly,
-              viewMode: action.file.isReadOnly ? "raw" : doc.viewMode,
+              viewMode: action.file.isReadOnly
+                ? "raw"
+                : resolveViewMode(doc.extension, doc.viewMode, action.file.content),
               externalChange: null,
               revision: doc.revision + 1,
             };
@@ -120,7 +157,7 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
     case "setViewMode":
       return updateDocument(state, action.key, (doc) => ({
         ...doc,
-        viewMode: doc.isReadOnly ? "raw" : resolveViewMode(doc.extension, action.viewMode),
+        viewMode: doc.isReadOnly ? "raw" : resolveViewMode(doc.extension, action.viewMode, doc.content),
       }));
     case "move":
       return moveDocuments(state, action);
@@ -133,35 +170,97 @@ export function isSameStat(a: FileStat, b: FileStat): boolean {
 
 function openDocument(
   state: DocumentsState,
-  { workspaceId, path, file }: { workspaceId: string; path: string; file: LoadedFile },
+  { folderId, path, file }: { folderId: string; path: string; file: LoadedFile },
 ): DocumentsState {
-  const key = documentKey(workspaceId, path);
-  if (state.documents.some((doc) => doc.key === key)) {
+  const key = documentKey(folderId, path);
+  const existing = state.documents.find((doc) => doc.key === key);
+  if (existing?.isPending) {
+    const read = toOpenDocument({ folderId, path, file, viewMode: existing.viewMode });
+    // A pending tab is read once it is shown, so the read only fills it; the user may have moved on.
+    return { ...state, documents: state.documents.map((doc) => (doc === existing ? read : doc)) };
+  }
+  if (existing) {
     return { ...state, activeKey: key };
   }
+  const opened = toOpenDocument({ folderId, path, file });
+  const activeIndex = state.documents.findIndex((doc) => doc.key === state.activeKey);
+  const insertAt = activeIndex === -1 ? state.documents.length : activeIndex + 1;
+  return {
+    documents: [...state.documents.slice(0, insertAt), opened, ...state.documents.slice(insertAt)],
+    activeKey: key,
+  };
+}
+
+function toOpenDocument({
+  folderId,
+  path,
+  file,
+  viewMode,
+}: {
+  folderId: string;
+  path: string;
+  file: LoadedFile;
+  viewMode?: ViewMode;
+}): OpenDocument {
   const name = baseName(path);
   const extension = normalizeExtension(name);
-  const opened: OpenDocument = {
-    key,
-    workspaceId,
+  return {
+    key: documentKey(folderId, path),
+    folderId,
     path,
     name,
     extension,
     content: file.content,
     isDirty: false,
     // Only the raw editor can show a read-only buffer.
-    viewMode: file.isReadOnly ? "raw" : getViewer(extension).defaultMode,
+    viewMode: file.isReadOnly
+      ? "raw"
+      : resolveViewMode(extension, viewMode ?? getViewer(extension).defaultMode, file.content),
     diskStat: file.stat,
     hasBom: file.hasBom,
     isReadOnly: file.isReadOnly,
     externalChange: null,
     revision: 0,
+    isPending: false,
   };
-  const activeIndex = state.documents.findIndex((doc) => doc.key === state.activeKey);
-  const insertAt = activeIndex === -1 ? state.documents.length : activeIndex + 1;
+}
+
+function restoreDocuments(
+  state: DocumentsState,
+  { tabs, activeIndex }: { tabs: readonly RestoredTab[]; activeIndex: number },
+): DocumentsState {
+  const openKeys = new Set(state.documents.map((doc) => doc.key));
+  const restored = tabs.flatMap(({ folderId, path, viewMode }): OpenDocument[] => {
+    const key = documentKey(folderId, path);
+    if (openKeys.has(key)) {
+      return [];
+    }
+    openKeys.add(key);
+    const name = baseName(path);
+    const extension = normalizeExtension(name);
+    return [
+      {
+        key,
+        folderId,
+        path,
+        name,
+        extension,
+        content: "",
+        isDirty: false,
+        viewMode: resolveViewMode(extension, viewMode),
+        diskStat: { size: 0, modifiedAt: 0 },
+        hasBom: false,
+        isReadOnly: false,
+        externalChange: null,
+        revision: 0,
+        isPending: true,
+      },
+    ];
+  });
+  const active = tabs[activeIndex];
   return {
-    documents: [...state.documents.slice(0, insertAt), opened, ...state.documents.slice(insertAt)],
-    activeKey: key,
+    documents: [...restored, ...state.documents],
+    activeKey: state.activeKey ?? (active ? documentKey(active.folderId, active.path) : null),
   };
 }
 
@@ -202,17 +301,17 @@ function updateDocument(
 
 function moveDocuments(
   state: DocumentsState,
-  { workspaceId, fromPath, toPath }: { workspaceId: string; fromPath: string; toPath: string },
+  { folderId, fromPath, toPath }: { folderId: string; fromPath: string; toPath: string },
 ): DocumentsState {
   let activeKey = state.activeKey;
   const documents = state.documents.map((doc) => {
-    if (doc.workspaceId !== workspaceId || !isSameOrInside(doc.path, fromPath)) {
+    if (doc.folderId !== folderId || !isSameOrInside(doc.path, fromPath)) {
       return doc;
     }
     const path = toPath + doc.path.slice(fromPath.length);
     const name = baseName(path);
     const extension = normalizeExtension(name);
-    const key = documentKey(workspaceId, path);
+    const key = documentKey(folderId, path);
     if (doc.key === state.activeKey) {
       activeKey = key;
     }

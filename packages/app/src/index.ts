@@ -7,15 +7,16 @@ export type {
   FileContents,
   FileDocument,
   FileStat,
+  FolderRelation,
   RestoreFolderResult,
   ThemeCapability,
   UpdaterCapability,
   ViewMode,
   WindowCapability,
-  Workspace,
   WorkspaceCapability,
+  WorkspaceFolder,
   WorkspaceErrorKind,
   WorkspaceNode,
 } from "./ports";
-export { WorkspaceError } from "./ports";
+export { LEGACY_FOLDER_ID, WorkspaceError } from "./ports";
 export { getThemeInstance, useTheme } from "./theme/theme-manager";
