@@ -2800,11 +2800,15 @@ describe("App", () => {
       );
     });
 
-    it("offers no download on ARM Linux, whose Chromium user agent still says x86_64", async () => {
+    it.each([
+      ["reports an ARM processor", () => Promise.resolve({ architecture: "arm", bitness: "64" })],
+      ["cannot name its processor", () => Promise.resolve({ architecture: "", bitness: "" })],
+      ["is blocked from naming its processor", () => Promise.reject(new DOMException("Blocked", "NotAllowedError"))],
+    ])("offers no download when Chromium on Linux, whose user agent says x86_64, %s", async (_case, answer) => {
       vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/142.0.0.0 Safari/537.36",
       );
-      const getHighEntropyValues = vi.fn().mockResolvedValue({ architecture: "arm", bitness: "64" });
+      const getHighEntropyValues = vi.fn(answer);
       Object.defineProperty(navigator, "userAgentData", { value: { getHighEntropyValues }, configurable: true });
       try {
         render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
