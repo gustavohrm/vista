@@ -1,7 +1,7 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-14
-scope: How the test categories run with Vitest, Playwright, Node's test runner, and cargo: file names, configuration, scripts, coverage reports, and commands.
+last_updated: 2026-11-16
+scope: How the test categories run with Vitest, Playwright, and cargo: file names, configuration, scripts, coverage reports, and commands.
 ---
 
 # Tests with Vitest, Playwright, and cargo

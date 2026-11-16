@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-13
+last_updated: 2026-11-16
 scope: Continuous integration, the pinned toolchain, action pinning, dependency updates, and the checks that report on pull requests.
 ---
 
@@ -108,7 +108,7 @@ Upgrades used to be manual: nothing updated the pins automatically, a cost the p
 
 ## Branch protection
 
-The workflow reports; it does not block on its own. What blocks is the `main` ruleset on the default branch, repository settings no file here can enforce. It replaced a classic branch protection rule in November 2026; a ruleset does the same job with more control, and either works if nobody can bypass it. The ruleset holds:
+The workflow reports; it does not block on its own. What blocks is the `main` ruleset on the default branch, repository settings no file here can enforce. A classic branch protection rule would do the same job; a ruleset gives more control, and either works if nobody can bypass it. The ruleset holds:
 
 | Setting                | Value                                                                                                               |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
