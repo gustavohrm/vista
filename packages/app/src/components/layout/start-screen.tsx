@@ -1,6 +1,8 @@
-import { useId } from "react";
+import { motion, useReducedMotion } from "motion/react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { formatShortcut } from "../../commands";
+import { LOGO_WRITE_MS, LogoWrite } from "../brand/logo-write";
 import { VistaLoader, VistaLogo } from "../brand/vista-logo";
 import { WorkspaceGlyph } from "../workspace/workspace-glyph";
 import { describeRecentFolders, type RecentWorkspace } from "../workspace/workspace-switcher";
@@ -82,10 +84,7 @@ export function StartScreen({
 
   return (
     <div className="flex min-h-0 flex-1 justify-center overflow-y-auto p-6">
-      <div className="my-auto flex w-full max-w-md flex-col gap-10">
-        <h1 className="flex">
-          <VistaLogo className="h-8 w-auto" />
-        </h1>
+      <Intro>
         <section aria-labelledby="start-list" className="flex flex-col gap-1.5">
           <h2 id="start-list" className={HEADING_CLASS}>
             Start
@@ -125,7 +124,110 @@ export function StartScreen({
             </ul>
           </section>
         )}
-      </div>
+      </Intro>
+    </div>
+  );
+}
+
+/** The still logo's height on the start screen, in pixels, and its width from the logo's proportions. */
+const LOGO_HEIGHT_PX = 32;
+const LOGO_WIDTH_PX = (LOGO_HEIGHT_PX * 250.93) / 78.32;
+/** How much larger the logo writes itself before settling into place. */
+const INTRO_SCALE = 2;
+const SETTLE = { duration: 0.35, ease: [0.4, 0, 0.2, 1] } as const;
+const REVEAL = { duration: 0.2, ease: [0.2, 0, 0, 1] } as const;
+
+/** Whether the intro has played in this run of the app; it plays on the first start screen only. */
+let hasPlayedIntro = false;
+
+/** Lets a test play the intro again. */
+export function resetStartIntro() {
+  hasPlayedIntro = false;
+}
+
+type IntroPhase = "write" | "settle" | "done";
+
+/**
+ * The start screen's column: the logo, then `children`. The first time it shows in a run of the
+ * app, the logo writes itself large in the middle of the screen, settles into its place, and only
+ * then do the lists fade in. Any key or click skips to the end, so nothing waits on it, and with
+ * reduced motion it starts at the end.
+ */
+function Intro({ children }: { children: ReactNode }) {
+  const isReduced = useReducedMotion() ?? false;
+  const [phase, setPhase] = useState<IntroPhase>(() => (hasPlayedIntro || isReduced ? "done" : "write"));
+  const [offset, setOffset] = useState<{ x: number; y: number } | null>(null);
+  const screenRef = useRef<HTMLDivElement>(null);
+  const logoRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    hasPlayedIntro = true;
+  }, []);
+
+  // Where the logo writes: the middle of the area the start screen fills, measured from its place.
+  useLayoutEffect(() => {
+    const area = screenRef.current?.parentElement?.getBoundingClientRect();
+    const logo = logoRef.current?.getBoundingClientRect();
+    if (area && logo) {
+      setOffset({
+        x: area.left + area.width / 2 - (logo.left + logo.width / 2),
+        y: area.top + area.height / 2 - (logo.top + logo.height / 2),
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (phase !== "write") {
+      return;
+    }
+    const timer = window.setTimeout(() => setPhase("settle"), LOGO_WRITE_MS);
+    return () => window.clearTimeout(timer);
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase === "done") {
+      return;
+    }
+    const skip = () => setPhase("done");
+    window.addEventListener("pointerdown", skip, true);
+    window.addEventListener("keydown", skip, true);
+    return () => {
+      window.removeEventListener("pointerdown", skip, true);
+      window.removeEventListener("keydown", skip, true);
+    };
+  }, [phase]);
+
+  const isLarge = phase === "write" && offset !== null;
+  return (
+    <div ref={screenRef} className="my-auto flex w-full max-w-md flex-col gap-10">
+      <h1 className="flex">
+        <motion.div
+          ref={logoRef}
+          initial={false}
+          animate={isLarge ? { x: offset.x, y: offset.y, scale: INTRO_SCALE } : { x: 0, y: 0, scale: 1 }}
+          transition={phase === "settle" ? SETTLE : { duration: 0 }}
+          onAnimationComplete={() => setPhase((current) => (current === "settle" ? "done" : current))}
+          style={{ height: LOGO_HEIGHT_PX, width: LOGO_WIDTH_PX }}
+          className="relative flex-none"
+        >
+          {phase === "done" ? (
+            <VistaLogo hasEntrance={false} className="h-full w-full" />
+          ) : (
+            <>
+              <LogoWrite height={LOGO_HEIGHT_PX} />
+              <span className="visually-hidden">Vista</span>
+            </>
+          )}
+        </motion.div>
+      </h1>
+      <motion.div
+        initial={false}
+        animate={phase === "done" ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
+        transition={REVEAL}
+        className="flex flex-col gap-10"
+      >
+        {children}
+      </motion.div>
     </div>
   );
 }
