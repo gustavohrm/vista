@@ -1,14 +1,12 @@
 ---
-status: APPROVED
-last_updated: 2026-11-15
+status: IMPLEMENTED
+last_updated: 2026-11-16
 scope: Workspaces of one or more local folders, the application shell, file tree representation, document view modes, and persistence across hosts.
 ---
 
 # Workspaces and document management
 
 This specification covers how Vista manages workspaces of local folders, the application shell around them, file tree representations, document view modes (`raw` vs `enriched`), and explicit persistence across platform hosts.
-
-The multi-folder workspace model and the shell layout described here were approved on 2026-11-15 and land over several changes. Until the last of them, parts of the code still follow the earlier single-folder design and its menu bar; that code is legacy, and this document is the intended behavior. The document returns to `IMPLEMENTED` with the change that completes the work.
 
 ## Core philosophy
 

@@ -1,6 +1,6 @@
 ---
-status: APPROVED
-last_updated: 2026-11-15
+status: IMPLEMENTED
+last_updated: 2026-11-16
 scope: Boundaries between shared app code, platform hosts, and workspace packages.
 ---
 
@@ -11,8 +11,6 @@ Vista separates shared product code from platform hosts:
 - `packages/app` is the home for shared React UI, features, state, domain behavior, and platform capability contracts. It provides the application shell, workspace file explorer, document viewers/editors, and platform contracts.
 - `apps/web` boots the shared app at the browser boundary using the File System Access API for local workspace access and is deployed as a Cloudflare Worker that also serves the desktop releases.
 - `apps/native` boots the shared app at the Tauri boundary, using Tauri plugins (`@tauri-apps/plugin-dialog` and `@tauri-apps/plugin-fs`) for local filesystem access, plus `tauri-plugin-persisted-scope` so the granted folder scope survives restarts, and `tauri-plugin-opener`, limited to revealing an entry in the file manager. Its single Tauri project targets desktop, Android, and iOS.
-
-The multi-folder workspace model and the shell layout this document describes were approved on 2026-11-15 and land over several changes, as [Workspaces](specs/workspaces.md) records; until then parts of the code follow the earlier layout.
 
 Platform hosts MUST keep browser- or Tauri-specific implementations outside `packages/app`. Shared code MUST consume future platform capabilities through narrow contracts. Add more workspace packages only when code has a proven independent responsibility or consumer.
 
