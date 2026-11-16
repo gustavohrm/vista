@@ -6,7 +6,9 @@ interface ActivityRailProps {
   /** Whether the explorer is shown. */
   isExplorerOpen: boolean;
   onToggleExplorer: () => void;
-  onOpenSettings: () => void;
+  /** Whether Settings is shown, which presses the gear. */
+  isSettingsOpen: boolean;
+  onToggleSettings: () => void;
 }
 
 /**
@@ -17,7 +19,12 @@ interface ActivityRailProps {
  * @param props - ActivityRail properties.
  * @returns Rail element.
  */
-export function ActivityRail({ isExplorerOpen, onToggleExplorer, onOpenSettings }: ActivityRailProps) {
+export function ActivityRail({
+  isExplorerOpen,
+  onToggleExplorer,
+  isSettingsOpen,
+  onToggleSettings,
+}: ActivityRailProps) {
   return (
     <nav aria-label="Activity bar" className="hidden w-12 flex-none flex-col items-center gap-1 pt-1 pb-2 md:flex">
       <RailButton
@@ -31,7 +38,13 @@ export function ActivityRail({ isExplorerOpen, onToggleExplorer, onOpenSettings 
       </RailButton>
       <ComingSoonButtons position="right" />
       <div className="flex-1" />
-      <RailButton label="Settings" tooltip="Settings" position="right" onClick={onOpenSettings}>
+      <RailButton
+        label="Settings"
+        tooltip="Settings"
+        position="right"
+        onClick={onToggleSettings}
+        isPressed={isSettingsOpen}
+      >
         <i className="ic-settings" aria-hidden="true" />
       </RailButton>
     </nav>
@@ -42,15 +55,27 @@ export function ActivityRail({ isExplorerOpen, onToggleExplorer, onOpenSettings 
  * The rail's actions at the top of the explorer drawer, below `md`, where the rail is not shown. The
  * drawer is the explorer itself, so its toggle stays in the title bar.
  *
- * @param props - The action that opens Settings.
+ * @param props - Whether Settings is shown, and the action that opens or closes it.
  * @returns Row of buttons, hidden from `md` up.
  */
-export function DrawerActivities({ onOpenSettings }: { onOpenSettings: () => void }) {
+export function DrawerActivities({
+  isSettingsOpen,
+  onToggleSettings,
+}: {
+  isSettingsOpen: boolean;
+  onToggleSettings: () => void;
+}) {
   return (
     <div className="flex flex-none items-center gap-0.5 px-1.5 pt-1 md:hidden">
       <ComingSoonButtons position="bottom" />
       <div className="flex-1" />
-      <RailButton label="Settings" tooltip="Settings" position="bottom" onClick={onOpenSettings}>
+      <RailButton
+        label="Settings"
+        tooltip="Settings"
+        position="bottom"
+        onClick={onToggleSettings}
+        isPressed={isSettingsOpen}
+      >
         <i className="ic-settings" aria-hidden="true" />
       </RailButton>
     </div>

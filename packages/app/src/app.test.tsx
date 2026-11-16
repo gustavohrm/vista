@@ -789,21 +789,28 @@ describe("App", () => {
       await user.click(
         within(screen.getByRole("navigation", { name: "Activity bar" })).getByRole("button", { name: "Settings" }),
       );
-      expect(screen.getByRole("dialog", { name: "Settings" })).toBeInTheDocument();
-      fireEvent(screen.getByRole("dialog", { name: "Settings" }), new Event("cancel", { cancelable: true }));
-      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(screen.getByRole("region", { name: "Settings" })).toBeInTheDocument();
+      expect(
+        within(screen.getByRole("navigation", { name: "Activity bar" })).getByRole("button", { name: "Settings" }),
+      ).toHaveAttribute("aria-pressed", "true");
+      await user.click(
+        within(screen.getByRole("navigation", { name: "Activity bar" })).getByRole("button", { name: "Settings" }),
+      );
+      expect(screen.queryByRole("region", { name: "Settings" })).not.toBeInTheDocument();
 
       const drawer = screen.getByRole("navigation", { name: "File Explorer" });
       expect(within(drawer).getByRole("button", { name: "Search" })).toHaveAttribute("aria-disabled", "true");
       expect(within(drawer).getByRole("button", { name: "Graph" })).toHaveAttribute("aria-disabled", "true");
       await user.click(within(drawer).getByRole("button", { name: "Settings" }));
-      expect(screen.getByRole("dialog", { name: "Settings" })).toBeInTheDocument();
+      expect(screen.getByRole("region", { name: "Settings" })).toBeInTheDocument();
+      await user.keyboard("{Escape}");
+      expect(screen.queryByRole("region", { name: "Settings" })).not.toBeInTheDocument();
     });
   });
 
   describe("settings", () => {
     function settingsDialog() {
-      return screen.findByRole("dialog", { name: "Settings" });
+      return screen.findByRole("region", { name: "Settings" });
     }
 
     it("opens with Ctrl+, on its first section, and lists every section", async () => {
@@ -815,13 +822,14 @@ describe("App", () => {
       const dialog = await settingsDialog();
 
       expect(
-        within(dialog)
-          .getAllByRole("tab")
-          .map((tab) => tab.textContent),
+        within(within(dialog).getByRole("navigation", { name: "Settings sections" }))
+          .getAllByRole("button")
+          .map((item) => item.textContent),
       ).toEqual(["Appearance", "Editor", "Files", "Keyboard Shortcuts", "About"]);
-      expect(within(dialog).getByRole("tab", { name: "Appearance" })).toHaveAttribute("aria-selected", "true");
-      await user.click(within(dialog).getByRole("tab", { name: "Editor" }));
-      expect(within(dialog).getByRole("checkbox", { name: "Word wrap" })).toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: "Appearance" })).toHaveAttribute("aria-current", "page");
+      expect(within(dialog).getByRole("button", { name: "Appearance" })).toHaveFocus();
+      await user.click(within(dialog).getByRole("button", { name: "Editor" }));
+      expect(within(dialog).getByRole("switch", { name: "Word wrap" })).toBeInTheDocument();
     });
 
     it("sets the theme in Appearance, and has no theme button outside it", async () => {
@@ -849,7 +857,10 @@ describe("App", () => {
       await user.click(screen.getByRole("button", { name: /^Keyboard shortcuts/ }));
 
       const dialog = await settingsDialog();
-      expect(within(dialog).getByRole("tab", { name: "Keyboard Shortcuts" })).toHaveAttribute("aria-selected", "true");
+      expect(within(dialog).getByRole("button", { name: "Keyboard Shortcuts" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
       expect(within(dialog).getByRole("row", { name: "Save Ctrl + S" })).toBeInTheDocument();
     });
 
@@ -863,7 +874,7 @@ describe("App", () => {
       await user.click(screen.getByRole("option", { name: "Settings: About Vista" }));
 
       const dialog = await settingsDialog();
-      expect(within(dialog).getByRole("tab", { name: "About" })).toHaveAttribute("aria-selected", "true");
+      expect(within(dialog).getByRole("button", { name: "About" })).toHaveAttribute("aria-current", "page");
       expect(within(dialog).getByText(`Vista ${APP_VERSION}`)).toBeInTheDocument();
       await user.click(within(dialog).getByRole("button", { name: "Check for Updates" }));
       expect(await findToast("Vista is up to date.")).toBeInTheDocument();
@@ -877,7 +888,7 @@ describe("App", () => {
 
       await user.keyboard("{Control>},{/Control}");
       const dialog = await settingsDialog();
-      await user.click(within(dialog).getByRole("tab", { name: "About" }));
+      await user.click(within(dialog).getByRole("button", { name: "About" }));
 
       expect(within(dialog).getByText(`Vista ${APP_VERSION}`)).toBeInTheDocument();
       expect(within(dialog).queryByRole("button", { name: "Check for Updates" })).not.toBeInTheDocument();
@@ -888,7 +899,7 @@ describe("App", () => {
     async function openWorkspaceSettings(user: ReturnType<typeof userEvent.setup>) {
       await user.click(await screen.findByRole("button", { name: "Research" }));
       await user.click(screen.getByRole("menuitem", { name: "Workspace Settings…" }));
-      return screen.findByRole("dialog", { name: "Workspace Settings" });
+      return screen.findByRole("region", { name: "Settings" });
     }
 
     function storedWorkspace() {
@@ -910,7 +921,7 @@ describe("App", () => {
 
       expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument();
       expect(storedWorkspace().name).toBe("Thesis");
-      await user.click(within(dialog).getByRole("button", { name: "Close" }));
+      await user.click(within(dialog).getByRole("button", { name: "Close Settings" }));
       expect(screen.getByRole("button", { name: "Thesis" })).toBeInTheDocument();
     });
 
@@ -953,7 +964,7 @@ describe("App", () => {
       expect(
         within(dialog)
           .getAllByRole("listitem")
-          .map((item) => item.textContent),
+          .map((item) => item.querySelector(".truncate")?.textContent),
       ).toEqual(["notes", "sources"]);
 
       await user.click(within(dialog).getByRole("button", { name: 'Remove "sources" from the workspace' }));
@@ -965,7 +976,7 @@ describe("App", () => {
       expect(within(dialog).queryByRole("button", { name: /^Remove "notes"/ })).not.toBeInTheDocument();
     });
 
-    it("adds a folder from the dialog", async () => {
+    it("adds a folder from Settings", async () => {
       const user = userEvent.setup();
       const extra = { id: "drafts", name: "drafts", rootPath: "/drafts" };
       const { capability } = createFoldersCapability([
@@ -991,7 +1002,7 @@ describe("App", () => {
         expect(
           within(dialog)
             .getAllByRole("listitem")
-            .map((item) => item.textContent),
+            .map((item) => item.querySelector(".truncate")?.textContent),
         ).toEqual(["notes", "drafts"]),
       );
       expect(storedWorkspace().folderIds).toEqual(["notes", "drafts"]);
@@ -1003,7 +1014,7 @@ describe("App", () => {
       const buttons = await screen.findAllByRole("button", { name });
       await user.click(buttons.find((button) => button.getAttribute("aria-haspopup") === "menu")!);
       await user.click(screen.getByRole("menuitem", { name: "Workspace Settings…" }));
-      return screen.findByRole("dialog", { name: "Workspace Settings" });
+      return screen.findByRole("region", { name: "Settings" });
     }
 
     function storedWorkspace() {
@@ -1172,7 +1183,9 @@ describe("App", () => {
       await user.click(await screen.findByRole("button", { name: "Open Folder" }));
       const dialog = await openWorkspaceSettings(user, "My Notes");
 
-      expect(within(dialog).getByRole("radio", { name: "On this device" })).toBeChecked();
+      // With one place to keep them, there is nothing to choose.
+      expect(within(dialog).getByRole("textbox", { name: "Name" })).toBeInTheDocument();
+      expect(within(dialog).queryByRole("radio", { name: "On this device" })).not.toBeInTheDocument();
       expect(within(dialog).queryByRole("radio", { name: "In My Notes/.vista" })).not.toBeInTheDocument();
     });
   });
@@ -1410,7 +1423,7 @@ describe("App", () => {
 
       await user.click(switcherButton("Thesis")!);
       await user.click(screen.getByRole("menuitem", { name: "Workspace Settings…" }));
-      const dialog = await screen.findByRole("dialog", { name: "Workspace Settings" });
+      const dialog = await screen.findByRole("region", { name: "Settings" });
       await user.clear(within(dialog).getByRole("textbox", { name: "Name" }));
       await user.type(within(dialog).getByRole("textbox", { name: "Name" }), "Dissertation");
 
@@ -1761,7 +1774,7 @@ describe("App", () => {
   });
 
   describe("tabs row", () => {
-    it("ends with the active file's view switch, Find, and editor settings, with no header above the document", async () => {
+    it("ends with the active file's view switch and Find, with no header above the document", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
       await openFolderFromWelcome(user);
@@ -1774,7 +1787,7 @@ describe("App", () => {
       expect(within(actions).getByRole("button", { name: "Rich text" })).toHaveAttribute("aria-pressed", "true");
       expect(within(actions).getByRole("button", { name: "Raw" })).toHaveAttribute("aria-pressed", "false");
       expect(within(actions).getByRole("button", { name: "Find" })).toBeInTheDocument();
-      expect(within(actions).getByRole("button", { name: "Editor settings" })).toBeInTheDocument();
+      expect(within(actions).getAllByRole("button")).toHaveLength(3);
       expect(screen.queryByRole("navigation", { name: "Breadcrumb" })).not.toBeInTheDocument();
       expect(screen.getByRole("main").querySelector("header")).toBeNull();
     });
@@ -1841,16 +1854,33 @@ describe("App", () => {
       expect(await screen.findByRole("tab", { name: "readme.md" })).toBe(docsTab);
     });
 
-    it("opens the Editor section of Settings from the editor settings menu", async () => {
+    it("covers the tabs with Settings and keeps them, with the document, until it closes", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
-      await openRawReadme(user);
+      const editor = await makeReadmeDirty(user);
 
-      await user.click(screen.getByRole("button", { name: "Editor settings" }));
-      await user.click(screen.getByRole("menuitem", { name: "All settings…" }));
+      await user.keyboard("{Control>},{/Control}");
+      const page = await screen.findByRole("region", { name: "Settings" });
+      expect(within(page).getByRole("button", { name: "My Notes" })).toHaveAttribute("aria-current", "page");
+      expect(screen.getByRole("tablist", { name: "Open files", hidden: true })).not.toBeVisible();
+      await user.keyboard("{Escape}");
 
-      expect(screen.getByRole("dialog", { name: "Settings" })).toBeInTheDocument();
-      expect(screen.getByRole("tab", { name: "Editor" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.queryByRole("region", { name: "Settings" })).not.toBeInTheDocument();
+      expect(getTab("readme.md")).toBeVisible();
+      expect(rawEditorText(editor)).not.toBe(README_CONTENT);
+    });
+
+    it("closes Settings when a file is opened from the explorer", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+
+      await user.keyboard("{Control>},{/Control}");
+      await screen.findByRole("region", { name: "Settings" });
+      await user.click(screen.getByText("readme.md"));
+
+      expect(screen.queryByRole("region", { name: "Settings" })).not.toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Hello Vista" })).toBeInTheDocument();
     });
   });
 
@@ -2095,14 +2125,17 @@ describe("App", () => {
       }
     });
 
-    it("applies a setting from the editor settings popover and remembers it", async () => {
+    it("applies a setting from the Editor section of Settings and remembers it", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
       await openRawReadme(user);
       expect(document.querySelector(".cm-lineNumbers")).toBeInTheDocument();
 
-      await user.click(screen.getByRole("button", { name: "Editor settings" }));
-      await user.click(screen.getByRole("menuitemcheckbox", { name: "Line numbers" }));
+      await user.keyboard("{Control>},{/Control}");
+      const page = await screen.findByRole("region", { name: "Settings" });
+      await user.click(within(page).getByRole("button", { name: "Editor" }));
+      await user.click(within(page).getByRole("switch", { name: "Line numbers" }));
+      await user.keyboard("{Escape}");
 
       expect(document.querySelector(".cm-lineNumbers")).not.toBeInTheDocument();
       expect(JSON.parse(localStorage.getItem("vista.settings") ?? "null")).toMatchObject({
@@ -2239,8 +2272,8 @@ describe("App", () => {
       expect(screen.getByRole("option", { name: "Workspace: Open Folder…" })).toHaveAttribute("aria-selected", "true");
       await user.keyboard("about{Enter}");
 
-      const settings = await screen.findByRole("dialog", { name: "Settings" });
-      expect(within(settings).getByRole("tab", { name: "About" })).toHaveAttribute("aria-selected", "true");
+      const settings = await screen.findByRole("region", { name: "Settings" });
+      expect(within(settings).getByRole("button", { name: "About" })).toHaveAttribute("aria-current", "page");
       expect(screen.queryByRole("dialog", { name: "Commands" })).not.toBeInTheDocument();
     });
 
@@ -2272,7 +2305,8 @@ describe("App", () => {
       await user.keyboard("{Control>}{Shift>}p{/Shift}{/Control}");
       await user.click(screen.getByRole("option", { name: "Workspace: Workspace Settings…" }));
 
-      expect(await screen.findByRole("dialog", { name: "Workspace Settings" })).toBeInTheDocument();
+      const page = await screen.findByRole("region", { name: "Settings" });
+      expect(within(page).getByRole("button", { name: "My Notes" })).toHaveAttribute("aria-current", "page");
     });
 
     it("shows a command that cannot run now as disabled and does not run it", async () => {
@@ -2784,14 +2818,12 @@ describe("App", () => {
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
       await openRawReadme(user);
 
+      const storedWordWrap = () => JSON.parse(localStorage.getItem("vista.settings") ?? "null")?.editor?.wordWrap;
       await runFromPalette(user, "View: Word Wrap");
-      await user.click(screen.getByRole("button", { name: "Editor settings" }));
-      expect(screen.getByRole("menuitemcheckbox", { name: "Word wrap" })).toHaveAttribute("aria-checked", "false");
-      await user.keyboard("{Escape}");
+      expect(storedWordWrap()).toBe(false);
       await user.keyboard("{Alt>}z{/Alt}");
-      await user.click(screen.getByRole("button", { name: "Editor settings" }));
 
-      expect(screen.getByRole("menuitemcheckbox", { name: "Word wrap" })).toHaveAttribute("aria-checked", "true");
+      expect(storedWordWrap()).toBe(true);
     });
 
     it("undoes in the raw editor with Undo, returning focus to it", async () => {
@@ -2805,18 +2837,18 @@ describe("App", () => {
       expect(editor).toHaveFocus();
     });
 
-    it("lists every command with a key in the Keyboard Shortcuts dialog", async () => {
+    it("lists every command with a key in the Keyboard Shortcuts section", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
 
       await screen.findByRole("button", { name: "Open Folder" });
       await runFromPalette(user, "Settings: Keyboard Shortcuts");
 
-      const dialog = await screen.findByRole("dialog", { name: "Settings" });
+      const dialog = await screen.findByRole("region", { name: "Settings" });
       expect(within(dialog).getByRole("row", { name: "Save Ctrl + S" })).toBeInTheDocument();
       expect(within(dialog).getByRole("row", { name: "Word Wrap Alt + Z" })).toBeInTheDocument();
       expect(within(dialog).getByRole("row", { name: "Undo Ctrl + Z" })).toBeInTheDocument();
-      const tabsSection = within(dialog).getByRole("rowheader", { name: "Tabs" }).closest("tbody")!;
+      const tabsSection = within(dialog).getByRole("table", { name: "Tabs" });
       expect(within(tabsSection).getByRole("row", { name: "Close Tab Alt + W" })).toBeInTheDocument();
     });
 
@@ -3262,15 +3294,15 @@ describe("App", () => {
       await openFolderFromWelcome(user);
 
       await user.keyboard("{Control>},{/Control}");
-      const dialog = await screen.findByRole("dialog", { name: "Settings" });
-      await user.click(within(dialog).getByRole("tab", { name: "Files" }));
+      const dialog = await screen.findByRole("region", { name: "Settings" });
+      await user.click(within(dialog).getByRole("button", { name: "Files" }));
       const limit = within(dialog).getByRole("spinbutton", { name: "Largest file to open (MB)" });
       await user.clear(limit);
       await user.type(limit, "0");
       expect(within(dialog).getByRole("alert")).toHaveTextContent("Enter a whole number from 1 to 512.");
       await user.clear(limit);
       await user.type(limit, "30");
-      await user.click(within(dialog).getByRole("button", { name: "Close" }));
+      await user.click(within(dialog).getByRole("button", { name: "Close Settings" }));
       await user.click(screen.getByText("readme.md"));
 
       expect(await screen.findByRole("tab", { name: /readme\.md/ })).toBeInTheDocument();

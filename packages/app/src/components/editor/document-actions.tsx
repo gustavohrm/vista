@@ -1,12 +1,10 @@
 import { motion, useReducedMotion } from "motion/react";
 import { useId, type ReactNode } from "react";
 
-import type { EditorSettings } from "../../domain/settings";
 import { getViewer } from "../../domain/viewers";
 import type { ViewMode } from "../../ports";
 import type { OpenDocument } from "../../state/documents";
 import { Tooltip } from "../feedback/tooltip";
-import { EditorSettingsMenu } from "./editor-settings-menu";
 
 interface DocumentActionsProps {
   /** The active tab's document. */
@@ -15,28 +13,15 @@ interface DocumentActionsProps {
   /** Whether the find bar is open, which presses the Find button. */
   isFindOpen: boolean;
   onFind: () => void;
-  editorSettings: EditorSettings;
-  onEditorSettingsChange: (changes: Partial<EditorSettings>) => void;
-  /** Opens the Editor section of Settings, from the editor settings menu. */
-  onOpenSettings: () => void;
 }
 
 /**
- * What acts on the active tab, at the right end of the tabs row: the view switch, Find, and the
- * editor settings gear.
+ * What acts on the active tab, at the right end of the tabs row: the view switch and Find.
  *
  * @param props - DocumentActions properties.
  * @returns The group of buttons.
  */
-export function DocumentActions({
-  document: doc,
-  onViewModeChange,
-  isFindOpen,
-  onFind,
-  editorSettings,
-  onEditorSettingsChange,
-  onOpenSettings,
-}: DocumentActionsProps) {
+export function DocumentActions({ document: doc, onViewModeChange, isFindOpen, onFind }: DocumentActionsProps) {
   const viewer = getViewer(doc.extension);
   const canToggleView = !doc.isReadOnly && viewer.hasRaw && viewer.enriched !== undefined;
 
@@ -59,7 +44,6 @@ export function DocumentActions({
           </button>
         )}
       </Tooltip>
-      <EditorSettingsMenu settings={editorSettings} onChange={onEditorSettingsChange} onOpenSettings={onOpenSettings} />
     </div>
   );
 }

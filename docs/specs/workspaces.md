@@ -91,11 +91,11 @@ Adding a folder to the current workspace is not in this menu: it is a change to 
 
 ### Workspace Settings
 
-**Workspace Settings…** opens a dialog for the current workspace. Every change applies at once, as in [Settings](#settings).
+**Workspace Settings…** opens [Settings](#settings) at the current workspace's section, the first one, listed under the workspace's own icon and name. Its lead says that these apply to this workspace only, and that Vista's own settings apply to every workspace. Every change applies at once.
 
 - **Name**, **Icon** from a fixed set, and **Colour** from the design-system palette. The icons are `folder` (the default), `book-open`, `notebook-pen`, `briefcase`, `code`, `house`, `star`, `heart`, `flask-conical`, `graduation-cap`, `pen-line`, and `globe`; they are a fixed set because an `ic-*` class must appear literally in the code to render. The colours are the palette's hues: `neutral` (the default), `indigo`, `emerald`, `amber`, and `rose`. A name is trimmed, may not be empty, and is at most 80 characters.
 - **Folders**: the list, with **Add Folder…** and a remove button per folder. [Folder rules](#folder-rules) apply.
-- **Details stored**: _On this device_ or _In {home folder}/.vista_, as [Where a workspace's details live](#where-a-workspaces-details-live) describes.
+- **Where its details are kept**: _On this device_ or _In {home folder}/.vista_, as [Where a workspace's details live](#where-a-workspaces-details-live) describes. The choice is shown only when there is one: for a folder Vista can't write to, the details can only stay on the device, so a choice of one would ask nothing.
 
 ### Reopening at startup
 
@@ -150,14 +150,16 @@ The raw view (`packages/app/src/components/editor/raw-editor.tsx`) is a [CodeMir
 
 ### Editor settings
 
-The gear button at the right end of the tabs row opens a menu of four check items: line numbers, word wrap, minimap, and vim mode, followed by **All settings…**, which opens [Settings](#settings). It is the same menu component as the right-click menus. The menu mirrors the Editor section of Settings, which is the home of these toggles, with the same labels; `Alt+Z` toggles word wrap, and the command palette lists all four. They apply to the raw editor at once and are remembered in the browser's `localStorage` under `vista.settings`, as `{ "version": 1, "editor": { "lineNumbers": true, "minimap": false, "vim": false, "wordWrap": true }, "files": { "maxOpenSizeMb": 10 } }`. A stored value that is missing, of the wrong type, or outside its allowed range (a whole number from 1 to 512 for `maxOpenSizeMb`) falls back to its default, field by field, so one bad field does not reset the others. When the store can't be read, the editor starts with the defaults. When it can't be written, a changed setting still applies for the rest of the session but is lost on reload.
+Line numbers, word wrap, minimap, and vim mode are switches in the Editor section of [Settings](#settings), their one home; `Alt+Z` toggles word wrap, and the command palette lists all four. An earlier gear menu in the tabs row repeated them; it was removed because it was a second home for the same toggles, which the [core philosophy](#core-philosophy) rules out, and the palette and `Alt+Z` already reach them without leaving the document. They apply to the raw editor at once and are remembered in the browser's `localStorage` under `vista.settings`, as `{ "version": 1, "editor": { "lineNumbers": true, "minimap": false, "vim": false, "wordWrap": true }, "files": { "maxOpenSizeMb": 10 } }`. A stored value that is missing, of the wrong type, or outside its allowed range (a whole number from 1 to 512 for `maxOpenSizeMb`) falls back to its default, field by field, so one bad field does not reset the others. When the store can't be read, the editor starts with the defaults. When it can't be written, a changed setting still applies for the rest of the session but is lost on reload.
 
 ### Settings
 
-The gear at the bottom of the left rail, or `Ctrl+,`, opens the Settings dialog, the one home for settings and for what used to sit in the Help menu. Its sections are:
+The gear at the bottom of the left rail, or `Ctrl+,`, opens Settings, the one home for settings and for what used to sit in the Help menu. Settings takes the document frame's place rather than floating over it, since it is a place to look around in, not one question to answer: the tabs row, the document, and the status bar step aside, keeping their state, and come back as they were when Settings closes. The explorer stays, and choosing a file in it closes Settings and opens the file; below `md`, the explorer drawer closes as Settings opens, since it would cover it. While Settings shows, commands that act on the document in view, such as Find or Close Tab, are disabled; Save and Save All still work. The gear is pressed while Settings shows, and pressing it again closes Settings, as do Escape and the close button in its header. Focus moves to the shown section as Settings opens, and back to where it was when it closes.
+
+Settings opens at the current workspace's section, or at Appearance with no workspace open. Its sections are listed on the left, below `md` in a row across the top, in two groups by where they apply: **Workspace**, with the current workspace's section, and **Vista**, whose sections apply in every workspace. Each section starts with its name and one sentence that says where it applies. Settings are rows in hairline groups, the name and description on the left and the control on the right; an on-off setting is a switch. The Vista sections are:
 
 - **Appearance**: the theme, as _System_, _Light_, or _Dark_. _System_ follows the operating system and changes with it. The choice is stored by `@codenhub/theme` under `vista-theme`, which already stores light and dark; the default stays _Dark_. There is no theme button in the title bar, so the theme has one home.
-- **Editor**: the four editor toggles.
+- **Editor**: the four editor switches.
 - **Files**: **Largest file to open (MB)**, described below.
 - **Keyboard Shortcuts**: every command that has a key, by category.
 - **About**: the version and the updater, where the host has one.
@@ -183,9 +185,9 @@ With no file open, the editor area shows a start screen instead of staying empty
 From top to bottom, the window holds:
 
 - **Title bar**: the [workspace switcher](#workspace-switcher) on the left and the go-to-file field in the middle. There is no menu bar, as [Commands and menus](#commands-and-menus) explains. With no workspace open, both would be empty or useless, so the title bar is not shown and the start screen takes the window.
-- **Left rail**: a narrow column of icon buttons. **Explorer** shows or hides the explorer. **Search** and **Graph** are shown disabled with the tooltip `Coming soon`, so the places those features will take are already where users will look for them. The **Settings** gear sits at the bottom.
+- **Left rail**: a narrow column of icon buttons. **Explorer** shows or hides the explorer. **Search** and **Graph** are shown disabled with the tooltip `Coming soon`, so the places those features will take are already where users will look for them. The **Settings** gear sits at the bottom, pressed while Settings shows.
 - **Explorer**, beside the rail: the workspace's folders, as [File and folder management](#file-and-folder-management) describes.
-- **Tabs row** above the document: the tabs, then, at the right end, the view switch, **Find**, and the editor settings gear. These act on the active tab, so they sit on the row that chooses it. There is no Save button: saving is `Ctrl+S`, and the dot in the tab shows unsaved edits.
+- **Tabs row** above the document: the tabs, then, at the right end, the view switch and **Find**. These act on the active tab, so they sit on the row that chooses it. There is no Save button: saving is `Ctrl+S`, and the dot in the tab shows unsaved edits.
 - **Path and status bar** at the bottom, as [Path and status bar](#path-and-status-bar) describes.
 
 The tabs row and the document sit together in one frame, a lighter panel with a hairline border and rounded corners, and the title bar, rail, explorer, and status bar sit on the darker ground around it, so the document is what stands forward. Each boundary is drawn once: the frame's edge separates it from everything else, and nothing inside the shell adds a second line.

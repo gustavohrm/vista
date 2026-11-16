@@ -30,13 +30,20 @@ import {
   type GoToRequest,
   type PaletteCommand,
 } from "./components/navigation/go-to-dialog";
-import { SettingsDialog, type SettingsSection } from "./components/settings/settings-dialog";
-import { WorkspaceSettingsDialog } from "./components/workspace/workspace-settings-dialog";
+import { SettingsPage, type SettingsSection } from "./components/settings/settings-page";
+import {
+  AboutSection,
+  AppearanceSection,
+  EditorSection,
+  FilesSection,
+  ShortcutsSection,
+} from "./components/settings/vista-sections";
+import { WorkspaceSection } from "./components/settings/workspace-section";
 import { WorkspaceSwitcher, type FolderStatus, type RecentWorkspace } from "./components/workspace/workspace-switcher";
 import { documentLocation } from "./domain/document-location";
 import { imageMimeType, resolveImageSource } from "./domain/image-source";
 import { joinWorkspacePath } from "./domain/path-validation";
-import { BYTES_PER_MB, type EditorSettings } from "./domain/settings";
+import { BYTES_PER_MB } from "./domain/settings";
 import { decodeText, encodeText } from "./domain/text-codec";
 import { getViewer } from "./domain/viewers";
 import { isDesktopViewport } from "./domain/viewport";
@@ -171,7 +178,8 @@ function AppShell({ adapter }: AppProps) {
   // A File menu request to name a new entry at the workspace root.
   const [newEntryRequest, setNewEntryRequest] = useState<NewEntryRequest | null>(null);
   // Settings, open on one of its sections, or Workspace Settings.
-  const [openDialog, setOpenDialog] = useState<SettingsSection | "workspace" | null>(null);
+  /** The Settings section shown in the frame, in place of the document; `null` while Settings is closed. */
+  const [settingsSection, setSettingsSection] = useState<SettingsSection | null>(null);
   // Raw editor state of each open tab: selection, scroll position, and undo history.
   const rawEditorStatesRef = useRef<RawEditorStateCache>(new Map());
   // Holds the startup restore so StrictMode's second effect run reuses it instead of restoring
@@ -1304,6 +1312,7 @@ function AppShell({ adapter }: AppProps) {
       if (!folder) {
         return false;
       }
+      setSettingsSection(null);
       const key = documentKey(folderId, path);
       // Selecting an open file only switches to its tab; reloading it would discard unsaved edits.
       if (documentsRef.current.documents.some((doc) => doc.key === key)) {
@@ -1744,15 +1753,27 @@ function AppShell({ adapter }: AppProps) {
     [activeDocument, adapter.workspace, readyFolder],
   );
 
-  const activeViewer = activeDocument ? getViewer(activeDocument.extension) : null;
+  /** The document the frame shows, for the commands that act on it: none while Settings covers it. */
+  const documentInView = settingsSection === null ? activeDocument : null;
+  const activeViewer = documentInView ? getViewer(documentInView.extension) : null;
   const canToggleView = activeViewer !== null && activeViewer.hasRaw && activeViewer.enriched !== undefined;
   const isRawShown =
-    activeDocument !== null && (activeDocument.viewMode !== "enriched" || activeViewer?.enriched === undefined);
-  const editorSettings = settings.editor;
-  const handleEditorSettingsChange = useCallback(
-    (changes: Partial<EditorSettings>) => updateSettings({ editor: changes }),
-    [updateSettings],
+    documentInView !== null && (documentInView.viewMode !== "enriched" || activeViewer?.enriched === undefined);
+  const isSettingsShown = settingsSection !== null;
+  useEffect(() => {
+    // Below md the explorer drawer covers the frame, so it steps aside for Settings, however it opened.
+    if (isSettingsShown && !isDesktopViewport()) {
+      setIsSidebarOpen(false);
+    }
+  }, [isSettingsShown]);
+  const hasWorkspace = currentWorkspace !== null;
+  /** Opens Settings at the open workspace's section, or at Vista's first with none open. */
+  const openSettings = useCallback(() => setSettingsSection(hasWorkspace ? "workspace" : "appearance"), [hasWorkspace]);
+  const toggleSettings = useCallback(
+    () => setSettingsSection((section) => (section === null ? (hasWorkspace ? "workspace" : "appearance") : null)),
+    [hasWorkspace],
   );
+  const editorSettings = settings.editor;
 
   const hasReadyFolder = workspace?.folders.some((entry) => entry.status === "ready") ?? false;
   const commands = useMemo<Command[]>(
@@ -1776,7 +1797,7 @@ function AppShell({ adapter }: AppProps) {
         category: "Workspace",
         label: "Workspace Settings…",
         isEnabled: !isPromptingForUnsavedChanges && workspace !== null,
-        run: () => setOpenDialog("workspace"),
+        run: () => setSettingsSection("workspace"),
       },
       {
         id: "file.newFile",
@@ -1814,7 +1835,7 @@ function AppShell({ adapter }: AppProps) {
               id: "file.copyPath",
               category: "File",
               label: "Copy Path",
-              isEnabled: activeDocument !== null,
+              isEnabled: documentInView !== null,
               run: () => {
                 if (activeDocument) {
                   copyFullPath(activeDocument);
@@ -1827,7 +1848,7 @@ function AppShell({ adapter }: AppProps) {
         id: "file.copyRelativePath",
         category: "File",
         label: "Copy Relative Path",
-        isEnabled: activeDocument !== null,
+        isEnabled: documentInView !== null,
         run: () => {
           if (activeDocument) {
             void copyText(activeDocument.path);
@@ -1840,7 +1861,7 @@ function AppShell({ adapter }: AppProps) {
               id: "file.reveal",
               category: "File",
               label: "Reveal in File Explorer",
-              isEnabled: activeDocument !== null,
+              isEnabled: documentInView !== null,
               run: () => {
                 if (activeDocument) {
                   void revealEntry(activeDocument);
@@ -1855,7 +1876,7 @@ function AppShell({ adapter }: AppProps) {
         label: "Settings…",
         shortcut: "Mod+,",
         isEnabled: !isPromptingForUnsavedChanges,
-        run: () => setOpenDialog("appearance"),
+        run: openSettings,
       },
       {
         id: "tabs.close",
@@ -1863,14 +1884,14 @@ function AppShell({ adapter }: AppProps) {
         label: "Close Tab",
         // Browsers reserve Ctrl+W for closing their own tab, so the web host uses Alt+W.
         shortcut: adapter.platform === "native" ? "Mod+W" : "Alt+W",
-        isEnabled: !isPromptingForUnsavedChanges && activeDocument !== null,
+        isEnabled: !isPromptingForUnsavedChanges && documentInView !== null,
         run: closeActiveDocument,
       },
       {
         id: "tabs.closeAll",
         category: "Tabs",
         label: "Close All Tabs",
-        isEnabled: !isPromptingForUnsavedChanges && activeDocument !== null,
+        isEnabled: !isPromptingForUnsavedChanges && documentInView !== null,
         run: closeAllDocuments,
       },
       // The editors handle these keys themselves, so the menus only show them.
@@ -1884,7 +1905,7 @@ function AppShell({ adapter }: AppProps) {
         category: "Edit",
         label: "Find",
         shortcut: "Mod+F",
-        isEnabled: !isPromptingForUnsavedChanges && activeDocument !== null,
+        isEnabled: !isPromptingForUnsavedChanges && documentInView !== null,
         run: () => openFind("find"),
       },
       {
@@ -1892,7 +1913,7 @@ function AppShell({ adapter }: AppProps) {
         category: "Edit",
         label: "Replace",
         shortcut: "Mod+H",
-        isEnabled: !isPromptingForUnsavedChanges && activeDocument !== null,
+        isEnabled: !isPromptingForUnsavedChanges && documentInView !== null,
         run: () => openFind("replace"),
       },
       {
@@ -2008,7 +2029,7 @@ function AppShell({ adapter }: AppProps) {
         category: "Go",
         label: "Go to Line",
         shortcut: "Mod+G",
-        isEnabled: !isPromptingForUnsavedChanges && activeDocument !== null,
+        isEnabled: !isPromptingForUnsavedChanges && documentInView !== null,
         run: () => setGoToQuery(":"),
       },
       {
@@ -2043,14 +2064,16 @@ function AppShell({ adapter }: AppProps) {
         id: "help.shortcuts",
         category: "Settings",
         label: "Keyboard Shortcuts",
-        run: () => setOpenDialog("shortcuts"),
+        run: () => setSettingsSection("shortcuts"),
       },
-      { id: "help.about", category: "Settings", label: "About Vista", run: () => setOpenDialog("about") },
+      { id: "help.about", category: "Settings", label: "About Vista", run: () => setSettingsSection("about") },
     ],
     [
       activateNeighborTab,
       moveActiveTab,
       activeDocument,
+      documentInView,
+      openSettings,
       adapter.platform,
       canToggleView,
       closeActiveDocument,
@@ -2128,7 +2151,7 @@ function AppShell({ adapter }: AppProps) {
       {
         label: "Keyboard shortcuts",
         icon: <i className="ic-keyboard" aria-hidden="true" />,
-        onSelect: () => setOpenDialog("shortcuts"),
+        onSelect: () => setSettingsSection("shortcuts"),
       },
     ],
     [requestNewEntry],
@@ -2151,8 +2174,12 @@ function AppShell({ adapter }: AppProps) {
     setVimMode({ key, mode });
   }, []);
   const handleJumpApplied = useCallback(() => setPendingJump(null), []);
-  const activeCursor = isRawShown && cursor?.key === activeDocument.key ? cursor.position : null;
-  const activeVimMode = isRawShown && vimMode?.key === activeDocument.key ? vimMode.mode : null;
+  const activeCursor = isRawShown && cursor?.key === documentInView.key ? cursor.position : null;
+  const activeVimMode = isRawShown && vimMode?.key === documentInView.key ? vimMode.mode : null;
+  /** The document the status bar describes: none while Settings covers the frame. */
+  const statusDocument = documentInView?.isPending ? null : documentInView;
+  // Settings shows the workspace's section only while a workspace is open.
+  const shownSettingsSection = settingsSection === "workspace" && !currentWorkspace ? "appearance" : settingsSection;
 
   return (
     <div
@@ -2175,7 +2202,7 @@ function AppShell({ adapter }: AppProps) {
                   recents={recents}
                   onSwitch={(workspaceId) => void handleOpenWorkspace(workspaceId)}
                   onOpenFolder={() => void handleOpenFolder()}
-                  onOpenSettings={() => setOpenDialog("workspace")}
+                  onOpenSettings={() => setSettingsSection("workspace")}
                 />
               }
               goToFileShortcut={GO_TO_FILE_SHORTCUT}
@@ -2190,14 +2217,17 @@ function AppShell({ adapter }: AppProps) {
               <ActivityRail
                 isExplorerOpen={isSidebarOpen}
                 onToggleExplorer={() => setIsSidebarOpen((previous) => !previous)}
-                onOpenSettings={() => setOpenDialog("appearance")}
+                isSettingsOpen={settingsSection !== null}
+                onToggleSettings={toggleSettings}
               />
             </ShellReveal>
           )}
           {workspace && (
             <ShellReveal key="explorer" axis="width">
               <Sidebar
-                activities={<DrawerActivities onOpenSettings={() => setOpenDialog("appearance")} />}
+                activities={
+                  <DrawerActivities isSettingsOpen={settingsSection !== null} onToggleSettings={toggleSettings} />
+                }
                 folders={explorerFolders}
                 activeEntry={
                   activeDocument ? { folderId: activeDocument.folderId, path: activeDocument.path } : undefined
@@ -2235,74 +2265,113 @@ function AppShell({ adapter }: AppProps) {
         <div
           className={`flex min-w-0 flex-1 flex-col transition-[padding] duration-300 ease-(--ease-move) motion-reduce:transition-none md:pr-2 ${
             workspace && isSidebarOpen ? "" : "md:pl-2"
-          } ${currentWorkspace ? "" : "md:pt-2"} ${shownDocument ? "" : "md:pb-2"}`}
+          } ${currentWorkspace ? "" : "md:pt-2"} ${statusDocument ? "" : "md:pb-2"}`}
         >
           <div className="bg-frame md:border-line md:rounded-frame flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:border">
-            <TabStrip
-              documents={documentsState.documents}
-              activeKey={documentsState.activeKey}
-              onActivate={(key) => dispatchDocuments({ type: "activate", key })}
-              onReorder={(key, toIndex) => dispatchDocuments({ type: "reorder", key, toIndex })}
-              onClose={(key) => closeDocuments([key])}
-              onCloseMany={(keys) => closeDocuments(keys)}
-              onCopyRelativePath={(path) => void copyText(path)}
-              onCopyPath={copyFullPath}
-              onReveal={revealEntry && ((doc) => void revealEntry(doc))}
-              locate={locateDocument}
-              actions={
-                shownDocument && (
-                  <DocumentActions
-                    document={shownDocument}
-                    onViewModeChange={handleViewModeChange}
-                    isFindOpen={find !== null}
-                    onFind={() => openFind("find")}
-                    editorSettings={settings.editor}
-                    onEditorSettingsChange={handleEditorSettingsChange}
-                    onOpenSettings={() => setOpenDialog("editor")}
+            {shownSettingsSection !== null && (
+              <SettingsPage
+                section={shownSettingsSection}
+                onSectionChange={setSettingsSection}
+                workspace={currentWorkspace}
+                onClose={() => setSettingsSection(null)}
+              >
+                {shownSettingsSection === "workspace" && currentWorkspace ? (
+                  <WorkspaceSection
+                    // A new name draft for each workspace, should the open one change underneath.
+                    key={currentWorkspace.id}
+                    workspace={currentWorkspace}
+                    onChange={handleChangeWorkspaceDetails}
+                    onAddFolder={() => void handleAddFolder()}
+                    onRemoveFolder={(folderId) => void handleRemoveFolder(folderId)}
+                    storage={workspace?.storage ?? "device"}
+                    canStoreInFolder={canStoreInFolder(workspace)}
+                    onChangeStorage={(storage) => void handleChangeStorage(storage)}
                   />
-                )
-              }
-            />
-            <EditorPane
-              platform={adapter.platform}
-              document={shownDocument}
-              onContentChange={handleContentChange}
-              onCursorChange={handleCursorChange}
-              onVimModeChange={handleVimModeChange}
-              rawEditorStates={rawEditorStatesRef.current}
-              reservedShortcuts={reservedShortcuts}
-              editorSettings={settings.editor}
-              find={find}
-              onFindClose={() => setFind(null)}
-              pendingJump={pendingJump?.key === activeDocumentKey ? pendingJump.position : null}
-              onJumpApplied={handleJumpApplied}
-              contextMenuItems={editorMenuItems}
-              loadImage={loadImage}
-              emptyState={
-                // Blank while a restored tab reads its file.
-                pendingActive ? null : (
-                  <StartScreen
-                    workspaceName={workspace?.name ?? null}
-                    isLoading={isLoading}
-                    recents={recents}
-                    onOpenFolder={() => void handleOpenFolder()}
-                    onOpenRecent={(workspaceId) => void handleOpenWorkspace(workspaceId)}
-                    onRemoveRecent={(workspaceId) => void handleRemoveRecent(workspaceId)}
-                    actions={startActions}
+                ) : shownSettingsSection === "editor" ? (
+                  <EditorSection settings={settings} onChange={updateSettings} />
+                ) : shownSettingsSection === "files" ? (
+                  <FilesSection settings={settings} onChange={updateSettings} />
+                ) : shownSettingsSection === "shortcuts" ? (
+                  <ShortcutsSection commands={commands} />
+                ) : shownSettingsSection === "about" ? (
+                  <AboutSection
+                    platform={adapter.platform}
+                    version={APP_VERSION}
+                    onCheckForUpdates={adapter.updater ? () => checkForUpdates({ isRequested: true }) : undefined}
                   />
-                )
-              }
-            />
+                ) : (
+                  <AppearanceSection theme={theme} />
+                )}
+              </SettingsPage>
+            )}
+            {/* The tabs and editors stay mounted under Settings, so each editor keeps its state. */}
+            <div
+              hidden={shownSettingsSection !== null}
+              className={shownSettingsSection === null ? "contents" : undefined}
+            >
+              <TabStrip
+                documents={documentsState.documents}
+                activeKey={documentsState.activeKey}
+                onActivate={(key) => dispatchDocuments({ type: "activate", key })}
+                onReorder={(key, toIndex) => dispatchDocuments({ type: "reorder", key, toIndex })}
+                onClose={(key) => closeDocuments([key])}
+                onCloseMany={(keys) => closeDocuments(keys)}
+                onCopyRelativePath={(path) => void copyText(path)}
+                onCopyPath={copyFullPath}
+                onReveal={revealEntry && ((doc) => void revealEntry(doc))}
+                locate={locateDocument}
+                actions={
+                  shownDocument && (
+                    <DocumentActions
+                      document={shownDocument}
+                      onViewModeChange={handleViewModeChange}
+                      isFindOpen={find !== null}
+                      onFind={() => openFind("find")}
+                    />
+                  )
+                }
+              />
+              <EditorPane
+                platform={adapter.platform}
+                document={shownDocument}
+                onContentChange={handleContentChange}
+                onCursorChange={handleCursorChange}
+                onVimModeChange={handleVimModeChange}
+                rawEditorStates={rawEditorStatesRef.current}
+                reservedShortcuts={reservedShortcuts}
+                editorSettings={settings.editor}
+                find={find}
+                onFindClose={() => setFind(null)}
+                pendingJump={pendingJump?.key === activeDocumentKey ? pendingJump.position : null}
+                onJumpApplied={handleJumpApplied}
+                contextMenuItems={editorMenuItems}
+                loadImage={loadImage}
+                emptyState={
+                  // Blank while a restored tab reads its file.
+                  pendingActive ? null : (
+                    <StartScreen
+                      workspaceName={workspace?.name ?? null}
+                      isLoading={isLoading}
+                      recents={recents}
+                      onOpenFolder={() => void handleOpenFolder()}
+                      onOpenRecent={(workspaceId) => void handleOpenWorkspace(workspaceId)}
+                      onRemoveRecent={(workspaceId) => void handleRemoveRecent(workspaceId)}
+                      actions={startActions}
+                    />
+                  )
+                }
+              />
+            </div>
           </div>
           <AnimatePresence initial={false}>
-            {shownDocument && (
+            {statusDocument && (
               <ShellReveal key="status-bar" axis="height">
                 <StatusBar
-                  activeFile={shownDocument}
+                  activeFile={statusDocument}
                   location={activeLocation}
                   copyPathLabel={adapter.platform === "native" ? "Copy Path" : "Copy Relative Path"}
-                  onCopyPath={() => (copyFullPath ? copyFullPath(shownDocument) : copyText(shownDocument.path))}
-                  onReveal={revealEntry ? () => void revealEntry(shownDocument) : undefined}
+                  onCopyPath={() => (copyFullPath ? copyFullPath(statusDocument) : copyText(statusDocument.path))}
+                  onReveal={revealEntry ? () => void revealEntry(statusDocument) : undefined}
                   cursor={activeCursor}
                   vimMode={activeVimMode}
                   onGoToLine={() => setGoToQuery(":")}
@@ -2324,34 +2393,6 @@ function AppShell({ adapter }: AppProps) {
           onGo={(request) => void handleGoTo(request)}
           onRunCommand={handleRunPaletteCommand}
           onClose={() => setGoToQuery(null)}
-        />
-      )}
-      {openDialog !== null && openDialog !== "workspace" && (
-        <SettingsDialog
-          section={openDialog}
-          onSectionChange={setOpenDialog}
-          settings={settings}
-          onChange={updateSettings}
-          theme={theme}
-          commands={commands}
-          platform={adapter.platform}
-          version={APP_VERSION}
-          onCheckForUpdates={adapter.updater ? () => checkForUpdates({ isRequested: true }) : undefined}
-          onClose={() => setOpenDialog(null)}
-        />
-      )}
-      {openDialog === "workspace" && currentWorkspace && (
-        <WorkspaceSettingsDialog
-          // A new name draft for each workspace, should the open one change underneath.
-          key={currentWorkspace.id}
-          workspace={currentWorkspace}
-          onChange={handleChangeWorkspaceDetails}
-          onAddFolder={() => void handleAddFolder()}
-          onRemoveFolder={(folderId) => void handleRemoveFolder(folderId)}
-          storage={workspace?.storage ?? "device"}
-          canStoreInFolder={canStoreInFolder(workspace)}
-          onChangeStorage={(storage) => void handleChangeStorage(storage)}
-          onClose={() => setOpenDialog(null)}
         />
       )}
       {unsavedRequest && <UnsavedChangesDialog fileNames={unsavedRequest.fileNames} onChoose={handleUnsavedChoice} />}

@@ -25,10 +25,12 @@ test("sets the theme from Settings", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Open Folder" })).toBeVisible();
 
   await page.keyboard.press("Control+Comma");
-  const settings = page.getByRole("dialog", { name: "Settings" });
-  await settings.getByRole("radio", { name: "Light" }).check();
+  const settings = page.getByRole("region", { name: "Settings" });
+  await settings.getByText("Light", { exact: true }).click();
+  await expect(settings.getByRole("radio", { name: "Light" })).toBeChecked();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
 
-  await settings.getByRole("radio", { name: "Dark" }).check();
+  await settings.getByText("Dark", { exact: true }).click();
+  await expect(settings.getByRole("radio", { name: "Dark" })).toBeChecked();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 });
