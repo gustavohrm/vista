@@ -437,12 +437,19 @@ function AppShell({ adapter }: AppProps) {
   /** A newer version the startup check found, shown as a quiet notice until installed or dismissed. */
   const [noticedUpdate, setNoticedUpdate] = useState<AvailableUpdate | null>(null);
 
+  // Set while an update downloads and installs, so the notice and About can't start a second one.
+  const isInstallingRef = useRef(false);
+
   /**
    * Asks to install `update` and installs it once accepted, after asking about unsaved changes, since
-   * installing restarts Vista.
+   * installing restarts Vista. While an install is under way it only says so.
    */
   const offerUpdate = useCallback(
     async (update: AvailableUpdate, isCancelled: () => boolean = () => false) => {
+      if (isInstallingRef.current) {
+        toast.show({ kind: "info", text: "Vista is already downloading an update. It restarts when it's installed." });
+        return;
+      }
       const accepted = await toast.confirm({
         title: `Vista ${update.version} is available`,
         message: "Install it now? Vista restarts to finish, and asks about unsaved changes first.",
@@ -453,10 +460,17 @@ function AppShell({ adapter }: AppProps) {
       if (!accepted || isCancelled() || isPromptingRef.current || (await confirmUnsavedChangesRef.current()) === null) {
         return;
       }
+      // Checked again: another offer may have been accepted while this one waited on the user.
+      if (isInstallingRef.current) {
+        return;
+      }
+      isInstallingRef.current = true;
+      setNoticedUpdate(null);
       toast.show({ kind: "info", text: `Downloading Vista ${update.version}. Vista restarts when it's installed.` });
       try {
         await update.install();
       } catch (err) {
+        isInstallingRef.current = false;
         console.error("Failed to install the update:", err);
         toast.show({
           kind: "error",

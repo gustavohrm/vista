@@ -3951,6 +3951,28 @@ describe("App", () => {
       expect(await findToast("Downloading Vista 0.3.0. Vista restarts when it's installed.")).toBeInTheDocument();
     });
 
+    it("starts no second install while one is under way", async () => {
+      const user = userEvent.setup();
+      const { updater, install } = createUpdater({ install: () => new Promise<void>(() => {}) });
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), updater }} />);
+
+      const offer = await openOffer(user);
+      await user.click(within(offer).getByRole("button", { name: "Install and Restart" }));
+      await waitFor(() => expect(install).toHaveBeenCalledTimes(1));
+      expect(screen.queryByRole("button", { name: "Update to 0.3.0" })).not.toBeInTheDocument();
+
+      await user.keyboard("{Control>},{/Control}");
+      const settings = await screen.findByRole("region", { name: "Settings" });
+      await user.click(within(settings).getByRole("button", { name: "About" }));
+      await user.click(within(settings).getByRole("button", { name: "Check for Updates" }));
+
+      expect(
+        await findToast("Vista is already downloading an update. It restarts when it's installed."),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(install).toHaveBeenCalledTimes(1);
+    });
+
     it("installs nothing when the user declines", async () => {
       const user = userEvent.setup();
       const { updater, install } = createUpdater();
