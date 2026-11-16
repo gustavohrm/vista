@@ -1,4 +1,4 @@
-import { useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "motion/react";
 import {
   useEffect,
   useRef,
@@ -136,29 +136,31 @@ export function TabStrip({
         aria-label="Open files"
         className="relative flex h-full min-w-0 flex-1 [scrollbar-width:none] items-center gap-0.5 overflow-x-auto overflow-y-hidden pl-1.5"
       >
-        {documents.map((doc) => (
-          <Tab
-            key={doc.key}
-            document={doc}
-            {...describeTab(doc, documents, locate)}
-            isActive={doc.key === activeKey}
-            isDragged={drag?.key === doc.key}
-            dragOffset={drag?.offsets[doc.key]}
-            isSettling={drag?.isSettling ?? false}
-            isRowDragging={drag !== null}
-            onActivate={() => onActivate(doc.key)}
-            onPointerDown={(event) => startDrag(doc.key, event)}
-            onClose={(event) => {
-              // A click with no pointer detail came from the keyboard (Enter or Space).
-              void closeTabs(event.detail === 0 ? doc.key : null, () => onClose(doc.key));
-            }}
-            onKeyDown={handleKeyDown}
-            onContextMenu={(event) => {
-              event.preventDefault();
-              setMenu({ key: doc.key, x: event.clientX, y: event.clientY });
-            }}
-          />
-        ))}
+        <AnimatePresence initial={false}>
+          {documents.map((doc) => (
+            <Tab
+              key={doc.key}
+              document={doc}
+              {...describeTab(doc, documents, locate)}
+              isActive={doc.key === activeKey}
+              isDragged={drag?.key === doc.key}
+              dragOffset={drag?.offsets[doc.key]}
+              isSettling={drag?.isSettling ?? false}
+              isRowDragging={drag !== null}
+              onActivate={() => onActivate(doc.key)}
+              onPointerDown={(event) => startDrag(doc.key, event)}
+              onClose={(event) => {
+                // A click with no pointer detail came from the keyboard (Enter or Space).
+                void closeTabs(event.detail === 0 ? doc.key : null, () => onClose(doc.key));
+              }}
+              onKeyDown={handleKeyDown}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                setMenu({ key: doc.key, x: event.clientX, y: event.clientY });
+              }}
+            />
+          ))}
+        </AnimatePresence>
         {menu && (
           <Menu
             label="Tab actions"
@@ -282,6 +284,11 @@ interface TabProps {
   onContextMenu: (event: MouseEvent) => void;
 }
 
+/** How long a new tab takes to grow in, and a closed one to shrink away, in seconds. */
+const TAB_GROW_SECONDS = 0.15;
+const TAB_SHRINK_SECONDS = 0.1;
+const EASE_MOVE = [0.4, 0, 0.2, 1] as const;
+
 /**
  * The dragged tab: above the tabs it passes, and filled opaquely with the selected tint over the
  * frame, so a tab under it does not show through. No shadow: it stays in the row, not above it.
@@ -305,6 +312,11 @@ function Tab({
   onKeyDown,
   onContextMenu,
 }: TabProps) {
+  // A closed tab stays a moment while it shrinks away; meanwhile it is not a tab any more, so the
+  // row's keys, focus, and drag measure only the tabs that remain.
+  const isPresent = useIsPresent();
+  const isReduced = useReducedMotion() ?? false;
+
   const handleAuxClick = (event: MouseEvent) => {
     if (event.button === MIDDLE_BUTTON) {
       event.preventDefault();
@@ -320,62 +332,85 @@ function Tab({
   };
 
   return (
-    // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- middle-click close is a mouse shortcut; keyboard users close with the tab's own Close button
-    <div
-      onAuxClick={handleAuxClick}
-      onMouseDown={handleMouseDown}
-      onContextMenu={onContextMenu}
-      data-tab-dragging={isDragged ? "" : undefined}
-      style={dragOffset ? { transform: `translateX(${dragOffset}px)` } : undefined}
-      // The dragged tab stays under the pointer and above the tabs it passes; the others, and the
-      // dragged one once released, slide. Outside a drag nothing slides, so keyboard moves are instant.
-      className={`group flex h-7 max-w-56 flex-none items-center rounded-md ease-(--ease-move) motion-reduce:transition-none ${
-        isDragged ? DRAGGED_TAB_CLASS : ""
-      } ${
-        isRowDragging && (!isDragged || isSettling)
-          ? "transition-[transform,background-color,color] duration-150"
-          : "transition-colors duration-100"
-      } ${isActive ? "bg-selected text-text-strong" : "text-text-muted hover:bg-hover hover:text-text"}`}
+    // A new tab grows in from nothing, pushing the tabs after it aside, and a closed one shrinks
+    // away as they close the gap. Clipped only while it grows or shrinks, so a drag can move it.
+    <motion.div
+      initial={{ width: 0, opacity: 0, overflow: "hidden" }}
+      animate={{
+        width: "auto",
+        opacity: 1,
+        transition: { duration: isReduced ? 0 : TAB_GROW_SECONDS, ease: EASE_MOVE },
+        transitionEnd: { overflow: "visible" },
+      }}
+      exit={{
+        width: 0,
+        opacity: 0,
+        overflow: "hidden",
+        transition: { duration: isReduced ? 0 : TAB_SHRINK_SECONDS, ease: EASE_MOVE },
+      }}
+      inert={!isPresent}
+      className="flex flex-none"
     >
-      <button
-        type="button"
-        role="tab"
-        aria-selected={isActive}
-        tabIndex={isActive ? 0 : -1}
-        // Named in full, so a screen reader hears the folder that tells two same-named tabs apart.
-        aria-label={doc.isDirty ? `${label} (unsaved)` : label}
-        data-tab-key={doc.key}
-        title={title}
-        onClick={onActivate}
-        onPointerDown={onPointerDown}
-        onKeyDown={onKeyDown}
-        className="flex h-full min-w-0 items-center gap-1.5 rounded-md pr-1 pl-2.5 text-[13px] outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-inset"
+      {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- middle-click close is a mouse shortcut; keyboard users close with the tab's own Close button */}
+      <div
+        onAuxClick={handleAuxClick}
+        onMouseDown={handleMouseDown}
+        onContextMenu={onContextMenu}
+        data-tab-dragging={isDragged ? "" : undefined}
+        style={dragOffset ? { transform: `translateX(${dragOffset}px)` } : undefined}
+        // The dragged tab stays under the pointer and above the tabs it passes; the others, and the
+        // dragged one once released, slide. Outside a drag nothing slides, so keyboard moves are instant.
+        className={`group flex h-7 max-w-56 flex-none items-center rounded-md ease-(--ease-move) motion-reduce:transition-none ${
+          isDragged ? DRAGGED_TAB_CLASS : ""
+        } ${
+          isRowDragging && (!isDragged || isSettling)
+            ? "transition-[transform,background-color,color] duration-150"
+            : "transition-colors duration-100"
+        } ${isActive ? "bg-selected text-text-strong" : "text-text-muted hover:bg-hover hover:text-text"}`}
       >
-        <FileIcon extension={doc.extension} className="text-text-faint flex flex-none text-sm" />
-        <span className="min-w-0 truncate">{doc.name}</span>
-        {folderHint && <span className="text-text-faint min-w-0 truncate">{folderHint}</span>}
-        {doc.isDirty && <span className="visually-hidden">(unsaved)</span>}
-      </button>
-      <button
-        type="button"
-        aria-label={`Close ${label}`}
-        tabIndex={isActive ? 0 : -1}
-        onClick={onClose}
-        className="btn ghost icon sm mr-1 size-5! min-h-0! min-w-0! flex-none p-0! text-[11px] [--ui-radius:4px]"
-      >
-        {doc.isDirty ? (
-          <>
-            <span aria-hidden="true" className="bg-text-muted inline-block size-1.5 rounded-full group-hover:hidden" />
-            <span className="hidden group-hover:inline-flex">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={isActive}
+          tabIndex={isActive ? 0 : -1}
+          // Named in full, so a screen reader hears the folder that tells two same-named tabs apart.
+          aria-label={doc.isDirty ? `${label} (unsaved)` : label}
+          data-tab-key={isPresent ? doc.key : undefined}
+          title={title}
+          onClick={onActivate}
+          onPointerDown={onPointerDown}
+          onKeyDown={onKeyDown}
+          className="flex h-full min-w-0 items-center gap-1.5 rounded-md pr-1 pl-2.5 text-[13px] outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-inset"
+        >
+          <FileIcon extension={doc.extension} className="text-text-faint flex flex-none text-sm" />
+          <span className="min-w-0 truncate">{doc.name}</span>
+          {folderHint && <span className="text-text-faint min-w-0 truncate">{folderHint}</span>}
+          {doc.isDirty && <span className="visually-hidden">(unsaved)</span>}
+        </button>
+        <button
+          type="button"
+          aria-label={`Close ${label}`}
+          tabIndex={isActive ? 0 : -1}
+          onClick={onClose}
+          className="btn ghost icon sm mr-1 size-5! min-h-0! min-w-0! flex-none p-0! text-[11px] [--ui-radius:4px]"
+        >
+          {doc.isDirty ? (
+            <>
+              <span
+                aria-hidden="true"
+                className="bg-text-muted inline-block size-1.5 rounded-full group-hover:hidden"
+              />
+              <span className="hidden group-hover:inline-flex">
+                <i className="ic-x" aria-hidden="true" />
+              </span>
+            </>
+          ) : (
+            <span className={isActive ? "inline-flex" : "inline-flex opacity-0 group-hover:opacity-100"}>
               <i className="ic-x" aria-hidden="true" />
             </span>
-          </>
-        ) : (
-          <span className={isActive ? "inline-flex" : "inline-flex opacity-0 group-hover:opacity-100"}>
-            <i className="ic-x" aria-hidden="true" />
-          </span>
-        )}
-      </button>
-    </div>
+          )}
+        </button>
+      </div>
+    </motion.div>
   );
 }
