@@ -65,6 +65,7 @@ import {
   LEGACY_FOLDER_ID,
   WorkspaceError,
   type AppAdapter,
+  type AvailableUpdate,
   type FileStat,
   type RestoreFolderResult,
   type ViewMode,
@@ -436,18 +437,29 @@ function AppShell({ adapter }: AppProps) {
    * Asks the updater for a newer version and offers to install it. At startup, which happens only
    * when the user turned on **Check at startup**, the check is quiet:
    * being offline is not something to interrupt the user about. Asked for from About, it says
-   * what it found.
+   * what it found. `pending` is a check already under way, to handle its result instead of asking again.
    */
   const checkForUpdates = useCallback(
-    async ({ isRequested, isCancelled = () => false }: { isRequested: boolean; isCancelled?: () => boolean }) => {
+    async ({
+      isRequested,
+      isCancelled = () => false,
+      pending,
+    }: {
+      isRequested: boolean;
+      isCancelled?: () => boolean;
+      pending?: Promise<AvailableUpdate | null>;
+    }) => {
       const updater = adapter.updater;
       if (!updater) {
         return;
       }
       let update;
       try {
-        update = await updater.check();
+        update = await (pending ?? updater.check());
       } catch (err) {
+        if (isCancelled()) {
+          return;
+        }
         console.warn("Could not check for updates:", err);
         if (isRequested) {
           toast.show({ kind: "error", text: "Couldn't check for updates. Check your connection and try again." });
@@ -489,18 +501,23 @@ function AppShell({ adapter }: AppProps) {
 
   // Read once, so turning the switch on asks at the next start, not now; About checks on request.
   const checkAtStartupRef = useRef(settings.updates.checkAtStartup);
+  // Holds the startup request so StrictMode's second effect run handles its result instead of
+  // asking the release host again. Clearing the flag instead would drop the offer: the first run is
+  // the one StrictMode cancels.
+  const startupCheckRef = useRef<Promise<AvailableUpdate | null> | null>(null);
 
   // Checked once per launch, and only when the user asked for it.
   useEffect(() => {
-    if (!checkAtStartupRef.current) {
+    if (!checkAtStartupRef.current || !adapter.updater) {
       return;
     }
+    startupCheckRef.current ??= adapter.updater.check();
     let isCancelled = false;
-    void checkForUpdates({ isRequested: false, isCancelled: () => isCancelled });
+    void checkForUpdates({ isRequested: false, isCancelled: () => isCancelled, pending: startupCheckRef.current });
     return () => {
       isCancelled = true;
     };
-  }, [checkForUpdates]);
+  }, [adapter.updater, checkForUpdates]);
 
   /**
    * Reopens a session's tabs as tabs that read their file when first shown. Each file is checked

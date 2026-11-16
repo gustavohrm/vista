@@ -3952,6 +3952,16 @@ describe("App", () => {
       error.mockRestore();
     });
 
+    it("asks once at startup under StrictMode, and still offers what it found", async () => {
+      const { updater } = createUpdater();
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), updater }} />, {
+        wrapper: StrictMode,
+      });
+
+      expect(await screen.findByRole("dialog", { name: "Vista 0.3.0 is available" })).toBeInTheDocument();
+      expect(updater.check).toHaveBeenCalledTimes(1);
+    });
+
     it("asks nothing at startup unless the user turned it on", async () => {
       localStorage.removeItem("vista.settings");
       const { updater } = createUpdater();
