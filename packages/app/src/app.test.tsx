@@ -2,7 +2,7 @@ import { EditorView } from "@codemirror/view";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { StrictMode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { version as APP_VERSION } from "../package.json";
 import { App } from "./app";
@@ -995,11 +995,11 @@ describe("App", () => {
       expect(within(dialog).getByRole("radio", { name: "System" })).toBeChecked();
     });
 
-    it("shows the version in About, and checks for updates where the host has an updater", async () => {
+    it("shows the version in About, and checks for updates on request where the host has an updater", async () => {
       const user = userEvent.setup();
-      const updater = { check: vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(null) };
+      const updater = { check: vi.fn().mockResolvedValue(null) };
       render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), updater }} />);
-      await waitFor(() => expect(updater.check).toHaveBeenCalledTimes(1));
+      await screen.findByRole("button", { name: "Open Folder…" });
 
       await user.keyboard("{Control>}{Shift>}p{/Shift}{/Control}");
       await user.click(screen.getByRole("option", { name: "Settings: About Vista" }));
@@ -1009,7 +1009,28 @@ describe("App", () => {
       expect(within(dialog).getByText(`Vista ${APP_VERSION}`)).toBeInTheDocument();
       await user.click(within(dialog).getByRole("button", { name: "Check for Updates" }));
       expect(await findToast("Vista is up to date.")).toBeInTheDocument();
-      expect(updater.check).toHaveBeenCalledTimes(2);
+      expect(updater.check).toHaveBeenCalledTimes(1);
+    });
+
+    it("turns checking at startup on in About, and remembers it", async () => {
+      const user = userEvent.setup();
+      const updater = { check: vi.fn().mockResolvedValue(null) };
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), updater }} />);
+      await screen.findByRole("button", { name: "Open Folder…" });
+
+      await user.keyboard("{Control>},{/Control}");
+      const dialog = await settingsDialog();
+      await user.click(within(dialog).getByRole("button", { name: "About" }));
+      const startupSwitch = within(dialog).getByRole("switch", { name: "Check at startup" });
+      expect(startupSwitch).not.toBeChecked();
+      await user.click(startupSwitch);
+
+      expect(startupSwitch).toBeChecked();
+      expect(JSON.parse(localStorage.getItem("vista.settings") ?? "null")).toMatchObject({
+        updates: { checkAtStartup: true },
+      });
+      // It applies from the next start; turning it on asks nothing now.
+      expect(updater.check).not.toHaveBeenCalled();
     });
 
     it("offers no update check in About when the host has no updater", async () => {
@@ -1023,6 +1044,7 @@ describe("App", () => {
 
       expect(within(dialog).getByText(`Vista ${APP_VERSION}`)).toBeInTheDocument();
       expect(within(dialog).queryByRole("button", { name: "Check for Updates" })).not.toBeInTheDocument();
+      expect(within(dialog).queryByRole("switch", { name: "Check at startup" })).not.toBeInTheDocument();
     });
   });
 
@@ -3842,6 +3864,10 @@ describe("App", () => {
   });
 
   describe("updating the desktop app", () => {
+    beforeEach(() => {
+      localStorage.setItem("vista.settings", JSON.stringify({ version: 1, updates: { checkAtStartup: true } }));
+    });
+
     function createUpdater(options: { check?: () => Promise<unknown>; install?: () => Promise<void> } = {}) {
       const install = vi.fn(options.install ?? (async () => {}));
       const updater = {
@@ -3921,9 +3947,19 @@ describe("App", () => {
       await user.click(within(dialog).getByRole("button", { name: "Install and Restart" }));
 
       expect(
-        await findToast("Couldn't install Vista 0.3.0. Vista will offer it again the next time it starts."),
+        await findToast("Couldn't install Vista 0.3.0. You can try again from About in Settings."),
       ).toBeInTheDocument();
       error.mockRestore();
+    });
+
+    it("asks nothing at startup unless the user turned it on", async () => {
+      localStorage.removeItem("vista.settings");
+      const { updater } = createUpdater();
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), updater }} />);
+      await screen.findByRole("button", { name: "Open Folder…" });
+
+      expect(updater.check).not.toHaveBeenCalled();
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
 
     it("offers nothing when Vista is up to date", async () => {

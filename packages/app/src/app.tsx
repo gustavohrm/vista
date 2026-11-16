@@ -433,7 +433,8 @@ function AppShell({ adapter }: AppProps) {
   confirmUnsavedChangesRef.current = confirmUnsavedChangesInAllDocuments;
 
   /**
-   * Asks the updater for a newer version and offers to install it. At startup the check is quiet:
+   * Asks the updater for a newer version and offers to install it. At startup, which happens only
+   * when the user turned on **Check at startup**, the check is quiet:
    * being offline is not something to interrupt the user about. Asked for from About, it says
    * what it found.
    */
@@ -479,15 +480,21 @@ function AppShell({ adapter }: AppProps) {
         console.error("Failed to install the update:", err);
         toast.show({
           kind: "error",
-          text: `Couldn't install Vista ${update.version}. Vista will offer it again the next time it starts.`,
+          text: `Couldn't install Vista ${update.version}. You can try again from About in Settings.`,
         });
       }
     },
     [adapter.updater, toast],
   );
 
-  // Checked once per launch.
+  // Read once, so turning the switch on asks at the next start, not now; About checks on request.
+  const checkAtStartupRef = useRef(settings.updates.checkAtStartup);
+
+  // Checked once per launch, and only when the user asked for it.
   useEffect(() => {
+    if (!checkAtStartupRef.current) {
+      return;
+    }
     let isCancelled = false;
     void checkForUpdates({ isRequested: false, isCancelled: () => isCancelled });
     return () => {
@@ -2416,6 +2423,8 @@ function AppShell({ adapter }: AppProps) {
                     platform={adapter.platform}
                     version={APP_VERSION}
                     onCheckForUpdates={adapter.updater ? () => checkForUpdates({ isRequested: true }) : undefined}
+                    settings={settings}
+                    onChange={updateSettings}
                   />
                 ) : (
                   <AppearanceSection theme={theme} />
