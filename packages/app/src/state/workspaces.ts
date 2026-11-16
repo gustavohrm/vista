@@ -249,9 +249,16 @@ export function createWorkspaceStore(
       }
       const locations: Record<string, string> = { [HOME_FOLDER_LOCATION]: homeId };
       const folderIds = [homeId];
+      const known: Readonly<Record<string, string>> = workspace.storage === "folder" ? workspace.locations : {};
       for (const location of details.folders) {
         // A location such as `toString` must not find the object prototype instead of a folder.
-        const folderId = Object.hasOwn(located, location) ? located[location] : undefined;
+        // A location the file still lists but this device did not find keeps the folder it had, so the
+        // host is not told to forget a folder the workspace still names.
+        const folderId = Object.hasOwn(located, location)
+          ? located[location]
+          : Object.hasOwn(known, location)
+            ? known[location]
+            : undefined;
         if (location !== HOME_FOLDER_LOCATION && folderId !== undefined && !folderIds.includes(folderId)) {
           locations[location] = folderId;
           folderIds.push(folderId);

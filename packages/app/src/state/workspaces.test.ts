@@ -349,6 +349,21 @@ describe("workspaces read from a folder", () => {
 
     expect(store.applyWorkspaceFile(workspace.id, { ...details, folders: ["."] }, {})?.unusedFolderIds).toEqual([]);
   });
+
+  it("keeps the folder of a location the file still lists but this device did not find", () => {
+    const store = createWorkspaceStore(memoryStorage(), options());
+    const workspace = store.workspaceForFile(notes);
+    store.applyWorkspaceFile(workspace.id, { ...details, folders: [".", "../sources"] }, { "../sources": "f2" });
+    const other = store.openFolder({ id: "f2", name: "sources", rootPath: "/sources" });
+
+    const kept = store.applyWorkspaceFile(workspace.id, { ...details, folders: [".", "../sources"] }, {});
+    expect(kept?.workspace).toMatchObject({ folderIds: ["f1", "f2"], locations: { ".": "f1", "../sources": "f2" } });
+    expect(
+      store.applyWorkspaceFile(workspace.id, { ...details, folders: [".", "../sources"] }, {})?.workspace,
+    ).toMatchObject({ folderIds: ["f1", "f2"] });
+    // The workspace still names the folder, so removing the other one that held it keeps its access.
+    expect(store.removeWorkspace(other.id)).toEqual({ unusedFolderIds: [] });
+  });
 });
 
 describe("recent workspaces", () => {
