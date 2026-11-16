@@ -72,10 +72,11 @@ describe("createWorkspaceStore", () => {
 
   it("does not overwrite a damaged list whose copy could not be kept", () => {
     const storage = memoryStorage({ [WORKSPACES_STORAGE_KEY]: "{broken" });
-    storage.setItem.mockImplementation((key) => {
+    storage.setItem.mockImplementation((key, value) => {
       if (key === WORKSPACES_BACKUP_KEY) {
         throw new Error("Quota exceeded");
       }
+      storage.values.set(key, value);
     });
     const store = createWorkspaceStore(storage, options());
 
@@ -284,6 +285,16 @@ describe("workspaces read from a folder", () => {
       color: "rose",
       folderIds: ["f1", "f2"],
       locations: { ".": "f1", "../sources": "f2" },
+    });
+  });
+
+  it("leaves out a location named like an object property when no folder was found for it", () => {
+    const store = createWorkspaceStore(memoryStorage(), options());
+    const workspace = store.workspaceForFile(notes);
+
+    expect(store.applyWorkspaceFile(workspace.id, { ...details, folders: [".", "toString"] }, {})).toMatchObject({
+      folderIds: ["f1"],
+      locations: { ".": "f1" },
     });
   });
 

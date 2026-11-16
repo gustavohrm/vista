@@ -680,8 +680,9 @@ function AppShell({ adapter }: AppProps) {
           const located: Record<string, string> = {};
           for (const location of read.details.folders.slice(1)) {
             // Asked one at a time, so each permission prompt follows the one before it.
+            const knownId = Object.hasOwn(record.locations, location) ? record.locations[location] : undefined;
             // oxlint-disable-next-line eslint/no-await-in-loop -- a workspace has few folders
-            const found = await findLocatedFolder(home, location, record.locations[location], {
+            const found = await findLocatedFolder(home, location, knownId, {
               restore,
               resolveRelative: adapter.workspace.resolveRelative?.bind(adapter.workspace),
             });
@@ -1264,7 +1265,13 @@ function AppShell({ adapter }: AppProps) {
         const opened = await toOpenFolder(folderId, result);
         setWorkspace((previous) =>
           previous?.id === current.id
-            ? { ...previous, folders: previous.folders.map((entry) => (entry.id === folderId ? opened : entry)) }
+            ? {
+                ...previous,
+                // The folder keeps the location the workspace file gave it.
+                folders: previous.folders.map((entry) =>
+                  entry.id === folderId ? { ...opened, location: entry.location } : entry,
+                ),
+              }
             : previous,
         );
       } catch (err) {
@@ -1366,10 +1373,12 @@ function AppShell({ adapter }: AppProps) {
   );
 
   // A restored tab reads its file when it is first shown, and closes when the file can't be shown.
-  const pendingReadsRef = useRef(new Set<string>());
+  // Each read is kept with the folder it started in: another workspace can restore the same folder id
+  // as a new folder while it runs, and a read from the old one must neither block nor close that tab.
+  const pendingReadsRef = useRef(new Map<string, WorkspaceFolder>());
   const pendingActive = activeDocument?.isPending ? activeDocument : null;
   useEffect(() => {
-    if (!pendingActive || pendingReadsRef.current.has(pendingActive.key)) {
+    if (!pendingActive) {
       return;
     }
     const { key, folderId, path } = pendingActive;
@@ -1383,18 +1392,23 @@ function AppShell({ adapter }: AppProps) {
       closeIfStillPending();
       return;
     }
-    pendingReadsRef.current.add(key);
+    if (pendingReadsRef.current.get(key) === folder) {
+      return;
+    }
+    pendingReadsRef.current.set(key, folder);
     const read = async () => {
       try {
-        if (!(await readIntoTab(folder, path))) {
+        if (!(await readIntoTab(folder, path)) && isStillOpen(folder)) {
           closeIfStillPending();
         }
       } finally {
-        pendingReadsRef.current.delete(key);
+        if (pendingReadsRef.current.get(key) === folder) {
+          pendingReadsRef.current.delete(key);
+        }
       }
     };
     void read();
-  }, [pendingActive, readIntoTab, readyFolder]);
+  }, [isStillOpen, pendingActive, readIntoTab, readyFolder]);
 
   // The session follows every change to the tabs and expanded folders, so leaving keeps it.
   useEffect(() => {

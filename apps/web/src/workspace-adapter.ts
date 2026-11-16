@@ -797,6 +797,8 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
     },
 
     async forgetFolder(id: string): Promise<void> {
+      // The app forgets only folders no workspace uses, so their handles and fallback bytes can go too.
+      sessions.delete(id);
       await runFolderTransaction("readwrite", (store) => requestResult(store.delete(id)));
     },
 

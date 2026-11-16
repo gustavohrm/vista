@@ -205,14 +205,11 @@ export function parseSession(stored: string | null): Session {
   if (!isRecord(value) || value.version !== 1) {
     return { version: 1, tabs: [], activeIndex: -1, expanded: {} };
   }
-  const tabs = Array.isArray(value.tabs) ? value.tabs.flatMap((tab) => parseSessionTab(tab) ?? []) : [];
-  const storedIndex = value.activeIndex;
-  const activeIndex =
-    tabs.length === 0
-      ? -1
-      : Number.isInteger(storedIndex) && (storedIndex as number) >= 0 && (storedIndex as number) < tabs.length
-        ? (storedIndex as number)
-        : 0;
+  const parsed: (SessionTab | null)[] = Array.isArray(value.tabs) ? value.tabs.map(parseSessionTab) : [];
+  const tabs = parsed.filter((tab): tab is SessionTab => tab !== null);
+  // The stored index counts damaged tabs too, so it is followed to its tab rather than reused as is.
+  const storedActive = Number.isInteger(value.activeIndex) ? parsed[value.activeIndex as number] : undefined;
+  const activeIndex = tabs.length === 0 ? -1 : storedActive ? tabs.indexOf(storedActive) : 0;
   return { version: 1, tabs, activeIndex, expanded: parseExpanded(value.expanded) };
 }
 

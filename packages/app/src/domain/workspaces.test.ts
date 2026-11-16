@@ -197,6 +197,33 @@ describe("parseSession", () => {
     expect(parseSession(null)).toEqual({ version: 1, tabs: [], activeIndex: -1, expanded: {} });
   });
 
+  it("keeps the active tab selected when a damaged tab before it is dropped", () => {
+    const stored = {
+      version: 1,
+      tabs: [
+        { folderId: "f1", path: "", viewMode: "raw" },
+        { folderId: "f1", path: "b.md", viewMode: "raw" },
+        { folderId: "f1", path: "c.md", viewMode: "raw" },
+      ],
+      activeIndex: 1,
+    };
+    const session = parseSession(JSON.stringify(stored));
+    expect(session.tabs.map((tab) => tab.path)).toEqual(["b.md", "c.md"]);
+    expect(session.activeIndex).toBe(0);
+  });
+
+  it("selects the first tab when the active one was damaged", () => {
+    const stored = {
+      version: 1,
+      tabs: [
+        { folderId: "f1", path: "a.md", viewMode: "raw" },
+        { folderId: "f1", path: "", viewMode: "raw" },
+      ],
+      activeIndex: 1,
+    };
+    expect(parseSession(JSON.stringify(stored)).activeIndex).toBe(0);
+  });
+
   it("reads a stored session", () => {
     const session = {
       version: 1,

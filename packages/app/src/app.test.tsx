@@ -1434,8 +1434,8 @@ describe("App", () => {
       expect(capability.writeFile).not.toHaveBeenCalled();
     });
 
-    /** Thesis, stored in `drafts` with `sources`, opened last; `drafts` holds `text`. */
-    async function storedThesisWith(text: string) {
+    /** Thesis, stored in `drafts` with `sources` at `sourcesLocation`, opened last; `drafts` holds `text`. */
+    async function storedThesisWith(text: string, sourcesLocation = "../sources") {
       const setup = createFoldersCapability(thesisFolders());
       localStorage.setItem(
         "vista.workspaces",
@@ -1448,7 +1448,7 @@ describe("App", () => {
               name: "Thesis",
               folderIds: ["drafts", "sources"],
               storage: "folder",
-              locations: { ".": "drafts", "../sources": "sources" },
+              locations: { ".": "drafts", [sourcesLocation]: "sources" },
               lastOpenedAt: 1,
             },
           ],
@@ -1507,6 +1507,41 @@ describe("App", () => {
         color: "amber",
       });
       expect(capability.writeFile).not.toHaveBeenCalled();
+    });
+
+    it("keeps a folder's location when access to it is allowed", async () => {
+      const user = userEvent.setup();
+      const { capability, folder } = await storedThesisWith(
+        fileText({ name: "Thesis", folders: [".", "inner/sources"] }),
+        "inner/sources",
+      );
+      let isAllowed = false;
+      capability.restoreFolder.mockImplementation(async (id) => {
+        if (id === "drafts") {
+          return { status: "restored", folder: DRAFTS_FOLDER };
+        }
+        return isAllowed
+          ? { status: "restored", folder: SOURCES_FOLDER }
+          : { status: "needs-permission", name: "sources" };
+      });
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await user.click(await screen.findByRole("button", { name: "Thesis" }));
+      await within(await findExplorerPanel()).findByRole("button", { name: "d.txt" });
+
+      isAllowed = true;
+      await user.click(within(explorerPanel()).getByRole("button", { name: "Allow access" }));
+      expect(await within(explorerPanel()).findByRole("button", { name: "plan.txt" })).toBeInTheDocument();
+
+      await user.click(switcherButton("Thesis")!);
+      await user.click(screen.getByRole("menuitem", { name: "Workspace Settings…" }));
+      const dialog = await screen.findByRole("region", { name: "Settings" });
+      await user.type(within(dialog).getByRole("textbox", { name: "Name" }), "!");
+      await waitFor(() =>
+        expect(JSON.parse(folder("drafts").textOf(".vista/workspace.json") ?? "null")).toMatchObject({
+          name: "Thesis!",
+          folders: [".", "inner/sources"],
+        }),
+      );
     });
 
     it("reopens a workspace whose file it can no longer read as a plain folder", async () => {
@@ -1595,6 +1630,42 @@ describe("App", () => {
 
       expect(await screen.findByRole("textbox", { name: "Raw text content of a.txt" })).toBeInTheDocument();
       expect(capability.restoreFolder).toHaveBeenLastCalledWith("notes", { interactive: true });
+    });
+
+    it("still shows a restored tab after switching to a workspace with the same folder mid-read", async () => {
+      const user = userEvent.setup();
+      // Both workspaces hold `notes` and restore a tab of its a.txt; the host opens a new folder object each time.
+      const { capability, folder } = twoWorkspaces("w1", ["notes"]);
+      for (const id of ["w1", "w2"]) {
+        localStorage.setItem(
+          `vista.session.${id}`,
+          JSON.stringify({ version: 1, tabs: [{ folderId: "notes", path: "a.txt", viewMode: "raw" }], activeIndex: 0 }),
+        );
+      }
+      capability.restoreFolder.mockImplementation(async (id) =>
+        id === "notes" ? { status: "restored", folder: { ...NOTES_FOLDER } } : { status: "none" },
+      );
+      let releaseFirstRead = () => {};
+      const firstRead = new Promise<void>((resolve) => {
+        releaseFirstRead = resolve;
+      });
+      let reads = 0;
+      capability.readFile.mockImplementation(async (target, path) => {
+        if (path === "a.txt" && reads++ === 0) {
+          await firstRead;
+        }
+        return folder("notes").readFile(target, path);
+      });
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await waitFor(() => expect(reads).toBe(1));
+
+      await user.click(screen.getByRole("button", { name: "Research" }));
+      await user.click(await screen.findByRole("menuitemradio", { name: "Work" }));
+      await waitFor(() => expect(screen.getByRole("button", { name: "Work" })).toBeInTheDocument());
+      releaseFirstRead();
+
+      expect(await screen.findByRole("textbox", { name: "Raw text content of a.txt" })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /^a.txt/ })).toBeInTheDocument();
     });
 
     it("closes the workspace to the start screen, and reopening it brings back its tabs", async () => {

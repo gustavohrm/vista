@@ -240,7 +240,8 @@ export function createWorkspaceStore(
       const locations: Record<string, string> = { [HOME_FOLDER_LOCATION]: homeId };
       const folderIds = [homeId];
       for (const location of details.folders) {
-        const folderId = located[location];
+        // A location such as `toString` must not find the object prototype instead of a folder.
+        const folderId = Object.hasOwn(located, location) ? located[location] : undefined;
         if (location !== HOME_FOLDER_LOCATION && folderId !== undefined && !folderIds.includes(folderId)) {
           locations[location] = folderId;
           folderIds.push(folderId);
