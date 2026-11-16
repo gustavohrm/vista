@@ -40,6 +40,7 @@ import {
 } from "./components/settings/vista-sections";
 import { WorkspaceSection } from "./components/settings/workspace-section";
 import { WorkspaceSwitcher, type FolderStatus, type RecentWorkspace } from "./components/workspace/workspace-switcher";
+import { desktopDownloadFor } from "./domain/desktop-download";
 import { documentLocation } from "./domain/document-location";
 import { imageMimeType, resolveImageSource } from "./domain/image-source";
 import { joinWorkspacePath } from "./domain/path-validation";
@@ -497,6 +498,12 @@ function AppShell({ adapter }: AppProps) {
       }
     },
     [adapter.updater, toast],
+  );
+
+  // The browser offers the desktop app; the desktop app offers nothing.
+  const desktopDownload = useMemo(
+    () => (adapter.platform === "web" ? desktopDownloadFor(navigator.userAgent) : null),
+    [adapter.platform],
   );
 
   // Read once, so turning the switch on asks at the next start, not now; About checks on request.
@@ -2440,6 +2447,7 @@ function AppShell({ adapter }: AppProps) {
                     platform={adapter.platform}
                     version={APP_VERSION}
                     onCheckForUpdates={adapter.updater ? () => checkForUpdates({ isRequested: true }) : undefined}
+                    desktopDownload={desktopDownload}
                     settings={settings}
                     onChange={updateSettings}
                   />
@@ -2506,6 +2514,7 @@ function AppShell({ adapter }: AppProps) {
                       onOpenRecent={(workspaceId) => void handleOpenWorkspace(workspaceId)}
                       onRemoveRecent={(workspaceId) => void handleRemoveRecent(workspaceId)}
                       hints={START_HINTS}
+                      desktopDownload={desktopDownload}
                     />
                   )
                 }

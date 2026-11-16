@@ -2774,6 +2774,34 @@ describe("App", () => {
   });
 
   describe("start screen", () => {
+    const WINDOWS_CHROME =
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/142.0.0.0 Safari/537.36";
+
+    it("offers the desktop app in the browser, on the start screen and in About", async () => {
+      const user = userEvent.setup();
+      vi.spyOn(navigator, "userAgent", "get").mockReturnValue(WINDOWS_CHROME);
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await screen.findByRole("button", { name: "Open Folder…" });
+
+      expect(screen.getByRole("link", { name: /Download for Windows/ })).toHaveAttribute("href", "/download/windows");
+
+      await user.keyboard("{Control>},{/Control}");
+      const dialog = await screen.findByRole("region", { name: "Settings" });
+      await user.click(within(dialog).getByRole("button", { name: "About" }));
+      expect(within(dialog).getByRole("link", { name: "Download for Windows" })).toHaveAttribute(
+        "href",
+        "/download/windows",
+      );
+    });
+
+    it("offers no download in the desktop app", async () => {
+      vi.spyOn(navigator, "userAgent", "get").mockReturnValue(WINDOWS_CHROME);
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability() }} />);
+      await screen.findByRole("button", { name: "Open Folder…" });
+
+      expect(screen.queryByRole("link", { name: /Download for/ })).not.toBeInTheDocument();
+    });
+
     it("shows key hints, not buttons, once a folder is open", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);

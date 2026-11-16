@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 
 import { COMMAND_CATEGORIES, formatShortcut, type Command } from "../../commands";
+import type { DesktopDownload } from "../../domain/desktop-download";
 import {
   isValidOpenSizeMb,
   MAX_OPEN_SIZE_MB_LIMIT,
@@ -228,15 +229,24 @@ interface AboutSectionProps extends SettingsSectionProps {
   platform: string;
   version: string;
   onCheckForUpdates?: () => Promise<void>;
+  /** The desktop installer to offer in the browser, or null where there is none to offer. */
+  desktopDownload?: DesktopDownload | null;
 }
 
 /**
- * The version, and the updater where the host has one.
+ * The version, the updater where the host has one, and in the browser a link to the desktop app.
  *
  * @param props - AboutSection properties.
  * @returns Section content.
  */
-export function AboutSection({ platform, version, onCheckForUpdates, settings, onChange }: AboutSectionProps) {
+export function AboutSection({
+  platform,
+  version,
+  onCheckForUpdates,
+  desktopDownload = null,
+  settings,
+  onChange,
+}: AboutSectionProps) {
   const [isChecking, setIsChecking] = useState(false);
   const checkAtStartupId = useId();
 
@@ -273,6 +283,11 @@ export function AboutSection({ platform, version, onCheckForUpdates, settings, o
             >
               Check for Updates
             </button>
+          )}
+          {desktopDownload && (
+            <a href={desktopDownload.href} className="btn sm">
+              {desktopDownload.label}
+            </a>
           )}
         </SettingsRow>
         {onCheckForUpdates && (
