@@ -89,6 +89,9 @@ export function useReorderDrag(
     const startOf = (rect: DOMRect) => (isRow ? rect.left : rect.top);
     const endOf = (rect: DOMRect) => (isRow ? rect.right : rect.bottom);
 
+    // A second pointer, such as a finger on a touch screen during a mouse drag, does not steer it.
+    const pointerId = event.pointerId;
+    const isOther = (other: PointerEvent) => other.pointerId !== pointerId;
     const startPoint = pointerAt(event);
     const startScroll = scrollOf();
     let point = startPoint;
@@ -183,6 +186,9 @@ export function useReorderDrag(
     };
 
     const handleMove = (move: PointerEvent) => {
+      if (isOther(move)) {
+        return;
+      }
       point = pointerAt(move);
       if (!isDragging) {
         if (Math.abs(point - startPoint) < DRAG_THRESHOLD_PX) {
@@ -217,7 +223,10 @@ export function useReorderDrag(
       settleTimer = window.setTimeout(complete, REORDER_SETTLE_MS);
     };
 
-    const handleUp = () => {
+    const handleUp = (up: PointerEvent) => {
+      if (isOther(up)) {
+        return;
+      }
       if (!isDragging || from < 0) {
         stop();
         return;
@@ -243,7 +252,7 @@ export function useReorderDrag(
       cancelAnimationFrame(frame);
       window.removeEventListener("pointermove", handleMove);
       window.removeEventListener("pointerup", handleUp);
-      window.removeEventListener("pointercancel", stop);
+      window.removeEventListener("pointercancel", handleCancel);
       window.removeEventListener("keydown", handleKeyDown, true);
     };
 
@@ -258,9 +267,15 @@ export function useReorderDrag(
       finish();
     };
 
+    const handleCancel = (cancel: PointerEvent) => {
+      if (!isOther(cancel)) {
+        stop();
+      }
+    };
+
     window.addEventListener("pointermove", handleMove);
     window.addEventListener("pointerup", handleUp);
-    window.addEventListener("pointercancel", stop);
+    window.addEventListener("pointercancel", handleCancel);
     window.addEventListener("keydown", handleKeyDown, true);
     stopRef.current = stop;
   };

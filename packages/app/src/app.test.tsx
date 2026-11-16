@@ -652,6 +652,18 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Open explorer" })).toBeInTheDocument();
   });
 
+  it("keeps a closed explorer out of the tab order, since it is only slid out of view", async () => {
+    const user = userEvent.setup();
+    render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+    await openFolderFromWelcome(user);
+    const explorer = screen.getByRole("navigation", { name: "File Explorer" });
+    expect(explorer).not.toHaveAttribute("inert");
+
+    await user.click(screen.getByRole("button", { name: "Close explorer" }));
+
+    expect(explorer).toHaveAttribute("inert");
+  });
+
   it("creates a new file via the root context menu and refreshes the tree", async () => {
     const user = userEvent.setup();
     const mockWorkspace = createMockWorkspaceCapability();
@@ -1975,6 +1987,20 @@ describe("App", () => {
       await user.keyboard("{Shift>}{ArrowLeft}{/Shift}");
       expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["readme.md", "data.csv"]);
       expect(getTab("readme.md")).toHaveFocus();
+    });
+
+    it("leaves focus alone on a later change after Shift+Arrow at the end of the row moved nothing", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      await user.click(screen.getByText("readme.md"));
+      getTab("readme.md").focus();
+
+      await user.keyboard("{Shift>}{ArrowRight}{/Shift}");
+      await user.click(screen.getByText("data.csv"));
+      await waitFor(() => expect(getTab("data.csv")).toBeInTheDocument());
+
+      expect(getTab("readme.md")).not.toHaveFocus();
     });
 
     it("moves the active tab with Move Tab Left and Move Tab Right in the palette", async () => {

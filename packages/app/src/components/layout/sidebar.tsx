@@ -256,6 +256,8 @@ export function Sidebar({
       {isOpen && <div aria-hidden="true" onClick={onClose} className="fixed inset-0 z-30 bg-black/40 md:hidden" />}
       <nav
         aria-label="File Explorer"
+        // Closed, the panel is only slid away or zero wide, so its controls would still take focus.
+        inert={!isOpen}
         // The panel's width animates open and closed while its content keeps the open width, so the
         // rows slide in with the edge instead of rewrapping on every frame.
         className={`bg-chrome text-text fixed top-11 bottom-0 left-0 z-40 flex w-[85vw] max-w-72 min-w-0 flex-none flex-col overflow-hidden transition-[width,transform] duration-300 ease-(--ease-move) select-none motion-reduce:transition-none md:static md:z-auto md:max-w-none ${

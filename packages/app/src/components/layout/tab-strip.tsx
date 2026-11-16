@@ -112,7 +112,7 @@ export function TabStrip({
       const key = event.currentTarget.dataset.tabKey;
       const index = documents.findIndex((doc) => doc.key === key);
       event.preventDefault();
-      if (key !== undefined && index >= 0) {
+      if (key !== undefined && index >= 0 && documents[index + step]) {
         onReorder(key, index + step);
         movedKeyRef.current = key;
       }

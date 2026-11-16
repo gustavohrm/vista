@@ -112,7 +112,7 @@ export function Tooltip({ text, shortcut, position, align = "center", className,
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLSpanElement>) => {
-    if (event.key === "Escape" && isOpen) {
+    if (event.key === "Escape") {
       dismiss();
     }
   };

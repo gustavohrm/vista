@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from "motion/react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 /** How long a shell part takes to come in, in seconds. Leaving takes two thirds of it. */
 const ENTER_SECONDS = 0.3;
@@ -23,6 +23,8 @@ interface ShellRevealProps {
  */
 export function ShellReveal({ axis, children }: ShellRevealProps) {
   const isReduced = useReducedMotion() ?? false;
+  // Clipped only while the size changes: once in, tooltips in the part reach past its edge.
+  const [isResizing, setIsResizing] = useState(false);
   const closed = { [axis]: 0, opacity: 0 };
   const open = { [axis]: "auto", opacity: 1 };
   return (
@@ -30,7 +32,9 @@ export function ShellReveal({ axis, children }: ShellRevealProps) {
       initial={closed}
       animate={{ ...open, transition: { duration: isReduced ? 0 : ENTER_SECONDS, ease: EASE_MOVE } }}
       exit={{ ...closed, transition: { duration: isReduced ? 0 : EXIT_SECONDS, ease: EASE_MOVE } }}
-      className={`flex flex-none overflow-hidden ${axis === "width" ? "flex-row" : "flex-col"}`}
+      onAnimationStart={() => setIsResizing(true)}
+      onAnimationComplete={() => setIsResizing(false)}
+      className={`flex flex-none ${isResizing ? "overflow-hidden" : ""} ${axis === "width" ? "flex-row" : "flex-col"}`}
     >
       {children}
     </motion.div>

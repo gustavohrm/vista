@@ -63,6 +63,22 @@ describe("StartScreen", () => {
     expect(formatLastOpened(new Date(2025, 10, 3).getTime(), now)).toMatch(/2025/);
   });
 
+  it("calls all of yesterday Yesterday when it was 25 hours long", () => {
+    const zone = process.env.TZ;
+    // New York's clocks went back on 2026-11-01, so that day ran 25 hours.
+    process.env.TZ = "America/New_York";
+    try {
+      const now = new Date(2026, 10, 2, 12).getTime();
+      expect(formatLastOpened(new Date(2026, 10, 1, 0, 30).getTime(), now)).toBe("Yesterday");
+    } finally {
+      if (zone === undefined) {
+        delete process.env.TZ;
+      } else {
+        process.env.TZ = zone;
+      }
+    }
+  });
+
   it("lists the recent workspaces with their folders, and says which one needs permission", async () => {
     const user = userEvent.setup();
     const { onOpenRecent, onRemoveRecent } = renderStartScreen(false, [

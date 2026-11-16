@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from "motion/react";
-import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import type { WorkspaceColor, WorkspaceIcon } from "../../domain/workspaces";
 import { Tooltip } from "../feedback/tooltip";
@@ -42,8 +42,11 @@ export function SettingsPage({ section, onSectionChange, workspace, onClose, chi
   const isReducedMotion = useReducedMotion() ?? false;
   const navRef = useRef<HTMLElement>(null);
 
+  // Taken as the page first renders, before it moves focus: StrictMode runs the effect below twice,
+  // and the second run would find the page's own item focused.
+  const [opener] = useState(() => (document.activeElement instanceof HTMLElement ? document.activeElement : null));
+
   useEffect(() => {
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     navRef.current?.querySelector<HTMLElement>("[aria-current='page']")?.focus();
     return () => {
       // Focus left inside the page goes nowhere once it is gone, so it goes back to the opener.
@@ -52,7 +55,7 @@ export function SettingsPage({ section, onSectionChange, workspace, onClose, chi
         opener.focus();
       }
     };
-  }, []);
+  }, [opener]);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === "Escape" && !event.defaultPrevented) {

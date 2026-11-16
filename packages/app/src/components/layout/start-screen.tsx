@@ -158,7 +158,7 @@ function Intro({ children }: { children: ReactNode }) {
   const [phase, setPhase] = useState<IntroPhase>(() => (hasPlayedIntro || isReduced ? "done" : "write"));
   const [offset, setOffset] = useState<{ x: number; y: number } | null>(null);
   const screenRef = useRef<HTMLDivElement>(null);
-  const logoRef = useRef<HTMLDivElement>(null);
+  const logoRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     hasPlayedIntro = true;
@@ -201,7 +201,8 @@ function Intro({ children }: { children: ReactNode }) {
   return (
     <div ref={screenRef} className="my-auto flex w-full max-w-md flex-col gap-10">
       <h1 className="flex">
-        <motion.div
+        {/* A span, as a heading holds only phrasing content. */}
+        <motion.span
           ref={logoRef}
           initial={false}
           animate={isLarge ? { x: offset.x, y: offset.y, scale: INTRO_SCALE } : { x: 0, y: 0, scale: 1 }}
@@ -218,7 +219,7 @@ function Intro({ children }: { children: ReactNode }) {
               <span className="visually-hidden">Vista</span>
             </>
           )}
-        </motion.div>
+        </motion.span>
       </h1>
       <motion.div
         initial={false}
@@ -243,7 +244,8 @@ export function formatLastOpened(timestamp: number, now = Date.now()): string {
   if (timestamp >= startOfToday) {
     return "Today";
   }
-  if (timestamp >= startOfToday - 24 * 60 * 60 * 1000) {
+  // The local start of yesterday, not 24 hours back, since a day a clock change shifts is 23 or 25 hours.
+  if (timestamp >= new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1).getTime()) {
     return "Yesterday";
   }
   return day.toLocaleDateString(undefined, {
