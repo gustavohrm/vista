@@ -109,7 +109,13 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
       return updateDocument(state, action.key, (doc) =>
         doc.content === action.content || doc.isReadOnly || doc.isPending
           ? doc
-          : { ...doc, content: action.content, isDirty: true },
+          : {
+              ...doc,
+              content: action.content,
+              isDirty: true,
+              // An edit can grow a CSV past what the table shows; the tab then moves to the raw view.
+              viewMode: resolveViewMode(doc.extension, doc.viewMode, action.content),
+            },
       );
     case "saved":
       // The buffer may have changed while the write was in flight; only what was written is clean.

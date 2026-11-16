@@ -428,6 +428,17 @@ describe("CSV files too large for the table", () => {
     expect(state.documents[0]?.viewMode).toBe("enriched");
   });
 
+  it("moves a table to the raw view when an edit grows it past the limit", () => {
+    let state = documentsReducer(INITIAL_DOCUMENTS_STATE, {
+      type: "open",
+      folderId: WS,
+      path: "small.csv",
+      file: loaded("Name\nAda\n"),
+    });
+    state = documentsReducer(state, { type: "edit", key: documentKey(WS, "small.csv"), content: tooLarge });
+    expect(state.documents[0]?.viewMode).toBe("raw");
+  });
+
   it("keeps one in the raw view when the table is asked for", () => {
     let state = documentsReducer(INITIAL_DOCUMENTS_STATE, {
       type: "open",

@@ -65,28 +65,28 @@ export const MAX_TABLE_CELLS = 10_000;
 
 /**
  * Whether the table can show a file: whether it has at most `MAX_TABLE_CELLS` cells, counted as the
- * first record's fields times the records. It stops counting at the limit, so a large file costs no
- * more than one at the limit, and a line break inside a quoted cell counts as a record, which errs
- * toward the raw view.
+ * widest record's fields times the records, since the table gives every row the widest record's
+ * columns. It parses record by record and stops once past the limit, so a large file costs no more
+ * than one at the limit.
  *
  * @param content - The file's text.
  * @returns Whether the table can show it.
  */
 export function fitsTable(content: string): boolean {
-  const first = Papa.parse<string[]>(content, { preview: 1 });
-  const columns = Math.max(1, first.data[0]?.length ?? 1);
-  const maxRecords = Math.floor(MAX_TABLE_CELLS / columns);
-  const newline = first.meta.linebreak || "\n";
-  let records = 1;
-  for (let at = content.indexOf(newline); at !== -1; at = content.indexOf(newline, at + newline.length)) {
-    // A final line break ends the last record rather than starting one.
-    if (at + newline.length === content.length) {
-      break;
-    }
-    records += 1;
-    if (records > maxRecords) {
-      return false;
-    }
-  }
-  return true;
+  // A final line break ends the last record rather than starting one, as in `parseCsv`.
+  const text = content.replace(/(\r\n|\r|\n)$/, "");
+  let records = 0;
+  let width = 1;
+  let fits = true;
+  Papa.parse<string[]>(text, {
+    step: (row, parser) => {
+      records += 1;
+      width = Math.max(width, row.data.length);
+      if (records * width > MAX_TABLE_CELLS) {
+        fits = false;
+        parser.abort();
+      }
+    },
+  });
+  return fits;
 }

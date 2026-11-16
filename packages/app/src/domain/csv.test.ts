@@ -68,6 +68,16 @@ describe("fitsTable", () => {
     expect(fitsTable(csvOf(MAX_TABLE_CELLS / 20, 20, "\r"))).toBe(true);
   });
 
+  it("counts the widest record, which every row of the table takes", () => {
+    const wide = Array.from({ length: MAX_TABLE_CELLS / 100 + 1 }, (_, c) => `${c}`).join(",");
+    expect(fitsTable(["Name", ...Array.from({ length: 99 }, () => wide)].join("\n"))).toBe(false);
+  });
+
+  it("does not count a line break inside a quoted cell as a record", () => {
+    const quoted = Array.from({ length: MAX_TABLE_CELLS }, () => '"a\nb"').join("\n");
+    expect(fitsTable(quoted)).toBe(true);
+  });
+
   it("fits an empty file", () => {
     expect(fitsTable("")).toBe(true);
   });
