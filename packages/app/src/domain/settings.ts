@@ -16,6 +16,11 @@ export interface FileSettings {
 export interface UpdateSettings {
   /** Whether to check at every start. Off by default, so Vista makes no update request the user didn't ask for. */
   checkAtStartup: boolean;
+  /**
+   * The version whose update notice the user dismissed, so the notice stays away until a newer one
+   * is out. Null when none was dismissed.
+   */
+  dismissedVersion: string | null;
 }
 
 /** User preferences, stored by the browser or webview under `SETTINGS_STORAGE_KEY`. */
@@ -43,7 +48,10 @@ export const MAX_OPEN_SIZE_MB_LIMIT = 512;
 /** Far above a note or a spreadsheet export, and below where the editors stop responding. */
 export const DEFAULT_FILE_SETTINGS: FileSettings = { maxOpenSizeMb: 10 };
 
-export const DEFAULT_UPDATE_SETTINGS: UpdateSettings = { checkAtStartup: false };
+export const DEFAULT_UPDATE_SETTINGS: UpdateSettings = { checkAtStartup: false, dismissedVersion: null };
+
+/** Longer than any version Vista publishes, such as `1.2.3-beta.4`, and short enough to bound a damaged store. */
+const MAX_VERSION_LENGTH = 64;
 
 export const DEFAULT_SETTINGS: Settings = {
   version: 1,
@@ -111,10 +119,17 @@ function parseFileSettings(value: unknown): FileSettings {
 }
 
 function parseUpdateSettings(value: unknown): UpdateSettings {
-  if (!isRecord(value) || typeof value.checkAtStartup !== "boolean") {
+  if (!isRecord(value)) {
     return DEFAULT_UPDATE_SETTINGS;
   }
-  return { checkAtStartup: value.checkAtStartup };
+  const { checkAtStartup, dismissedVersion } = value;
+  return {
+    checkAtStartup: typeof checkAtStartup === "boolean" ? checkAtStartup : DEFAULT_UPDATE_SETTINGS.checkAtStartup,
+    dismissedVersion:
+      typeof dismissedVersion === "string" && dismissedVersion !== "" && dismissedVersion.length <= MAX_VERSION_LENGTH
+        ? dismissedVersion
+        : DEFAULT_UPDATE_SETTINGS.dismissedVersion,
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
