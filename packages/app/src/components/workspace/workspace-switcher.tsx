@@ -34,11 +34,12 @@ interface WorkspaceSwitcherProps {
   onSwitch: (workspaceId: string) => void;
   onOpenFolder: () => void;
   onOpenSettings: () => void;
+  onClose: () => void;
 }
 
 /**
  * The button at the top left that shows the open workspace, and its menu: the recent workspaces to
- * switch to, then Open Folder and Workspace Settings. Adding a folder to the workspace lives in the
+ * switch to, then Open Folder, Workspace Settings, and Close Workspace. Adding a folder to the workspace lives in the
  * explorer's header, beside the folders it adds to.
  */
 export function WorkspaceSwitcher({
@@ -47,6 +48,7 @@ export function WorkspaceSwitcher({
   onSwitch,
   onOpenFolder,
   onOpenSettings,
+  onClose,
 }: WorkspaceSwitcherProps) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState<{ x: number; y: number } | null>(null);
@@ -71,6 +73,7 @@ export function WorkspaceSwitcher({
       icon: <i className="ic-settings-2" aria-hidden="true" />,
       onSelect: onOpenSettings,
     },
+    { label: "Close Workspace", icon: <i className="ic-folder-x" aria-hidden="true" />, onSelect: onClose },
   ];
 
   return (

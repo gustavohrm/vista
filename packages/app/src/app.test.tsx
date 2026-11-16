@@ -1535,6 +1535,24 @@ describe("App", () => {
       expect(capability.restoreFolder).toHaveBeenLastCalledWith("notes", { interactive: true });
     });
 
+    it("closes the workspace to the start screen, and reopening it brings back its tabs", async () => {
+      const user = userEvent.setup();
+      const { capability } = twoWorkspaces();
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await user.click((await findFileRows("a.txt"))[0]!);
+      await screen.findByRole("textbox", { name: "Raw text content of a.txt" });
+
+      await user.click(screen.getByRole("button", { name: "Research" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Close Workspace" }));
+
+      expect(await screen.findByRole("heading", { name: "Recent workspaces" })).toBeInTheDocument();
+      expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+      expect(JSON.parse(localStorage.getItem("vista.workspaces") ?? "null").lastWorkspaceId).toBeNull();
+
+      await user.click(screen.getByRole("button", { name: "Research" }));
+      expect(await screen.findByRole("textbox", { name: "Raw text content of a.txt" })).toBeInTheDocument();
+    });
+
     it("lists every remembered workspace on the start screen with its folders", async () => {
       const { capability } = twoWorkspaces(null);
       render(<App adapter={{ platform: "web", workspace: capability }} />);

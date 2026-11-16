@@ -828,6 +828,23 @@ function AppShell({ adapter }: AppProps) {
     [confirmUnsavedChangesInAllDocuments, openStoredWorkspace, toast, workspaceStore],
   );
 
+  /**
+   * Closes the open workspace and shows the start screen, after asking about unsaved edits. Its tabs
+   * stay in its session for the next time it opens.
+   */
+  const handleCloseWorkspace = useCallback(async () => {
+    const current = workspaceRef.current;
+    if (!current || !(await confirmUnsavedChangesInAllDocuments())) {
+      return;
+    }
+    workspaceStore.markClosed(current.id);
+    setRecentFolders((known) => new Map(known).set(current.id, summarizeFolders(current.folders)));
+    sessionRestoreRef.current = null;
+    setWorkspace(null);
+    setExpandedKeys(new Set());
+    dispatchDocuments({ type: "close", keys: documentsRef.current.documents.map((doc) => doc.key) });
+  }, [confirmUnsavedChangesInAllDocuments, workspaceStore]);
+
   const handleRemoveRecent = useCallback(
     async (workspaceId: string) => {
       const record = workspaceStore.workspace(workspaceId);
@@ -1807,6 +1824,13 @@ function AppShell({ adapter }: AppProps) {
         run: () => setSettingsSection("workspace"),
       },
       {
+        id: "workspace.close",
+        category: "Workspace",
+        label: "Close Workspace",
+        isEnabled: !isPromptingForUnsavedChanges && workspace !== null,
+        run: handleCloseWorkspace,
+      },
+      {
         id: "file.newFile",
         category: "File",
         label: "New File",
@@ -2090,6 +2114,7 @@ function AppShell({ adapter }: AppProps) {
       documentsState.documents.length,
       editorSettings,
       handleAddFolder,
+      handleCloseWorkspace,
       handleOpenFolder,
       hasReadyFolder,
       handleViewModeChange,
@@ -2183,6 +2208,7 @@ function AppShell({ adapter }: AppProps) {
                   onSwitch={(workspaceId) => void handleOpenWorkspace(workspaceId)}
                   onOpenFolder={() => void handleOpenFolder()}
                   onOpenSettings={() => setSettingsSection("workspace")}
+                  onClose={() => void handleCloseWorkspace()}
                 />
               }
               goToFileShortcut={GO_TO_FILE_SHORTCUT}

@@ -41,6 +41,8 @@ export interface WorkspaceStore {
   /** The workspace Open Folder opens for a folder: the one that is exactly it, or a new one. */
   openFolder(folder: WorkspaceFolder): WorkspaceRecord;
   markOpened(workspaceId: string): void;
+  /** Notes that the workspace was closed, so the next start shows the start screen instead of reopening it. */
+  markClosed(workspaceId: string): void;
   /** Changes a workspace's name, icon, or colour. The name must already pass `validateWorkspaceName`. */
   updateDetails(workspaceId: string, changes: WorkspaceDetails): WorkspaceRecord | null;
   /** `location` is where the folder is from the home folder; only a workspace stored in its folder keeps it. */
@@ -166,6 +168,12 @@ export function createWorkspaceStore(
         return workspace;
       }
       return opened(findWorkspaceForFolder(list, folder.id) ?? createFor(folder.id, folder.name));
+    },
+
+    markClosed(workspaceId) {
+      if (list.lastWorkspaceId === workspaceId) {
+        save({ ...list, lastWorkspaceId: null });
+      }
     },
 
     markOpened(workspaceId) {

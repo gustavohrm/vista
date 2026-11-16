@@ -342,6 +342,20 @@ describe("recent workspaces", () => {
 
     expect(createWorkspaceStore(storage, options()).lastWorkspace()).toBeNull();
   });
+
+  it("no longer reopens a closed workspace at startup, but keeps it and its session", () => {
+    const storage = memoryStorage();
+    const store = clockedStore(storage);
+    const workspace = store.openFolder(notes);
+    const session: Session = { version: 1, tabs: [], activeIndex: -1, expanded: {} };
+    store.saveSession(workspace.id, session);
+    store.markClosed(workspace.id);
+
+    const reloaded = createWorkspaceStore(storage, options());
+    expect(reloaded.lastWorkspace()).toBeNull();
+    expect(reloaded.workspace(workspace.id)).not.toBeNull();
+    expect(reloaded.loadSession(workspace.id)).toEqual(session);
+  });
 });
 
 describe("migrateLegacyFolder", () => {
