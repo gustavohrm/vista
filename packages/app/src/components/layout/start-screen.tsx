@@ -29,6 +29,8 @@ interface StartScreenProps {
   onRemoveRecent: (workspaceId: string) => void;
   /** Key hints shown while a workspace is open and no file is. */
   hints: readonly StartHint[];
+  /** A quiet notice under the Start list, such as a newer version being out; the title bar shows it otherwise. */
+  notice?: ReactNode;
 }
 
 /** A row of the start screen's lists: icon, text, and an optional detail at the right end. */
@@ -56,6 +58,7 @@ export function StartScreen({
   onOpenRecent,
   onRemoveRecent,
   hints,
+  notice,
 }: StartScreenProps) {
   if (!hasWorkspace && isLoading) {
     return (
@@ -106,6 +109,7 @@ export function StartScreen({
               </button>
             </li>
           </ul>
+          {notice && <div className="mt-2 flex">{notice}</div>}
         </section>
         {recents.length > 0 && (
           <section aria-labelledby="recent-workspaces" className="flex flex-col gap-1.5">

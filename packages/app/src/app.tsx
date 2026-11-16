@@ -14,6 +14,7 @@ import type { FindMode } from "./components/editor/find-bar";
 import type { CursorInfo, EditorPosition, RawEditorStateCache } from "./components/editor/raw-editor";
 import { ToastProvider, useToast } from "./components/feedback/toast";
 import { UnsavedChangesDialog, type UnsavedChangesChoice } from "./components/feedback/unsaved-changes-dialog";
+import { UpdateNotice } from "./components/feedback/update-notice";
 import { ActivityRail, DrawerActivities } from "./components/layout/activity-rail";
 import { ShellReveal } from "./components/layout/shell-reveal";
 import { Sidebar, type ExplorerEntry, type ExplorerFolder, type NewEntryRequest } from "./components/layout/sidebar";
@@ -433,11 +434,48 @@ function AppShell({ adapter }: AppProps) {
   const confirmUnsavedChangesRef = useRef(confirmUnsavedChangesInAllDocuments);
   confirmUnsavedChangesRef.current = confirmUnsavedChangesInAllDocuments;
 
+  /** A newer version the startup check found, shown as a quiet notice until installed or dismissed. */
+  const [noticedUpdate, setNoticedUpdate] = useState<AvailableUpdate | null>(null);
+
   /**
-   * Asks the updater for a newer version and offers to install it. At startup, which happens only
-   * when the user turned on **Check at startup**, the check is quiet:
-   * being offline is not something to interrupt the user about. Asked for from About, it says
-   * what it found. `pending` is a check already under way, to handle its result instead of asking again.
+   * Asks to install `update` and installs it once accepted, after asking about unsaved changes, since
+   * installing restarts Vista.
+   */
+  const offerUpdate = useCallback(
+    async (update: AvailableUpdate, isCancelled: () => boolean = () => false) => {
+      const accepted = await toast.confirm({
+        title: `Vista ${update.version} is available`,
+        message: "Install it now? Vista restarts to finish, and asks about unsaved changes first.",
+        confirmLabel: "Install and Restart",
+        cancelLabel: "Later",
+      });
+      // A prompt already open belongs to another flow; replacing it would leave that flow waiting forever.
+      if (!accepted || isCancelled() || isPromptingRef.current || (await confirmUnsavedChangesRef.current()) === null) {
+        return;
+      }
+      toast.show({ kind: "info", text: `Downloading Vista ${update.version}. Vista restarts when it's installed.` });
+      try {
+        await update.install();
+      } catch (err) {
+        console.error("Failed to install the update:", err);
+        toast.show({
+          kind: "error",
+          text: `Couldn't install Vista ${update.version}. You can try again from About in Settings.`,
+        });
+      }
+    },
+    [toast],
+  );
+
+  // Read once, like the switch below: dismissing a notice applies to the next start.
+  const dismissedVersionRef = useRef(settings.updates.dismissedVersion);
+
+  /**
+   * Asks the updater for a newer version. At startup, which happens only when the user turned on
+   * **Check at startup**, the check is quiet: being offline is not something to interrupt the user
+   * about, and a newer version shows as a notice rather than a prompt, unless the user dismissed
+   * that version's notice before. Asked for from About, it says what it found and offers the
+   * install. `pending` is a check already under way, to handle its result instead of asking again.
    */
   const checkForUpdates = useCallback(
     async ({
@@ -475,28 +513,31 @@ function AppShell({ adapter }: AppProps) {
         }
         return;
       }
-      const accepted = await toast.confirm({
-        title: `Vista ${update.version} is available`,
-        message: "Install it now? Vista restarts to finish, and asks about unsaved changes first.",
-        confirmLabel: "Install and Restart",
-        cancelLabel: "Later",
-      });
-      // A prompt already open belongs to another flow; replacing it would leave that flow waiting forever.
-      if (!accepted || isCancelled() || isPromptingRef.current || (await confirmUnsavedChangesRef.current()) === null) {
+      if (!isRequested) {
+        if (update.version !== dismissedVersionRef.current) {
+          setNoticedUpdate(update);
+        }
         return;
       }
-      toast.show({ kind: "info", text: `Downloading Vista ${update.version}. Vista restarts when it's installed.` });
-      try {
-        await update.install();
-      } catch (err) {
-        console.error("Failed to install the update:", err);
-        toast.show({
-          kind: "error",
-          text: `Couldn't install Vista ${update.version}. You can try again from About in Settings.`,
-        });
-      }
+      await offerUpdate(update, isCancelled);
     },
-    [adapter.updater, toast],
+    [adapter.updater, offerUpdate, toast],
+  );
+
+  const dismissUpdateNotice = useCallback(
+    (version: string) => {
+      setNoticedUpdate(null);
+      updateSettings({ updates: { dismissedVersion: version } });
+    },
+    [updateSettings],
+  );
+
+  const updateNotice = noticedUpdate && (
+    <UpdateNotice
+      version={noticedUpdate.version}
+      onInstall={() => void offerUpdate(noticedUpdate)}
+      onDismiss={() => dismissUpdateNotice(noticedUpdate.version)}
+    />
   );
 
   // Read once, so turning the switch on asks at the next start, not now; About checks on request.
@@ -2322,6 +2363,7 @@ function AppShell({ adapter }: AppProps) {
                 />
               }
               goToFileShortcut={GO_TO_FILE_SHORTCUT}
+              notice={updateNotice}
               panels={[
                 {
                   label: "Toggle Explorer",
@@ -2506,6 +2548,7 @@ function AppShell({ adapter }: AppProps) {
                       onOpenRecent={(workspaceId) => void handleOpenWorkspace(workspaceId)}
                       onRemoveRecent={(workspaceId) => void handleRemoveRecent(workspaceId)}
                       hints={START_HINTS}
+                      notice={updateNotice}
                     />
                   )
                 }

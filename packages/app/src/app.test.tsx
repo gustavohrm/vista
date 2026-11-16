@@ -3876,12 +3876,75 @@ describe("App", () => {
       return { updater, install };
     }
 
+    /** Opens the install offer from the notice the startup check leaves. */
+    async function openOffer(user: UserEvent) {
+      await user.click(await screen.findByRole("button", { name: "Update to 0.3.0" }));
+      return screen.findByRole("dialog", { name: "Vista 0.3.0 is available" });
+    }
+
+    it("shows a new version found at startup as a notice, not a prompt", async () => {
+      const { updater, install } = createUpdater();
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), updater }} />);
+
+      expect(await screen.findByRole("button", { name: "Update to 0.3.0" })).toBeInTheDocument();
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(install).not.toHaveBeenCalled();
+    });
+
+    it("keeps a dismissed version's notice away at the next start, but not a newer version's", async () => {
+      const user = userEvent.setup();
+      const { updater } = createUpdater();
+      const { unmount } = render(
+        <App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), updater }} />,
+      );
+
+      await user.click(await screen.findByRole("button", { name: "Dismiss Vista 0.3.0" }));
+
+      expect(screen.queryByRole("button", { name: "Update to 0.3.0" })).not.toBeInTheDocument();
+      expect(JSON.parse(localStorage.getItem("vista.settings") ?? "null")).toMatchObject({
+        updates: { checkAtStartup: true, dismissedVersion: "0.3.0" },
+      });
+      unmount();
+
+      const again = createUpdater();
+      const view = render(
+        <App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), updater: again.updater }} />,
+      );
+      await waitFor(() => expect(again.updater.check).toHaveBeenCalledTimes(1));
+      expect(screen.queryByRole("button", { name: "Update to 0.3.0" })).not.toBeInTheDocument();
+      view.unmount();
+
+      const newer = createUpdater({ check: async () => ({ version: "0.4.0", install: vi.fn() }) });
+      render(
+        <App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), updater: newer.updater }} />,
+      );
+      expect(await screen.findByRole("button", { name: "Update to 0.4.0" })).toBeInTheDocument();
+    });
+
+    it("offers a dismissed version when the user checks from About", async () => {
+      const user = userEvent.setup();
+      localStorage.setItem(
+        "vista.settings",
+        JSON.stringify({ version: 1, updates: { checkAtStartup: false, dismissedVersion: "0.3.0" } }),
+      );
+      const { updater } = createUpdater();
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), updater }} />);
+      await screen.findByRole("button", { name: "Open Folder…" });
+
+      await user.keyboard("{Control>},{/Control}");
+      const settings = await screen.findByRole("region", { name: "Settings" });
+      await user.click(within(settings).getByRole("button", { name: "About" }));
+      await user.click(within(settings).getByRole("button", { name: "Check for Updates" }));
+
+      expect(await screen.findByRole("dialog", { name: "Vista 0.3.0 is available" })).toBeInTheDocument();
+    });
+
     it("offers a new version and installs it when accepted", async () => {
       const user = userEvent.setup();
       const { updater, install } = createUpdater();
       render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), updater }} />);
 
-      const dialog = await screen.findByRole("dialog", { name: "Vista 0.3.0 is available" });
+      const dialog = await openOffer(user);
       await user.click(within(dialog).getByRole("button", { name: "Install and Restart" }));
 
       await waitFor(() => expect(install).toHaveBeenCalledTimes(1));
@@ -3893,7 +3956,7 @@ describe("App", () => {
       const { updater, install } = createUpdater();
       render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), updater }} />);
 
-      const dialog = await screen.findByRole("dialog", { name: "Vista 0.3.0 is available" });
+      const dialog = await openOffer(user);
       await user.click(within(dialog).getByRole("button", { name: "Later" }));
 
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
@@ -3916,7 +3979,7 @@ describe("App", () => {
       await makeReadmeDirty(user);
       release();
 
-      const offer = await screen.findByRole("dialog", { name: "Vista 0.3.0 is available" });
+      const offer = await openOffer(user);
       await user.click(within(offer).getByRole("button", { name: "Install and Restart" }));
       const unsaved = await screen.findByRole("dialog", { name: "Save changes to readme.md?" });
       await user.click(within(unsaved).getByRole("button", { name: "Cancel" }));
@@ -3943,7 +4006,7 @@ describe("App", () => {
       const { updater } = createUpdater({ install: async () => Promise.reject(new Error("signature mismatch")) });
       render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), updater }} />);
 
-      const dialog = await screen.findByRole("dialog", { name: "Vista 0.3.0 is available" });
+      const dialog = await openOffer(user);
       await user.click(within(dialog).getByRole("button", { name: "Install and Restart" }));
 
       expect(
@@ -3952,13 +4015,13 @@ describe("App", () => {
       error.mockRestore();
     });
 
-    it("asks once at startup under StrictMode, and still offers what it found", async () => {
+    it("asks once at startup under StrictMode, and still shows what it found", async () => {
       const { updater } = createUpdater();
       render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), updater }} />, {
         wrapper: StrictMode,
       });
 
-      expect(await screen.findByRole("dialog", { name: "Vista 0.3.0 is available" })).toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: "Update to 0.3.0" })).toBeInTheDocument();
       expect(updater.check).toHaveBeenCalledTimes(1);
     });
 
@@ -3978,6 +4041,7 @@ describe("App", () => {
 
       await waitFor(() => expect(updater.check).toHaveBeenCalledTimes(1));
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Update to/ })).not.toBeInTheDocument();
     });
   });
 });

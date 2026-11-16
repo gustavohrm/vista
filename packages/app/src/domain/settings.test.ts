@@ -28,14 +28,33 @@ describe("parseSettings", () => {
   it("reads the stored update setting", () => {
     const stored = JSON.stringify({ version: 1, updates: { checkAtStartup: true } });
 
-    expect(parseSettings(stored)).toEqual({ ...DEFAULT_SETTINGS, updates: { checkAtStartup: true } });
+    expect(parseSettings(stored)).toEqual({
+      ...DEFAULT_SETTINGS,
+      updates: { checkAtStartup: true, dismissedVersion: null },
+    });
+  });
+
+  it("reads the version whose update notice was dismissed", () => {
+    const stored = JSON.stringify({ version: 1, updates: { checkAtStartup: true, dismissedVersion: "0.4.0" } });
+
+    expect(parseSettings(stored).updates).toEqual({ checkAtStartup: true, dismissedVersion: "0.4.0" });
+  });
+
+  it.each([
+    ["mistyped", 4],
+    ["empty", ""],
+    ["longer than any version", "1".repeat(65)],
+  ])("dismisses no version when the stored one is %s, and keeps the other update setting", (_case, dismissed) => {
+    const stored = JSON.stringify({ version: 1, updates: { checkAtStartup: true, dismissedVersion: dismissed } });
+
+    expect(parseSettings(stored).updates).toEqual({ checkAtStartup: true, dismissedVersion: null });
   });
 
   it.each([
     ["missing, as in settings stored before it existed", { version: 1, editor: { vim: true } }],
     ["mistyped", { version: 1, updates: { checkAtStartup: "yes" } }],
   ])("leaves startup update checks off when the setting is %s", (_case, stored) => {
-    expect(parseSettings(JSON.stringify(stored)).updates).toEqual({ checkAtStartup: false });
+    expect(parseSettings(JSON.stringify(stored)).updates).toEqual({ checkAtStartup: false, dismissedVersion: null });
   });
 
   it("keeps the stored editor settings when the file settings are damaged", () => {
