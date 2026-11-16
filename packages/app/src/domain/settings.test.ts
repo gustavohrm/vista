@@ -34,6 +34,19 @@ describe("parseSettings", () => {
     });
   });
 
+  it("keeps a dismissed version as long as the longest version allowed", () => {
+    const version = "1".repeat(64);
+    const stored = JSON.stringify({ version: 1, updates: { checkAtStartup: true, dismissedVersion: version } });
+
+    expect(parseSettings(stored).updates.dismissedVersion).toBe(version);
+  });
+
+  it("keeps the dismissed version when the startup switch is mistyped", () => {
+    const stored = JSON.stringify({ version: 1, updates: { checkAtStartup: "yes", dismissedVersion: "0.4.0" } });
+
+    expect(parseSettings(stored).updates).toEqual({ checkAtStartup: false, dismissedVersion: "0.4.0" });
+  });
+
   it("reads the version whose update notice was dismissed", () => {
     const stored = JSON.stringify({ version: 1, updates: { checkAtStartup: true, dismissedVersion: "0.4.0" } });
 
