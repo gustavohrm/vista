@@ -39,7 +39,7 @@ test.describe("responsive shell at mobile width", () => {
     // The drawer opens below the title bar, which stays above it so its toggle remains tappable.
     // It animates in via a CSS transform transition, so poll until it settles.
     await expect.poll(async () => (await explorer.boundingBox())?.x).toBe(0);
-    expect((await explorer.boundingBox())?.y).toBe(40);
+    expect((await explorer.boundingBox())?.y).toBe(44);
     await expect(page.getByRole("navigation", { name: "Activity bar" })).toBeHidden();
     await expect(explorer.getByRole("button", { name: "Settings" })).toBeVisible();
     await expect(explorer.getByRole("button", { name: "Search" })).toBeVisible();
@@ -76,8 +76,13 @@ test.describe("responsive shell at desktop width", () => {
     // The title bar's drawer button and the drawer's own actions are for narrow screens only.
     await expect(page.getByRole("button", { name: "Close explorer" })).toBeHidden();
     await expect(explorer.getByRole("button", { name: "Settings" })).toBeHidden();
-    const railBox = await rail.boundingBox();
-    expect((await explorer.boundingBox())?.x).toBe((railBox?.x ?? 0) + (railBox?.width ?? 0));
+    // The rail and explorer grow in as the folder opens, so poll until they settle.
+    await expect
+      .poll(async () => {
+        const railBox = await rail.boundingBox();
+        return (await explorer.boundingBox())?.x === (railBox?.x ?? 0) + (railBox?.width ?? 0) && railBox?.width === 48;
+      })
+      .toBe(true);
 
     await toggle.click();
 

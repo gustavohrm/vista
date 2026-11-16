@@ -29,6 +29,9 @@ function pathText(page: Page) {
 }
 
 test.describe("path bar", () => {
+  // The bar sits beside the explorer, under the frame, so the fixture's long path needs a wide window.
+  test.use({ viewport: { width: 1600, height: 900 } });
+
   test("shows the whole path where it fits", async ({ page }) => {
     await openDeepNote(page);
 
@@ -51,7 +54,7 @@ test.describe("path bar", () => {
       await expect(page.locator(`[id="${bubbleId}"]`)).toHaveText(FULL_PATH);
 
       // With more room the path is fitted again from the whole of it.
-      await page.setViewportSize({ width: 1280, height: 800 });
+      await page.setViewportSize({ width: 1600, height: 900 });
       await expect(text).toHaveText(FULL_PATH);
     });
   });
