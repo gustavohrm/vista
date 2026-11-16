@@ -41,6 +41,7 @@ import {
 } from "./components/settings/vista-sections";
 import { WorkspaceSection } from "./components/settings/workspace-section";
 import { WorkspaceSwitcher, type FolderStatus, type RecentWorkspace } from "./components/workspace/workspace-switcher";
+import { type CpuArchitecture, type DesktopDownload, desktopDownloadFor } from "./domain/desktop-download";
 import { documentLocation } from "./domain/document-location";
 import { imageMimeType, resolveImageSource } from "./domain/image-source";
 import { joinWorkspacePath } from "./domain/path-validation";
@@ -553,6 +554,24 @@ function AppShell({ adapter }: AppProps) {
       onDismiss={() => dismissUpdateNotice(noticedUpdate.version)}
     />
   );
+
+  // The browser offers the desktop app; the desktop app offers nothing.
+  const [desktopDownload, setDesktopDownload] = useState<DesktopDownload | null>(null);
+  useEffect(() => {
+    if (adapter.platform !== "web") {
+      return;
+    }
+    let isCancelled = false;
+    void (async () => {
+      const cpu = await readCpuArchitecture();
+      if (!isCancelled) {
+        setDesktopDownload(desktopDownloadFor(navigator.userAgent, cpu));
+      }
+    })();
+    return () => {
+      isCancelled = true;
+    };
+  }, [adapter.platform]);
 
   // Read once, so turning the switch on asks at the next start, not now; About checks on request.
   const checkAtStartupRef = useRef(settings.updates.checkAtStartup);
@@ -2415,6 +2434,7 @@ function AppShell({ adapter }: AppProps) {
                 onShowExplorer={showExplorer}
                 isSettingsOpen={settingsSection !== null}
                 onToggleSettings={toggleSettings}
+                desktopDownload={desktopDownload}
               />
             </ShellReveal>
           )}
@@ -2422,7 +2442,11 @@ function AppShell({ adapter }: AppProps) {
             <ShellReveal key="explorer" axis="width">
               <Sidebar
                 activities={
-                  <DrawerActivities isSettingsOpen={settingsSection !== null} onToggleSettings={toggleSettings} />
+                  <DrawerActivities
+                    isSettingsOpen={settingsSection !== null}
+                    onToggleSettings={toggleSettings}
+                    desktopDownload={desktopDownload}
+                  />
                 }
                 folders={explorerFolders}
                 activeEntry={
@@ -2562,6 +2586,7 @@ function AppShell({ adapter }: AppProps) {
                       onOpenRecent={(workspaceId) => void handleOpenWorkspace(workspaceId)}
                       onRemoveRecent={(workspaceId) => void handleRemoveRecent(workspaceId)}
                       hints={START_HINTS}
+                      desktopDownload={desktopDownload}
                       notice={updateNotice}
                     />
                   )
@@ -2907,4 +2932,29 @@ function describeUnrememberedFolder(workspace: OpenWorkspace, picked: WorkspaceF
 
 function describeUnreadableFile(folderName: string): string {
   return `"${folderName}" has workspace details this version of Vista can't read, so it opened as a plain folder.`;
+}
+
+/** The part of User-Agent Client Hints that reads the processor; only Chromium has it, and TypeScript's DOM types do not. */
+interface NavigatorWithClientHints {
+  userAgentData?: { getHighEntropyValues(hints: string[]): Promise<Partial<CpuArchitecture>> };
+}
+
+/**
+ * Asks the browser for its processor, which Chromium leaves out of its user agent.
+ *
+ * @returns The processor, or null where the browser does not say, such as Firefox, or Chromium on a
+ *   non-secure origin or under a Permissions Policy that blocks it.
+ */
+async function readCpuArchitecture(): Promise<CpuArchitecture | null> {
+  const clientHints = (navigator as NavigatorWithClientHints).userAgentData;
+  if (!clientHints) {
+    return null;
+  }
+  try {
+    const { architecture, bitness } = await clientHints.getHighEntropyValues(["architecture", "bitness"]);
+    // Chromium answers with empty strings where it cannot tell.
+    return architecture && bitness ? { architecture, bitness } : null;
+  } catch {
+    return null;
+  }
 }

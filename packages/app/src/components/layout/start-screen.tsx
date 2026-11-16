@@ -2,6 +2,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { formatShortcut } from "../../commands";
+import type { DesktopDownload } from "../../domain/desktop-download";
 import { LOGO_WRITE_MS, LogoWrite } from "../brand/logo-write";
 import { VistaLoader, VistaLogo } from "../brand/vista-logo";
 import { WorkspaceGlyph } from "../workspace/workspace-glyph";
@@ -29,6 +30,8 @@ interface StartScreenProps {
   onRemoveRecent: (workspaceId: string) => void;
   /** Key hints shown while a workspace is open and no file is. */
   hints: readonly StartHint[];
+  /** The desktop installer to offer in the browser, standing in for the rail's link, or null where there is none. */
+  desktopDownload?: DesktopDownload | null;
   /** A quiet notice under the Start list, such as a newer version being out; the title bar shows it otherwise. */
   notice?: ReactNode;
 }
@@ -41,8 +44,8 @@ const HEADING_CLASS = "text-text-faint text-xs font-medium";
 
 /**
  * Fills the editor area while no file is open. While a folder is being opened or restored it shows
- * the loader. Without a workspace it shows the logo, the Start list (Open Folder and Settings), and
- * the recent workspaces. With a workspace it shows only a few key hints: every action already has
+ * the loader. Without a workspace it shows the logo, the Start list (Open Folder, then Settings and
+ * in the browser the desktop download, which stand in for the rail it hides), and the recent workspaces. With a workspace it shows only a few key hints: every action already has
  * its home in the shell, so the empty frame repeats none of them.
  *
  * @param props - StartScreen properties.
@@ -58,6 +61,7 @@ export function StartScreen({
   onOpenRecent,
   onRemoveRecent,
   hints,
+  desktopDownload = null,
   notice,
 }: StartScreenProps) {
   if (!hasWorkspace && isLoading) {
@@ -108,6 +112,14 @@ export function StartScreen({
                 </kbd>
               </button>
             </li>
+            {desktopDownload && (
+              <li>
+                <a href={desktopDownload.href} className={ROW_CLASS}>
+                  <i className="ic-monitor-down text-text-muted flex-none text-base" aria-hidden="true" />
+                  <span className="text-text-strong flex-1">{desktopDownload.label}</span>
+                </a>
+              </li>
+            )}
           </ul>
           {notice && <div className="mt-2 flex">{notice}</div>}
         </section>

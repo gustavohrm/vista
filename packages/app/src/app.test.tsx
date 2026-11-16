@@ -2,7 +2,7 @@ import { EditorView } from "@codemirror/view";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { StrictMode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { version as APP_VERSION } from "../package.json";
 import { App } from "./app";
@@ -2774,6 +2774,80 @@ describe("App", () => {
   });
 
   describe("start screen", () => {
+    const WINDOWS_CHROME =
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/142.0.0.0 Safari/537.36";
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("offers the desktop app in the browser, on the start screen and then in the rail", async () => {
+      const user = userEvent.setup();
+      vi.spyOn(navigator, "userAgent", "get").mockReturnValue(WINDOWS_CHROME);
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await screen.findByRole("button", { name: "Open Folder…" });
+
+      expect(await screen.findByRole("link", { name: "Download for Windows" })).toHaveAttribute(
+        "href",
+        "/download/windows",
+      );
+
+      await openFolderFromWelcome(user);
+      const rail = screen.getByRole("navigation", { name: "Activity bar" });
+      expect(within(rail).getByRole("link", { name: "Download Vista for Windows" })).toHaveAttribute(
+        "href",
+        "/download/windows",
+      );
+    });
+
+    it.each([
+      ["reports an ARM processor", () => Promise.resolve({ architecture: "arm", bitness: "64" }), null],
+      [
+        "reports an x86_64 processor",
+        () => Promise.resolve({ architecture: "x86", bitness: "64" }),
+        "Download for Linux",
+      ],
+      [
+        "cannot name its processor",
+        () => Promise.resolve({ architecture: "", bitness: "" }),
+        "Download for Linux (x86_64)",
+      ],
+      [
+        "is blocked from naming its processor",
+        () => Promise.reject(new DOMException("Blocked", "NotAllowedError")),
+        "Download for Linux (x86_64)",
+      ],
+    ])(
+      "offers the matching download when Chromium on Linux, whose user agent says x86_64, %s",
+      async (_case, answer, label) => {
+        vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/142.0.0.0 Safari/537.36",
+        );
+        const getHighEntropyValues = vi.fn(answer);
+        Object.defineProperty(navigator, "userAgentData", { value: { getHighEntropyValues }, configurable: true });
+        try {
+          render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+          await screen.findByRole("button", { name: "Open Folder…" });
+          await waitFor(() => expect(getHighEntropyValues).toHaveBeenCalled());
+          // Let the reported processor reach the screen before checking what it offers.
+          await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+
+          const links = screen.queryAllByRole("link", { name: /Download for/ }).map((link) => link.textContent);
+          expect(links).toEqual(label ? [label] : []);
+        } finally {
+          Reflect.deleteProperty(navigator, "userAgentData");
+        }
+      },
+    );
+
+    it("offers no download in the desktop app", async () => {
+      vi.spyOn(navigator, "userAgent", "get").mockReturnValue(WINDOWS_CHROME);
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability() }} />);
+      await screen.findByRole("button", { name: "Open Folder…" });
+
+      expect(screen.queryByRole("link", { name: /Download for/ })).not.toBeInTheDocument();
+    });
+
     it("shows key hints, not buttons, once a folder is open", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);

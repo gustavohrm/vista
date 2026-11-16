@@ -1,6 +1,7 @@
 import { motion, useAnimate, useReducedMotion } from "motion/react";
 import { useId, type ReactNode } from "react";
 
+import type { DesktopDownload } from "../../domain/desktop-download";
 import { Tooltip } from "../feedback/tooltip";
 
 interface ActivityRailProps {
@@ -11,11 +12,13 @@ interface ActivityRailProps {
   /** Whether Settings is shown, which presses the gear. */
   isSettingsOpen: boolean;
   onToggleSettings: () => void;
+  /** The desktop installer to offer in the browser, above the gear, or null where there is none to offer. */
+  desktopDownload?: DesktopDownload | null;
 }
 
 /**
  * The narrow column at the left edge, from `md` up: Explorer, the Search and Graph places that are
- * still to come, and the Settings gear at its foot. One background marks the place the frame shows,
+ * still to come, and at its foot the desktop download in the browser, then the Settings gear. One background marks the place the frame shows,
  * so one button is always marked, and slides from one button to the other as it changes. Explorer only goes
  * to the explorer, never hides it; the title bar's panel toggle does that. Below `md` the explorer
  * drawer carries the same actions through `DrawerActivities`.
@@ -28,6 +31,7 @@ export function ActivityRail({
   onShowExplorer,
   isSettingsOpen,
   onToggleSettings,
+  desktopDownload = null,
 }: ActivityRailProps) {
   const indicatorId = useId();
   return (
@@ -44,6 +48,7 @@ export function ActivityRail({
       </RailButton>
       <ComingSoonButtons position="right" />
       <div className="flex-1" />
+      {desktopDownload && <DownloadLink download={desktopDownload} position="right" />}
       <RailButton
         label="Settings"
         tooltip="Settings"
@@ -62,20 +67,24 @@ export function ActivityRail({
  * The rail's actions at the top of the explorer drawer, below `md`, where the rail is not shown. The
  * drawer is the explorer itself, so its toggle stays in the title bar.
  *
- * @param props - Whether Settings is shown, and the action that opens or closes it.
+ * @param props - Whether Settings is shown, the action that opens or closes it, and the desktop
+ *   download to offer in the browser, if any.
  * @returns Row of buttons, hidden from `md` up.
  */
 export function DrawerActivities({
   isSettingsOpen,
   onToggleSettings,
+  desktopDownload = null,
 }: {
   isSettingsOpen: boolean;
   onToggleSettings: () => void;
+  desktopDownload?: DesktopDownload | null;
 }) {
   return (
     <div className="flex flex-none items-center gap-0.5 px-1.5 pt-1 md:hidden">
       <ComingSoonButtons position="bottom" />
       <div className="flex-1" />
+      {desktopDownload && <DownloadLink download={desktopDownload} position="bottom" />}
       <RailButton
         label="Settings"
         tooltip="Settings"
@@ -102,6 +111,28 @@ function ComingSoonButtons({ position }: { position: "right" | "bottom" }) {
     </>
   );
 }
+
+/** The desktop download: a link, since it leaves for the installer rather than acting in the app. */
+function DownloadLink({ download, position }: { download: DesktopDownload; position: "right" | "bottom" }) {
+  const label = download.label.replace("Download", "Download Vista");
+  return (
+    <Tooltip text={label} position={position} className="flex flex-none">
+      {(bubbleId) => (
+        <a
+          href={download.href}
+          aria-label={label}
+          aria-describedby={bubbleId}
+          className={`${RAIL_BUTTON_CLASS} text-text-faint hover:text-text hover:bg-hover`}
+        >
+          <i className="ic-monitor-down" aria-hidden="true" />
+        </a>
+      )}
+    </Tooltip>
+  );
+}
+
+const RAIL_BUTTON_CLASS =
+  "relative flex size-[34px] items-center justify-center rounded-lg text-lg transition-colors duration-100 focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] focus-visible:outline-none";
 
 interface RailButtonProps {
   label: string;
@@ -141,7 +172,7 @@ function RailButton({
           aria-current={isCurrent ? "true" : undefined}
           aria-disabled={onClick ? undefined : true}
           onClick={onClick}
-          className={`relative flex size-[34px] items-center justify-center rounded-lg text-lg transition-colors duration-100 focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] focus-visible:outline-none ${
+          className={`${RAIL_BUTTON_CLASS} ${
             isActive ? "text-text-strong" : "text-text-faint"
           } ${onClick ? `hover:text-text ${isActive ? "" : "hover:bg-hover"}` : "opacity-50"}`}
         >
