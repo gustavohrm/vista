@@ -382,6 +382,31 @@ describe("App", () => {
       expect(mockWorkspace.forgetFolder).toHaveBeenCalledWith("inner");
     });
 
+    it("refuses a folder this browser can't remember in a workspace Vista remembers", async () => {
+      const user = userEvent.setup();
+      const mockWorkspace = createMockWorkspaceCapability();
+      render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
+      await openFolderFromWelcome(user);
+      mockWorkspace.pickFolder.mockResolvedValueOnce({
+        id: "work",
+        name: "Work",
+        rootPath: "/work",
+        accessMode: "fallback",
+      });
+
+      await user.click(within(explorerPanel()).getByRole("button", { name: "Add Folder to Workspace" }));
+
+      expect(
+        await findToast(
+          'This browser can open "Work" only until Vista closes, so it can\'t join a workspace Vista remembers.',
+        ),
+      ).toBeInTheDocument();
+      expect(within(explorerPanel()).queryByRole("button", { name: "Work" })).not.toBeInTheDocument();
+      expect(JSON.parse(localStorage.getItem("vista.workspaces") ?? "null").workspaces[0].folderIds).toEqual([
+        "workspace-1",
+      ]);
+    });
+
     it("refuses a folder already in the workspace without forgetting it", async () => {
       const user = userEvent.setup();
       const mockWorkspace = createMockWorkspaceCapability();
@@ -1040,7 +1065,7 @@ describe("App", () => {
       await findFileRows("a.txt");
       const dialog = await openWorkspaceSettings(user);
 
-      await user.click(within(dialog).getByRole("button", { name: "Add Folder…" }));
+      await user.click(within(dialog).getByRole("button", { name: "Add Folder to Workspace…" }));
 
       await waitFor(() =>
         expect(
@@ -1112,6 +1137,90 @@ describe("App", () => {
       await storeInNotes(user, folder);
 
       expect(workspaceFile(folder("notes").textOf(".vista/workspace.json"))?.folders).toEqual([".", "deep/sources"]);
+    });
+
+    it("keeps the details on the device when two folders would share a location, and says why", async () => {
+      const user = userEvent.setup();
+      const other: WorkspaceFolder = { id: "other", name: "sources", rootPath: "/elsewhere/sources" };
+      const { capability, folder } = createFoldersCapability(
+        [...storedFolders(), { folder: other, files: { "b.txt": PLAIN_TEXT } }],
+        { relativeLocation: vi.fn(async () => null) },
+      );
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("plan.txt");
+      const dialog = await openWorkspaceSettings(user);
+
+      await user.click(within(dialog).getByRole("radio", { name: "In notes/.vista" }));
+
+      expect(
+        await findToast(
+          'Two folders named "sources" would both be recorded as "../sources", so the details stay on this device.',
+        ),
+      ).toBeInTheDocument();
+      expect(within(dialog).getByRole("radio", { name: "On this device" })).toBeChecked();
+      expect(folder("notes").textOf(".vista/workspace.json")).toBeUndefined();
+      expect(storedWorkspace().storage).not.toBe("folder");
+    });
+
+    it("refuses adding a folder that would share another folder's location in the file", async () => {
+      const user = userEvent.setup();
+      const { capability, folder } = createFoldersCapability(storedFolders(), {
+        relativeLocation: vi.fn(async () => null),
+      });
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("plan.txt");
+      await storeInNotes(user, folder);
+      vi.mocked(capability.pickFolder).mockResolvedValueOnce({
+        id: "other",
+        name: "sources",
+        rootPath: "/elsewhere/sources",
+      });
+
+      await user.click(within(explorerPanel()).getByRole("button", { name: "Add Folder to Workspace" }));
+
+      expect(
+        await findToast(
+          '"sources" would be recorded as "../sources", like another folder of this workspace, so it can\'t be added while the details are stored in "notes".',
+        ),
+      ).toBeInTheDocument();
+      expect(storedWorkspace().folderIds).toEqual(["notes", "sources"]);
+      expect(capability.forgetFolder).toHaveBeenCalledWith("other");
+    });
+
+    it("forgets a folder the workspace file no longer lists once no workspace holds it", async () => {
+      const { capability } = createFoldersCapability([
+        {
+          folder: NOTES_FOLDER,
+          files: {
+            "a.txt": PLAIN_TEXT,
+            ".vista/workspace.json": JSON.stringify({ version: 1, name: "Research", folders: ["."] }),
+          },
+        },
+        { folder: SOURCES_FOLDER, files: { "plan.txt": PLAIN_TEXT } },
+      ]);
+      localStorage.setItem(
+        "vista.workspaces",
+        JSON.stringify({
+          version: 1,
+          lastWorkspaceId: "w1",
+          workspaces: [
+            {
+              id: "w1",
+              name: "Research",
+              folderIds: ["notes", "sources"],
+              storage: "folder",
+              locations: { ".": "notes", "../sources": "sources" },
+              lastOpenedAt: 1,
+            },
+          ],
+        }),
+      );
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+
+      await findFileRows("a.txt");
+
+      await waitFor(() => expect(capability.forgetFolder).toHaveBeenCalledWith("sources"));
+      expect(storedWorkspace().folderIds).toEqual(["notes"]);
     });
 
     it("rewrites the file when the workspace's details change", async () => {

@@ -273,12 +273,32 @@ describe("workspaces read from a folder", () => {
     expect(createWorkspaceStore(storage, options()).workspaceForFile(notes).id).toBe(created.id);
   });
 
+  it("turns the device workspace that is exactly the folder into the one its file describes, keeping its session", () => {
+    const storage = memoryStorage();
+    const store = createWorkspaceStore(storage, options());
+    const plain = store.openFolder(notes);
+    const session: Session = {
+      version: 1,
+      tabs: [{ folderId: "f1", path: "a.md", viewMode: "raw" }],
+      activeIndex: 0,
+      expanded: {},
+    };
+    store.saveSession(plain.id, session);
+
+    const found = store.workspaceForFile(notes);
+
+    expect(found).toMatchObject({ id: plain.id, folderIds: ["f1"], storage: "folder", locations: { ".": "f1" } });
+    expect(stored(storage).workspaces).toHaveLength(1);
+    expect(store.loadSession(found.id)).toEqual(session);
+  });
+
   it("takes the file's details and the folders found for its locations, in the file's order", () => {
     const store = createWorkspaceStore(memoryStorage(), options());
     const workspace = store.workspaceForFile(notes);
 
     expect(
-      store.applyWorkspaceFile(workspace.id, { ...details, folders: [...details.folders] }, { "../sources": "f2" }),
+      store.applyWorkspaceFile(workspace.id, { ...details, folders: [...details.folders] }, { "../sources": "f2" })
+        ?.workspace,
     ).toMatchObject({
       name: "Thesis",
       icon: "book-open",
@@ -292,20 +312,42 @@ describe("workspaces read from a folder", () => {
     const store = createWorkspaceStore(memoryStorage(), options());
     const workspace = store.workspaceForFile(notes);
 
-    expect(store.applyWorkspaceFile(workspace.id, { ...details, folders: [".", "toString"] }, {})).toMatchObject({
+    expect(
+      store.applyWorkspaceFile(workspace.id, { ...details, folders: [".", "toString"] }, {})?.workspace,
+    ).toMatchObject({
       folderIds: ["f1"],
       locations: { ".": "f1" },
     });
   });
 
-  it("drops a location the file no longer lists", () => {
+  it("drops a location the file no longer lists, and reports its folder once no workspace holds it", () => {
+    const store = createWorkspaceStore(memoryStorage(), options());
+    const workspace = store.workspaceForFile(notes);
+    store.applyWorkspaceFile(workspace.id, { ...details, folders: [".", "../sources"] }, { "../sources": "f2" });
+
+    expect(store.applyWorkspaceFile(workspace.id, { ...details, folders: ["."] }, { "../sources": "f2" })).toEqual({
+      workspace: expect.objectContaining({ folderIds: ["f1"], locations: { ".": "f1" } }),
+      unusedFolderIds: ["f2"],
+    });
+  });
+
+  it("does not report a folder the file still lists but this device didn't find", () => {
     const store = createWorkspaceStore(memoryStorage(), options());
     const workspace = store.workspaceForFile(notes);
     store.applyWorkspaceFile(workspace.id, { ...details, folders: [".", "../sources"] }, { "../sources": "f2" });
 
     expect(
-      store.applyWorkspaceFile(workspace.id, { ...details, folders: ["."] }, { "../sources": "f2" }),
-    ).toMatchObject({ folderIds: ["f1"], locations: { ".": "f1" } });
+      store.applyWorkspaceFile(workspace.id, { ...details, folders: [".", "../sources"] }, {})?.unusedFolderIds,
+    ).toEqual([]);
+  });
+
+  it("does not report a dropped folder another workspace still holds", () => {
+    const store = createWorkspaceStore(memoryStorage(), options());
+    const workspace = store.workspaceForFile(notes);
+    store.applyWorkspaceFile(workspace.id, { ...details, folders: [".", "../sources"] }, { "../sources": "f2" });
+    store.openFolder({ id: "f2", name: "sources", rootPath: "/sources" });
+
+    expect(store.applyWorkspaceFile(workspace.id, { ...details, folders: ["."] }, {})?.unusedFolderIds).toEqual([]);
   });
 });
 

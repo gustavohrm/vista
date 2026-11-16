@@ -50,17 +50,22 @@ export interface WorkspaceStore {
   /** Keeps the details in the home folder from now on; `locations` are the other folders', by location. */
   storeInFolder(workspaceId: string, locations: Readonly<Record<string, string>>): WorkspaceRecord | null;
   storeOnDevice(workspaceId: string): WorkspaceRecord | null;
-  /** The workspace stored in this home folder on this device, created when there is none yet. */
+  /**
+   * The workspace stored in this home folder on this device. When there is none yet, the device
+   * workspace that is exactly the folder becomes it, keeping its id and session, or one is created.
+   */
   workspaceForFile(home: WorkspaceFolder): WorkspaceRecord;
   /**
    * Takes the details read from a workspace's file. `located` names the folder found on this device
-   * for each location; locations the file no longer lists are dropped.
+   * for each location; locations the file no longer lists are dropped. `unusedFolderIds` are the
+   * dropped locations' folders no workspace holds anymore, so their host may forget them; a location
+   * the file still lists but this device didn't find is not dropped.
    */
   applyWorkspaceFile(
     workspaceId: string,
     details: WorkspaceFileDetails,
     located: Readonly<Record<string, string>>,
-  ): WorkspaceRecord | null;
+  ): { workspace: WorkspaceRecord; unusedFolderIds: string[] } | null;
   isFolderUsed(folderId: string): boolean;
   /**
    * Null when the folder is the workspace's only one, since a workspace is one or more folders, or
@@ -222,6 +227,11 @@ export function createWorkspaceStore(
       if (found) {
         return found;
       }
+      // The folder's own device workspace becomes the folder-backed one, so Recent and the session stay one.
+      const plain = findWorkspaceForFolder(list, home.id);
+      if (plain) {
+        return replace({ ...plain, storage: "folder", locations: { [HOME_FOLDER_LOCATION]: home.id } });
+      }
       const created: WorkspaceRecord = {
         ...createFor(home.id, home.name),
         storage: "folder",
@@ -248,7 +258,15 @@ export function createWorkspaceStore(
         }
       }
       const { name, icon, color } = details;
-      return replace({ ...workspace, name, icon, color, folderIds, storage: "folder", locations });
+      const updated = replace({ ...workspace, name, icon, color, folderIds, storage: "folder", locations });
+      const listed = new Set(details.folders);
+      const dropped =
+        workspace.storage === "folder"
+          ? Object.entries(workspace.locations).flatMap(([location, id]) =>
+              listed.has(location) || folderIds.includes(id) ? [] : [id],
+            )
+          : [];
+      return { workspace: updated, unusedFolderIds: dropped.filter((id) => !isUsed(id)) };
     },
 
     storeOnDevice(workspaceId) {

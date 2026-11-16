@@ -200,7 +200,7 @@ export function WorkspaceSection({
       </SettingsGroup>
       <button type="button" onClick={onAddFolder} className="btn sm mt-3">
         <i className="ic-folder-plus" aria-hidden="true" />
-        Add Folder…
+        Add Folder to Workspace…
       </button>
 
       {canChooseStorage && (

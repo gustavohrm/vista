@@ -693,8 +693,19 @@ function AppShell({ adapter }: AppProps) {
               slots.push({ kind: "missing", location });
             }
           }
-          target = workspaceStore.applyWorkspaceFile(record.id, read.details, located) ?? record;
+          const applied = workspaceStore.applyWorkspaceFile(record.id, read.details, located);
+          target = applied?.workspace ?? record;
           readText = serializeWorkspaceFile(read.details);
+          // The file no longer lists these folders and no workspace holds them, so their host may forget them.
+          await Promise.all(
+            (applied?.unusedFolderIds ?? []).map(async (folderId) => {
+              try {
+                await adapter.workspace.forgetFolder(folderId);
+              } catch (err) {
+                console.error("Failed to forget a folder the workspace file dropped:", err);
+              }
+            }),
+          );
         }
       }
       if (!slots) {
@@ -1029,6 +1040,14 @@ function AppShell({ adapter }: AppProps) {
             // oxlint-disable-next-line eslint/no-await-in-loop -- a workspace has few folders
             located.set(entry.id, await locateFolder(homeFolder, entry));
           }
+          const collision = findSharedLocation(current.folders, located);
+          if (collision) {
+            toast.show({
+              kind: "info",
+              text: `Two folders named "${collision.name}" would both be recorded as "${collision.location}", so the details stay on this device.`,
+            });
+            return;
+          }
           const folders = current.folders.map((entry) => ({
             ...entry,
             location: located.get(entry.id) ?? HOME_FOLDER_LOCATION,
@@ -1101,9 +1120,22 @@ function AppShell({ adapter }: AppProps) {
         return;
       }
       const reachable = current.folders.flatMap((entry) => (entry.folder ? [entry.folder] : []));
-      const refusal = current.folders.some((entry) => entry.id === picked.id)
-        ? `"${picked.name}" is already part of this workspace.`
-        : await checkFolderOverlap(adapter.workspace, reachable, picked);
+      const home = current.folders[0]?.folder;
+      // Only a workspace stored in its folder records where each folder is.
+      const location =
+        current.storage === "folder" && home
+          ? await locateFolder(home, { id: picked.id, name: picked.name, folder: picked, status: "ready", tree: [] })
+          : undefined;
+      let refusal: string | null;
+      if (current.folders.some((entry) => entry.id === picked.id)) {
+        refusal = `"${picked.name}" is already part of this workspace.`;
+      } else if (location !== undefined && home && current.folders.some((entry) => entry.location === location)) {
+        refusal = `"${picked.name}" would be recorded as "${location}", like another folder of this workspace, so it can't be added while the details are stored in "${home.name}".`;
+      } else {
+        refusal =
+          describeUnrememberedFolder(current, picked) ??
+          (await checkFolderOverlap(adapter.workspace, reachable, picked));
+      }
       if (refusal) {
         toast.show({ kind: "error", text: refusal });
         // A folder picked for the first time was remembered; nothing uses it now.
@@ -1116,12 +1148,8 @@ function AppShell({ adapter }: AppProps) {
       if (workspaceRef.current?.id !== current.id) {
         return;
       }
-      const home = current.folders[0]?.folder;
-      const added: OpenFolder = { id: picked.id, name: picked.name, folder: picked, status: "ready", tree };
-      if (current.storage === "folder" && home) {
-        added.location = await locateFolder(home, added);
-      }
-      workspaceStore.addFolder(current.id, picked.id, added.location);
+      const added: OpenFolder = { id: picked.id, name: picked.name, folder: picked, status: "ready", tree, location };
+      workspaceStore.addFolder(current.id, picked.id, location);
       setWorkspace((previous) =>
         previous?.id === current.id ? { ...previous, folders: [...previous.folders, added] } : previous,
       );
@@ -2702,6 +2730,40 @@ function missingFolder(location: string): OpenFolder {
 
 function isMissingFolder(entry: OpenFolder): boolean {
   return entry.id.startsWith(MISSING_FOLDER_PREFIX);
+}
+
+/**
+ * The first location two folders would share in the workspace file, such as two folders named
+ * `sources` the host can't place, which both become `../sources`; reading the file back would keep one.
+ */
+function findSharedLocation(
+  folders: readonly OpenFolder[],
+  located: ReadonlyMap<string, string>,
+): { name: string; location: string } | null {
+  const seen = new Set<string>();
+  for (const entry of folders.slice(1)) {
+    const location = located.get(entry.id);
+    if (location === undefined) {
+      continue;
+    }
+    if (seen.has(location)) {
+      return { name: entry.name, location };
+    }
+    seen.add(location);
+  }
+  return null;
+}
+
+/**
+ * Why a folder the host can't remember, opened through the directory input, can't join this workspace:
+ * one Vista remembers would try to restore it on the next start. A workspace already holding such a
+ * folder lasts only for the session, so it may take another.
+ */
+function describeUnrememberedFolder(workspace: OpenWorkspace, picked: WorkspaceFolder): string | null {
+  if (picked.accessMode !== "fallback" || workspace.folders.some((entry) => entry.folder?.accessMode === "fallback")) {
+    return null;
+  }
+  return `This browser can open "${picked.name}" only until Vista closes, so it can't join a workspace Vista remembers.`;
 }
 
 function describeUnreadableFile(folderName: string): string {
