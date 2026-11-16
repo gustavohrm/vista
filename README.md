@@ -1,8 +1,10 @@
 # Vista
 
-Vista is an early-stage, multi-platform workspace for managing notes and personal data. Its goal is a lightweight middle ground between Notion, Obsidian, and VS Code that operates directly on local folders.
+Vista is a multi-platform workspace for managing notes and personal data: a lightweight middle ground between Notion, Obsidian, and VS Code that operates directly on local folders.
 
-The current implementation opens a local folder as a workspace, shows its file tree, edits Markdown and CSV files, and creates, renames, and deletes files, on the web and in a Tauri desktop host. Backlinks, folder search, and data export are planned. Desktop Chrome and Edge, and Windows, are the verified targets; the mobile builds are prepared but unverified.
+A workspace is one or more local folders with a name, an icon, a colour, and a session that remembers its tabs. Vista shows the folders' files, edits Markdown in a rich-text editor or as raw text, edits CSV as a table or as raw text, edits plain text, and creates, renames, moves, and deletes files and folders. It saves only when asked, and never overwrites a change made on disk without asking. It runs in the browser and as a desktop app for Windows and Linux, which updates itself. Desktop Chrome and Edge, and Windows, are the verified targets; the Android and iOS builds are prepared but have no folder access yet.
+
+Workspace search, a graph view with backlinks, and data export are planned, as the [roadmap](docs/roadmap.md) records.
 
 ## Repository
 

@@ -1,6 +1,6 @@
 ---
 status: APPROVED
-last_updated: 2026-11-14
+last_updated: 2026-11-16
 scope: How code keeps Vista's security commitments, for anyone writing or reviewing a change.
 ---
 
@@ -28,7 +28,7 @@ Vista issues and stores no secrets: it has no accounts, sessions, or server-side
 ## Untrusted input
 
 - Every input crossing a trust boundary is validated at that boundary, before any other code sees it, and parsed into a typed value. What does not parse is rejected, not passed along.
-- Every input has a size bound. New code that reads input enforces the bound during the read: an input of exactly the limit is accepted, and once the read finds more than the limit, it stops and the input is rejected, never truncated and parsed as if it were whole. Reading at most `limit + 1` bytes and rejecting when the extra byte exists is enough; a reader that works in chunks of a fixed maximum size can stop at the first chunk that crosses the limit, but not one that takes chunks of any size a stream hands it. Checking the size after reading the whole input is too late, because the memory is already spent. A size check before the read can reject a file early, but it is not the bound: another program can grow the file between the check and the read. File reads from the user's folder have no bound yet: a very large file is read whole into memory by both hosts' adapters.
+- Every input has a size bound. New code that reads input enforces the bound during the read: an input of exactly the limit is accepted, and once the read finds more than the limit, it stops and the input is rejected, never truncated and parsed as if it were whole. Reading at most `limit + 1` bytes and rejecting when the extra byte exists is enough; a reader that works in chunks of a fixed maximum size can stop at the first chunk that crosses the limit, but not one that takes chunks of any size a stream hands it. Checking the size after reading the whole input is too late, because the memory is already spent. A size check before the read can reject a file early, but it is not the bound: another program can grow the file between the check and the read. File reads from the user's folder fall short of this rule: opening a file checks its size against **Largest file to open** before reading and rejects it after reading when it grew, as [Opening a file](../specs/workspaces.md#opening-a-file) describes, but both hosts' adapters read the file whole, so a file that grew in between is in memory before it is refused.
 - Files in the user's folder are untrusted input: the user or another program can edit them. So is state Vista stores, such as the settings in `localStorage`, which `packages/app/src/domain/settings.ts` reads field by field and replaces with the default where a field does not parse. A value read from either is checked as if it came from outside.
 - A file or folder name the user types is checked against what the file system accepts, as `packages/app/src/domain/path-validation.ts` does, before any adapter sees it.
 - Do not build a path by concatenating input. Resolve it through the adapter, which keeps it inside the granted folder.
@@ -51,7 +51,8 @@ Vista issues and stores no secrets: it has no accounts, sessions, or server-side
 
 ## Outbound calls and dependencies
 
-- Vista makes no network calls of its own. No telemetry, update checks, or third-party lookups without a recorded decision and a way for the user to turn them off.
+- Vista makes no network calls of its own, except the desktop update check below. No telemetry, update checks, or third-party lookups without a recorded decision and a way for the user to turn them off.
+- **Exception, temporary: the desktop update check.** The desktop app asks `https://vista.coden.dev/releases/latest.json` for a newer version at every startup (`checkForUpdates` in `packages/app/src/app.tsx`), and the user cannot turn it off. It breaks the rule above in the desktop host only; the web host makes no such call. It is tolerated for now because it reaches only Vista's own release host, sends nothing but the request itself, and installs nothing without the user's confirmation and a valid signature. It is to be fixed by making update checks opt-in, as the [roadmap](../roadmap.md) records; this exception is removed in that change.
 - Every dependency is a trust decision. The rule in the [coding guidelines](code.md#architecture-and-design) on adding dependencies applies with extra force to anything that runs at install time, which `allowBuilds` in [Workspace](../workspace.md#dependency-installs) lists, or that handles file content.
 
 ## Reviewing a change

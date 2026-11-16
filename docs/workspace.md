@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-14
+last_updated: 2026-11-16
 scope: The root script names and what each guarantees, the shared tool configurations, the pinned toolchain, install rules, how dependency versions are declared, and how the git hooks are wired.
 ---
 
@@ -23,7 +23,7 @@ This document is the workspace's contract: the names of the root scripts and wha
 | `pnpm test:e2e`      | The web host's browser suite passes. Needs a browser installed; `pnpm verify` does not run it.                                     |
 | `pnpm build`         | The web and native frontend bundles build.                                                                                         |
 | `pnpm verify`        | `verify:web`, then `verify:rust`, stopping at the first failure. It is the delivery gate [Contributing](../CONTRIBUTING.md) names. |
-| `pnpm verify:web`    | `format:check`, `lint:check`, `typecheck`, `test`, `build:web` and `build:native`, in that order.                                  |
+| `pnpm verify:web`    | `versions:check`, `format:check`, `lint:check`, `typecheck`, `test`, `build:web` and `build:native`, in that order.                |
 | `pnpm verify:rust`   | rustfmt, then clippy, over the native host's Rust crate.                                                                           |
 | `pnpm prepare`       | Runs on install: points git at the committed hooks in `.githooks/`.                                                                |
 

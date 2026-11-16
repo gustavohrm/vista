@@ -109,7 +109,7 @@ One of `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `rever
 The area the change lands in, and optional. For workspace projects, use the app or package name without the `@vista/` prefix:
 
 - `app` for the shared UI shell and product features (`packages/app`)
-- `web` for the browser host and Cloudflare deployment scaffold (`apps/web`)
+- `web` for the browser host and its Cloudflare Worker (`apps/web`)
 - `native` for the Tauri desktop and mobile host (`apps/native`)
 
 Repository-level areas use their own name, such as `ci`, `hooks`, `docs`, `deps`. Leave the scope out when the change spans several.
@@ -176,10 +176,10 @@ A pull request that builds on another unmerged one targets that one's branch and
 
 Releasing is a maintainer action, and it is separate from merging. Merging changes `main`; a release or deployment puts a version where people install or reach it, and a published version can be superseded but rarely taken back. Bump the version and record what users need to know in an ordinary pull request first; the release itself names a commit already on `main`.
 
-Vista is an end-user application, not a set of published npm packages, and it has no releases yet.
+Vista is an end-user application, not a set of published npm packages. A release is a tag named `v` and the version, such as `v0.0.1`, the first one.
 
 - **Web App**: the web app (`apps/web`) is a Cloudflare Worker, deployed by the release workflow when a version tag is pushed, as [CI](docs/ci.md#releases) describes. `pnpm deploy:web` builds the web host and runs `wrangler deploy`; `pnpm --filter=@vista/web deploy:check` runs the same build with `--dry-run`.
-- **Desktop and Mobile App**: The native app (`apps/native`) produces desktop executables and mobile packages via Tauri (`build:desktop`, `build:android`, `build:ios`). App store distribution, code signing, and release packaging are handled at release milestones.
+- **Desktop and Mobile App**: The native app (`apps/native`) produces desktop installers and mobile packages via Tauri (`build:desktop`, `build:android`, `build:ios`). The release workflow builds, signs for the updater, and publishes the Windows and Linux installers, as [CI](docs/ci.md#releases) describes. Mobile packages are built by hand and not released. App-store distribution and operating-system code signing are not set up.
 
 Pushing a release tag, deploying, and publishing a release are outward-facing actions. An agent asks first and never does any of them on its own initiative.
 

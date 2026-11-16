@@ -35,7 +35,7 @@ Icons are supplied by `@codenhub/icons` configured in Vite with `mode: "svg"`. I
 
 ## Theming
 
-Theming is powered by `@codenhub/theme` and `@codenhub/styles`. It defaults to system preference and supports explicit light and dark themes using the standard design tokens.
+Theming is powered by `@codenhub/theme` and `@codenhub/styles`. The appearance is light, dark, or following the operating system, and dark by default.
 
 ## Tests
 

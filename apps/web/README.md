@@ -19,7 +19,7 @@ Vite provides frontend development and hot reload. `preview:worker` builds fresh
 pnpm --filter=@vista/web exec wrangler dev --local --port 8798 --inspector-port 9248
 ```
 
-`wrangler.json` serves the built frontend as a single-page application, including direct navigation and reload at nested URLs. Its small Worker currently forwards requests to the asset binding; introduce server behavior only when a feature needs it.
+`wrangler.json` serves the built frontend as a single-page application, including direct navigation and reload at nested URLs. The Worker (`src/worker.ts`) answers the release routes [Deployment](#deployment) lists and hands every other request to the asset binding. Introduce more server behavior only when a feature needs it.
 
 ## Tests
 
@@ -28,7 +28,7 @@ pnpm --filter=@vista/web exec playwright install chromium
 pnpm --filter=@vista/web test:e2e
 ```
 
-The smoke test starts an isolated local Wrangler server on port 8799 with inspector port 9249 and tests the production frontend output. Those ports must be free. It checks application startup and styles on a nested URL and after reload. Feature routing is not implemented yet.
+The browser suite in `tests/e2e/` builds the frontend, starts an isolated local Wrangler server on port 8799 with inspector port 9249, and tests the production output in Chromium. Those ports must be free. It covers startup and styles on a nested URL and after reload, tabs, the path bar, the editor chrome, menus and Markdown images, the CSV table, the responsive layout, and creating, renaming, and deleting files. Automation cannot drive the native folder picker, so the suite opens its fixture folders through the `webkitdirectory` fallback. Every test fails on a JavaScript error or a content security policy violation.
 
 ## Deployment
 
@@ -44,4 +44,4 @@ Never put API tokens into source files or `VITE_*` environment variables. Keep l
 
 ## Browser scope
 
-Initial workspace support targets current desktop Chrome and Edge with File System Access APIs. Folder selection must follow a user gesture in a secure context and remain permission-aware. Feature detection and unavailable/denied/cancelled outcomes belong to the future workspace adapter. Mobile browsers and browsers without folder APIs are not promised equivalent workspace access.
+Workspace support targets current desktop Chrome and Edge with File System Access APIs. Folder selection follows a user gesture in a secure context and is permission-aware. The workspace adapter (`src/workspace-adapter.ts`) detects whether the API is available, falls back to a `webkitdirectory` input where it is not, and reports cancellation, denied permission, and folders that are gone, as [Workspaces](../../docs/specs/workspaces.md#platform-specific-implementations) describes. Mobile browsers and browsers without folder APIs are not promised equivalent workspace access.

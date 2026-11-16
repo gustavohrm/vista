@@ -1,6 +1,6 @@
 ---
 status: DRAFT
-last_updated: 2026-11-13
+last_updated: 2026-11-16
 scope: How workspace failures are classified, presented to the user, and logged across the shared app and the web and native hosts.
 ---
 
@@ -34,7 +34,7 @@ Toasts use `@codenhub/toaster` through `ToastProvider` (`packages/app/src/compon
 ### Outcomes that are not errors
 
 - **Cancellation.** The web picker returns `null` on `AbortError`. The native `open()` resolves to `null` on cancel, and the native adapter returns `null` for it. Callers treat `null` as "nothing happened" with no toast.
-- **Folder restore.** `restoreFolder` reports `restored`, `needs-permission`, `unavailable`, or `none` as values. `unavailable` shows the info toast `Couldn't reopen "{name}". It may have been moved or deleted.` (`app.tsx`).
+- **Folder restore.** `restoreFolder` reports `restored`, `needs-permission`, `unavailable`, or `none` as values. An `unavailable` folder stays in its workspace, marked missing on its root row, as [Reopening at startup](workspaces.md#reopening-at-startup) describes; a workspace none of whose folders can be reopened, and none waiting for permission, does not open and shows the info toast `Couldn't reopen "{name}". It may have been moved or deleted.`, or `Couldn't reopen "{workspace}". Its folders may have been moved or deleted.` when it has several folders (`app.tsx`).
 - **Opening a file.** `loadFile` (`packages/app/src/state/load-file.ts`) reports a file that is missing, over the size limit, or binary as a value, and each shows its own toast, as [Opening a file](workspaces.md#opening-a-file) describes. A file that isn't UTF-8 opens read-only with an info toast.
 - **Unsaved changes.** `saveActiveFile` returns `false` on failure, and the caller decides whether to continue.
 
@@ -42,7 +42,7 @@ Toasts use `@codenhub/toaster` through `ToastProvider` (`packages/app/src/compon
 
 These are best-effort and log a warning instead of throwing:
 
-- Reading, writing, and forgetting the last-opened folder, in both hosts (`localStorage` on native, IndexedDB on web). The write and forget functions' doc comments say "Failures are logged only"; the read functions log and treat a failure as nothing remembered.
+- Reading and writing the remembered folders, in both hosts (`vista.folders` in `localStorage` on native, the `folders` store in IndexedDB on web): a failure is logged, and a read that fails is treated as nothing remembered.
 - An unreadable subfolder during a tree scan, in both hosts: it is logged with `console.warn` and shown in the tree marked as unreadable, so the user still sees it.
 - Removing the native save's temporary file after a failed rename: the cleanup failure is logged with `console.warn`, and the rename's own error is what the user sees.
 - Checking the tree and open tabs against the disk when the window regains focus: a failure is logged with `console.error` and shows no toast, because the user did not ask for the check and what is on screen is still usable. The next focus checks again.
@@ -50,7 +50,7 @@ These are best-effort and log a warning instead of throwing:
 - Native restore, which probes the folder with `readDir` and forgets it on failure.
 - Markdown editor create and destroy failures, which are logged with `console.error`.
 
-Most of these carry a comment. Some, such as the `catch` in `readLastFolderPath`, do not.
+Most of these carry a comment saying why; not all do.
 
 ### Logging
 
