@@ -3,6 +3,7 @@ name = "vista-native"
 version = "0.0.1"
 description = "Native host for Vista"
 authors = ["Gustavo Motta"]
+license = "Apache-2.0"
 edition = "2024"
 
 [lib]
