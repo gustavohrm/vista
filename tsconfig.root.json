@@ -13,5 +13,7 @@
     "checkJs": true,
     "tsBuildInfoFile": "./node_modules/.cache/tsconfig.root.tsbuildinfo"
   },
-  "include": ["*.ts", "*.mjs", "scripts/**/*.ts", "scripts/**/*.mjs"]
+  // `scripts/changelog.mjs` reads the changelog with the app's own parser, which imports nothing, so it is checked
+  // by these rules as well as by the app's.
+  "include": ["*.ts", "*.mjs", "scripts/**/*.ts", "scripts/**/*.mjs", "packages/app/src/domain/changelog.ts"]
 }

@@ -8,6 +8,7 @@
     "build": "pnpm build:web && pnpm build:native",
     "build:native": "pnpm --filter=@vista/native build",
     "build:web": "pnpm --filter=@vista/web build",
+    "changelog:check": "node scripts/changelog.mjs check",
     "deploy:web": "pnpm --filter=@vista/web run deploy",
     "dev:native": "pnpm --filter=@vista/native dev:native",
     "dev:web": "pnpm --filter=@vista/web dev",
@@ -25,7 +26,7 @@
     "versions:check": "node scripts/check-versions.mjs",
     "verify": "pnpm verify:web && pnpm verify:rust",
     "verify:rust": "pnpm --filter=@vista/native format:rust:check && pnpm --filter=@vista/native lint:rust:check",
-    "verify:web": "pnpm versions:check && pnpm format:check && pnpm lint:check && pnpm typecheck && pnpm test && pnpm build:web && pnpm build:native"
+    "verify:web": "pnpm versions:check && pnpm changelog:check && pnpm format:check && pnpm lint:check && pnpm typecheck && pnpm test && pnpm build:web && pnpm build:native"
   },
   "devDependencies": {
     "@types/node": "catalog:",

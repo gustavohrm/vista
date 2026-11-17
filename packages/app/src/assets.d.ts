@@ -9,3 +9,11 @@ declare module "*.svg?raw" {
   const text: string;
   export default text;
 }
+
+/**
+ * Vite's `import.meta.glob`, in the one form the app uses: files read as text at build time and inlined, keyed
+ * by their path relative to the importing file.
+ */
+interface ImportMeta {
+  glob(pattern: string, options: { query: "?raw"; import: "default"; eager: true }): Record<string, string>;
+}

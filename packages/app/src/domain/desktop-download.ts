@@ -3,6 +3,8 @@ export interface DesktopDownload {
   label: string;
   /** A path the web host redirects to the current installer, as `apps/web/src/worker.ts` serves it. */
   href: string;
+  /** The version the link downloads, such as `0.2.0`, when it is known. */
+  version?: string;
 }
 
 /** The processor a browser reports through User-Agent Client Hints, as `"x86"` and `"64"`. */

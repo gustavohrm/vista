@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 
 import { COMMAND_CATEGORIES, formatShortcut, type Command } from "../../commands";
+import type { ChangelogEntry } from "../../domain/changelog";
 import {
   isValidOpenSizeMb,
   MAX_OPEN_SIZE_MB_LIMIT,
@@ -11,6 +12,7 @@ import {
 import type { SettingsChanges } from "../../state/settings";
 import type { ThemePreference, ThemeState } from "../../theme/theme-manager";
 import { GroupHeading, SectionHeading, SettingsGroup, SettingsRow, Switch } from "./settings-parts";
+import { formatReleaseDate, WhatsNewDialog } from "./whats-new-dialog";
 
 const THEME_OPTIONS: readonly { value: ThemePreference; label: string }[] = [
   { value: "system", label: "System" },
@@ -227,17 +229,20 @@ export function ShortcutsSection({ commands }: { commands: readonly Command[] })
 interface AboutSectionProps extends SettingsSectionProps {
   platform: string;
   version: string;
+  /** The running version's changelog entry, when the changelog publishes one. */
+  entry?: ChangelogEntry;
   onCheckForUpdates?: () => Promise<void>;
 }
 
 /**
- * The version, and the updater where the host has one.
+ * The version and what it changed, and the updater where the host has one.
  *
  * @param props - AboutSection properties.
  * @returns Section content.
  */
-export function AboutSection({ platform, version, onCheckForUpdates, settings, onChange }: AboutSectionProps) {
+export function AboutSection({ platform, version, entry, onCheckForUpdates, settings, onChange }: AboutSectionProps) {
   const [isChecking, setIsChecking] = useState(false);
+  const [isWhatsNewShown, setIsWhatsNewShown] = useState(false);
   const checkAtStartupId = useId();
 
   const checkForUpdates = async () => {
@@ -261,7 +266,7 @@ export function AboutSection({ platform, version, onCheckForUpdates, settings, o
       <SettingsGroup>
         <SettingsRow
           label={`Vista ${version}`}
-          description={`Running in the ${platform === "native" ? "desktop app" : "browser"}.`}
+          description={`${entry?.date ? `Released ${formatReleaseDate(entry.date)}. ` : ""}Running in the ${platform === "native" ? "desktop app" : "browser"}.`}
         >
           {onCheckForUpdates && (
             <button
@@ -275,6 +280,13 @@ export function AboutSection({ platform, version, onCheckForUpdates, settings, o
             </button>
           )}
         </SettingsRow>
+        {entry && (
+          <SettingsRow label="What's New" description={entry.description || `The changes in Vista ${version}.`}>
+            <button type="button" onClick={() => setIsWhatsNewShown(true)} className="btn sm">
+              What&apos;s New
+            </button>
+          </SettingsRow>
+        )}
         {onCheckForUpdates && (
           <SettingsRow
             label="Check at startup"
@@ -291,6 +303,7 @@ export function AboutSection({ platform, version, onCheckForUpdates, settings, o
           </SettingsRow>
         )}
       </SettingsGroup>
+      {entry && isWhatsNewShown && <WhatsNewDialog entry={entry} onClose={() => setIsWhatsNewShown(false)} />}
     </>
   );
 }

@@ -8,7 +8,7 @@ scope: Index of the project documentation.
 
 `docs/` holds durable project knowledge. [Contributing](../CONTRIBUTING.md) contains the contributor workflow; [agent instructions](../AGENTS.md) contain agent behavior guidance. [Documentation guidelines](guidelines/documentation.md) define how these documents are written, what their status means, and how they change.
 
-Every document in `docs/` is listed here. Adding, moving, or deleting one updates this index in the same change.
+Every document in `docs/` is listed here. Adding, moving, or deleting one updates this index in the same change. The changelog is listed by its index: each version page is linked from there, as [the changelog spec](specs/changelog.md) defines.
 
 ## Overview
 
@@ -16,6 +16,7 @@ Every document in `docs/` is listed here. Adding, moving, or deleting one update
 | ------------------------------- | ----------------------------------------------------------------------------------- |
 | [Architecture](architecture.md) | Shared app code versus platform hosts, platform adapters, and the hosting decision. |
 | [Roadmap](roadmap.md)           | Planned, possible, and ruled-out work, each cited to the document that states it.   |
+| [Changelog](changelog/index.md) | What each released version changed, newest first.                                   |
 
 ## Repository references
 
@@ -44,3 +45,4 @@ Every document in `docs/` is listed here. Adding, moving, or deleting one update
 | [Tests](specs/tests.md)             | Test categories, where each lives, coverage, and what no automated test reaches.                             |
 | [Stack tests](specs/stack-tests.md) | The runners, file names, configuration, scripts, and commands for Vitest, Playwright, and cargo.             |
 | [Errors](specs/errors.md)           | How failures are classified, shown, and logged today, and a draft direction for user-facing failure kinds.   |
+| [Changelog](specs/changelog.md)     | The changelog pages, the check that holds a release to them, and where the app and GitHub show them.         |

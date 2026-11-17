@@ -17,6 +17,8 @@ Every document in `docs/` MUST start with YAML frontmatter containing these fiel
 
 Documents SHOULD include `scope` when the title alone does not make ownership clear.
 
+The pages under `docs/changelog/` are the one exception: they carry the `title`, `date`, and `description` header [the changelog spec](../specs/changelog.md#the-header) defines instead. Each records a release, so it has no status to change, and its date is the release date. The exception is permanent and covers that directory only.
+
 Allowed statuses:
 
 - `DRAFT`: Work in progress. Use as context, not as binding source of truth.

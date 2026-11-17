@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { flushSync } from "react-dom";
 
 import { version as APP_VERSION } from "../package.json";
+import { changelogEntryFor } from "./changelog";
 import { runCommand, sortByCategory, useCommandShortcuts, type Command } from "./commands";
 import { findCodeMirrorView, runEditingAction, type EditingAction } from "./commands/editing";
 import { DocumentActions } from "./components/editor/document-actions";
@@ -453,7 +454,7 @@ function AppShell({ adapter }: AppProps) {
       }
       const accepted = await toast.confirm({
         title: `Vista ${update.version} is available`,
-        message: "Install it now? Vista restarts to finish, and asks about unsaved changes first.",
+        message: `${update.notes ? `${update.notes} ` : ""}Install it now? Vista restarts to finish, and asks about unsaved changes first.`,
         confirmLabel: "Install and Restart",
         cancelLabel: "Later",
       });
@@ -550,6 +551,7 @@ function AppShell({ adapter }: AppProps) {
   const updateNotice = noticedUpdate && (
     <UpdateNotice
       version={noticedUpdate.version}
+      notes={noticedUpdate.notes}
       onInstall={() => void offerUpdate(noticedUpdate)}
       onDismiss={() => dismissUpdateNotice(noticedUpdate.version)}
     />
@@ -565,7 +567,9 @@ function AppShell({ adapter }: AppProps) {
     void (async () => {
       const cpu = await readCpuArchitecture();
       if (!isCancelled) {
-        setDesktopDownload(desktopDownloadFor(navigator.userAgent, cpu));
+        const download = desktopDownloadFor(navigator.userAgent, cpu);
+        // The web app is deployed with each release, so its own version is the one the link downloads.
+        setDesktopDownload(download && { ...download, version: APP_VERSION });
       }
     })();
     return () => {
@@ -2519,6 +2523,7 @@ function AppShell({ adapter }: AppProps) {
                   <AboutSection
                     platform={adapter.platform}
                     version={APP_VERSION}
+                    entry={changelogEntryFor(APP_VERSION)}
                     onCheckForUpdates={adapter.updater ? () => checkForUpdates({ isRequested: true }) : undefined}
                     settings={settings}
                     onChange={updateSettings}
