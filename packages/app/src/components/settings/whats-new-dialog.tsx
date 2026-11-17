@@ -17,13 +17,13 @@ export function formatReleaseDate(date: string): string {
 
 interface WhatsNewDialogProps {
   entry: ChangelogEntry;
-  /** Closes the dialog. Escape, a click on the backdrop, and the Close button all call it. */
+  /** Closes the dialog. Escape, a click on the backdrop, and the close button all call it. */
   onClose: () => void;
 }
 
 /**
  * Modal showing one version's changelog entry: its date and summary, then each heading with its changes.
- * Renders a native `<dialog>` opened with `showModal()`, like the unsaved-changes dialog. The parent
+ * The close button is an icon beside the title, so the entry has the room a footer row would take. Renders a native `<dialog>` opened with `showModal()`, like the unsaved-changes dialog. The parent
  * unmounts it once `onClose` fires.
  *
  * @param props - WhatsNewDialog properties.
@@ -82,11 +82,23 @@ export function WhatsNewDialog({ entry, onClose }: WhatsNewDialogProps) {
       className="card soft floating flush w-[min(30rem,calc(100vw-2rem))] [--ui-radius-surface:12px]"
     >
       <div className="flex max-h-[min(36rem,calc(100vh-4rem))] flex-col gap-4 p-5">
-        <div className="flex flex-col gap-1">
-          <h2 id={titleId} className="text-text-strong text-[15px] leading-snug font-semibold">
-            What&apos;s new in Vista {entry.version}
-          </h2>
-          {entry.date && <p className="text-text-faint text-xs">Released {formatReleaseDate(entry.date)}</p>}
+        <div className="flex items-start gap-2">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <h2 id={titleId} className="text-text-strong text-[15px] leading-snug font-semibold">
+              What&apos;s new in Vista {entry.version}
+            </h2>
+            {entry.date && <p className="text-text-faint text-xs">Released {formatReleaseDate(entry.date)}</p>}
+          </div>
+          {/* No tooltip: the dialog focuses this button as it opens, which would show one at once. */}
+          <button
+            ref={closeButtonRef}
+            type="button"
+            aria-label="Close"
+            onClick={onClose}
+            className="icon-button text-text-faint -mt-1 -mr-1.5 size-7 flex-none text-base"
+          >
+            <i className="ic-x" aria-hidden="true" />
+          </button>
         </div>
         <div className="flex min-h-0 flex-col gap-4 overflow-y-auto text-[13px] leading-normal">
           {entry.description && <p className="text-text">{entry.description}</p>}
@@ -113,11 +125,6 @@ export function WhatsNewDialog({ entry, onClose }: WhatsNewDialogProps) {
               </ul>
             </section>
           ))}
-        </div>
-        <div className="flex justify-end">
-          <button ref={closeButtonRef} type="button" onClick={onClose} className="btn sm">
-            Close
-          </button>
         </div>
       </div>
     </dialog>
