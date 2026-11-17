@@ -33,6 +33,8 @@
   --color-selection-text: #0a0a0a;
   --color-highlight: light-dark(rgb(197 240 59 / 75%), rgb(197 240 59 / 35%));
   --color-highlight-soft: light-dark(rgb(197 240 59 / 35%), rgb(197 240 59 / 16%));
+  /* The window's close button under the pointer, the red Windows uses, so it reads as the system's. */
+  --color-window-close: #c42b1c;
   --radius-frame: 10px;
   --ease-enter: cubic-bezier(0.2, 0, 0, 1);
   --ease-exit: cubic-bezier(0.3, 0, 1, 1);

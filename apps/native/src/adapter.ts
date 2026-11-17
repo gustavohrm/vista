@@ -16,6 +16,6 @@ if (isMobile) {
 export const nativeAdapter: AppAdapter = {
   platform: "native",
   workspace,
-  window: createNativeWindowAdapter(),
+  window: createNativeWindowAdapter(!isMobile, import.meta.env.TAURI_ENV_PLATFORM === "windows"),
   ...(isMobile ? {} : { updater: createNativeUpdaterAdapter() }),
 };

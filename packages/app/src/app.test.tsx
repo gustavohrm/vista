@@ -3936,6 +3936,35 @@ describe("App", () => {
       return { window, requestClose: () => check() };
     }
 
+    it("draws the window's buttons on the start screen when the host has no system frame", async () => {
+      const controls = {
+        minimize: vi.fn(async () => {}),
+        toggleMaximize: vi.fn(async () => {}),
+        close: vi.fn(async () => {}),
+        startDragging: vi.fn(async () => {}),
+        watchMaximized: vi.fn(() => () => {}),
+      };
+      const { window } = createWindow();
+      render(
+        <App
+          adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), window: { ...window, controls } }}
+        />,
+      );
+      await screen.findByRole("button", { name: "Open Folder…" });
+
+      expect(screen.getByRole("button", { name: "Minimize" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Maximize" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
+    });
+
+    it("draws no window buttons where the host draws the frame", async () => {
+      const { window } = createWindow();
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), window }} />);
+      await screen.findByRole("button", { name: "Open Folder…" });
+
+      expect(screen.queryByRole("button", { name: "Minimize" })).not.toBeInTheDocument();
+    });
+
     it("closes at once when nothing is unsaved", async () => {
       const { window, requestClose } = createWindow();
       render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), window }} />);

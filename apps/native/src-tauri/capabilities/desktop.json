@@ -1,8 +1,17 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "desktop",
-  "description": "Updating and restarting the installed desktop app, and revealing an entry in the file manager",
+  "description": "Updating and restarting the installed desktop app, revealing an entry in the file manager, the window buttons and dragging of the app's own title bar, and Snap Layouts from its Maximize button",
   "windows": ["main"],
   "platforms": ["windows", "linux", "macOS"],
-  "permissions": ["updater:default", "process:allow-restart", "opener:allow-reveal-item-in-dir"]
+  "permissions": [
+    "updater:default",
+    "process:allow-restart",
+    "opener:allow-reveal-item-in-dir",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-close",
+    "core:window:allow-start-dragging",
+    "allow-show-snap-layouts"
+  ]
 }

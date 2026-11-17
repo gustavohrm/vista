@@ -13,6 +13,7 @@ export type {
   UpdaterCapability,
   ViewMode,
   WindowCapability,
+  WindowControls,
   WorkspaceCapability,
   WorkspaceFolder,
   WorkspaceErrorKind,
