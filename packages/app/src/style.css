@@ -81,6 +81,15 @@
   color: var(--color-text);
 }
 
+/* Menus keep the edge and drop the shadow. The menu itself takes focus while no item has it, as when
+   opened with the pointer, and its items show focus with their fill, so the menu draws no focus ring:
+   neither the global outline nor the card's inset ring, which is drawn in its box-shadow. */
+.card.floating.vista-menu,
+.card.floating.vista-menu:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 /* A field edited in place, such as a CSV cell or a name in the explorer. Focused, it keeps the
    size and corner of the text it replaces and shows only a hairline over the hover fill, instead of
    the package's 3px focus ring, which made a cell look like a form field. An invalid name takes the

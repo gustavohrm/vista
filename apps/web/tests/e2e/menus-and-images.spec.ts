@@ -40,6 +40,22 @@ test.describe("menus and Markdown images", () => {
     await expect(page.getByRole("menuitem", { name: "Rename" }).locator("svg")).toBeVisible();
   });
 
+  test("draws a menu with its edge alone: no shadow, and no focus ring on the menu itself", async ({ page }) => {
+    await page.getByText("gallery.md").click({ button: "right" });
+    const menu = page.getByRole("menu");
+    await expect(menu).toBeFocused();
+    // A key press puts the browser in keyboard mode, so the menu's own focus now matches :focus-visible.
+    await page.keyboard.press("Shift");
+    await menu.evaluate((element: HTMLElement) => element.focus());
+    expect(await menu.evaluate((element) => element.matches(":focus-visible"))).toBe(true);
+
+    const style = await menu.evaluate((element) => {
+      const { boxShadow, outlineStyle, borderTopStyle } = getComputedStyle(element);
+      return { boxShadow, outlineStyle, borderTopStyle };
+    });
+    expect(style).toEqual({ boxShadow: "none", outlineStyle: "none", borderTopStyle: "solid" });
+  });
+
   test("lights one menu item at a time, following the pointer or the keyboard", async ({ page }) => {
     await page.getByText("gallery.md").click({ button: "right" });
     const menu = page.getByRole("menu");
