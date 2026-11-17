@@ -2828,6 +2828,8 @@ describe("App", () => {
       expect(screen.getByRole("link", { name: "Download for Windows" })).toHaveAccessibleDescription(
         `Vista ${APP_VERSION}`,
       );
+      // Without it, a host that answers with a page rather than the installer navigates away from the app.
+      expect(screen.getByRole("link", { name: "Download for Windows" })).toHaveAttribute("download");
 
       await openFolderFromWelcome(user);
       const rail = screen.getByRole("navigation", { name: "Activity bar" });
@@ -2835,6 +2837,7 @@ describe("App", () => {
         "href",
         "/download/windows",
       );
+      expect(within(rail).getByRole("link", { name: "Download Vista for Windows" })).toHaveAttribute("download");
     });
 
     it.each([
