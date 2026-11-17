@@ -39,11 +39,16 @@ report() {
 trap report EXIT
 
 # Runs a command over a newline-delimited file list, skipping an empty one.
+#
+# The list goes out in batches of at most 7000 bytes. On Windows a command such
+# as `pnpm` is a `.cmd` shim that `cmd.exe` runs, and `cmd.exe` refuses a command
+# line over 8191 characters, while `xargs` would size batches for the far larger
+# POSIX limit. The margin covers what the shim adds, such as the path to `node`.
 run_on() {
   run_list=$1
   shift
   if [ -s "$run_list" ]; then
-    tr '\n' '\0' <"$run_list" | xargs -0 "$@"
+    tr '\n' '\0' <"$run_list" | xargs -0 -s 7000 "$@"
   fi
 }
 
