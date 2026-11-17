@@ -41,6 +41,9 @@ jobs:
       - name: Check versions
         run: pnpm versions:check
 
+      - name: Check the changelog
+        run: pnpm changelog:check
+
       - name: Check formatting
         run: pnpm format:check
 

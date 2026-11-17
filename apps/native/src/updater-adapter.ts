@@ -16,6 +16,8 @@ export function createNativeUpdaterAdapter(): UpdaterCapability {
       }
       return {
         version: update.version,
+        // The manifest's `notes`, which the release writes from the version's changelog entry.
+        notes: update.body?.trim() || undefined,
         async install() {
           // The signature is verified against the public key in `tauri.conf.json` before anything installs.
           await update.downloadAndInstall();

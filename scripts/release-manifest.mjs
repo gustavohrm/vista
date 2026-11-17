@@ -6,10 +6,13 @@
 //
 // URLs are relative to the releases folder (`0.2.0/Vista_0.2.0_x64-setup.exe`);
 // the Worker makes them absolute against the origin it is served from, so the
-// manifest works wherever the web app is hosted.
+// manifest works wherever the web app is hosted. Its `notes` are the description of the version's
+// changelog entry, which the app shows when it offers the update.
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { readEntry } from "./changelog.mjs";
 
 /** @typedef {{ url: string, signature: string }} PlatformEntry */
 
@@ -34,13 +37,14 @@ const PLATFORMS = [
 /**
  * Builds the updater manifest for one release.
  *
- * @param {{ version: string, pubDate: string, names: string[], read: (name: string) => string }} release -
- *   The version, the publication time as an ISO 8601 string, the file names in the release directory, and a
- *   function that reads one of them as text.
- * @returns {{ version: string, pub_date: string, platforms: Record<string, PlatformEntry> }} The manifest.
+ * @param {{ version: string, notes?: string, pubDate: string, names: string[], read: (name: string) => string }} release -
+ *   The version, a sentence on what it changes, the publication time as an ISO 8601 string, the file names in
+ *   the release directory, and a function that reads one of them as text.
+ * @returns {{ version: string, notes?: string, pub_date: string, platforms: Record<string, PlatformEntry> }}
+ *   The manifest, without `notes` when there are none.
  * @throws {Error} When a platform has no installer, more than one, or one without its `.sig` file.
  */
-export function buildManifest({ version, pubDate, names, read }) {
+export function buildManifest({ version, notes = "", pubDate, names, read }) {
   // Tauri names the RPM `Vista-{version}-1.x86_64.rpm` and every other bundle `Vista_{version}_…`.
   const prefixes = [`Vista_${version}_`, `Vista-${version}-`];
   /** @type {Record<string, PlatformEntry>} */
@@ -59,7 +63,7 @@ export function buildManifest({ version, pubDate, names, read }) {
     }
     platforms[platform.key] = { url: `${version}/${installer}`, signature: read(`${installer}.sig`).trim() };
   }
-  return { version, pub_date: pubDate, platforms };
+  return { version, ...(notes.trim() === "" ? {} : { notes: notes.trim() }), pub_date: pubDate, platforms };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -70,6 +74,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
   const manifest = buildManifest({
     version,
+    notes: readEntry(version).description,
     pubDate: new Date().toISOString(),
     names: readdirSync(directory),
     read: (name) => readFileSync(join(directory, name), "utf8"),

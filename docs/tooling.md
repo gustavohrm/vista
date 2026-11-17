@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-14
+last_updated: 2026-11-17
 scope: Setup, how the root scripts are implemented, the TypeScript and Vitest configuration, the order of `pnpm verify`, narrowing a run, adding a package, and generated and ignored output.
 ---
 
@@ -22,23 +22,24 @@ nvm for Windows does not read `.nvmrc`, and `nvm install` and `nvm use` without 
 
 ## Scripts
 
-| Script                | Runs                                                                                        |
-| --------------------- | ------------------------------------------------------------------------------------------- |
-| `pnpm format:check`   | `oxfmt --check`, then `prettier --check` over `**/*.md`.                                    |
-| `pnpm format:fix`     | The same two formatters, rewriting files, then `cargo fmt` for Rust.                        |
-| `pnpm lint:check`     | `oxlint --deny-warnings`.                                                                   |
-| `pnpm lint:fix`       | `oxlint --fix`.                                                                             |
-| `pnpm typecheck`      | `tsc -b` over the solution in `tsconfig.json`: the root files and every referenced package. |
-| `pnpm versions:check` | `node scripts/check-versions.mjs`: every manifest carries the root `package.json` version.  |
-| `pnpm test`           | `vitest run`: every package's and app's Vitest project, in one run.                         |
-| `pnpm test:watch`     | `vitest`, in watch mode.                                                                    |
-| `pnpm test:coverage`  | `vitest run --coverage`, with a V8 coverage report in `coverage/`.                          |
-| `pnpm test:e2e`       | `playwright test` in `@vista/web`.                                                          |
-| `pnpm build`          | `build:web`, then `build:native`, each `vite build` in its host.                            |
-| `pnpm deploy:web`     | `build:web`, then `wrangler deploy`, in `@vista/web`.                                       |
-| `pnpm verify`         | `verify:web`, then `verify:rust`, in the order [below](#verification).                      |
-| `pnpm labels`         | `node scripts/sync-labels.mjs`, which needs an authenticated `gh`.                          |
-| `pnpm prepare`        | `git config core.hooksPath .githooks`, reporting rather than failing when git cannot.       |
+| Script                 | Runs                                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------------- |
+| `pnpm format:check`    | `oxfmt --check`, then `prettier --check` over `**/*.md`.                                          |
+| `pnpm format:fix`      | The same two formatters, rewriting files, then `cargo fmt` for Rust.                              |
+| `pnpm lint:check`      | `oxlint --deny-warnings`.                                                                         |
+| `pnpm lint:fix`        | `oxlint --fix`.                                                                                   |
+| `pnpm typecheck`       | `tsc -b` over the solution in `tsconfig.json`: the root files and every referenced package.       |
+| `pnpm versions:check`  | `node scripts/check-versions.mjs`: every manifest carries the root `package.json` version.        |
+| `pnpm changelog:check` | `node scripts/changelog.mjs check`: the version in `package.json` has a complete changelog entry. |
+| `pnpm test`            | `vitest run`: every package's and app's Vitest project, in one run.                               |
+| `pnpm test:watch`      | `vitest`, in watch mode.                                                                          |
+| `pnpm test:coverage`   | `vitest run --coverage`, with a V8 coverage report in `coverage/`.                                |
+| `pnpm test:e2e`        | `playwright test` in `@vista/web`.                                                                |
+| `pnpm build`           | `build:web`, then `build:native`, each `vite build` in its host.                                  |
+| `pnpm deploy:web`      | `build:web`, then `wrangler deploy`, in `@vista/web`.                                             |
+| `pnpm verify`          | `verify:web`, then `verify:rust`, in the order [below](#verification).                            |
+| `pnpm labels`          | `node scripts/sync-labels.mjs`, which needs an authenticated `gh`.                                |
+| `pnpm prepare`         | `git config core.hooksPath .githooks`, reporting rather than failing when git cannot.             |
 
 `lint:check` and `lint:fix` accept a root-relative path, such as `pnpm lint:fix packages/app/src`, to narrow oxlint to it.
 
@@ -46,13 +47,13 @@ The Rust scripts live in `apps/native/package.json`: `format:rust:check`, `forma
 
 ## TypeScript and Vitest
 
-| File                      | Configures                                                                                                                                                                                                                                                       |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tsconfig.base.json`      | The compiler settings every project shares: strict, `noUncheckedIndexedAccess`, `verbatimModuleSyntax`, bundler resolution, and type-checking only (`noEmit`).                                                                                                   |
-| `tsconfig.json`           | The solution `tsc -b` builds. It lists projects and holds no files.                                                                                                                                                                                              |
-| `tsconfig.root.json`      | The project for code outside the packages: root config files such as `vitest.config.ts`, and `scripts/`. Node.js runs these directly, so it checks them by Node's rules: Node.js types, NodeNext resolution, and relative imports with the file's own extension. |
-| `<package>/tsconfig.json` | One project per package and app. It extends `tsconfig.base.json` and adds the DOM `lib`, `jsx`, and, in the hosts, the `vite/client` types.                                                                                                                      |
-| `vitest.config.ts`        | The Vitest projects: the root project for tests in `scripts/`, and every package and app with a `vitest.config.ts`, which names its project. Coverage is configured here, for every project at once.                                                             |
+| File                      | Configures                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tsconfig.base.json`      | The compiler settings every project shares: strict, `noUncheckedIndexedAccess`, `verbatimModuleSyntax`, bundler resolution, and type-checking only (`noEmit`).                                                                                                                                                                                                                                        |
+| `tsconfig.json`           | The solution `tsc -b` builds. It lists projects and holds no files.                                                                                                                                                                                                                                                                                                                                   |
+| `tsconfig.root.json`      | The project for code outside the packages: root config files such as `vitest.config.ts`, and `scripts/`, plus `packages/app/src/domain/changelog.ts`, which `scripts/changelog.mjs` imports, so that file is checked by both projects' rules. Node.js runs these directly, so it checks them by Node's rules: Node.js types, NodeNext resolution, and relative imports with the file's own extension. |
+| `<package>/tsconfig.json` | One project per package and app. It extends `tsconfig.base.json` and adds the DOM `lib`, `jsx`, and, in the hosts, the `vite/client` types.                                                                                                                                                                                                                                                           |
+| `vitest.config.ts`        | The Vitest projects: the root project for tests in `scripts/`, and every package and app with a `vitest.config.ts`, which names its project. Coverage is configured here, for every project at once.                                                                                                                                                                                                  |
 
 The hosts import `@vista/app` as source, so `tsc -b` checks its files in each project that reaches them, not only in `packages/app`. The cost is repeated work, and an error in shared code is reported once per project.
 
@@ -63,6 +64,7 @@ The hosts import `@vista/app` as source, so `tsc -b` checks its files in each pr
 `verify:web`:
 
 1. `versions:check`: the four `package.json` files and `Cargo.toml` carry one version, and `tauri.conf.json` reads it from `apps/native/package.json` rather than repeating it. A release bumps them together.
+1. `changelog:check`: `docs/changelog/` has a complete entry for that version, listed first in its index, as [the changelog spec](specs/changelog.md) defines. The pull request that raises the version writes it.
 1. `format:check`: oxfmt over code, CSS, HTML, JSON, and YAML, then Prettier over Markdown.
 1. `lint:check`: oxlint with `--deny-warnings`.
 1. `typecheck`: `tsc -b` over the solution.

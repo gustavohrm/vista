@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-16
+last_updated: 2026-11-17
 scope: The root script names and what each guarantees, the shared tool configurations, the pinned toolchain, install rules, how dependency versions are declared, and how the git hooks are wired.
 ---
 
@@ -10,22 +10,23 @@ This document is the workspace's contract: the names of the root scripts and wha
 
 ## Root scripts
 
-| Script               | Guarantees                                                                                                                         |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm format:check`  | Every file is formatted: code, CSS, HTML, JSON and YAML by oxfmt, Markdown by Prettier. Reports, writes nothing.                   |
-| `pnpm format:fix`    | The same two formatters, and rustfmt for Rust, rewriting files.                                                                    |
-| `pnpm lint:check`    | oxlint passes over the repository, with warnings treated as errors.                                                                |
-| `pnpm lint:fix`      | oxlint, applying its safe fixes.                                                                                                   |
-| `pnpm typecheck`     | Every package and the repository's own TypeScript type-check.                                                                      |
-| `pnpm test`          | Every package's and app's unit and integration suites pass.                                                                        |
-| `pnpm test:watch`    | The same, in watch mode.                                                                                                           |
-| `pnpm test:coverage` | The same, with a coverage report in `coverage/`.                                                                                   |
-| `pnpm test:e2e`      | The web host's browser suite passes. Needs a browser installed; `pnpm verify` does not run it.                                     |
-| `pnpm build`         | The web and native frontend bundles build.                                                                                         |
-| `pnpm verify`        | `verify:web`, then `verify:rust`, stopping at the first failure. It is the delivery gate [Contributing](../CONTRIBUTING.md) names. |
-| `pnpm verify:web`    | `versions:check`, `format:check`, `lint:check`, `typecheck`, `test`, `build:web` and `build:native`, in that order.                |
-| `pnpm verify:rust`   | rustfmt, then clippy, over the native host's Rust crate.                                                                           |
-| `pnpm prepare`       | Runs on install: points git at the committed hooks in `.githooks/`.                                                                |
+| Script                 | Guarantees                                                                                                                             |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm format:check`    | Every file is formatted: code, CSS, HTML, JSON and YAML by oxfmt, Markdown by Prettier. Reports, writes nothing.                       |
+| `pnpm format:fix`      | The same two formatters, and rustfmt for Rust, rewriting files.                                                                        |
+| `pnpm lint:check`      | oxlint passes over the repository, with warnings treated as errors.                                                                    |
+| `pnpm lint:fix`        | oxlint, applying its safe fixes.                                                                                                       |
+| `pnpm typecheck`       | Every package and the repository's own TypeScript type-check.                                                                          |
+| `pnpm test`            | Every package's and app's unit and integration suites pass.                                                                            |
+| `pnpm test:watch`      | The same, in watch mode.                                                                                                               |
+| `pnpm test:coverage`   | The same, with a coverage report in `coverage/`.                                                                                       |
+| `pnpm test:e2e`        | The web host's browser suite passes. Needs a browser installed; `pnpm verify` does not run it.                                         |
+| `pnpm build`           | The web and native frontend bundles build.                                                                                             |
+| `pnpm changelog:check` | The version in `package.json` has a complete [changelog](specs/changelog.md) entry, listed first in its index.                         |
+| `pnpm verify`          | `verify:web`, then `verify:rust`, stopping at the first failure. It is the delivery gate [Contributing](../CONTRIBUTING.md) names.     |
+| `pnpm verify:web`      | `versions:check`, `changelog:check`, `format:check`, `lint:check`, `typecheck`, `test`, `build:web` and `build:native`, in that order. |
+| `pnpm verify:rust`     | rustfmt, then clippy, over the native host's Rust crate.                                                                               |
+| `pnpm prepare`         | Runs on install: points git at the committed hooks in `.githooks/`.                                                                    |
 
 `pnpm verify` is what CI runs ([CI](ci.md)), so a green local `verify` predicts a green run. [Tooling](tooling.md#verification) gives the order of its steps and why.
 

@@ -249,6 +249,11 @@ export interface AvailableUpdate {
   /** The new version, such as `0.3.0`. */
   version: string;
   /**
+   * A sentence on what the new version changes, from its changelog entry, when the release source gives one.
+   * It is shown as plain text.
+   */
+  notes?: string;
+  /**
    * Downloads, verifies, and installs the update, then restarts the app. It may not return: on
    * Windows the installer ends the running app itself.
    *

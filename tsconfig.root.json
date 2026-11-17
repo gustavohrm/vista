@@ -1,5 +1,6 @@
 {
-  // The repository's own code outside the workspace packages: the root config files and `scripts/`.
+  // The repository's own code outside the workspace packages: the root config files and `scripts/`, plus the one
+  // package file a script imports, listed in `include` below.
   "extends": "./tsconfig.base.json",
   // Node.js runs these files directly, with type stripping and no bundler, so they are checked by Node's rules:
   // its types, NodeNext resolution, and relative imports written with the file's own extension, `.ts` or
@@ -13,5 +14,7 @@
     "checkJs": true,
     "tsBuildInfoFile": "./node_modules/.cache/tsconfig.root.tsbuildinfo"
   },
-  "include": ["*.ts", "*.mjs", "scripts/**/*.ts", "scripts/**/*.mjs"]
+  // `scripts/changelog.mjs` reads the changelog with the app's own parser, which imports nothing, so it is checked
+  // by these rules as well as by the app's.
+  "include": ["*.ts", "*.mjs", "scripts/**/*.ts", "scripts/**/*.mjs", "packages/app/src/domain/changelog.ts"]
 }

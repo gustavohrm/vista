@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-12
+last_updated: 2026-11-17
 scope: How durable project documentation under `docs/` is structured, maintained, interpreted, and written, including this document.
 ---
 
@@ -16,6 +16,8 @@ Every document in `docs/` MUST start with YAML frontmatter containing these fiel
 - `last_updated`: date of the last meaningful content change in `YYYY-MM-DD` format.
 
 Documents SHOULD include `scope` when the title alone does not make ownership clear.
+
+The pages under `docs/changelog/` are the one exception: they carry the header [the changelog spec](../specs/changelog.md#the-header) defines instead, `title`, `date`, and `description` on a version page and `title` alone on the index. A version page records a release, so it has no status to change, and its date is the release date; the index only lists those pages. The exception is permanent and covers that directory only.
 
 Allowed statuses:
 

@@ -36,6 +36,16 @@ describe("buildManifest", () => {
     });
   });
 
+  it("carries the entry's description as the notes the app shows", () => {
+    const manifest = buildManifest({
+      version: "0.2.0",
+      notes: " Folders open faster.\n",
+      pubDate: "x",
+      ...readerFor(FILES),
+    });
+    expect(manifest.notes).toBe("Folders open faster.");
+  });
+
   it("fails when an installer is missing", () => {
     const rest = without(FILES, "Vista_0.2.0_amd64.AppImage");
 

@@ -64,6 +64,7 @@ export function StartScreen({
   desktopDownload = null,
   notice,
 }: StartScreenProps) {
+  const downloadVersionId = useId();
   if (!hasWorkspace && isLoading) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center p-6">
@@ -114,9 +115,20 @@ export function StartScreen({
             </li>
             {desktopDownload && (
               <li>
-                <a href={desktopDownload.href} className={ROW_CLASS}>
+                <a
+                  href={desktopDownload.href}
+                  // The label names the link and the version describes it, rather than both making up its name.
+                  aria-label={desktopDownload.label}
+                  aria-describedby={desktopDownload.version ? downloadVersionId : undefined}
+                  className={ROW_CLASS}
+                >
                   <i className="ic-monitor-down text-text-muted flex-none text-base" aria-hidden="true" />
                   <span className="text-text-strong flex-1">{desktopDownload.label}</span>
+                  {desktopDownload.version && (
+                    <span id={downloadVersionId} className="text-text-faint flex-none text-xs">
+                      Vista {desktopDownload.version}
+                    </span>
+                  )}
                 </a>
               </li>
             )}

@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { version as APP_VERSION } from "../package.json";
 import { App } from "./app";
+import { changelogEntryFor } from "./changelog";
+import { inlineParts } from "./domain/changelog";
 import {
   LEGACY_FOLDER_ID,
   type AppAdapter,
@@ -1031,6 +1033,38 @@ describe("App", () => {
       });
       // It applies from the next start; turning it on asks nothing now.
       expect(updater.check).not.toHaveBeenCalled();
+    });
+
+    it("shows what the running version changed in About, from its changelog entry", async () => {
+      const user = userEvent.setup();
+      const entry = changelogEntryFor(APP_VERSION);
+      // The release check makes the running version's entry exist; this reads the one inlined from docs/changelog/.
+      expect(entry).toBeDefined();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await screen.findByRole("button", { name: "Open Folder…" });
+
+      await user.keyboard("{Control>},{/Control}");
+      const settings = await settingsDialog();
+      await user.click(within(settings).getByRole("button", { name: "About" }));
+      expect(within(settings).getByText(entry?.description ?? "")).toBeInTheDocument();
+      await user.click(within(settings).getByRole("button", { name: "What's New" }));
+
+      const whatsNew = await screen.findByRole("dialog", { name: `What's new in Vista ${APP_VERSION}` });
+      for (const section of entry?.sections ?? []) {
+        const heading = within(whatsNew).getByRole("heading", { name: section.heading });
+        const shown = within(heading.closest("section") as HTMLElement)
+          .getAllByRole("listitem")
+          .map((item) => item.textContent);
+        expect(shown).toEqual(
+          section.items.map((item) =>
+            inlineParts(item)
+              .map((part) => part.text)
+              .join(""),
+          ),
+        );
+      }
+      await user.click(within(whatsNew).getByRole("button", { name: "Close" }));
+      expect(screen.queryByRole("dialog", { name: `What's new in Vista ${APP_VERSION}` })).not.toBeInTheDocument();
     });
 
     it("offers no update check in About when the host has no updater", async () => {
@@ -2791,6 +2825,9 @@ describe("App", () => {
         "href",
         "/download/windows",
       );
+      expect(screen.getByRole("link", { name: "Download for Windows" })).toHaveAccessibleDescription(
+        `Vista ${APP_VERSION}`,
+      );
 
       await openFolderFromWelcome(user);
       const rail = screen.getByRole("navigation", { name: "Activity bar" });
@@ -2832,7 +2869,9 @@ describe("App", () => {
           // Let the reported processor reach the screen before checking what it offers.
           await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
 
-          const links = screen.queryAllByRole("link", { name: /Download for/ }).map((link) => link.textContent);
+          const links = screen
+            .queryAllByRole("link", { name: /Download for/ })
+            .map((link) => link.getAttribute("aria-label") ?? link.textContent);
           expect(links).toEqual(label ? [label] : []);
         } finally {
           Reflect.deleteProperty(navigator, "userAgentData");
@@ -3963,6 +4002,22 @@ describe("App", () => {
       expect(await screen.findByRole("button", { name: "Update to 0.3.0" })).toBeInTheDocument();
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       expect(install).not.toHaveBeenCalled();
+    });
+
+    it("says what the new version changes, from the release's notes, in the notice and the offer", async () => {
+      const user = userEvent.setup();
+      const install = vi.fn();
+      const updater = {
+        check: vi.fn(async () => ({ version: "0.3.0", notes: "Folders open faster.", install })),
+      } as unknown as NonNullable<AppAdapter["updater"]>;
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), updater }} />);
+
+      expect(await screen.findByRole("button", { name: "Update to 0.3.0" })).toHaveAttribute(
+        "title",
+        "Vista 0.3.0 is available. Folders open faster. Choose to install it.",
+      );
+      const offer = await openOffer(user);
+      expect(within(offer).getByText(/^Folders open faster\. Install it now\?/)).toBeInTheDocument();
     });
 
     it("keeps a dismissed version's notice away at the next start, but not a newer version's", async () => {

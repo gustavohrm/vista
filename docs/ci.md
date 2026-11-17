@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-16
+last_updated: 2026-11-17
 scope: Continuous integration, the pinned toolchain, action pinning, dependency updates, and the checks that report on pull requests.
 ---
 
@@ -20,12 +20,12 @@ CI reads those same files rather than repeating a version: `pnpm/action-setup` t
 
 ## Jobs
 
-| Job                 | Runner           | Runs                                                                                                                                                                               |
-| ------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Web`               | `ubuntu-latest`  | `pnpm versions:check`, `pnpm format:check`, `pnpm lint:check`, `pnpm typecheck`, `pnpm test`, `pnpm build:web`, `pnpm build:native`, `pnpm test:e2e`, then `Working tree is clean` |
-| `Rust`              | `windows-latest` | `pnpm --filter=@vista/native` `format:rust:check`, `lint:rust:check`, then `Working tree is clean`                                                                                 |
-| `Desktop (Windows)` | `windows-latest` | `pnpm --filter=@vista/native build:desktop`, then `Working tree is clean`, then uploads the NSIS installer                                                                         |
-| `Desktop (Linux)`   | `ubuntu-22.04`   | `pnpm --filter=@vista/native lint:rust:check`, `build:desktop`, then `Working tree is clean`, then uploads the `.deb`, `.rpm`, and AppImage                                        |
+| Job                 | Runner           | Runs                                                                                                                                                                                                       |
+| ------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Web`               | `ubuntu-latest`  | `pnpm versions:check`, `pnpm changelog:check`, `pnpm format:check`, `pnpm lint:check`, `pnpm typecheck`, `pnpm test`, `pnpm build:web`, `pnpm build:native`, `pnpm test:e2e`, then `Working tree is clean` |
+| `Rust`              | `windows-latest` | `pnpm --filter=@vista/native` `format:rust:check`, `lint:rust:check`, then `Working tree is clean`                                                                                                         |
+| `Desktop (Windows)` | `windows-latest` | `pnpm --filter=@vista/native build:desktop`, then `Working tree is clean`, then uploads the NSIS installer                                                                                                 |
+| `Desktop (Linux)`   | `ubuntu-22.04`   | `pnpm --filter=@vista/native lint:rust:check`, `build:desktop`, then `Working tree is clean`, then uploads the `.deb`, `.rpm`, and AppImage                                                                |
 
 Every job runs on every pull request, every merge-queue check, and every push to `main`, in parallel. There is no change-based selection: the repository is one application, and a check that skips half of it on a pull request is a check that lets the other half reach `main` unverified.
 
@@ -45,9 +45,10 @@ Runs for the same pull request cancel each other, because only the newest push i
 
 `.github/workflows/release.yml` publishes a release when a tag named `v` and the version, such as `v0.2.0`, is pushed. It runs one release at a time and never cancels one halfway.
 
-1. `Check the tag` runs `scripts/check-versions.mjs` and fails unless the tag names the version in `package.json`.
+1. `Check the tag` runs `scripts/check-versions.mjs` and fails unless the tag names the version in `package.json`, then fails unless `docs/changelog/` has a complete entry for it, with `scripts/changelog.mjs check`, as [the changelog spec](specs/changelog.md#the-check) defines. It installs the pinned Node.js first, since that script loads TypeScript through Node's type stripping.
 2. `Build (Windows)` and `Build (Linux)` run `tauri build` with `createUpdaterArtifacts`, signing each installer with the private key, which only that step can read. Windows ships the NSIS installer only; Linux ships the `.deb`, `.rpm`, and AppImage.
-3. `Publish` flattens the downloaded bundle folders, refuses a version that is already published, since its files are served as never changing, and writes `latest.json` with `scripts/release-manifest.mjs`, which fails before anything is uploaded when an installer or its `.sig` is missing. It uploads the installers to the R2 bucket under the version's folder, deploys the web app, and only then uploads `latest.json`, so a client is never told about files the Worker cannot serve. Last, `scripts/release-retention.mjs` deletes old releases.
+3. `Publish` flattens the downloaded bundle folders, refuses a version that is already published, since its files are served as never changing, and writes `latest.json` with `scripts/release-manifest.mjs`, which fails before anything is uploaded when an installer or its `.sig` is missing, and sets its `notes` to the changelog entry's description, which the app shows when it offers the update. It uploads the installers to the R2 bucket under the version's folder, deploys the web app, and only then uploads `latest.json`, so a client is never told about files the Worker cannot serve. Last, `scripts/release-retention.mjs` deletes old releases.
+4. `GitHub release` creates the GitHub release for the tag, with the changelog entry's body and a link to the downloads but no installers, marked as a prerelease when the version has a suffix such as `-beta.1`. It is the only job with `contents: write`, and it installs no dependencies, so no install script ever runs beside that token. It is a job of its own so a failed call to GitHub is retried by rerunning it alone, after the release is already served; it leaves a GitHub release that already exists as it is.
 
 The Worker in `apps/web` serves the bucket: `/releases/latest.json` for the updater, `/releases/<version>/<file>` for the files, and `/download/windows`, `/download/linux` (the AppImage), `/download/deb`, and `/download/rpm` as links to the current installer. The web app and the desktop releases therefore move together: the Worker is deployed by a release, not by a merge to `main`.
 

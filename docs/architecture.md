@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-16
+last_updated: 2026-11-17
 scope: Boundaries between shared app code, platform hosts, and workspace packages.
 ---
 
@@ -86,4 +86,4 @@ The find bar (`components/editor/find-bar.tsx`) owns the query and the UI and se
 
 ## Hosting decision
 
-The web app is hosted as a Cloudflare Worker, and the same Worker serves the desktop installers and the updater manifest from an R2 bucket. Clients download and update from that Worker rather than from GitHub Releases, so wherever the web app is hosted, the downloads are too. GitHub Actions still builds, signs, and publishes each release, so releases depend on GitHub as well as on the web app's host. A release deploys both together. [`docs/ci.md`](ci.md#releases) describes the workflow, the routes, and how long releases are kept.
+The web app is hosted as a Cloudflare Worker, and the same Worker serves the desktop installers and the updater manifest from an R2 bucket. Clients download and update from that Worker rather than from GitHub Releases, so wherever the web app is hosted, the downloads are too. Each release also has a GitHub release, which carries its changelog entry but no installers. GitHub Actions still builds, signs, and publishes each release, so releases depend on GitHub as well as on the web app's host. A release deploys both together. [`docs/ci.md`](ci.md#releases) describes the workflow, the routes, and how long releases are kept.
