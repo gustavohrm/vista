@@ -61,6 +61,13 @@ describe("findChangelogProblems", () => {
     ]);
   });
 
+  it("fails when an index item for an older version is not a link to a version page", () => {
+    const pages = { ...PAGES, "index.md": INDEX.replace("- [0.1.0](0.1.0.md)", "- [0.1.0](0.1.0)") };
+    expect(findChangelogProblems("0.2.0", readerFor(pages))).toEqual([
+      expect.stringContaining('"[0.1.0](0.1.0)", which is not a link to a version page'),
+    ]);
+  });
+
   it("fails when the index links a page that does not exist", () => {
     const pages = { ...PAGES, "0.1.0.md": undefined };
     expect(findChangelogProblems("0.2.0", readerFor(pages))).toEqual([

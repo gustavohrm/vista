@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-16
+last_updated: 2026-11-17
 scope: Boundaries between shared app code, platform hosts, and workspace packages.
 ---
 

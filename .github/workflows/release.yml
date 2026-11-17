@@ -118,9 +118,6 @@ jobs:
     runs-on: ubuntu-latest
     environment: release
     timeout-minutes: 20
-    # Only this job writes to the repository, and only to create the GitHub release for the tag.
-    permissions:
-      contents: write
     env:
       VERSION: ${{ needs.version.outputs.version }}
     steps:
@@ -209,16 +206,50 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+  # A job of its own, so the token that can write to the repository is never in a job that runs dependency
+  # install scripts, and a failed call to GitHub is retried by rerunning this job alone: rerunning `Publish`
+  # would stop at its check that the version is not already published.
+  github-release:
+    name: GitHub release
+    needs: [version, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The pinned Node.js, for the changelog script's type stripping; no dependencies are installed.
+      - name: Install Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
       # The entry's body, for readers on GitHub; the installers stay on the web app's host, as the downloads do.
-      # Last, so a failure here leaves the release already served and pruned.
+      # A version with a suffix, such as 1.0.0-beta.1, is marked as a prerelease. A release a previous run
+      # created is left as it is, so a rerun only finishes what failed.
       - name: Create the GitHub release
         run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            echo "The GitHub release for $GITHUB_REF_NAME already exists."
+            exit 0
+          fi
           {
             node scripts/changelog.mjs notes "$VERSION"
             echo
             echo "Download Vista from $SITE_URL."
           } > release-notes.md
-          gh release create "$GITHUB_REF_NAME" --verify-tag --title "Vista $VERSION" --notes-file release-notes.md
+          prerelease=()
+          if [[ "$VERSION" == *-* ]]; then
+            prerelease=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" --verify-tag "${prerelease[@]}" --title "Vista $VERSION"             --notes-file release-notes.md
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}

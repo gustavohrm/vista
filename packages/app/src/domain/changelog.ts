@@ -6,7 +6,10 @@
 /** The Keep a Changelog headings an entry may use, in the order they appear. */
 export const CHANGELOG_HEADINGS = ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"] as const;
 
-/** One heading of an entry, such as `Fixed`, and its bullets as written, in inline Markdown. */
+/**
+ * One heading of an entry, such as `Fixed`, and its bullets as written, in inline Markdown. A heading deeper
+ * than `##` keeps its marks, as `### Details`, so the check can tell it from an entry heading.
+ */
 export interface ChangelogSection {
   heading: string;
   items: string[];
@@ -16,6 +19,8 @@ export interface ChangelogSection {
 export interface ChangelogEntry {
   /** The version the page is named for, such as `0.2.0`. */
   version: string;
+  /** The text of the page's `# ` heading, or an empty string when it has none. */
+  title: string;
   /** The release date, `YYYY-MM-DD`, or an empty string when the page sets none. */
   date: string;
   /** A sentence on what the release changes for a user, or an empty string when the page sets none. */
@@ -35,6 +40,24 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const PLACEHOLDER = /^TODO\b/i;
 // A file name the index may link: a version, as the release tag names it, and `.md`.
 const PAGE_NAME = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?\.md$/;
+// A list item in the index, whether or not it is a link the index can read.
+const INDEX_ITEM = /^\s*[-*]\s+(.*?)\s*$/;
+const INDEX_LINK = /^\[[^\]]*\]\(([^)\s]+)\)$/;
+
+/**
+ * Whether a string is a real calendar day as `YYYY-MM-DD`. `Date` rolls `2026-02-31` over to March 3, so the
+ * parsed day is written back and compared.
+ *
+ * @param date - The string to test.
+ * @returns True for a real day.
+ */
+export function isIsoDate(date: string): boolean {
+  if (!ISO_DATE.test(date)) {
+    return false;
+  }
+  const day = new Date(`${date}T00:00:00Z`);
+  return !Number.isNaN(day.getTime()) && day.toISOString().slice(0, 10) === date;
+}
 
 /**
  * Splits a page into its frontmatter fields and its body. Only flat `key: value` lines are read, which is
@@ -66,14 +89,24 @@ export function parseFrontmatter(text: string): { fields: Record<string, string>
  * @returns File names such as `0.2.0.md`; a link to anything else is left out.
  */
 export function parseChangelogIndex(text: string): string[] {
-  const names: string[] = [];
-  for (const match of text.matchAll(/^\s*-\s+\[[^\]]*\]\(([^)\s]+)\)\s*$/gm)) {
-    const target = match[1] ?? "";
-    if (PAGE_NAME.test(target)) {
-      names.push(target);
+  return readIndexItems(text).flatMap((item) => (item.page === null ? [] : [item.page]));
+}
+
+/**
+ * Reads each list item of the index, and the version page it links when it is one.
+ *
+ * @param text - The text of `docs/changelog/index.md`.
+ * @returns The items in order, each with its text and its page, or null for an item that links no page.
+ */
+export function readIndexItems(text: string): { text: string; page: string | null }[] {
+  return text.split(/\r?\n/).flatMap((line) => {
+    const item = INDEX_ITEM.exec(line)?.[1];
+    if (item === undefined) {
+      return [];
     }
-  }
-  return names;
+    const target = INDEX_LINK.exec(item)?.[1];
+    return [{ text: item, page: target !== undefined && PAGE_NAME.test(target) ? target : null }];
+  });
 }
 
 /**
@@ -91,6 +124,7 @@ export function parseChangelogPage(version: string, text: string): ChangelogEntr
   // The title is the page's one `# ` heading; everything after it is the body.
   const title = /^# .*$/m.exec(afterFrontmatter);
   const body = (title ? afterFrontmatter.slice(title.index + title[0].length) : afterFrontmatter).trim();
+  const titleText = title ? title[0].slice(2).trim() : "";
 
   const sections: ChangelogSection[] = [];
   let section: ChangelogSection | null = null;
@@ -102,17 +136,18 @@ export function parseChangelogPage(version: string, text: string): ChangelogEntr
     item = null;
   };
   for (const line of body.split(/\r?\n/)) {
-    const heading = /^##\s+(.+?)\s*$/.exec(line);
+    const heading = /^(#{2,6})\s+(.+?)\s*$/.exec(line);
     const bullet = /^[-*]\s+(.*)$/.exec(line);
     if (heading) {
       finishItem();
-      section = { heading: heading[1] ?? "", items: [] };
+      const [, marks = "", name = ""] = heading;
+      section = { heading: marks === "##" ? name : `${marks} ${name}`, items: [] };
       sections.push(section);
     } else if (bullet) {
       finishItem();
       item = (bullet[1] ?? "").trim();
-    } else if (item !== null && /^\s+\S/.test(line)) {
-      // An indented line continues the bullet above it.
+    } else if (item !== null && line.trim() !== "") {
+      // Any other text line continues the bullet above it, indented or not, as Markdown reads it.
       item = `${item} ${line.trim()}`;
     } else {
       finishItem();
@@ -120,7 +155,14 @@ export function parseChangelogPage(version: string, text: string): ChangelogEntr
   }
   finishItem();
 
-  return { version, date: fields.date ?? "", description: fields.description ?? "", sections, body };
+  return {
+    version,
+    title: titleText,
+    date: fields.date ?? "",
+    description: fields.description ?? "",
+    sections,
+    body,
+  };
 }
 
 /**
@@ -160,7 +202,7 @@ export function findEntryProblems(version: string, text: string): string[] {
   if (title !== version) {
     problems.push(`${page} must set "title: ${version}", not "${title}".`);
   }
-  if (!ISO_DATE.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) {
+  if (!isIsoDate(date)) {
     problems.push(`${page} must set "date" to the release date as YYYY-MM-DD.`);
   }
   if (description === "" || PLACEHOLDER.test(description)) {
@@ -168,11 +210,25 @@ export function findEntryProblems(version: string, text: string): string[] {
   }
 
   const entry = parseChangelogPage(version, text);
+  if (entry.title !== version) {
+    problems.push(`${page} must have the heading "# ${version}".`);
+  }
   const allowed: readonly string[] = CHANGELOG_HEADINGS;
+  let previous = -1;
   for (const section of entry.sections) {
-    if (!allowed.includes(section.heading)) {
-      problems.push(`${page} has a "## ${section.heading}" heading. Use only ${CHANGELOG_HEADINGS.join(", ")}.`);
-    } else if (section.items.length === 0) {
+    const position = allowed.indexOf(section.heading);
+    const shown = section.heading.startsWith("#") ? section.heading : `## ${section.heading}`;
+    if (position === -1) {
+      problems.push(`${page} has a "${shown}" heading. Use only ${CHANGELOG_HEADINGS.join(", ")}, as ##.`);
+      continue;
+    }
+    if (position <= previous) {
+      problems.push(
+        `${page} has "${shown}" out of order or twice. Use ${CHANGELOG_HEADINGS.join(", ")}, in that order.`,
+      );
+    }
+    previous = Math.max(previous, position);
+    if (section.items.length === 0) {
       problems.push(`${page} has a "## ${section.heading}" heading with no bullets. Remove it or add one.`);
     }
   }
@@ -194,8 +250,7 @@ export function findEntryProblems(version: string, text: string): string[] {
  */
 export function inlineParts(markdown: string): InlinePart[] {
   const parts: InlinePart[] = [];
-  const pushText = (text: string) => {
-    const plain = text.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
+  const pushText = (plain: string) => {
     if (plain === "") {
       return;
     }
@@ -206,7 +261,8 @@ export function inlineParts(markdown: string): InlinePart[] {
       parts.push({ kind: "text", text: plain });
     }
   };
-  let rest = markdown;
+  // Links go first, so a link whose text is a code span keeps the span.
+  let rest = markdown.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
   for (let code = /`([^`]+)`/.exec(rest); code; code = /`([^`]+)`/.exec(rest)) {
     pushText(rest.slice(0, code.index));
     parts.push({ kind: "code", text: code[1] ?? "" });

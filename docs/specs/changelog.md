@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-16
+last_updated: 2026-11-17
 scope: The changelog under docs/changelog/, the check that holds a release to it, and where its entries are shown.
 ---
 
@@ -75,15 +75,19 @@ These pages carry the fields above instead of the `status` and `last_updated` he
 - `index.md` is missing, or links a page that does not exist;
 - the version has no page, or the index does not link it, or lists another version first;
 - the page's `title` is not the version, its `date` is not a real `YYYY-MM-DD` date, or its `description` is empty or `TODO`;
-- the page has a heading other than the six above, a heading with no bullets, no bullets at all, or a bullet that starts with `TODO`.
+- the page has a heading other than the six above, a heading with no bullets, no bullets at all, or a bullet that starts with `TODO`, and a heading deeper than `##` counts as one other than the six;
+- the page has no `# {version}` heading, or its `##` headings are out of the order above or repeated;
+- any item of `index.md`, for any version, is not a link to a version page, since it would drop that version from every surface.
+
+Keeping every released version linked is otherwise a review rule: removing a correct link fails nothing, because dropping one is sometimes right, as [The index decides what is published](#the-index-decides-what-is-published) says.
 
 Only the current version's page is checked. An older page that was written before a rule existed is brought in line when it is next edited, rather than failing every run. `pnpm verify` runs the check, so the pull request that raises the version fails without its entry. The release workflow runs it again, in `Check the tag`, before anything is built, so a tag cannot publish a version that has no entry.
 
 ## Where entries are shown
 
-- **In the app.** `packages/app/src/changelog.ts` inlines `docs/changelog/` at build time, so each build carries the entries up to its own version, in the browser and on the desktop, and reads them without a network request. **About** in Settings shows the running version's release date and summary, and **What's New** opens the entry, as [the workspace spec](workspaces.md#settings) describes. In the browser, the start screen's desktop download names the version it downloads, which is the running one, since a release deploys the web app.
+- **In the app.** `packages/app/src/changelog.ts` inlines `docs/changelog/` at build time, so each build carries the entries up to its own version, in the browser and on the desktop, and reads them without a network request. **About** in Settings shows the running version's release date and summary, and **What's New** opens the entry, as [the workspace spec](workspaces.md#settings) describes. In the browser, the start screen's desktop download names the version it downloads, which is the running one, since a release deploys the web app. The release deploys the web app a moment before it publishes `latest.json`, which the download links follow, so for that moment, or until a rerun if the manifest upload fails, the label names the new version beside the previous installer. Reading the version from the manifest instead would cost a request on every start for that window alone.
 - **In the update offer.** A newer version cannot be in the running build, so `scripts/release-manifest.mjs` writes the entry's `description` into the `notes` field of `latest.json`, and the desktop updater passes it to the app. The offer and the update notice show it as plain text.
-- **On GitHub.** The release workflow creates the GitHub release for the tag with the entry's body and a link to the downloads. The installers are not attached: they are served from the web app's host, as [Architecture](../architecture.md#hosting-decision) records.
+- **On GitHub.** The release workflow's last job creates the GitHub release for the tag with the entry's body and a link to the downloads, as a prerelease for a version with a suffix. The installers are not attached: they are served from the web app's host, as [Architecture](../architecture.md#hosting-decision) records.
 
 A public `/changelog.json` route on the Worker was considered and not added: every surface above already has the entries, and the Worker's R2 copy would not do, since [retention](../ci.md#releases) keeps only the newest version folder before 1.0. A surface that needs entries the running build lacks, such as a website page, can add the route then.
 

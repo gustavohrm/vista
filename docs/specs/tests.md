@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-16
+last_updated: 2026-11-17
 scope: Test categories, where each lives, coverage expectations, and what no automated test reaches.
 ---
 

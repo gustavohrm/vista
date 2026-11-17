@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-14
+last_updated: 2026-11-17
 scope: Setup, how the root scripts are implemented, the TypeScript and Vitest configuration, the order of `pnpm verify`, narrowing a run, adding a package, and generated and ignored output.
 ---
 
@@ -47,13 +47,13 @@ The Rust scripts live in `apps/native/package.json`: `format:rust:check`, `forma
 
 ## TypeScript and Vitest
 
-| File                      | Configures                                                                                                                                                                                                                                                       |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tsconfig.base.json`      | The compiler settings every project shares: strict, `noUncheckedIndexedAccess`, `verbatimModuleSyntax`, bundler resolution, and type-checking only (`noEmit`).                                                                                                   |
-| `tsconfig.json`           | The solution `tsc -b` builds. It lists projects and holds no files.                                                                                                                                                                                              |
-| `tsconfig.root.json`      | The project for code outside the packages: root config files such as `vitest.config.ts`, and `scripts/`. Node.js runs these directly, so it checks them by Node's rules: Node.js types, NodeNext resolution, and relative imports with the file's own extension. |
-| `<package>/tsconfig.json` | One project per package and app. It extends `tsconfig.base.json` and adds the DOM `lib`, `jsx`, and, in the hosts, the `vite/client` types.                                                                                                                      |
-| `vitest.config.ts`        | The Vitest projects: the root project for tests in `scripts/`, and every package and app with a `vitest.config.ts`, which names its project. Coverage is configured here, for every project at once.                                                             |
+| File                      | Configures                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tsconfig.base.json`      | The compiler settings every project shares: strict, `noUncheckedIndexedAccess`, `verbatimModuleSyntax`, bundler resolution, and type-checking only (`noEmit`).                                                                                                                                                                                                                                        |
+| `tsconfig.json`           | The solution `tsc -b` builds. It lists projects and holds no files.                                                                                                                                                                                                                                                                                                                                   |
+| `tsconfig.root.json`      | The project for code outside the packages: root config files such as `vitest.config.ts`, and `scripts/`, plus `packages/app/src/domain/changelog.ts`, which `scripts/changelog.mjs` imports, so that file is checked by both projects' rules. Node.js runs these directly, so it checks them by Node's rules: Node.js types, NodeNext resolution, and relative imports with the file's own extension. |
+| `<package>/tsconfig.json` | One project per package and app. It extends `tsconfig.base.json` and adds the DOM `lib`, `jsx`, and, in the hosts, the `vite/client` types.                                                                                                                                                                                                                                                           |
+| `vitest.config.ts`        | The Vitest projects: the root project for tests in `scripts/`, and every package and app with a `vitest.config.ts`, which names its project. Coverage is configured here, for every project at once.                                                                                                                                                                                                  |
 
 The hosts import `@vista/app` as source, so `tsc -b` checks its files in each project that reaches them, not only in `packages/app`. The cost is repeated work, and an error in shared code is reported once per project.
 

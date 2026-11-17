@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-16
+last_updated: 2026-11-17
 scope: Workspaces of one or more local folders, the application shell, file tree representation, document view modes, and persistence across hosts.
 ---
 

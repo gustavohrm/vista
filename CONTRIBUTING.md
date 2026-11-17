@@ -174,7 +174,7 @@ A pull request that builds on another unmerged one targets that one's branch and
 
 ## Deployment and releases
 
-Releasing is a maintainer action, and it is separate from merging. Merging changes `main`; a release or deployment puts a version where people install or reach it, and a published version can be superseded but rarely taken back. Bump the version and record what users need to know in an ordinary pull request first; the release itself names a commit already on `main`. That pull request writes the version's page in `docs/changelog/` and links it at the top of `docs/changelog/index.md`, as [the changelog spec](docs/specs/changelog.md) defines; `pnpm verify` fails without it.
+Releasing is a maintainer action, and it is separate from merging. Merging changes `main`; a release or deployment puts a version where people install or reach it, and a published version can be superseded but rarely taken back. Bump the version and record what users need to know in an ordinary pull request first; the release itself names a commit already on `main`. That pull request also writes the version's [changelog](docs/specs/changelog.md) entry.
 
 Vista is an end-user application, not a set of published npm packages. A release is a tag named `v` followed by the version, such as `v0.0.1`.
 

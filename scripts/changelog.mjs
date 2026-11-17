@@ -10,15 +10,16 @@
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { findEntryProblems, parseChangelogIndex, parseChangelogPage } from "../packages/app/src/domain/changelog.ts";
+import { findEntryProblems, parseChangelogPage, readIndexItems } from "../packages/app/src/domain/changelog.ts";
 
 export const CHANGELOG_DIR = "docs/changelog";
 
 /** @typedef {(name: string) => string | null} ReadPage */
 
 /**
- * Reports what keeps a version's entry from being released: no index, no page, a page the index does not
- * link, an index link to a page that does not exist, or a page that is incomplete.
+ * Reports what keeps a version's entry from being released: no index, an index item that is not a link to a
+ * version page, an index link to a page that does not exist, no page, a page the index does not link or does
+ * not list first, or a page that is incomplete.
  *
  * @param {string} version - The version being released.
  * @param {ReadPage} read - Returns a page's text by its file name in `docs/changelog/`, or null when it is missing.
@@ -30,11 +31,19 @@ export function findChangelogProblems(version, read) {
     return [`${CHANGELOG_DIR}/index.md is missing. It lists every published version, newest first.`];
   }
   const page = `${version}.md`;
-  const linked = parseChangelogIndex(index);
+  const items = readIndexItems(index);
+  const linked = items.flatMap((item) => (item.page === null ? [] : [item.page]));
+  // An item that links no version page would silently drop that version from every surface, so each is reported,
+  // not only the current version's.
   /** @type {string[]} */
-  const problems = linked
-    .filter((name) => read(name) === null)
-    .map((name) => `${CHANGELOG_DIR}/index.md links ${name}, which does not exist.`);
+  const problems = [
+    ...items
+      .filter((item) => item.page === null)
+      .map((item) => `${CHANGELOG_DIR}/index.md has "${item.text}", which is not a link to a version page.`),
+    ...linked
+      .filter((name) => read(name) === null)
+      .map((name) => `${CHANGELOG_DIR}/index.md links ${name}, which does not exist.`),
+  ];
   const text = read(page);
   if (text === null) {
     problems.push(`${CHANGELOG_DIR}/${page} is missing. Write the entry in the change that raises the version.`);

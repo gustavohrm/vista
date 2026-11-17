@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { findEntryProblems, inlineParts, parseChangelogIndex, parseChangelogPage, readChangelog } from "./changelog";
+import {
+  findEntryProblems,
+  inlineParts,
+  isIsoDate,
+  parseChangelogIndex,
+  parseChangelogPage,
+  readChangelog,
+  readIndexItems,
+} from "./changelog";
 
 const PAGE = `---
 title: 0.2.0
@@ -42,12 +50,38 @@ describe("parseChangelogPage", () => {
     expect(entry.body.startsWith("## Changed")).toBe(true);
   });
 
+  it("continues a bullet over a wrapped line with no indent, as Markdown does", () => {
+    const page = "# 0.1.0\n\n## Added\n\n- One thing\nwrapped.\n- Another.\n";
+    expect(parseChangelogPage("0.1.0", page).sections[0]?.items).toEqual(["One thing wrapped.", "Another."]);
+  });
+
   it("reads a page with no frontmatter without throwing", () => {
     expect(parseChangelogPage("0.1.0", "# 0.1.0\n\n## Added\n\n- One thing.\n")).toMatchObject({
       date: "",
       description: "",
       sections: [{ heading: "Added", items: ["One thing."] }],
     });
+  });
+});
+
+describe("isIsoDate", () => {
+  it.each([
+    ["2026-12-01", true],
+    ["2028-02-29", true],
+    ["2026-02-29", false],
+    ["2026-02-31", false],
+    ["2026-1-01", false],
+  ])("reads %s as %s", (date, expected) => {
+    expect(isIsoDate(date)).toBe(expected);
+  });
+});
+
+describe("readIndexItems", () => {
+  it("keeps an item that links no version page, so the check can report it", () => {
+    expect(readIndexItems("- [0.2.0](0.2.0.md)\n- [0.1.0](0.1.0.md\n")).toEqual([
+      { text: "[0.2.0](0.2.0.md)", page: "0.2.0.md" },
+      { text: "[0.1.0](0.1.0.md", page: null },
+    ]);
   });
 });
 
@@ -87,6 +121,10 @@ describe("findEntryProblems", () => {
     ["a TODO description", PAGE.replace(/description: .*/, "description: TODO"), '"description"'],
     ["a heading Keep a Changelog does not define", PAGE.replace("## Changed", "## Improved"), '"## Improved"'],
     ["a TODO bullet", PAGE.replace("- A second fix.", "- TODO: describe"), "TODO bullet"],
+    ["a rolled-over date", PAGE.replace("2026-12-01", "2026-02-31"), '"date"'],
+    ["a title heading that is not the version", PAGE.replace("# 0.2.0", "# Two"), '"# 0.2.0"'],
+    ["a deeper heading", PAGE.replace("## Changed", "### Improved"), '"### Improved"'],
+    ["headings out of order", PAGE.replace("## Changed", "## Security"), "out of order"],
   ])("reports %s", (_case, text, message) => {
     expect(findEntryProblems("0.2.0", text)).toEqual([expect.stringContaining(message)]);
   });
@@ -105,6 +143,14 @@ describe("findEntryProblems", () => {
 });
 
 describe("inlineParts", () => {
+  it("keeps the code span that is a link's text", () => {
+    expect(inlineParts("See [`strict`](https://example.com).")).toEqual([
+      { kind: "text", text: "See " },
+      { kind: "code", text: "strict" },
+      { kind: "text", text: "." },
+    ]);
+  });
+
   it("keeps code spans apart and a link's text only", () => {
     expect(inlineParts("Use `parseConfig` with `strict`. ([#12](https://example.com/12))")).toEqual([
       { kind: "text", text: "Use " },

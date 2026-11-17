@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { version as APP_VERSION } from "../package.json";
 import { App } from "./app";
 import { changelogEntryFor } from "./changelog";
+import { inlineParts } from "./domain/changelog";
 import {
   LEGACY_FOLDER_ID,
   type AppAdapter,
@@ -1050,7 +1051,17 @@ describe("App", () => {
 
       const whatsNew = await screen.findByRole("dialog", { name: `What's new in Vista ${APP_VERSION}` });
       for (const section of entry?.sections ?? []) {
-        expect(within(whatsNew).getByRole("heading", { name: section.heading })).toBeInTheDocument();
+        const heading = within(whatsNew).getByRole("heading", { name: section.heading });
+        const shown = within(heading.closest("section") as HTMLElement)
+          .getAllByRole("listitem")
+          .map((item) => item.textContent);
+        expect(shown).toEqual(
+          section.items.map((item) =>
+            inlineParts(item)
+              .map((part) => part.text)
+              .join(""),
+          ),
+        );
       }
       await user.click(within(whatsNew).getByRole("button", { name: "Close" }));
       expect(screen.queryByRole("dialog", { name: `What's new in Vista ${APP_VERSION}` })).not.toBeInTheDocument();
