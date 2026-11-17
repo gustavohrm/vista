@@ -333,6 +333,7 @@ describe("App", () => {
       await user.click(screen.getByRole("menuitem", { name: "Remove Folder from Workspace" }));
       const dialog = await screen.findByRole("dialog", { name: 'Remove "sources" from the workspace?' });
       expect(dialog).toHaveTextContent("Your folders and files aren't changed.");
+      expect(within(dialog).getByRole("button", { name: "Remove" })).toHaveClass("toast-dialog-btn-error");
       await user.click(within(dialog).getByRole("button", { name: "Remove" }));
 
       await waitFor(() =>
