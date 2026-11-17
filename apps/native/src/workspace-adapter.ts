@@ -223,7 +223,14 @@ export function createNativeWorkspaceAdapter(): WorkspaceCapability {
       // `open()` itself resolves to null on user cancellation rather than rejecting, so any
       // rejection here is a genuine failure and must propagate rather than being swallowed
       // into the same null result cancellation produces.
-      const selected = await open({ directory: true, multiple: false, title: "Select Folder for Vista Workspace" });
+      // `recursive` grants the whole tree to the fs scope; without it only the folder's direct children
+      // are allowed, and reading `.vista/workspace.json` or any subfolder is refused.
+      const selected = await open({
+        directory: true,
+        recursive: true,
+        multiple: false,
+        title: "Select Folder for Vista Workspace",
+      });
       if (!selected || typeof selected !== "string") {
         return null;
       }
