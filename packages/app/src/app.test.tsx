@@ -333,6 +333,7 @@ describe("App", () => {
       await user.click(screen.getByRole("menuitem", { name: "Remove Folder from Workspace" }));
       const dialog = await screen.findByRole("dialog", { name: 'Remove "sources" from the workspace?' });
       expect(dialog).toHaveTextContent("Your folders and files aren't changed.");
+      expect(within(dialog).getByRole("button", { name: "Remove" })).toHaveClass("toast-dialog-btn-error");
       await user.click(within(dialog).getByRole("button", { name: "Remove" }));
 
       await waitFor(() =>
@@ -2828,6 +2829,8 @@ describe("App", () => {
       expect(screen.getByRole("link", { name: "Download for Windows" })).toHaveAccessibleDescription(
         `Vista ${APP_VERSION}`,
       );
+      // Without it, a host that answers with a page rather than the installer navigates away from the app.
+      expect(screen.getByRole("link", { name: "Download for Windows" })).toHaveAttribute("download");
 
       await openFolderFromWelcome(user);
       const rail = screen.getByRole("navigation", { name: "Activity bar" });
@@ -2835,6 +2838,7 @@ describe("App", () => {
         "href",
         "/download/windows",
       );
+      expect(within(rail).getByRole("link", { name: "Download Vista for Windows" })).toHaveAttribute("download");
     });
 
     it.each([

@@ -117,6 +117,8 @@ export function StartScreen({
               <li>
                 <a
                   href={desktopDownload.href}
+                  // Like the rail's, so the click downloads rather than navigating away from the app.
+                  download
                   // The label names the link and the version describes it, rather than both making up its name.
                   aria-label={desktopDownload.label}
                   aria-describedby={desktopDownload.version ? downloadVersionId : undefined}

@@ -112,7 +112,10 @@ function ComingSoonButtons({ position }: { position: "right" | "bottom" }) {
   );
 }
 
-/** The desktop download: a link, since it leaves for the installer rather than acting in the app. */
+/**
+ * The desktop download: a link, since it leaves for the installer rather than acting in the app. `download`
+ * keeps the click from navigating away from the app when the host answers with a page instead of the installer.
+ */
 function DownloadLink({ download, position }: { download: DesktopDownload; position: "right" | "bottom" }) {
   const label = download.label.replace("Download", "Download Vista");
   return (
@@ -120,6 +123,7 @@ function DownloadLink({ download, position }: { download: DesktopDownload; posit
       {(bubbleId) => (
         <a
           href={download.href}
+          download
           aria-label={label}
           aria-describedby={bubbleId}
           className={`${RAIL_BUTTON_CLASS} text-text-faint hover:text-text hover:bg-hover`}

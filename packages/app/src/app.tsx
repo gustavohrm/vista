@@ -1285,6 +1285,7 @@ function AppShell({ adapter }: AppProps) {
         title: `Remove "${entry.name}" from the workspace?`,
         message: "Your folders and files aren't changed.",
         confirmLabel: "Remove",
+        destructive: true,
       });
       const keys = documentsRef.current.documents.filter((doc) => doc.folderId === folderId).map((doc) => doc.key);
       if (!confirmed || !(await closeDocuments(keys))) {
