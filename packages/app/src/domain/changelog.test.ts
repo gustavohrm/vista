@@ -151,6 +151,14 @@ describe("inlineParts", () => {
     ]);
   });
 
+  it("keeps a link written inside a code span as written", () => {
+    expect(inlineParts("Write `[text](url)` for a link.")).toEqual([
+      { kind: "text", text: "Write " },
+      { kind: "code", text: "[text](url)" },
+      { kind: "text", text: " for a link." },
+    ]);
+  });
+
   it("keeps code spans apart and a link's text only", () => {
     expect(inlineParts("Use `parseConfig` with `strict`. ([#12](https://example.com/12))")).toEqual([
       { kind: "text", text: "Use " },

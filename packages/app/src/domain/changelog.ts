@@ -261,13 +261,26 @@ export function inlineParts(markdown: string): InlinePart[] {
       parts.push({ kind: "text", text: plain });
     }
   };
-  // Links go first, so a link whose text is a code span keeps the span.
-  let rest = markdown.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
-  for (let code = /`([^`]+)`/.exec(rest); code; code = /`([^`]+)`/.exec(rest)) {
-    pushText(rest.slice(0, code.index));
-    parts.push({ kind: "code", text: code[1] ?? "" });
-    rest = rest.slice(code.index + code[0].length);
+  // One pass finds whichever comes first, a code span or a link, so a code span keeps a link's syntax as
+  // written, and a link whose text is a code span keeps the span.
+  const token = /`([^`]+)`|\[((?:`[^`]*`|[^\]`])*)\]\([^)]*\)/g;
+  let end = 0;
+  for (const match of markdown.matchAll(token)) {
+    pushText(markdown.slice(end, match.index));
+    end = match.index + match[0].length;
+    if (match[1] !== undefined) {
+      parts.push({ kind: "code", text: match[1] });
+      continue;
+    }
+    const label = match[2] ?? "";
+    let labelEnd = 0;
+    for (const code of label.matchAll(/`([^`]+)`/g)) {
+      pushText(label.slice(labelEnd, code.index));
+      parts.push({ kind: "code", text: code[1] ?? "" });
+      labelEnd = code.index + code[0].length;
+    }
+    pushText(label.slice(labelEnd));
   }
-  pushText(rest);
+  pushText(markdown.slice(end));
   return parts;
 }
