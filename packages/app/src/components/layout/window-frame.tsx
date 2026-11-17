@@ -81,7 +81,7 @@ export function WindowButtons({ controls }: { controls: WindowControls }) {
     }, SNAP_LAYOUTS_DELAY_MS);
   }
 
-  function maximizeButton(bubbleId?: string) {
+  function maximizeButton(bubbleId: string) {
     return (
       <button
         type="button"
@@ -121,14 +121,12 @@ export function WindowButtons({ controls }: { controls: WindowControls }) {
           </button>
         )}
       </Tooltip>
-      {/* Where the layouts show on resting, they stand in for the tooltip, as on Windows. */}
-      {showSnapLayouts ? (
-        maximizeButton()
-      ) : (
-        <Tooltip text={maximizeLabel} position="bottom" className="flex">
-          {(bubbleId) => maximizeButton(bubbleId)}
-        </Tooltip>
-      )}
+      {/* The tooltip stays where the layouts may show: they open over it, and when Windows shows
+          none, because the user turned them off or another window is in front, it still names the
+          button. */}
+      <Tooltip text={maximizeLabel} position="bottom" className="flex">
+        {(bubbleId) => maximizeButton(bubbleId)}
+      </Tooltip>
       <Tooltip text="Close" position="bottom" className="flex">
         {(bubbleId) => (
           <button
