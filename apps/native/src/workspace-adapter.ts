@@ -209,6 +209,11 @@ export function createNativeWorkspaceAdapter(): WorkspaceCapability {
   async function isReadable(folderPath: string): Promise<boolean> {
     try {
       await readDir(folderPath);
+      // A folder remembered before the picker granted whole trees has only its direct children in
+      // scope, which a read of the root does not tell apart. `exists` refuses a path out of scope
+      // rather than answering false, so a path two levels down does; such a folder then reads as
+      // unavailable, and picking it again grants the whole tree.
+      await exists(joinFolderPath(folderPath, ".vista/workspace.json"));
       return true;
     } catch (err) {
       console.warn(`Could not read the folder "${folderNameFromPath(folderPath)}":`, err);
@@ -223,7 +228,14 @@ export function createNativeWorkspaceAdapter(): WorkspaceCapability {
       // `open()` itself resolves to null on user cancellation rather than rejecting, so any
       // rejection here is a genuine failure and must propagate rather than being swallowed
       // into the same null result cancellation produces.
-      const selected = await open({ directory: true, multiple: false, title: "Select Folder for Vista Workspace" });
+      // `recursive` grants the whole tree to the fs scope; without it only the folder's direct children
+      // are allowed, and reading `.vista/workspace.json` or any subfolder is refused.
+      const selected = await open({
+        directory: true,
+        recursive: true,
+        multiple: false,
+        title: "Select Folder for Vista Workspace",
+      });
       if (!selected || typeof selected !== "string") {
         return null;
       }
