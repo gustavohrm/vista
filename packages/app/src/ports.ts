@@ -242,6 +242,34 @@ export interface WindowCapability {
    * @returns A function that removes the check.
    */
   onCloseRequested(check: () => Promise<boolean>): () => void;
+  /**
+   * The window's own buttons and dragging, for a host whose window has no system frame, so the
+   * application draws them in its title bar. Absent where the system draws the frame, or there is none.
+   */
+  controls?: WindowControls;
+}
+
+/** What a window's frame does, for an application that draws the frame itself. */
+export interface WindowControls {
+  minimize(): Promise<void>;
+  /** Maximizes the window, or restores it when it is maximized. */
+  toggleMaximize(): Promise<void>;
+  /** Asks to close the window, as the frame's close button does, so the `onCloseRequested` check runs. */
+  close(): Promise<void>;
+  /** Moves the window with the pointer, from a press on the title bar until it is released. */
+  startDragging(): Promise<void>;
+  /**
+   * Shows the system's window layouts, as Windows does when the pointer rests on a frame's Maximize
+   * button. Absent where the system has none to show.
+   */
+  showSnapLayouts?(): Promise<void>;
+  /**
+   * Calls `listener` with whether the window is maximized, once soon after and again whenever it
+   * changes.
+   *
+   * @returns A function that stops the calls.
+   */
+  watchMaximized(listener: (isMaximized: boolean) => void): () => void;
 }
 
 /** A newer version of the desktop app, ready to install. */
