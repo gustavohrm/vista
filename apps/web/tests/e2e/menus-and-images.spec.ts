@@ -54,6 +54,14 @@ test.describe("menus and Markdown images", () => {
       return { boxShadow, outlineStyle, borderTopStyle };
     });
     expect(style).toEqual({ boxShadow: "none", outlineStyle: "none", borderTopStyle: "solid" });
+
+    // With every item disabled, no item can take focus, so the menu shows it instead.
+    await menu.evaluate((element) => {
+      for (const item of element.querySelectorAll("[data-menu-item]")) {
+        item.setAttribute("aria-disabled", "true");
+      }
+    });
+    await expect.poll(() => menu.evaluate((element) => getComputedStyle(element).outlineStyle)).toBe("solid");
   });
 
   test("lights one menu item at a time, following the pointer or the keyboard", async ({ page }) => {
