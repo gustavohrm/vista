@@ -209,6 +209,11 @@ export function createNativeWorkspaceAdapter(): WorkspaceCapability {
   async function isReadable(folderPath: string): Promise<boolean> {
     try {
       await readDir(folderPath);
+      // A folder remembered before the picker granted whole trees has only its direct children in
+      // scope, which a read of the root does not tell apart. `exists` refuses a path out of scope
+      // rather than answering false, so a path two levels down does; such a folder then reads as
+      // unavailable, and picking it again grants the whole tree.
+      await exists(joinFolderPath(folderPath, ".vista/workspace.json"));
       return true;
     } catch (err) {
       console.warn(`Could not read the folder "${folderNameFromPath(folderPath)}":`, err);
