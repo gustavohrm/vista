@@ -137,7 +137,7 @@ export function WorkspaceNavItem({ workspace, isCurrent, onSelect }: WorkspaceNa
         <span
           className={`flex min-w-0 flex-1 items-center gap-2.5 ${workspace.status === "unavailable" ? "opacity-50" : ""}`}
         >
-          <WorkspaceGlyph icon={workspace.icon} color={workspace.color} isTile className="text-[10px]" />
+          <WorkspaceGlyph icon={workspace.icon} color={workspace.color} isTile className="text-xs" />
           <span className="truncate">{workspace.name}</span>
         </span>
         {workspace.status === "open" && (

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 
 
 import { Tooltip } from "../feedback/tooltip";
 import type { ManagedWorkspace } from "./workspace-manager";
-import { WorkspaceNavItem } from "./workspace-nav-item";
+import { WorkspaceNav } from "./workspace-nav";
 
 /** A section of Settings: a workspace's page, or one of Vista's own. */
 export type SettingsSection = "workspaces" | "appearance" | "editor" | "files" | "shortcuts" | "about";
@@ -37,7 +37,8 @@ interface SettingsPageProps {
 /**
  * Settings, shown in the frame in place of the document: a header with the close button, the
  * sections on the left, grouped by where they apply, and the shown one on the right. The Workspaces
- * group lists every workspace, each opening its page, with New Workspace at the group's label. It rises into
+ * group lists the workspaces, each opening its page; its See All lists every one in place of the
+ * sections, under a "Settings › Workspaces" heading whose Settings brings the sections back. It rises into
  * the frame as it opens, and a new section fades in. Escape closes it, as does the close button.
  * Focus moves to the shown section's item as it opens and, when it closes with focus inside it,
  * goes back to where it was.
@@ -57,6 +58,8 @@ export function SettingsPage({
 }: SettingsPageProps) {
   const isReducedMotion = useReducedMotion() ?? false;
   const navRef = useRef<HTMLElement>(null);
+  const [isFullList, setIsFullList] = useState(false);
+  const [isLeavingFullList, setIsLeavingFullList] = useState(false);
 
   // Taken as the page first renders, before it moves focus: StrictMode runs the effect below twice,
   // and the second run would find the page's own item focused.
@@ -72,6 +75,14 @@ export function SettingsPage({
       }
     };
   }, [opener]);
+
+  // Back from the full list, focus goes to the See All that opened it.
+  useEffect(() => {
+    if (isLeavingFullList) {
+      navRef.current?.querySelector<HTMLElement>("[data-see-all]")?.focus();
+      setIsLeavingFullList(false);
+    }
+  }, [isLeavingFullList]);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === "Escape" && !event.defaultPrevented) {
@@ -90,7 +101,26 @@ export function SettingsPage({
       className="flex min-h-0 min-w-0 flex-1 flex-col"
     >
       <header className="border-line flex h-10 flex-none items-center border-b pr-1.5 pl-4">
-        <h1 className="text-text-strong flex-1 text-[13px] font-semibold">Settings</h1>
+        <h1 className="text-text-strong flex min-w-0 flex-1 items-center gap-1 text-[13px] font-semibold">
+          {isFullList ? (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFullList(false);
+                  setIsLeavingFullList(true);
+                }}
+                className="text-text-muted hover:text-text-strong -mx-1 cursor-pointer rounded px-1 font-semibold transition-colors duration-100 outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)]"
+              >
+                Settings
+              </button>
+              <i className="ic-chevron-right text-text-faint text-xs" aria-hidden="true" />
+              Workspaces
+            </>
+          ) : (
+            "Settings"
+          )}
+        </h1>
         <Tooltip text="Close" shortcut="Escape" position="bottom">
           {(tooltipId) => (
             <button
@@ -111,38 +141,25 @@ export function SettingsPage({
           aria-label="Settings sections"
           className="border-line flex flex-none [scrollbar-width:none] gap-0.5 overflow-x-auto border-b px-2 py-2 md:block md:w-[232px] md:overflow-y-auto md:border-r md:border-b-0 md:px-3 md:py-5"
         >
-          {/* Below md the label hides with the others, and New Workspace starts the row. */}
-          <div className="flex flex-none items-center md:mb-1 md:pl-2.5">
-            <span className="text-text-faint hidden flex-1 text-xs font-medium md:block">Workspaces</span>
-            <Tooltip text="New Workspace" position="bottom" className="flex flex-none">
-              {(bubbleId) => (
-                <button
-                  type="button"
-                  onClick={onNewWorkspace}
-                  aria-label="New Workspace…"
-                  aria-describedby={bubbleId}
-                  className="icon-button size-7 text-base md:size-6 md:text-sm"
-                >
-                  <i className="ic-plus" aria-hidden="true" />
-                </button>
-              )}
-            </Tooltip>
-          </div>
-          {workspaces.map((workspace) => (
-            <WorkspaceNavItem
-              key={workspace.id}
-              workspace={workspace}
-              isCurrent={section === "workspaces" && shownWorkspaceId === workspace.id}
-              onSelect={() => onSelectWorkspace(workspace.id)}
-            />
-          ))}
-          <GroupLabel>Vista</GroupLabel>
-          {VISTA_SECTIONS.map(({ id, label, icon }) => (
-            <NavItem key={id} isCurrent={section === id} onSelect={() => onSectionChange(id)}>
-              <span className="text-text-faint flex text-[15px]">{icon}</span>
-              {label}
-            </NavItem>
-          ))}
+          <WorkspaceNav
+            workspaces={workspaces}
+            shownWorkspaceId={section === "workspaces" ? shownWorkspaceId : null}
+            isFullList={isFullList}
+            onSelectWorkspace={onSelectWorkspace}
+            onNewWorkspace={onNewWorkspace}
+            onSeeAll={() => setIsFullList(true)}
+          />
+          {!isFullList && (
+            <>
+              <GroupLabel>Vista</GroupLabel>
+              {VISTA_SECTIONS.map(({ id, label, icon }) => (
+                <NavItem key={id} isCurrent={section === id} onSelect={() => onSectionChange(id)}>
+                  <span className="text-text-faint flex text-[15px]">{icon}</span>
+                  {label}
+                </NavItem>
+              ))}
+            </>
+          )}
         </nav>
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-8 md:px-14 md:py-10">
           <motion.div

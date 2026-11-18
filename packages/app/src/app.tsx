@@ -2741,9 +2741,12 @@ function AppShell({ adapter }: AppProps) {
               <WorkspaceSwitcher
                 current={currentWorkspace}
                 recents={recents}
+                workspaces={workspaceStore
+                  .allWorkspaces()
+                  .map(({ id, name, icon, color }) => ({ id, name, icon, color, folders: null }))}
                 onSwitch={(workspaceId) => void handleOpenWorkspace(workspaceId)}
                 onOpenFolder={() => void handleOpenFolder()}
-                onOpenSettings={openWorkspaceSettings}
+                onOpenSettings={showManaged}
                 onClose={() => void handleCloseWorkspace()}
                 onRemoveFromRecent={handleRemoveFromRecent}
                 // A workspace opened while the last one is restored could be replaced when that finishes.

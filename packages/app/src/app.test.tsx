@@ -264,7 +264,7 @@ describe("App", () => {
       await appendToRawEditor(user, await screen.findByRole("textbox", { name: "Raw text content of plan.txt" }), "!");
       await user.keyboard("{Control>}s{/Control}");
 
-      expect(screen.getByRole("button", { name: "Research" })).toHaveAttribute("aria-haspopup", "menu");
+      expect(screen.getByRole("button", { name: "Research" })).toHaveAttribute("aria-haspopup", "listbox");
       expect(within(explorerPanel()).getByRole("button", { name: "notes", expanded: true })).toBeInTheDocument();
       expect(within(explorerPanel()).getByRole("button", { name: "sources", expanded: true })).toBeInTheDocument();
       await waitFor(() => expect(folder("sources").textOf("plan.txt")).toBe(`${PLAIN_TEXT}!`));
@@ -974,9 +974,17 @@ describe("App", () => {
       expect(
         within(within(dialog).getByRole("navigation", { name: "Settings sections" }))
           .getAllByRole("button")
-          .map((item) => item.textContent),
-        // New Workspace, then Vista's sections, with no workspace to list.
-      ).toEqual(["", "Appearance", "Editor", "Files", "Keyboard Shortcuts", "About"]);
+          .map((item) => item.getAttribute("aria-label") ?? item.textContent),
+        // The Workspaces group's buttons, then Vista's sections, with no workspace to list.
+      ).toEqual([
+        "Search Workspaces",
+        "New Workspace…",
+        "Appearance",
+        "Editor",
+        "Files",
+        "Keyboard Shortcuts",
+        "About",
+      ]);
       expect(within(dialog).getByRole("button", { name: "Appearance" })).toHaveAttribute("aria-current", "page");
       expect(within(dialog).getByRole("button", { name: "Appearance" })).toHaveFocus();
       await user.click(within(dialog).getByRole("button", { name: "Editor" }));
@@ -1088,7 +1096,7 @@ describe("App", () => {
   describe("workspace settings", () => {
     async function openWorkspaceSettings(user: ReturnType<typeof userEvent.setup>) {
       await user.click(await screen.findByRole("button", { name: "Research" }));
-      await user.click(screen.getByRole("menuitem", { name: "Workspace Settings…" }));
+      await user.click(screen.getByTitle('Settings for "Research"'));
       return screen.findByRole("region", { name: "Settings" });
     }
 
@@ -1225,8 +1233,8 @@ describe("App", () => {
   describe("workspace details in the folder", () => {
     async function openWorkspaceSettings(user: ReturnType<typeof userEvent.setup>, name = "Research") {
       const buttons = await screen.findAllByRole("button", { name });
-      await user.click(buttons.find((button) => button.getAttribute("aria-haspopup") === "menu")!);
-      await user.click(screen.getByRole("menuitem", { name: "Workspace Settings…" }));
+      await user.click(buttons.find((button) => button.getAttribute("aria-haspopup") === "listbox")!);
+      await user.click(screen.getByTitle(`Settings for "${name}"`));
       return screen.findByRole("region", { name: "Settings" });
     }
 
@@ -1516,12 +1524,14 @@ describe("App", () => {
 
     async function openFolderFromSwitcher(user: ReturnType<typeof userEvent.setup>, current: string) {
       const buttons = await screen.findAllByRole("button", { name: current });
-      await user.click(buttons.find((button) => button.getAttribute("aria-haspopup") === "menu")!);
-      await user.click(screen.getByRole("menuitem", { name: "Open Folder…" }));
+      await user.click(buttons.find((button) => button.getAttribute("aria-haspopup") === "listbox")!);
+      await user.click(screen.getByRole("option", { name: "Open Folder…" }));
     }
 
     function switcherButton(name: string) {
-      return screen.getAllByRole("button", { name }).find((button) => button.getAttribute("aria-haspopup") === "menu");
+      return screen
+        .getAllByRole("button", { name })
+        .find((button) => button.getAttribute("aria-haspopup") === "listbox");
     }
 
     function storedThesis() {
@@ -1719,7 +1729,7 @@ describe("App", () => {
       await within(await findExplorerPanel()).findByRole("button", { name: "plan.txt" });
 
       await user.click(switcherButton("Thesis")!);
-      await user.click(screen.getByRole("menuitem", { name: "Workspace Settings…" }));
+      await user.click(screen.getByTitle('Settings for "Thesis"'));
       const dialog = await screen.findByRole("region", { name: "Settings" });
       await user.clear(within(dialog).getByRole("textbox", { name: "Name" }));
       await user.type(within(dialog).getByRole("textbox", { name: "Name" }), "Dissertation");
@@ -1786,7 +1796,7 @@ describe("App", () => {
       expect(await within(explorerPanel()).findByRole("button", { name: "plan.txt" })).toBeInTheDocument();
 
       await user.click(switcherButton("Thesis")!);
-      await user.click(screen.getByRole("menuitem", { name: "Workspace Settings…" }));
+      await user.click(screen.getByTitle('Settings for "Thesis"'));
       const dialog = await screen.findByRole("region", { name: "Settings" });
       await user.type(within(dialog).getByRole("textbox", { name: "Name" }), "!");
       await waitFor(() =>
@@ -1871,15 +1881,15 @@ describe("App", () => {
       await screen.findByRole("textbox", { name: "Raw text content of a.txt" });
 
       await user.click(screen.getByRole("button", { name: "Research" }));
-      expect(screen.getByRole("menuitemradio", { name: "Research" })).toBeChecked();
-      const work = await screen.findByRole("menuitemradio", { name: "Work" });
+      expect(screen.getByRole("option", { name: "Research" })).toBeChecked();
+      const work = await screen.findByRole("option", { name: "Work" });
       await user.click(work);
 
       expect(await within(await findExplorerPanel()).findByRole("button", { name: "plan.txt" })).toBeInTheDocument();
       expect(screen.queryByRole("tab")).not.toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: "Work" }));
-      await user.click(screen.getByRole("menuitemradio", { name: "Research" }));
+      await user.click(screen.getByRole("option", { name: "Research" }));
 
       expect(await screen.findByRole("textbox", { name: "Raw text content of a.txt" })).toBeInTheDocument();
       expect(capability.restoreFolder).toHaveBeenLastCalledWith("notes", { interactive: true });
@@ -1913,7 +1923,7 @@ describe("App", () => {
       await waitFor(() => expect(reads).toBe(1));
 
       await user.click(screen.getByRole("button", { name: "Research" }));
-      await user.click(await screen.findByRole("menuitemradio", { name: "Work" }));
+      await user.click(await screen.findByRole("option", { name: "Work" }));
       await waitFor(() => expect(screen.getByRole("button", { name: "Work" })).toBeInTheDocument());
       releaseFirstRead();
 
@@ -1929,7 +1939,7 @@ describe("App", () => {
       await screen.findByRole("textbox", { name: "Raw text content of a.txt" });
 
       await user.click(screen.getByRole("button", { name: "Research" }));
-      await user.click(await screen.findByRole("menuitem", { name: "Close Workspace" }));
+      await user.click(await screen.findByRole("option", { name: "Close Workspace" }));
 
       expect(await screen.findByRole("heading", { name: "Recent workspaces" })).toBeInTheDocument();
       expect(screen.queryByRole("tab")).not.toBeInTheDocument();
@@ -1946,19 +1956,75 @@ describe("App", () => {
 
       await user.click(await screen.findByRole("button", { name: "No workspace" }));
 
-      expect(await screen.findByRole("menuitemradio", { name: "Research" })).not.toBeChecked();
-      expect(screen.getByRole("menuitemradio", { name: "Work" })).toBeInTheDocument();
-      expect(screen.getByRole("menuitem", { name: "Open Folder…" })).toBeInTheDocument();
-      expect(screen.queryByRole("menuitem", { name: "Close Workspace" })).not.toBeInTheDocument();
+      expect(await screen.findByRole("option", { name: "Research" })).not.toBeChecked();
+      expect(screen.getByRole("option", { name: "Work" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "Open Folder…" })).toBeInTheDocument();
+      expect(screen.queryByRole("option", { name: "Close Workspace" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Go to file" })).not.toBeInTheDocument();
 
-      await user.click(screen.getByRole("menuitemradio", { name: "Work" }));
-      expect(await screen.findByRole("button", { name: "Work" })).toHaveAttribute("aria-haspopup", "menu");
+      await user.click(screen.getByRole("option", { name: "Work" }));
+      expect(await screen.findByRole("button", { name: "Work" })).toHaveAttribute("aria-haspopup", "listbox");
     });
 
     function storedWorkspaces(): { id: string; name: string; storage?: string; hiddenFromRecent?: true }[] {
       return JSON.parse(localStorage.getItem("vista.workspaces") ?? "null").workspaces;
     }
+
+    it("turns the switcher into a search field that finds every workspace, past Recent", async () => {
+      const user = userEvent.setup();
+      const { capability } = twoWorkspaces();
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findExplorerPanel();
+
+      await user.click(screen.getByRole("button", { name: "Research" }));
+      const list = await screen.findByRole("listbox", { name: "Workspaces" });
+      expect(screen.getByRole("combobox", { name: "Search workspaces" })).toHaveFocus();
+      // The recent workspaces, then Open Folder and Close Workspace together.
+      expect(
+        within(list)
+          .getAllByRole("option")
+          .map((option) => option.textContent),
+      ).toEqual(["Research", "Work", "Open Folder…", "Close Workspace"]);
+      expect(within(list).getAllByRole("separator")).toHaveLength(1);
+      expect(within(list).queryByRole("option", { name: "Workspace Settings…" })).not.toBeInTheDocument();
+
+      // Shift+Delete takes the picked workspace out of Recent; typing still finds it.
+      await user.keyboard("{ArrowDown}{Shift>}{Delete}{/Shift}");
+      expect(within(list).queryByRole("option", { name: "Work" })).not.toBeInTheDocument();
+      // Typing searches the actions' labels too.
+      await user.keyboard("wo");
+      expect(
+        within(list)
+          .getAllByRole("option")
+          .map((option) => option.textContent),
+      ).toEqual(["Work", "Close Workspace"]);
+      expect(within(list).queryByTitle('Remove "Work" from Recent')).not.toBeInTheDocument();
+      await user.keyboard("{Enter}");
+
+      expect(await screen.findByRole("button", { name: "Work" })).toHaveFocus();
+      expect(storedWorkspaces().find((workspace) => workspace.id === "w2")?.hiddenFromRecent).toBeUndefined();
+    });
+
+    it("opens any workspace's page in Settings from its row in the switcher, the open one's too", async () => {
+      const user = userEvent.setup();
+      const { capability } = twoWorkspaces();
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findExplorerPanel();
+
+      await user.click(screen.getByRole("button", { name: "Research" }));
+      await user.click(screen.getByTitle('Settings for "Research"'));
+      const page = await screen.findByRole("region", { name: "Settings" });
+      expect(within(page).getByRole("heading", { name: "Research" })).toBeInTheDocument();
+      expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+
+      // Ctrl+, opens the picked one's page, not the open one's, and Settings stays open.
+      await user.click(
+        screen.getAllByRole("button", { name: "Research" }).find((button) => button.hasAttribute("aria-haspopup"))!,
+      );
+      await user.keyboard("{ArrowDown}{Control>},{/Control}");
+      expect(await within(page).findByRole("heading", { name: "Work" })).toBeInTheDocument();
+      expect(screen.getByRole("region", { name: "Settings" })).toBe(page);
+    });
 
     it("removes a workspace from Recent in the switcher, keeping the menu open and the workspace", async () => {
       const user = userEvent.setup();
@@ -1967,13 +2033,13 @@ describe("App", () => {
       await findExplorerPanel();
 
       await user.click(screen.getByRole("button", { name: "Research" }));
-      const menu = await screen.findByRole("menu", { name: "Workspaces" });
+      const menu = await screen.findByRole("listbox", { name: "Workspaces" });
       // The open workspace has no X: it would come back the next time it opens.
       expect(within(menu).queryByTitle('Remove "Research" from Recent')).not.toBeInTheDocument();
       await user.click(within(menu).getByTitle('Remove "Work" from Recent'));
 
-      expect(within(menu).queryByRole("menuitemradio", { name: "Work" })).not.toBeInTheDocument();
-      expect(within(menu).getByRole("menuitemradio", { name: "Research" })).toBeChecked();
+      expect(within(menu).queryByRole("option", { name: "Work" })).not.toBeInTheDocument();
+      expect(within(menu).getByRole("option", { name: "Research" })).toBeChecked();
       expect(storedWorkspaces().find((workspace) => workspace.id === "w2")).toMatchObject({ hiddenFromRecent: true });
       expect(capability.forgetFolder).not.toHaveBeenCalled();
     });
@@ -2013,7 +2079,7 @@ describe("App", () => {
       await findFileRows("a.txt");
 
       await user.click(screen.getByRole("button", { name: "Research" }));
-      await user.click(await screen.findByRole("menuitem", { name: "Close Workspace" }));
+      await user.click(await screen.findByRole("option", { name: "Close Workspace" }));
 
       await screen.findByRole("heading", { name: "Recent workspaces" });
       // The written logo is an image of the stroke; the opening plays on the logo drawn inline.
@@ -2050,7 +2116,7 @@ describe("App", () => {
       await user.click(await within(settings).findByRole("button", { name: "Open" }));
 
       await user.click(await screen.findByRole("button", { name: "Work" }));
-      expect(await screen.findByRole("menuitemradio", { name: "Work" })).toBeChecked();
+      expect(await screen.findByRole("option", { name: "Work" })).toBeChecked();
       expect(storedWorkspaces().find((workspace) => workspace.id === "w2")?.hiddenFromRecent).toBeUndefined();
     });
 
@@ -2066,7 +2132,7 @@ describe("App", () => {
       }
 
       function switcherButton() {
-        return screen.getAllByRole("button").find((button) => button.getAttribute("aria-haspopup") === "menu");
+        return screen.getAllByRole("button").find((button) => button.getAttribute("aria-haspopup") === "listbox");
       }
 
       it("lists every workspace by name in the navigation, opening at the open one's page", async () => {
