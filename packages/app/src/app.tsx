@@ -164,6 +164,11 @@ function AppShell({ adapter }: AppProps) {
   const theme = useTheme();
   const toast = useToast();
   const [workspace, setWorkspace] = useState<OpenWorkspace | null>(null);
+  // Whether a workspace has been open in this run, so the start screen knows it is not the first view.
+  const [hasOpenedWorkspace, setHasOpenedWorkspace] = useState(false);
+  if (workspace && !hasOpenedWorkspace) {
+    setHasOpenedWorkspace(true);
+  }
   // `documentKey`s of the expanded folders inside the workspace's folders.
   const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(() => new Set());
   const [documentsState, dispatchDocuments] = useReducer(documentsReducer, INITIAL_DOCUMENTS_STATE);
@@ -1986,7 +1991,9 @@ function AppShell({ adapter }: AppProps) {
         id: "file.openFolder",
         category: "Workspace",
         label: "Open Folder…",
-        isEnabled: !isPromptingForUnsavedChanges,
+        // While a workspace is loading, a folder opened meanwhile could be replaced when that finishes,
+        // and a cancelled pick would end the loading early, letting the switcher choose one too.
+        isEnabled: !isPromptingForUnsavedChanges && !isLoading,
         run: handleOpenFolder,
       },
       {
@@ -2308,6 +2315,7 @@ function AppShell({ adapter }: AppProps) {
       hasReadyFolder,
       handleViewModeChange,
       hasDirtyDocuments,
+      isLoading,
       isPromptingForUnsavedChanges,
       isRawShown,
       isExplorerShown,
@@ -2381,65 +2389,62 @@ function AppShell({ adapter }: AppProps) {
   return (
     <div
       data-platform={adapter.platform}
-      className="bg-chrome text-text flex h-screen w-screen flex-col overflow-hidden"
+      // Positioned so its clip also holds absolutely positioned parts, such as a visually hidden
+      // label in a bar sliding out past the window's edge, which would otherwise make the page scroll.
+      className="bg-chrome text-text relative flex h-screen w-screen flex-col overflow-hidden"
     >
-      {/* The title bar, rail, and explorer belong to a workspace: with none open there is nothing for
-          them to show, so they are not there, and opening one brings them in around the frame. A
-          window the app draws the frame of keeps the row for its buttons and for moving it. */}
+      {/* The title bar stays with no workspace open, holding the switcher, so another workspace is
+          one click away and a window the app draws the frame of has a row for its buttons and for
+          moving it. The rail and explorer belong to a workspace: with none open there is nothing
+          for them to show, so they are not there, and opening one brings them in beside the frame. */}
       {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- moving the window is a pointer gesture, as on a system title bar; the keyboard moves it with the system's own shortcuts */}
-      <div
-        onMouseDown={handleWindowDrag}
-        className={`relative z-50 flex flex-none select-none ${windowControls ? "h-11" : ""}`}
-      >
+      <div onMouseDown={handleWindowDrag} className="relative z-50 flex flex-none select-none">
         <div className="flex min-w-0 flex-1 flex-col">
-          <AnimatePresence initial={false}>
-            {currentWorkspace && (
-              <ShellReveal key="title-bar" axis="height">
-                <TitleBar
-                  isSidebarOpen={isSidebarOpen}
-                  hasExplorer={workspace !== null}
-                  onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
-                  onGoToFile={openGoToFile}
-                  switcher={
-                    <WorkspaceSwitcher
-                      current={currentWorkspace}
-                      recents={recents}
-                      onSwitch={(workspaceId) => void handleOpenWorkspace(workspaceId)}
-                      onOpenFolder={() => void handleOpenFolder()}
-                      onOpenSettings={() => setSettingsSection("workspace")}
-                      onClose={() => void handleCloseWorkspace()}
-                    />
-                  }
-                  goToFileShortcut={GO_TO_FILE_SHORTCUT}
-                  notice={updateNotice}
-                  panels={[
-                    {
-                      label: "Toggle Explorer",
-                      icon: isExplorerShown ? (
-                        <i className="ic-panel-left" aria-hidden="true" />
-                      ) : (
-                        <i className="ic-panel-left-dashed" aria-hidden="true" />
-                      ),
-                      isShown: isExplorerShown,
-                      isEnabled: workspace !== null && canToggleExplorer,
-                      onToggle: () => setIsSidebarOpen((previous) => !previous),
-                    },
-                    {
-                      label: "Toggle Status Bar",
-                      icon: isStatusBarShown ? (
-                        <i className="ic-panel-bottom" aria-hidden="true" />
-                      ) : (
-                        <i className="ic-panel-bottom-dashed" aria-hidden="true" />
-                      ),
-                      isShown: isStatusBarShown,
-                      isEnabled: statusDocument !== null,
-                      onToggle: () => setIsStatusBarOpen((previous) => !previous),
-                    },
-                  ]}
-                />
-              </ShellReveal>
-            )}
-          </AnimatePresence>
+          <TitleBar
+            isSidebarOpen={isSidebarOpen}
+            hasWorkspace={workspace !== null}
+            onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+            onGoToFile={openGoToFile}
+            switcher={
+              <WorkspaceSwitcher
+                current={currentWorkspace}
+                recents={recents}
+                onSwitch={(workspaceId) => void handleOpenWorkspace(workspaceId)}
+                onOpenFolder={() => void handleOpenFolder()}
+                onOpenSettings={() => setSettingsSection("workspace")}
+                onClose={() => void handleCloseWorkspace()}
+                onRemove={(workspaceId) => void handleRemoveRecent(workspaceId)}
+                // A workspace opened while the last one is restored could be replaced when that finishes.
+                isDisabled={isLoading}
+              />
+            }
+            goToFileShortcut={GO_TO_FILE_SHORTCUT}
+            notice={updateNotice}
+            panels={[
+              {
+                label: "Toggle Explorer",
+                icon: isExplorerShown ? (
+                  <i className="ic-panel-left" aria-hidden="true" />
+                ) : (
+                  <i className="ic-panel-left-dashed" aria-hidden="true" />
+                ),
+                isShown: isExplorerShown,
+                isEnabled: workspace !== null && canToggleExplorer,
+                onToggle: () => setIsSidebarOpen((previous) => !previous),
+              },
+              {
+                label: "Toggle Status Bar",
+                icon: isStatusBarShown ? (
+                  <i className="ic-panel-bottom" aria-hidden="true" />
+                ) : (
+                  <i className="ic-panel-bottom-dashed" aria-hidden="true" />
+                ),
+                isShown: isStatusBarShown,
+                isEnabled: statusDocument !== null,
+                onToggle: () => setIsStatusBarOpen((previous) => !previous),
+              },
+            ]}
+          />
         </div>
         {windowControls && <WindowButtons controls={windowControls} />}
       </div>
@@ -2505,8 +2510,7 @@ function AppShell({ adapter }: AppProps) {
             // The rail's glyphs sit as far from the frame as from the window's edge, so the frame
             // needs no margin of its own beside the rail, with the explorer open or not.
             workspace ? "" : "md:pl-2"
-            // The window's own row already holds the frame off the window's top edge.
-          } ${currentWorkspace || windowControls ? "" : "md:pt-2"} ${isStatusBarShown ? "" : "md:pb-2"}`}
+          } ${isStatusBarShown ? "" : "md:pb-2"}`}
         >
           <div className="bg-frame md:border-line md:rounded-frame flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:border">
             {shownSettingsSection !== null && (
@@ -2599,6 +2603,7 @@ function AppShell({ adapter }: AppProps) {
                     <StartScreen
                       hasWorkspace={workspace !== null}
                       isLoading={isLoading}
+                      entrance={hasOpenedWorkspace ? "opening" : "single-stroke"}
                       recents={recents}
                       onOpenFolder={() => void handleOpenFolder()}
                       onOpenSettings={openSettings}
@@ -2607,7 +2612,6 @@ function AppShell({ adapter }: AppProps) {
                       onRemoveRecent={(workspaceId) => void handleRemoveRecent(workspaceId)}
                       hints={START_HINTS}
                       desktopDownload={desktopDownload}
-                      notice={updateNotice}
                     />
                   )
                 }

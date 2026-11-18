@@ -237,7 +237,7 @@ The bar is never stretched or squeezed. It moves only inside a clip shaped like 
 
 The entrance plays once, where the logo first appears. There are two, one for each kind of surface.
 
-**Single stroke**, 2.4 s, for brand surfaces: a website's first view, the opening of a video, a launch post, and the app's first start screen in a run, where the logo writes itself at twice its size in the middle of the window and then settles into its place. The V comes alone. A Daylight stroke leaves its opening and writes **ista** in one line, like a highlighter, with each letter appearing as the stroke passes over it. It sweeps back along the horizon line and docks in the V as the bar, which settles with a 1.5-unit dip that the V shares.
+**Single stroke**, 2.4 s, for brand surfaces: a website's first view, the opening of a video, a launch post, and the app's start screen when it is the first view in a run, where the logo writes itself at twice its size in the middle of the window and then settles into its place. The V comes alone. A Daylight stroke leaves its opening and writes **ista** in one line, like a highlighter, with each letter appearing as the stroke passes over it. It sweeps back along the horizon line and docks in the V as the bar, which settles with a 1.5-unit dip that the V shares.
 
 | Part   | Movement                                                    | Start    | Ends     |
 | ------ | ----------------------------------------------------------- | -------- | -------- |
@@ -246,7 +246,7 @@ The entrance plays once, where the logo first appears. There are two, one for ea
 | Stroke | Returns along the horizon line into the opening             | 1,560 ms | 1,960 ms |
 | Bar    | Replaces the stroke; the bar and V dip 1.5 units and return | 1,940 ms | 2,300 ms |
 
-**The opening**, 1.4 s, for an in-app place where a person is waiting to start work and Single stroke would be too long; the start screen used it until it took Single stroke: the arms draw down to the point, the bar rises up the opening and widens with it into place, and the letters slide out from behind the right arm.
+**The opening**, 1.4 s, for an in-app place where a person is waiting to start work and Single stroke would be too long, such as the start screen after a workspace closes: the arms draw down to the point, the bar rises up the opening and widens with it into place, and the letters slide out from behind the right arm.
 
 | Part    | Movement                                                                    | Start  | Duration |
 | ------- | --------------------------------------------------------------------------- | ------ | -------- |

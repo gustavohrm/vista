@@ -20,6 +20,12 @@ interface StartScreenProps {
   hasWorkspace: boolean;
   /** Whether a folder is still being opened or restored, so nothing is offered yet. */
   isLoading: boolean;
+  /**
+   * How the logo comes in: `single-stroke` when the start screen is the app's first view in this
+   * run, where it writes itself large and settles into place, and `opening` after a workspace was
+   * open, where it plays the shorter entrance in its place. Defaults to `opening`.
+   */
+  entrance?: "single-stroke" | "opening";
   /** The remembered workspaces, the most recent first. */
   recents: readonly RecentWorkspace[];
   onOpenFolder: () => void;
@@ -32,15 +38,32 @@ interface StartScreenProps {
   hints: readonly StartHint[];
   /** The desktop installer to offer in the browser, standing in for the rail's link, or null where there is none. */
   desktopDownload?: DesktopDownload | null;
-  /** A quiet notice under the Start list, such as a newer version being out; the title bar shows it otherwise. */
-  notice?: ReactNode;
 }
+
+/**
+ * How many recent workspaces the start screen lists: a shortcut back to the latest few, not every
+ * workspace Vista remembers, which the switcher lists.
+ */
+const MAX_RECENT_SHOWN = 5;
 
 /** A row of the start screen's lists: icon, text, and an optional detail at the right end. */
 const ROW_CLASS =
   "flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left text-[13px] text-text transition-colors duration-100 hover:bg-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring)]";
-/** A list heading; it shares the left edge of the rows' icons. */
-const HEADING_CLASS = "text-text-faint text-xs font-medium";
+/**
+ * A list heading; it shares the left edge of the rows' icons, and a rule runs from it to the rows'
+ * right end, so the details aligned there have an edge to line up with.
+ */
+const HEADING_CLASS = "text-text-faint flex items-center gap-3 text-xs font-medium";
+
+/** A list heading's text and its rule. */
+function Heading({ id, children }: { id: string; children: ReactNode }) {
+  return (
+    <h2 id={id} className={HEADING_CLASS}>
+      {children}
+      <span aria-hidden="true" className="divider text-line min-w-0 flex-1" />
+    </h2>
+  );
+}
 
 /**
  * Fills the editor area while no file is open. While a folder is being opened or restored it shows
@@ -54,6 +77,7 @@ const HEADING_CLASS = "text-text-faint text-xs font-medium";
 export function StartScreen({
   hasWorkspace,
   isLoading,
+  entrance = "opening",
   recents,
   onOpenFolder,
   onOpenSettings,
@@ -62,7 +86,6 @@ export function StartScreen({
   onRemoveRecent,
   hints,
   desktopDownload = null,
-  notice,
 }: StartScreenProps) {
   const downloadVersionId = useId();
   if (!hasWorkspace && isLoading) {
@@ -92,11 +115,9 @@ export function StartScreen({
 
   return (
     <div className="flex min-h-0 flex-1 justify-center overflow-y-auto p-6">
-      <Intro>
+      <Intro entrance={entrance}>
         <section aria-labelledby="start-list" className="flex flex-col gap-1.5">
-          <h2 id="start-list" className={HEADING_CLASS}>
-            Start
-          </h2>
+          <Heading id="start-list">Start</Heading>
           <ul className="-mx-2 flex flex-col gap-px">
             <li>
               <button type="button" onClick={onOpenFolder} className={ROW_CLASS}>
@@ -128,22 +149,19 @@ export function StartScreen({
                   <span className="text-text-strong flex-1">{desktopDownload.label}</span>
                   {desktopDownload.version && (
                     <span id={downloadVersionId} className="text-text-faint flex-none text-xs">
-                      Vista {desktopDownload.version}
+                      v{desktopDownload.version}
                     </span>
                   )}
                 </a>
               </li>
             )}
           </ul>
-          {notice && <div className="mt-2 flex">{notice}</div>}
         </section>
         {recents.length > 0 && (
           <section aria-labelledby="recent-workspaces" className="flex flex-col gap-1.5">
-            <h2 id="recent-workspaces" className={HEADING_CLASS}>
-              Recent workspaces
-            </h2>
+            <Heading id="recent-workspaces">Recent workspaces</Heading>
             <ul className="-mx-2 flex flex-col gap-px">
-              {recents.map((workspace) => (
+              {recents.slice(0, MAX_RECENT_SHOWN).map((workspace) => (
                 <RecentEntry
                   key={workspace.id}
                   workspace={workspace}
@@ -167,7 +185,7 @@ const INTRO_SCALE = 2;
 const SETTLE = { duration: 0.35, ease: [0.4, 0, 0.2, 1] } as const;
 const REVEAL = { duration: 0.2, ease: [0.2, 0, 0, 1] } as const;
 
-/** Whether the intro has played in this run of the app; it plays on the first start screen only. */
+/** Whether the Single stroke intro has played in this run of the app; it plays at most once. */
 let hasPlayedIntro = false;
 
 /** Lets a test play the intro again. */
@@ -178,21 +196,28 @@ export function resetStartIntro() {
 type IntroPhase = "write" | "settle" | "done";
 
 /**
- * The start screen's column: the logo, then `children`. The first time it shows in a run of the
- * app, the logo writes itself large in the middle of the screen, settles into its place, and only
- * then do the lists fade in. Any key or click skips to the end, so nothing waits on it, and with
- * reduced motion it starts at the end.
+ * The start screen's column: the logo, then `children`. With the `single-stroke` entrance, the first
+ * time in a run of the app, the logo writes itself large in the middle of the screen, settles into
+ * its place, and only then do the lists fade in. Any key or click skips to the end, so nothing waits
+ * on it, and with reduced motion it starts at the end. Otherwise the logo starts in its place and
+ * plays the opening entrance beside the lists, which show at once.
  */
-function Intro({ children }: { children: ReactNode }) {
+function Intro({ entrance, children }: { entrance: "single-stroke" | "opening"; children: ReactNode }) {
   const isReduced = useReducedMotion() ?? false;
-  const [phase, setPhase] = useState<IntroPhase>(() => (hasPlayedIntro || isReduced ? "done" : "write"));
+  const [phase, setPhase] = useState<IntroPhase>(() =>
+    entrance === "single-stroke" && !hasPlayedIntro && !isReduced ? "write" : "done",
+  );
+  // The still logo that ends the Single stroke must not play the opening entrance after it.
+  const [hasWritten] = useState(phase === "write");
   const [offset, setOffset] = useState<{ x: number; y: number } | null>(null);
   const screenRef = useRef<HTMLDivElement>(null);
   const logoRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    hasPlayedIntro = true;
-  }, []);
+    if (hasWritten) {
+      hasPlayedIntro = true;
+    }
+  }, [hasWritten]);
 
   // Where the logo writes: the middle of the area the start screen fills, measured from its place.
   useLayoutEffect(() => {
@@ -242,7 +267,7 @@ function Intro({ children }: { children: ReactNode }) {
           className="relative flex-none"
         >
           {phase === "done" ? (
-            <VistaLogo hasEntrance={false} className="h-full w-full" />
+            <VistaLogo hasEntrance={entrance === "opening"} className="h-full w-full" />
           ) : (
             <>
               <LogoWrite height={LOGO_HEIGHT_PX} />

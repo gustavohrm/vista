@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { version as APP_VERSION } from "../package.json";
 import { App } from "./app";
 import { changelogEntryFor } from "./changelog";
+import { resetStartIntro } from "./components/layout/start-screen";
 import { inlineParts } from "./domain/changelog";
 import {
   LEGACY_FOLDER_ID,
@@ -1937,6 +1938,86 @@ describe("App", () => {
       expect(await screen.findByRole("textbox", { name: "Raw text content of a.txt" })).toBeInTheDocument();
     });
 
+    it("keeps the switcher in the title bar with no workspace open, offering every workspace", async () => {
+      const user = userEvent.setup();
+      const { capability } = twoWorkspaces(null);
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+
+      await user.click(await screen.findByRole("button", { name: "No workspace" }));
+
+      expect(await screen.findByRole("menuitemradio", { name: "Research" })).not.toBeChecked();
+      expect(screen.getByRole("menuitemradio", { name: "Work" })).toBeInTheDocument();
+      expect(screen.getByRole("menuitem", { name: "Open Folder…" })).toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: "Close Workspace" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Go to file" })).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("menuitemradio", { name: "Work" }));
+      expect(await screen.findByRole("button", { name: "Work" })).toHaveAttribute("aria-haspopup", "menu");
+    });
+
+    it("forgets a workspace from the switcher", async () => {
+      const user = userEvent.setup();
+      const { capability } = twoWorkspaces();
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findExplorerPanel();
+
+      await user.click(screen.getByRole("button", { name: "Research" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Remove from Recent…" }));
+      const list = await screen.findByRole("menu", { name: "Remove from Recent" });
+      // The open workspace is closed before it is forgotten.
+      expect(within(list).queryByRole("menuitem", { name: "Research" })).not.toBeInTheDocument();
+      await user.click(within(list).getByRole("menuitem", { name: "Work" }));
+      await user.click(await screen.findByRole("button", { name: "Remove" }));
+
+      await user.click(screen.getByRole("button", { name: "Research" }));
+      expect(await screen.findByRole("menuitemradio", { name: "Research" })).toBeChecked();
+      expect(screen.queryByRole("menuitemradio", { name: "Work" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: "Remove from Recent…" })).not.toBeInTheDocument();
+    });
+
+    it("holds the switcher and Open Folder until the last workspace has been restored", async () => {
+      const user = userEvent.setup();
+      const { capability } = twoWorkspaces();
+      const restoreFolder = capability.restoreFolder;
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      capability.restoreFolder = vi.fn(async (id, options) => {
+        await held;
+        return restoreFolder(id, options);
+      });
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+
+      // Opening another workspace now could finish first and then be replaced by the restored one.
+      expect(await screen.findByRole("button", { name: "No workspace" })).toBeDisabled();
+      await user.keyboard("{Control>}{Shift>}p{/Shift}{/Control}");
+      expect(await screen.findByRole("option", { name: /^Workspace: Open Folder…/ })).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
+      await user.keyboard("{Escape}");
+
+      release();
+      expect(await screen.findByRole("button", { name: "Research" })).toBeEnabled();
+    });
+
+    it("writes the logo only when the start screen is the first view, and plays the opening after a close", async () => {
+      resetStartIntro();
+      const user = userEvent.setup();
+      const { capability } = twoWorkspaces();
+      const { container } = render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("a.txt");
+
+      await user.click(screen.getByRole("button", { name: "Research" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Close Workspace" }));
+
+      await screen.findByRole("heading", { name: "Recent workspaces" });
+      // The written logo is an image of the stroke; the opening plays on the logo drawn inline.
+      expect(container.querySelector("h1 img")).not.toBeInTheDocument();
+      expect(container.querySelector('h1 svg[data-motion="enter"]')).toBeInTheDocument();
+    });
+
     it("lists every remembered workspace on the start screen, without its folders", async () => {
       const { capability } = twoWorkspaces(null);
       render(<App adapter={{ platform: "web", workspace: capability }} />);
@@ -2826,9 +2907,7 @@ describe("App", () => {
         "href",
         "/download/windows",
       );
-      expect(screen.getByRole("link", { name: "Download for Windows" })).toHaveAccessibleDescription(
-        `Vista ${APP_VERSION}`,
-      );
+      expect(screen.getByRole("link", { name: "Download for Windows" })).toHaveAccessibleDescription(`v${APP_VERSION}`);
       // Without it, a host that answers with a page rather than the installer navigates away from the app.
       expect(screen.getByRole("link", { name: "Download for Windows" })).toHaveAttribute("download");
 
