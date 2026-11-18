@@ -2192,7 +2192,10 @@ describe("App", () => {
 
       await user.click(screen.getByRole("button", { name: "Research" }));
 
-      expect(screen.getByRole("listbox").style.maxWidth).toMatch(/100vw/);
+      const { style } = screen.getByRole("listbox");
+      expect(style.maxWidth).toMatch(/100vw/);
+      // The width it opened at stays its least only while that fits, as the window narrows.
+      expect(style.minWidth).toMatch(/100vw/);
       expect(within(screen.getByRole("option", { name: /^Work/ })).getByText("Work")).toHaveClass("truncate");
     });
 

@@ -324,8 +324,12 @@ export function WorkspaceSwitcher({
             style={{
               left: anchor.x,
               top: anchor.y,
-              minWidth: listWidth ?? undefined,
-              // A long name is cut off rather than push the row's buttons past the window's edge.
+              // A long name is cut off rather than push the row's buttons past the window's edge, even
+              // when the window narrows while the list is open: a min-width would win over the max.
+              minWidth:
+                listWidth === null
+                  ? undefined
+                  : `min(${listWidth}px, calc(100vw - ${anchor.x + VIEWPORT_MARGIN_PX}px))`,
               maxWidth: `calc(100vw - ${anchor.x + VIEWPORT_MARGIN_PX}px)`,
             }}
             className="vista-menu vista-pop card soft floating fixed z-50 flex max-h-[calc(100vh-56px)] min-w-48 flex-col overflow-y-auto p-1 text-[13px] [--ui-radius-surface:8px]"
