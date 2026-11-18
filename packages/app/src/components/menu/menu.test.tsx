@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useState, type ComponentProps } from "react";
+import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Menu, MENU_SEPARATOR, type MenuEntry } from "./menu";
@@ -95,64 +95,6 @@ describe("Menu", () => {
     expect(props.onClose).toHaveBeenCalledOnce();
     expect(focusedWhenRun).toBe(field);
     field.remove();
-  });
-
-  describe("an item that can be removed", () => {
-    function RemovableList({ onClose }: { onClose: () => void }) {
-      const [names, setNames] = useState(["Notes", "Work", "Archive"]);
-      return (
-        <Menu
-          label="Workspaces"
-          x={10}
-          y={20}
-          onClose={onClose}
-          items={names.map((name) => ({
-            label: name,
-            onSelect: vi.fn(),
-            remove: { label: `Remove "${name}"`, onRemove: () => setNames((all) => all.filter((n) => n !== name)) },
-          }))}
-        />
-      );
-    }
-
-    it("removes the highlighted row on Delete, keeping the menu open and the highlight on the next row", async () => {
-      const user = userEvent.setup();
-      fireEvent.keyDown(document.body, { key: "Enter" });
-      const onClose = vi.fn();
-      render(<RemovableList onClose={onClose} />);
-      const notes = screen.getByRole("menuitem", { name: "Notes" });
-      expect(notes).toHaveAttribute("aria-keyshortcuts", "Delete");
-
-      await user.keyboard("{ArrowDown}{Delete}");
-
-      expect(screen.queryByRole("menuitem", { name: "Work" })).not.toBeInTheDocument();
-      expect(screen.getByRole("menuitem", { name: "Archive" })).toHaveFocus();
-      expect(onClose).not.toHaveBeenCalled();
-      await user.keyboard("{Delete}");
-      expect(screen.getByRole("menuitem", { name: "Notes" })).toHaveFocus();
-    });
-
-    it("removes a row with its X, without choosing the row or closing the menu", async () => {
-      const user = userEvent.setup();
-      const onClose = vi.fn();
-      render(<RemovableList onClose={onClose} />);
-
-      await user.click(screen.getByTitle('Remove "Work"'));
-
-      expect(screen.queryByRole("menuitem", { name: "Work" })).not.toBeInTheDocument();
-      expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Notes", "Archive"]);
-      expect(onClose).not.toHaveBeenCalled();
-    });
-
-    it("ignores Delete on a row that can't be removed", async () => {
-      const user = userEvent.setup();
-      const props = renderMenu();
-
-      await user.keyboard("{Delete}");
-
-      expect(screen.getByRole("menuitem", { name: "Cut" })).toHaveFocus();
-      expect(props.onClose).not.toHaveBeenCalled();
-    });
   });
 
   it("ignores a disabled item", async () => {

@@ -1966,7 +1966,13 @@ describe("App", () => {
       expect(await screen.findByRole("button", { name: "Work" })).toHaveAttribute("aria-haspopup", "listbox");
     });
 
-    function storedWorkspaces(): { id: string; name: string; storage?: string; hiddenFromRecent?: true }[] {
+    function storedWorkspaces(): {
+      id: string;
+      name: string;
+      storage?: string;
+      hiddenFromRecent?: true;
+      folderIds: string[];
+    }[] {
       return JSON.parse(localStorage.getItem("vista.workspaces") ?? "null").workspaces;
     }
 
@@ -1994,6 +2000,7 @@ describe("App", () => {
       // The actions stay below the matches whatever is typed, even when no workspace matches.
       await user.keyboard("zz");
       expect(within(list).getByText("No matching workspaces")).toBeInTheDocument();
+      expect(within(list).getAllByRole("separator")).toHaveLength(1);
       expect(
         within(list)
           .getAllByRole("option")
@@ -2010,6 +2017,26 @@ describe("App", () => {
 
       expect(await screen.findByRole("button", { name: "Work" })).toHaveFocus();
       expect(storedWorkspaces().find((workspace) => workspace.id === "w2")?.hiddenFromRecent).toBeUndefined();
+    });
+
+    it("leaves Shift+Delete to the search field, and Ctrl+, to Settings, on a row they don't act on", async () => {
+      const user = userEvent.setup();
+      const { capability } = twoWorkspaces();
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findExplorerPanel();
+
+      await user.click(screen.getByRole("button", { name: "Research" }));
+      const field = screen.getByRole("combobox", { name: "Search workspaces" });
+      // The open workspace's row, first, can't be removed from Recent.
+      expect(fireEvent.keyDown(field, { key: "Delete", shiftKey: true })).toBe(true);
+
+      await user.keyboard("{ArrowUp}");
+      expect(screen.getByRole("option", { name: "Close Workspace" })).toHaveAttribute("aria-selected", "true");
+      await user.keyboard("{Control>},{/Control}");
+
+      const page = await screen.findByRole("region", { name: "Settings" });
+      expect(within(page).getByRole("heading", { name: "Research" })).toBeInTheDocument();
+      expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
     });
 
     it("leaves a workspace that has never been opened out of the switcher, even when typing", async () => {
@@ -2257,8 +2284,9 @@ describe("App", () => {
         );
         await user.click(within(dialog).getByRole("button", { name: "Delete" }));
 
-        // The next workspace by name shows in its place.
+        // The next workspace by name shows in its place, and focus goes to its item.
         expect(await within(page).findByRole("heading", { name: "Work" })).toBeInTheDocument();
+        await waitFor(() => expect(navigation(page).getByRole("button", { name: "Work" })).toHaveFocus());
         expect(navigation(page).queryByRole("button", { name: "Research" })).not.toBeInTheDocument();
         expect(switcherButton()).toHaveAccessibleName("No workspace");
         expect(storedWorkspaces().map((workspace) => workspace.id)).toEqual(["w2"]);
@@ -2278,6 +2306,150 @@ describe("App", () => {
         expect(await within(page).findByRole("radio", { name: "System" })).toBeInTheDocument();
         expect(navigation(page).getByRole("button", { name: "Appearance" })).toHaveAttribute("aria-current", "page");
         expect(storedWorkspaces()).toEqual([]);
+      });
+
+      it("deletes a workspace that isn't open, showing the one before it when it was last by name", async () => {
+        const user = userEvent.setup();
+        const { capability } = twoWorkspaces();
+        render(<App adapter={{ platform: "web", workspace: capability }} />);
+        await findExplorerPanel();
+        const page = await openSettings(user);
+        await user.click(within(page).getByRole("button", { name: "Work" }));
+
+        await user.click(await within(page).findByRole("button", { name: "Delete Workspace…" }));
+        await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" }));
+
+        expect(await within(page).findByRole("heading", { name: "Research" })).toBeInTheDocument();
+        expect(switcherButton()).toHaveAccessibleName("Research");
+        expect(storedWorkspaces().map((workspace) => workspace.id)).toEqual(["w1"]);
+        expect(localStorage.getItem("vista.session.w2")).toBeNull();
+      });
+
+      it("doesn't open a workspace deleted while its folders are read", async () => {
+        const user = userEvent.setup();
+        const { capability, folder } = twoWorkspaces();
+        let releaseRead = () => {};
+        const read = new Promise<void>((resolve) => {
+          releaseRead = resolve;
+        });
+        render(<App adapter={{ platform: "web", workspace: capability }} />);
+        await findExplorerPanel();
+        capability.readTree.mockImplementation(async (target) => {
+          if (target.id === "sources") {
+            await read;
+          }
+          return folder(target.id).readTree(target);
+        });
+        const page = await openSettings(user);
+        await user.click(within(page).getByRole("button", { name: "Work" }));
+
+        await user.click(await within(page).findByRole("button", { name: "Open" }));
+        await waitFor(() => expect(capability.readTree).toHaveBeenCalledWith(SOURCES_FOLDER));
+        await user.click(within(page).getByRole("button", { name: "Delete Workspace…" }));
+        await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" }));
+        await waitFor(() => expect(storedWorkspaces().map((workspace) => workspace.id)).toEqual(["w1"]));
+        releaseRead();
+
+        await waitFor(() => expect(capability.readTree).toHaveBeenCalledTimes(2));
+        expect(switcherButton()).toHaveAccessibleName("Research");
+        expect(localStorage.getItem("vista.session.w2")).toBeNull();
+      });
+
+      it("opens a workspace made from a folder picked through the browser's folder input, in the same run", async () => {
+        const user = userEvent.setup();
+        const picked: WorkspaceFolder = { ...SOURCES_FOLDER, accessMode: "fallback" };
+        const { capability } = createFoldersCapability([
+          { folder: NOTES_FOLDER, files: { "a.txt": PLAIN_TEXT } },
+          { folder: picked, files: { "plan.txt": PLAIN_TEXT } },
+        ]);
+        // The host can't remember a folder picked this way.
+        capability.restoreFolder.mockImplementation(async (id) =>
+          id === "notes" ? { status: "restored", folder: NOTES_FOLDER } : { status: "none" },
+        );
+        vi.mocked(capability.pickFolder).mockResolvedValueOnce(picked);
+        render(<App adapter={{ platform: "web", workspace: capability }} />);
+        await findExplorerPanel();
+        const page = await openSettings(user);
+
+        await user.click(within(page).getByRole("button", { name: "New Workspace…" }));
+        await user.click(await within(page).findByRole("button", { name: "Open" }));
+
+        await waitFor(() => expect(screen.queryByRole("region", { name: "Settings" })).not.toBeInTheDocument());
+        expect(switcherButton()).toHaveAccessibleName("sources");
+        expect(await within(await findExplorerPanel()).findByRole("button", { name: "plan.txt" })).toBeInTheDocument();
+      });
+
+      it("says so when a workspace's folders can't be found as it opens", async () => {
+        const user = userEvent.setup();
+        const { capability } = twoWorkspaces();
+        capability.restoreFolder.mockImplementation(async (id) =>
+          id === "notes" ? { status: "restored", folder: NOTES_FOLDER } : { status: "none" },
+        );
+        render(<App adapter={{ platform: "web", workspace: capability }} />);
+        await findExplorerPanel();
+        const page = await openSettings(user);
+        await user.click(within(page).getByRole("button", { name: "Work" }));
+
+        await user.click(await within(page).findByRole("button", { name: "Open" }));
+
+        expect(
+          await screen.findByText('Couldn\'t reopen "Work". Its folders may have been moved or deleted.'),
+        ).toBeInTheDocument();
+        expect(switcherButton()).toHaveAccessibleName("Research");
+      });
+
+      it("shows a folder added on a workspace's page in its item in the navigation", async () => {
+        const user = userEvent.setup();
+        const { capability } = twoWorkspaces();
+        vi.mocked(capability.pickFolder).mockResolvedValueOnce(NOTES_FOLDER);
+        render(<App adapter={{ platform: "web", workspace: capability }} />);
+        await findExplorerPanel();
+        const page = await openSettings(user);
+        await user.click(within(page).getByRole("button", { name: "Work" }));
+
+        await user.click(await within(page).findByRole("button", { name: "Add Folder to Workspace" }));
+        await within(page).findByRole("button", { name: 'Remove "notes" from the workspace' });
+        await user.click(navigation(page).getByRole("button", { name: "Research" }));
+
+        expect(navigation(page).getByRole("button", { name: "Work" })).toHaveAccessibleDescription(/sources.*notes/);
+      });
+
+      it("keeps the open workspace's folders expanded when a folder it shares leaves another workspace", async () => {
+        const user = userEvent.setup();
+        const { capability } = createFoldersCapability([
+          { folder: NOTES_FOLDER, files: { "docs/b.txt": PLAIN_TEXT } },
+          { folder: SOURCES_FOLDER, files: { "plan.txt": PLAIN_TEXT } },
+        ]);
+        localStorage.setItem(
+          "vista.workspaces",
+          JSON.stringify({
+            version: 1,
+            lastWorkspaceId: "w1",
+            workspaces: [
+              { id: "w1", name: "Research", folderIds: ["notes"], lastOpenedAt: 2 },
+              { id: "w2", name: "Work", folderIds: ["sources", "notes"], lastOpenedAt: 1 },
+            ],
+          }),
+        );
+        localStorage.setItem(
+          "vista.session.w1",
+          JSON.stringify({ version: 1, tabs: [], activeIndex: -1, expanded: { notes: ["docs"] } }),
+        );
+        render(<App adapter={{ platform: "web", workspace: capability }} />);
+        const explorer = await findExplorerPanel();
+        expect(await within(explorer).findByRole("button", { name: "b.txt" })).toBeInTheDocument();
+        const page = await openSettings(user);
+        await user.click(within(page).getByRole("button", { name: "Work" }));
+
+        await user.click(await within(page).findByRole("button", { name: 'Remove "notes" from the workspace' }));
+        await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
+        await waitFor(() =>
+          expect(storedWorkspaces().find((workspace) => workspace.id === "w2")?.folderIds).toEqual(["sources"]),
+        );
+        await user.click(within(page).getByRole("button", { name: "Close Settings" }));
+
+        expect(await within(await findExplorerPanel()).findByRole("button", { name: "b.txt" })).toBeInTheDocument();
+        expect(JSON.parse(localStorage.getItem("vista.session.w1")!).expanded).toEqual({ notes: ["docs"] });
       });
 
       it("keeps a workspace when deleting it is cancelled", async () => {

@@ -215,6 +215,23 @@ function AppShell({ adapter }: AppProps) {
   // The folders of each workspace other than the open one, as last seen, by workspace id.
   const [recentFolders, setRecentFolders] = useState<ReadonlyMap<string, RecentWorkspace["folders"]>>(() => new Map());
   const [workspaceStore] = useState(() => createWorkspaceStore(browserStorage, { now: Date.now, newId: randomId }));
+  // Folders picked through the browser's folder input, which the host can't remember, kept for the
+  // run, so a workspace holding one, kept for the session only, opens again in it, as from its page.
+  const sessionFoldersRef = useRef(new Map<string, WorkspaceFolder>());
+  const pickFolder = useCallback(async () => {
+    const picked = await adapter.workspace.pickFolder();
+    if (picked?.accessMode === "fallback") {
+      sessionFoldersRef.current.set(picked.id, picked);
+    }
+    return picked;
+  }, [adapter.workspace]);
+  const restoreFolder = useCallback(
+    async (id: string, options: { interactive: boolean }): Promise<RestoreFolderResult> => {
+      const known = sessionFoldersRef.current.get(id);
+      return known ? { status: "restored", folder: known } : adapter.workspace.restoreFolder(id, options);
+    },
+    [adapter.workspace],
+  );
   const [unsavedRequest, setUnsavedRequest] = useState<UnsavedChangesRequest | null>(null);
   // Tagged with its tab so a position from another tab is never shown.
   const [cursor, setCursor] = useState<{ key: string; position: CursorInfo } | null>(null);
@@ -260,6 +277,15 @@ function AppShell({ adapter }: AppProps) {
   /** Changes a workspace wherever it shows: as the open one, or on its page in Settings. */
   const updateWorkspace = useCallback((workspaceId: string, change: (previous: OpenWorkspace) => OpenWorkspace) => {
     setWorkspace((previous) => (previous?.id === workspaceId ? change(previous) : previous));
+    // A workspace that isn't open shows its folders in the navigation as last seen, so its page's
+    // changes go there too.
+    const page = managedRef.current;
+    if (page?.workspace.id === workspaceId && workspaceRef.current?.id !== workspaceId) {
+      const { folders } = change(page.workspace);
+      setRecentFolders((known) =>
+        new Map(known).set(workspaceId, summarizeFolders(folders.filter((entry) => !isMissingFolder(entry)))),
+      );
+    }
     setManaged((previous) =>
       previous?.workspace.id === workspaceId ? { ...previous, workspace: change(previous.workspace) } : previous,
     );
@@ -688,17 +714,20 @@ function AppShell({ adapter }: AppProps) {
    * edits. The folders' trees are read before, so a failed read leaves the previous state intact.
    *
    * @param open - Called once the user has answered about unsaved edits; marks the workspace opened
-   *   in the store and returns it with its folders.
+   *   in the store and returns it with its folders, or null when it is gone meanwhile.
    * @param approvedEdits - Unsaved edits the user already agreed to lose or saved before the
    *   folders were read. Edits made meanwhile are asked about again.
    * @returns Whether the workspace opened; false when the user kept their unsaved edits instead.
    */
   const adoptWorkspace = useCallback(
-    async (open: () => OpenWorkspace, approvedEdits?: ApprovedEdits): Promise<boolean> => {
+    async (open: () => OpenWorkspace | null, approvedEdits?: ApprovedEdits): Promise<boolean> => {
       if (!(await confirmUnsavedChangesInAllDocuments(approvedEdits))) {
         return false;
       }
       const opened = open();
+      if (!opened) {
+        return false;
+      }
       const previous = workspaceRef.current;
       if (previous) {
         setRecentFolders((known) => new Map(known).set(previous.id, summarizeFolders(previous.folders)));
@@ -867,8 +896,7 @@ function AppShell({ adapter }: AppProps) {
         restored,
       }: { interactive: boolean; approvedEdits?: ApprovedEdits; restored?: ReadonlyMap<string, RestoreFolderResult> },
     ): Promise<boolean> => {
-      const restore = async (id: string) =>
-        restored?.get(id) ?? (await adapter.workspace.restoreFolder(id, { interactive }));
+      const restore = async (id: string) => restored?.get(id) ?? (await restoreFolder(id, { interactive }));
       const read = await readStoredWorkspace(record, restore);
       if (read.kind === "unreadable") {
         toast.show({ kind: "info", text: describeUnreadableFile(read.home.name) });
@@ -882,7 +910,10 @@ function AppShell({ adapter }: AppProps) {
       const isWaiting = results.some(([, result]) => result.status === "needs-permission");
       if (!results.some(([, result]) => result.status === "restored") || (!interactive && isWaiting)) {
         const gone = results.flatMap(([, result]) => (result.status === "unavailable" ? [result.name] : []));
-        if (!isWaiting && gone.length > 0) {
+        // A folder the host has nothing for is gone too, though it has no name to give. At startup that
+        // stays quiet, since nothing was asked for; opened by choice, nothing else would say why it didn't.
+        const isLost = interactive && results.some(([, result]) => result.status === "none");
+        if (!isWaiting && (gone.length > 0 || isLost)) {
           toast.show({ kind: "info", text: describeUnreachableWorkspace(target, gone) });
         }
         return false;
@@ -898,6 +929,10 @@ function AppShell({ adapter }: AppProps) {
       );
       const opened = withLocations(target, folders);
       const wasAdopted = await adoptWorkspace(() => {
+        // Deleted while its folders were read, so there is nothing left to open.
+        if (!workspaceStore.workspace(target.id)) {
+          return null;
+        }
         workspaceStore.markOpened(target.id);
         // The file as read, so it is only written again once something changes.
         if (readText === null) {
@@ -909,7 +944,7 @@ function AppShell({ adapter }: AppProps) {
       }, approvedEdits);
       return wasAdopted;
     },
-    [adapter.workspace, adoptWorkspace, openPlainFolder, readStoredWorkspace, toOpenFolder, toast, workspaceStore],
+    [adoptWorkspace, openPlainFolder, readStoredWorkspace, restoreFolder, toOpenFolder, toast, workspaceStore],
   );
 
   const handleOpenFolder = useCallback(async () => {
@@ -922,7 +957,7 @@ function AppShell({ adapter }: AppProps) {
       return;
     }
     try {
-      const opened = await adapter.workspace.pickFolder();
+      const opened = await pickFolder();
       if (!opened) {
         return;
       }
@@ -962,6 +997,7 @@ function AppShell({ adapter }: AppProps) {
     adoptWorkspace,
     confirmUnsavedChangesInAllDocuments,
     openStoredWorkspace,
+    pickFolder,
     readWorkspaceFile,
     toast,
     workspaceStore,
@@ -1078,7 +1114,7 @@ function AppShell({ adapter }: AppProps) {
       return;
     }
     try {
-      const picked = await adapter.workspace.pickFolder();
+      const picked = await pickFolder();
       if (!picked) {
         return;
       }
@@ -1092,7 +1128,7 @@ function AppShell({ adapter }: AppProps) {
       const message = err instanceof Error ? err.message : "Failed to create the workspace.";
       toast.show({ kind: "error", text: message });
     }
-  }, [adapter.workspace, showManaged, toast, workspaceStore]);
+  }, [adapter.workspace, pickFolder, showManaged, toast, workspaceStore]);
 
   /**
    * Forgets a workspace and its session after asking, closing it first when it is open, and shows the
@@ -1170,8 +1206,7 @@ function AppShell({ adapter }: AppProps) {
           : { workspace: withLocations(record, []), lock: "loading" },
       );
       try {
-        const restore = async (id: string) =>
-          restored?.get(id) ?? (await adapter.workspace.restoreFolder(id, { interactive: false }));
+        const restore = async (id: string) => restored?.get(id) ?? (await restoreFolder(id, { interactive: false }));
         const read = await readStoredWorkspace(record, restore);
         const { target, slots, readText } =
           read.kind === "read"
@@ -1225,7 +1260,7 @@ function AppShell({ adapter }: AppProps) {
         setManagedId(null);
       }
     },
-    [adapter.workspace, readStoredWorkspace, toast, workspaceStore],
+    [readStoredWorkspace, restoreFolder, toast, workspaceStore],
   );
 
   const currentWorkspace: RecentWorkspace | null = workspace && {
@@ -1279,7 +1314,7 @@ function AppShell({ adapter }: AppProps) {
           const results = await Promise.all(
             record.folderIds.map(async (id): Promise<[string, RestoreFolderResult]> => [
               id,
-              await adapter.workspace.restoreFolder(id, { interactive: false }),
+              await restoreFolder(id, { interactive: false }),
             ]),
           );
           setRecentFolders((known) =>
@@ -1292,7 +1327,7 @@ function AppShell({ adapter }: AppProps) {
       };
       void probe();
     }
-  }, [adapter.workspace, isLoading, unknownRecentIds, workspaceStore]);
+  }, [isLoading, restoreFolder, unknownRecentIds, workspaceStore]);
 
   const handleChangeWorkspaceDetails = useCallback(
     (changes: WorkspaceDetails, workspaceId?: string) => {
@@ -1486,7 +1521,7 @@ function AppShell({ adapter }: AppProps) {
       }
       const isOpen = current.id === workspaceRef.current?.id;
       try {
-        const picked = await adapter.workspace.pickFolder();
+        const picked = await pickFolder();
         if (!picked) {
           return;
         }
@@ -1532,7 +1567,7 @@ function AppShell({ adapter }: AppProps) {
         toast.show({ kind: "error", text: message });
       }
     },
-    [adapter.workspace, locateFolder, targetWorkspace, toast, updateWorkspace, workspaceStore],
+    [adapter.workspace, locateFolder, pickFolder, targetWorkspace, toast, updateWorkspace, workspaceStore],
   );
 
   const handleRemoveFolder = useCallback(
@@ -1576,8 +1611,11 @@ function AppShell({ adapter }: AppProps) {
         return;
       }
       updateWorkspace(current.id, withoutFolder);
-      const prefix = documentKey(folderId, "");
-      setExpandedKeys((previous) => new Set([...previous].filter((key) => !key.startsWith(prefix))));
+      // Another workspace may hold the folder too; only the open one's explorer shows it.
+      if (isOpen) {
+        const prefix = documentKey(folderId, "");
+        setExpandedKeys((previous) => new Set([...previous].filter((key) => !key.startsWith(prefix))));
+      }
       if (removed.isFolderUnused) {
         try {
           await adapter.workspace.forgetFolder(folderId);
@@ -1600,7 +1638,7 @@ function AppShell({ adapter }: AppProps) {
         return;
       }
       try {
-        const picked = await adapter.workspace.pickFolder();
+        const picked = await pickFolder();
         if (!picked) {
           return;
         }
@@ -1645,7 +1683,7 @@ function AppShell({ adapter }: AppProps) {
         toast.show({ kind: "error", text: message });
       }
     },
-    [adapter.workspace, toast, workspaceStore],
+    [adapter.workspace, pickFolder, toast, workspaceStore],
   );
 
   const handleAllowAccess = useCallback(
@@ -1655,7 +1693,7 @@ function AppShell({ adapter }: AppProps) {
         return;
       }
       try {
-        const result = await adapter.workspace.restoreFolder(folderId, { interactive: true });
+        const result = await restoreFolder(folderId, { interactive: true });
         if (result.status === "needs-permission") {
           return;
         }
@@ -1683,7 +1721,7 @@ function AppShell({ adapter }: AppProps) {
         toast.show({ kind: "error", text: message });
       }
     },
-    [adapter.workspace, openStoredWorkspace, toOpenFolder, toast, workspaceStore],
+    [openStoredWorkspace, restoreFolder, toOpenFolder, toast, workspaceStore],
   );
 
   /** Asks for access to a workspace's home folder from its page, then reads the page again from it. */
@@ -1698,7 +1736,7 @@ function AppShell({ adapter }: AppProps) {
         return;
       }
       try {
-        const result = await adapter.workspace.restoreFolder(homeId, { interactive: true });
+        const result = await restoreFolder(homeId, { interactive: true });
         if (result.status !== "needs-permission") {
           await loadManaged(workspaceId, new Map([[homeId, result]]));
         }
@@ -1708,7 +1746,7 @@ function AppShell({ adapter }: AppProps) {
         toast.show({ kind: "error", text: message });
       }
     },
-    [adapter.workspace, handleAllowAccess, loadManaged, toast, workspaceStore],
+    [handleAllowAccess, loadManaged, restoreFolder, toast, workspaceStore],
   );
 
   const refreshTree = useCallback(

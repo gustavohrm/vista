@@ -315,7 +315,7 @@ function RecentEntry({ workspace, onOpen, onRemove }: RecentEntryProps) {
   const descriptionId = useId();
   const dateId = useId();
   const needsPermission = workspace.folders?.some((folder) => folder.status === "needs-permission") ?? false;
-  // The folders are not listed: the name usually is the folder's, and the manager lists them.
+  // The folders are not listed: the name usually is the folder's, and Settings lists them.
   const description = needsPermission ? "Click to allow access" : undefined;
   const lastOpened =
     workspace.lastOpenedAt !== undefined && workspace.lastOpenedAt > 0

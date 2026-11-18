@@ -76,6 +76,13 @@ export function SettingsPage({
     };
   }, [opener]);
 
+  // Focus lost with what held it, as when Delete takes the page with it, goes to the item now shown.
+  useEffect(() => {
+    if (document.activeElement === null || document.activeElement === document.body) {
+      navRef.current?.querySelector<HTMLElement>("[aria-current='page']")?.focus();
+    }
+  }, [section, shownWorkspaceId]);
+
   // Back from the full list, focus goes to the See All that opened it.
   useEffect(() => {
     if (isLeavingFullList) {

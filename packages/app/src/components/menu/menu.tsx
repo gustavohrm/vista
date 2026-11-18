@@ -36,12 +36,6 @@ export interface MenuItem {
   selected?: boolean;
   destructive?: boolean;
   onSelect: () => void;
-  /**
-   * Takes the item out of the list it stands for, such as Remove from Recent: an X at the row's
-   * right end, shown while the pointer rests on the row or the row is highlighted, and the `Delete`
-   * key on the highlighted row. The menu stays open, and the highlight moves to the next row.
-   */
-  remove?: { label: string; onRemove: () => void };
 }
 
 export const MENU_SEPARATOR = "separator";
@@ -102,18 +96,6 @@ export function Menu({ label, items, x, y, onClose, returnFocusTo, ignorePointer
   // The highlight is the focused item. Set when the pointer gave it, so leaving the menu clears it,
   // and dropped when the keyboard moves it, so leaving then keeps it.
   const isPointerHighlightRef = useRef(false);
-  // Which enabled item to highlight once a removed one is gone, so the highlight stays in the list.
-  const pendingHighlightRef = useRef<number | null>(null);
-
-  useLayoutEffect(() => {
-    const index = pendingHighlightRef.current;
-    if (index === null) {
-      return;
-    }
-    pendingHighlightRef.current = null;
-    const enabledItems = getEnabledItems(menuRef.current);
-    (enabledItems[Math.min(index, enabledItems.length - 1)] ?? menuRef.current)?.focus();
-  }, [items]);
 
   useEffect(() => {
     // Opened with the pointer, nothing is highlighted until the pointer moves over an item. With
@@ -130,11 +112,7 @@ export function Menu({ label, items, x, y, onClose, returnFocusTo, ignorePointer
   };
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    // A row's X belongs to the row, so resting on it keeps the row highlighted.
-    const target = event.target as Element;
-    const item =
-      target.closest("[data-menu-row]")?.querySelector<HTMLElement>(ENABLED_ITEM_SELECTOR) ??
-      target.closest<HTMLElement>(ENABLED_ITEM_SELECTOR);
+    const item = (event.target as Element).closest<HTMLElement>(ENABLED_ITEM_SELECTOR);
     if (!item) {
       clearPointerHighlight();
       return;
@@ -162,15 +140,6 @@ export function Menu({ label, items, x, y, onClose, returnFocusTo, ignorePointer
     if (returnTarget instanceof HTMLElement && returnTarget.isConnected) {
       returnTarget.focus();
     }
-  };
-
-  const remove = (item: MenuItem, element: Element | null) => {
-    if (!item.remove || item.disabled) {
-      return;
-    }
-    const index = getEnabledItems(menuRef.current).indexOf(element as HTMLElement);
-    pendingHighlightRef.current = Math.max(index, 0);
-    item.remove.onRemove();
   };
 
   const choose = (item: MenuItem) => {
@@ -208,14 +177,6 @@ export function Menu({ label, items, x, y, onClose, returnFocusTo, ignorePointer
         // Focus goes back first, so the browser's Tab then moves on from there in either direction.
         closeAndReturnFocus();
         return;
-      case "Delete": {
-        const item = items[Number((document.activeElement as HTMLElement | null)?.dataset.itemIndex)];
-        if (item === undefined || item === MENU_SEPARATOR || !item.remove) {
-          return;
-        }
-        remove(item, document.activeElement);
-        break;
-      }
       default:
         return;
     }
@@ -247,28 +208,10 @@ export function Menu({ label, items, x, y, onClose, returnFocusTo, ignorePointer
         item === MENU_SEPARATOR ? (
           // oxlint-disable-next-line react/no-array-index-key -- separators have no identity besides their position
           <MenuSeparator key={`separator-${index}`} />
-        ) : item.remove ? (
-          <div key={item.id ?? item.label} data-menu-row className="group relative flex flex-none">
-            <MenuItemButton item={item} index={index} hasIconColumn={hasIcons} onChoose={() => choose(item)} />
-            <button
-              type="button"
-              // The keyboard reaches it as the row's Delete key, so it is left out of the tab order and
-              // the accessibility tree, and it doesn't take focus from the row when clicked.
-              tabIndex={-1}
-              aria-hidden="true"
-              title={item.remove.label}
-              onPointerDown={(event) => event.preventDefault()}
-              onClick={(event) => remove(item, event.currentTarget.previousElementSibling)}
-              className="icon-button text-text-faint absolute top-1/2 right-1 size-5 -translate-y-1/2 text-xs opacity-0 group-focus-within:opacity-100 group-hover:opacity-100"
-            >
-              <i className="ic-x" />
-            </button>
-          </div>
         ) : (
           <MenuItemButton
             key={item.id ?? item.label}
             item={item}
-            index={index}
             hasIconColumn={hasIcons}
             onChoose={() => choose(item)}
           />
@@ -286,14 +229,12 @@ function MenuSeparator() {
 
 interface MenuItemButtonProps {
   item: MenuItem;
-  /** Its place in the menu's items, so a key can find the item a row stands for. */
-  index: number;
   /** Whether to keep a column for icons and check marks, so labels line up. */
   hasIconColumn: boolean;
   onChoose: () => void;
 }
 
-function MenuItemButton({ item, index, hasIconColumn, onChoose }: MenuItemButtonProps) {
+function MenuItemButton({ item, hasIconColumn, onChoose }: MenuItemButtonProps) {
   const isCheckbox = item.checked !== undefined;
   const isOption = item.selected !== undefined;
   const icon = isCheckbox ? item.checked && <i className="ic-check" /> : item.icon;
@@ -305,16 +246,15 @@ function MenuItemButton({ item, index, hasIconColumn, onChoose }: MenuItemButton
       aria-checked={isCheckbox ? item.checked : isOption ? item.selected : undefined}
       aria-describedby={item.description === undefined ? undefined : descriptionId}
       aria-disabled={item.disabled || undefined}
-      aria-keyshortcuts={item.shortcut ? toAriaShortcut(item.shortcut) : item.remove ? "Delete" : undefined}
+      aria-keyshortcuts={item.shortcut ? toAriaShortcut(item.shortcut) : undefined}
       data-menu-item
-      data-item-index={index}
       tabIndex={-1}
       onClick={onChoose}
       // Focus is the one highlight: the menu moves it under the pointer, and there is no separate
       // hover fill to add to it.
       className={`focus:bg-selected flex min-h-7 w-full flex-none cursor-pointer items-center gap-2 rounded px-2 text-left outline-none ${
         item.destructive ? "text-destructive" : "text-text"
-      } ${item.disabled ? "pointer-events-none opacity-40" : ""} ${item.remove ? "pr-7" : ""}`}
+      } ${item.disabled ? "pointer-events-none opacity-40" : ""}`}
     >
       {hasIconColumn && (
         <span aria-hidden="true" className="flex w-4 flex-none justify-center text-sm">

@@ -190,8 +190,10 @@ export function WorkspaceSwitcher({
       onOpenSettings(option.id);
     }
   };
+  const canRemove = (option: Option | undefined) =>
+    option?.kind === "workspace" && option.isRecent && !option.isCurrent;
   const remove = (option: Option | undefined) => {
-    if (option?.kind === "workspace" && option.isRecent && !option.isCurrent) {
+    if (option && canRemove(option)) {
       onRemoveFromRecent(option.id);
     }
   };
@@ -208,8 +210,17 @@ export function WorkspaceSwitcher({
     } else if (event.key === "Escape" || event.key === "Tab") {
       close();
     } else if (event.key === "Delete" && event.shiftKey) {
+      if (!canRemove(option)) {
+        // Left to the field, where it cuts the selection.
+        return;
+      }
       remove(option);
     } else if (event.key === "," && (event.ctrlKey || event.metaKey)) {
+      if (option?.kind !== "workspace") {
+        // Not a workspace's row, so Settings opens as the shortcut opens it anywhere else.
+        setAnchor(null);
+        return;
+      }
       // Settings' own shortcut, here for the picked workspace rather than the open one.
       openSettings(option);
     } else {
@@ -303,7 +314,7 @@ export function WorkspaceSwitcher({
                 option={option}
                 isActive={index === active}
                 hasSeparatorBefore={
-                  option.kind === "action" && (isEmptySearch || options[index - 1]?.kind === "workspace")
+                  option.kind === "action" && (index === 0 ? isEmptySearch : options[index - 1]?.kind === "workspace")
                 }
                 onHighlight={() => setActiveIndex(index)}
                 onChoose={() => choose(option)}
