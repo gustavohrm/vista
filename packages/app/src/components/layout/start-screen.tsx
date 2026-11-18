@@ -267,7 +267,7 @@ function Intro({ entrance, children }: { entrance: "single-stroke" | "opening"; 
           className="relative flex-none"
         >
           {phase === "done" ? (
-            <VistaLogo hasEntrance={!hasWritten} className="h-full w-full" />
+            <VistaLogo hasEntrance={entrance === "opening"} className="h-full w-full" />
           ) : (
             <>
               <LogoWrite height={LOGO_HEIGHT_PX} />

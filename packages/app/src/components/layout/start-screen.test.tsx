@@ -55,6 +55,7 @@ describe("StartScreen", () => {
     const second = renderStartScreen(false, [], false, "single-stroke");
 
     expect(second.container.querySelector("img")).not.toBeInTheDocument();
+    expect(second.container.querySelector('svg[data-motion="enter"]')).not.toBeInTheDocument();
   });
 
   it("plays the opening in the logo's place once a workspace has been open", () => {
