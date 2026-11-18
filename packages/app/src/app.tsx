@@ -2381,7 +2381,9 @@ function AppShell({ adapter }: AppProps) {
   return (
     <div
       data-platform={adapter.platform}
-      className="bg-chrome text-text flex h-screen w-screen flex-col overflow-hidden"
+      // Positioned so its clip also holds absolutely positioned parts, such as a visually hidden
+      // label in a bar sliding out past the window's edge, which would otherwise make the page scroll.
+      className="bg-chrome text-text relative flex h-screen w-screen flex-col overflow-hidden"
     >
       {/* The title bar, rail, and explorer belong to a workspace: with none open there is nothing for
           them to show, so they are not there, and opening one brings them in around the frame. A
