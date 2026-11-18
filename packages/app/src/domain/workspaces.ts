@@ -193,9 +193,12 @@ export function findWorkspaceForFolder(list: WorkspaceList, folderId: string): W
 export type NameMatch = "start" | "word" | "inside";
 const NAME_MATCH_ORDER: readonly NameMatch[] = ["start", "word", "inside"];
 
-/** Lowercase, without accents, so `programacao` finds `Programação`. */
+/**
+ * Lowercase, without accents, so `programacao` finds `Programação`. The lowercasing ignores the
+ * device's language, so `idea` finds `IDEA` under Turkish too, where `I` would lower to a dotless `ı`.
+ */
 function foldForSearch(text: string): string {
-  return text.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase();
+  return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 }
 
 /**
@@ -215,7 +218,9 @@ export function matchWorkspaceName(name: string, query: string): NameMatch | nul
     return null;
   }
   for (; index !== -1; index = haystack.indexOf(needle, index + 1)) {
-    if (!/[\p{L}\p{N}]/u.test(haystack[index - 1]!)) {
+    // The whole character before the match, which outside the Basic Multilingual Plane is two code
+    // units. Not `[\p{L}\p{N}]$`: V8 (Node 26) misses such a character with a class before `$`.
+    if (!/(?:\p{L}|\p{N})$/u.test(haystack.slice(0, index))) {
       return "word";
     }
   }

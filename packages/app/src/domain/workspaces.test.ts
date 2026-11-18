@@ -391,6 +391,10 @@ describe("matchWorkspaceName", () => {
     expect(matchWorkspaceName("Piano notes", "no")).toBe("word");
   });
 
+  it("reads a letter outside the Basic Multilingual Plane as one character", () => {
+    expect(matchWorkspaceName("\u{10400}foo", "foo")).toBe("inside");
+  });
+
   it("ignores case, accents, and the text's outer spaces", () => {
     expect(matchWorkspaceName("Programação", "  PROGRAMACAO ")).toBe("start");
     expect(matchWorkspaceName("São Paulo", "sao")).toBe("start");
