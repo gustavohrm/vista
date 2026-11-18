@@ -25,75 +25,64 @@ const MENU_OFFSET_PX = 4;
 interface WorkspaceSwitcherProps {
   /** The open workspace, or null while none is. */
   current: RecentWorkspace | null;
-  /** Every remembered workspace, the most recent first, including the current one. */
+  /** The recent workspaces, the most recent first, including the current one. */
   recents: readonly RecentWorkspace[];
   onSwitch: (workspaceId: string) => void;
   onOpenFolder: () => void;
+  /** Opens the workspace manager. */
+  onManage: () => void;
+  /** Opens the current workspace's page in the manager. */
   onOpenSettings: () => void;
   onClose: () => void;
-  /** Asks to forget a workspace, as Remove from Recent on the start screen does. */
-  onRemove: (workspaceId: string) => void;
+  /** Takes a workspace out of Recent without forgetting it. */
+  onRemoveFromRecent: (workspaceId: string) => void;
   /** Whether the button is unavailable, as while the last workspace is still being restored. */
   isDisabled?: boolean;
 }
 
 /**
  * The button at the top left that shows the open workspace, and its menu: the recent workspaces to
- * switch to, then Open Folder, Workspace Settings, and Close Workspace. Adding a folder to the workspace lives in the
- * explorer's header, beside the folders it adds to. With no workspace open the button says so, and
- * its menu offers the workspaces and Open Folder only. Remove from Recent turns the menu into the list
- * of workspaces to forget, so one the start screen no longer lists can be forgotten too.
+ * switch to, then Open Folder and Manage Workspaces, then Workspace Settings and Close Workspace while
+ * a workspace is open. Each recent row but the current one's can be removed from Recent, with its X
+ * or the Delete key, and the menu stays open. Creating, editing, and deleting workspaces live in the
+ * manager; adding a folder lives in the explorer's header, beside the folders it adds to.
  */
 export function WorkspaceSwitcher({
   current,
   recents,
   onSwitch,
   onOpenFolder,
+  onManage,
   onOpenSettings,
   onClose,
-  onRemove,
+  onRemoveFromRecent,
   isDisabled = false,
 }: WorkspaceSwitcherProps) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState<{ x: number; y: number } | null>(null);
-  const [isRemoving, setIsRemoving] = useState(false);
-  // The open workspace is closed before it is forgotten, so it is not offered here.
-  const removable = recents.filter((workspace) => workspace.id !== current?.id);
 
-  const removeItems = removable.map((workspace): MenuEntry => ({
-    id: workspace.id,
-    label: workspace.name,
-    icon: <WorkspaceGlyph icon={workspace.icon} color={workspace.color} isTile className="text-xs" />,
-    onSelect: () => onRemove(workspace.id),
-  }));
-
-  const switchItems: MenuEntry[] = [
-    ...recents.map((workspace): MenuEntry => ({
-      id: workspace.id,
-      label: workspace.name,
-      icon: <WorkspaceGlyph icon={workspace.icon} color={workspace.color} isTile className="text-xs" />,
-      selected: workspace.id === current?.id,
-      onSelect: () => {
-        if (workspace.id !== current?.id) {
-          onSwitch(workspace.id);
-        }
-      },
-    })),
+  const items: MenuEntry[] = [
+    ...recents.map((workspace): MenuEntry => {
+      const isCurrent = workspace.id === current?.id;
+      return {
+        id: workspace.id,
+        label: workspace.name,
+        icon: <WorkspaceGlyph icon={workspace.icon} color={workspace.color} isTile className="text-xs" />,
+        selected: isCurrent,
+        onSelect: () => {
+          if (!isCurrent) {
+            onSwitch(workspace.id);
+          }
+        },
+        // The open workspace is the most recent, and would come back the next time it opens.
+        remove: isCurrent
+          ? undefined
+          : { label: `Remove "${workspace.name}" from Recent`, onRemove: () => onRemoveFromRecent(workspace.id) },
+      };
+    }),
     ...(recents.length > 0 ? [MENU_SEPARATOR as MenuEntry] : []),
     { label: "Open Folder…", icon: <i className="ic-folder-open" aria-hidden="true" />, onSelect: onOpenFolder },
-    ...(removable.length > 0
-      ? [
-          {
-            label: "Remove from Recent…",
-            icon: <i className="ic-x" aria-hidden="true" />,
-            // The menu closes before this runs; reopening it in the same place shows the list to remove from.
-            onSelect: () => {
-              setIsRemoving(true);
-              setOpen(open);
-            },
-          } satisfies MenuEntry,
-        ]
-      : []),
+    { label: "Manage Workspaces…", icon: <i className="ic-layers" aria-hidden="true" />, onSelect: onManage },
     ...(current
       ? ([
           MENU_SEPARATOR,
@@ -139,16 +128,11 @@ export function WorkspaceSwitcher({
       </button>
       {open && (
         <Menu
-          // A new menu, so the list to remove from takes focus as a menu opening does.
-          key={isRemoving ? "remove" : "switch"}
-          label={isRemoving ? "Remove from Recent" : "Workspaces"}
-          items={isRemoving ? removeItems : switchItems}
+          label="Workspaces"
+          items={items}
           x={open.x}
           y={open.y}
-          onClose={() => {
-            setOpen(null);
-            setIsRemoving(false);
-          }}
+          onClose={() => setOpen(null)}
           returnFocusTo={buttonRef.current}
           ignorePointerDownIn={buttonRef.current}
         />

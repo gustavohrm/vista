@@ -26,25 +26,20 @@ interface StartScreenProps {
    * open, where it plays the shorter entrance in its place. Defaults to `opening`.
    */
   entrance?: "single-stroke" | "opening";
-  /** The remembered workspaces, the most recent first. */
+  /** The recent workspaces, the most recent first, as the switcher lists them. */
   recents: readonly RecentWorkspace[];
   onOpenFolder: () => void;
   onOpenSettings: () => void;
   /** Shortcut that opens Settings, in the `Mod+,` notation. */
   settingsShortcut: string;
   onOpenRecent: (workspaceId: string) => void;
+  /** Takes a workspace out of Recent without forgetting it. */
   onRemoveRecent: (workspaceId: string) => void;
   /** Key hints shown while a workspace is open and no file is. */
   hints: readonly StartHint[];
   /** The desktop installer to offer in the browser, standing in for the rail's link, or null where there is none. */
   desktopDownload?: DesktopDownload | null;
 }
-
-/**
- * How many recent workspaces the start screen lists: a shortcut back to the latest few, not every
- * workspace Vista remembers, which the switcher lists.
- */
-const MAX_RECENT_SHOWN = 5;
 
 /** A row of the start screen's lists: icon, text, and an optional detail at the right end. */
 const ROW_CLASS =
@@ -161,7 +156,7 @@ export function StartScreen({
           <section aria-labelledby="recent-workspaces" className="flex flex-col gap-1.5">
             <Heading id="recent-workspaces">Recent workspaces</Heading>
             <ul className="-mx-2 flex flex-col gap-px">
-              {recents.slice(0, MAX_RECENT_SHOWN).map((workspace) => (
+              {recents.map((workspace) => (
                 <RecentEntry
                   key={workspace.id}
                   workspace={workspace}
@@ -320,7 +315,7 @@ function RecentEntry({ workspace, onOpen, onRemove }: RecentEntryProps) {
   const descriptionId = useId();
   const dateId = useId();
   const needsPermission = workspace.folders?.some((folder) => folder.status === "needs-permission") ?? false;
-  // The folders are not listed: the name usually is the folder's, and Settings lists them.
+  // The folders are not listed: the name usually is the folder's, and the manager lists them.
   const description = needsPermission ? "Click to allow access" : undefined;
   const lastOpened =
     workspace.lastOpenedAt !== undefined && workspace.lastOpenedAt > 0

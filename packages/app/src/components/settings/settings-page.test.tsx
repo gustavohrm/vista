@@ -9,7 +9,7 @@ function Shell({ isOpen }: { isOpen: boolean }) {
     <>
       <button type="button">Opener</button>
       {isOpen && (
-        <SettingsPage section="appearance" onSectionChange={() => undefined} workspace={null} onClose={() => undefined}>
+        <SettingsPage section="appearance" onSectionChange={() => undefined} onClose={() => undefined}>
           <p>Section</p>
         </SettingsPage>
       )}

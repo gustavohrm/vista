@@ -1,14 +1,12 @@
 import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
-import type { WorkspaceColor, WorkspaceIcon } from "../../domain/workspaces";
 import { Tooltip } from "../feedback/tooltip";
-import { WorkspaceGlyph } from "../workspace/workspace-glyph";
 
-/** A section of Settings: the open workspace's, or one of Vista's own. */
-export type SettingsSection = "workspace" | "appearance" | "editor" | "files" | "shortcuts" | "about";
+/** A section of Settings: the workspace manager, or one of Vista's own. */
+export type SettingsSection = "workspaces" | "appearance" | "editor" | "files" | "shortcuts" | "about";
 
-const VISTA_SECTIONS: readonly { id: Exclude<SettingsSection, "workspace">; label: string; icon: ReactNode }[] = [
+const VISTA_SECTIONS: readonly { id: Exclude<SettingsSection, "workspaces">; label: string; icon: ReactNode }[] = [
   { id: "appearance", label: "Appearance", icon: <i className="ic-sun" aria-hidden="true" /> },
   { id: "editor", label: "Editor", icon: <i className="ic-type" aria-hidden="true" /> },
   { id: "files", label: "Files", icon: <i className="ic-folder" aria-hidden="true" /> },
@@ -21,8 +19,8 @@ const EASE_ENTER = [0.2, 0, 0, 1] as const;
 interface SettingsPageProps {
   section: SettingsSection;
   onSectionChange: (section: SettingsSection) => void;
-  /** The open workspace, for its item under Workspace; with none, that group is not shown. */
-  workspace: { name: string; icon: WorkspaceIcon; color: WorkspaceColor } | null;
+  /** Tells apart two views of one section, such as the manager's list and a workspace's page, so each fades in. */
+  viewKey?: string;
   onClose: () => void;
   /** The shown section's content. */
   children: ReactNode;
@@ -38,7 +36,7 @@ interface SettingsPageProps {
  * @param props - SettingsPage properties.
  * @returns Page element.
  */
-export function SettingsPage({ section, onSectionChange, workspace, onClose, children }: SettingsPageProps) {
+export function SettingsPage({ section, onSectionChange, viewKey = "", onClose, children }: SettingsPageProps) {
   const isReducedMotion = useReducedMotion() ?? false;
   const navRef = useRef<HTMLElement>(null);
 
@@ -95,16 +93,14 @@ export function SettingsPage({ section, onSectionChange, workspace, onClose, chi
           aria-label="Settings sections"
           className="border-line flex flex-none [scrollbar-width:none] gap-0.5 overflow-x-auto border-b px-2 py-2 md:block md:w-[232px] md:overflow-y-auto md:border-r md:border-b-0 md:px-3 md:py-5"
         >
-          {workspace && (
-            <>
-              <GroupLabel isFirst>Workspace</GroupLabel>
-              <NavItem isCurrent={section === "workspace"} onSelect={() => onSectionChange("workspace")}>
-                <WorkspaceGlyph icon={workspace.icon} color={workspace.color} className="text-[15px]" />
-                <span className="truncate">{workspace.name}</span>
-              </NavItem>
-            </>
-          )}
-          <GroupLabel isFirst={!workspace}>Vista</GroupLabel>
+          <GroupLabel isFirst>Workspace</GroupLabel>
+          <NavItem isCurrent={section === "workspaces"} onSelect={() => onSectionChange("workspaces")}>
+            <span className="text-text-faint flex text-[15px]">
+              <i className="ic-layers" aria-hidden="true" />
+            </span>
+            Workspaces
+          </NavItem>
+          <GroupLabel>Vista</GroupLabel>
           {VISTA_SECTIONS.map(({ id, label, icon }) => (
             <NavItem key={id} isCurrent={section === id} onSelect={() => onSectionChange(id)}>
               <span className="text-text-faint flex text-[15px]">{icon}</span>
@@ -114,7 +110,7 @@ export function SettingsPage({ section, onSectionChange, workspace, onClose, chi
         </nav>
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-8 md:px-14 md:py-10">
           <motion.div
-            key={section}
+            key={`${section}:${viewKey}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.12, ease: EASE_ENTER }}
