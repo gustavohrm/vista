@@ -48,13 +48,13 @@ A theme changes everything coloured in the interface: grounds, lines, text, the 
 
 Cyberpunk and Tokyo were proposed as two themes and merged into Neon, since both were neon accents on a near-black navy. Each theme's palette is Vista's own; none reproduces an existing editor theme.
 
-A theme is a set of values for Vista's colour tokens, each a `light-dark()` pair, as [Architecture](../architecture.md#shared-presentation) describes. No component names a theme. Every variant, at both contrast levels, meets the ratios [the brand guidelines](../guidelines/brand.md#colours) record for text and lines, and adding a theme adds its measured ratios there.
+A theme is a value, as a `light-dark()` pair, for every colour token `packages/app/src/style.css` defines or sets, including the `@codenhub/styles` tokens it overrides, as [Architecture](../architecture.md#shared-presentation) describes. The stylesheet is the list: a theme sets every token in it, and a token added later gets a value in every theme. No component names a theme. Every variant meets the ratios [Contrast](#contrast) sets for each level, and adding a theme records its measured pairings in [the brand guidelines](../guidelines/brand.md#colours).
 
 Themes ship in steps: Daylight and Neutral first, with one more, to prove the token set, then the rest.
 
 ## Contrast
 
-_More_ strengthens what the standard level draws below the ratios that text and controls require: muted and faint text, lines, borders, and the hover and selected fills, to at least 4.5:1 for text and 3:1 for lines and boundaries. It is one rule set applied over any theme's tokens, so a new theme needs no contrast work of its own beyond measuring the result. _Standard_ uses the theme as designed, even where the operating system asks for more contrast. A less-contrast level is not offered: `@codenhub/styles` does not read `prefers-contrast: less`, and the need is rare.
+At _Standard_, every variant meets WCAG 2.2 AA: text at 4.5:1 against its ground, and the boundaries that identify a control at 3:1. Dividers, and faint text that only supports other text, such as line numbers, may sit lower by design. _More_ raises those: muted and faint text to at least 4.5:1, and every line, border, and hover or selected fill to at least 3:1. It is one rule set applied over any theme's tokens, so a new theme needs no contrast work of its own beyond measuring the result. _Standard_ uses the theme as designed, even where the operating system asks for more contrast. A less-contrast level is not offered: `@codenhub/styles` does not read `prefers-contrast: less`, and the need is rare.
 
 The operating system's high-contrast mode (`forced-colors: active`) is not this setting and always applies, whatever Contrast says.
 
@@ -93,7 +93,7 @@ Contrast and motion are written as attributes on `<html>`, each resolved to one 
 | `data-contrast` | `standard`, `more`        |
 | `data-motion`   | `full`, `reduced`, `none` |
 
-While a preference is _System_, Vista resolves it from the media query and follows its changes. Vista's CSS and `@codenhub/styles` read only the attributes, never `prefers-contrast` or `prefers-reduced-motion` directly, so one place decides and a new interaction only has to say which kind of motion it is. The attributes are set before the first paint, as the theme is, so a reload never shows the wrong appearance first.
+Vista always sets both attributes. While a preference is _System_, Vista resolves it from the media query and follows its changes. Vista's own CSS reads only the attributes, never `prefers-contrast` or `prefers-reduced-motion`, so one place decides and a new interaction only has to say which kind of motion it is. `@codenhub/styles` falls back to the media queries only when an attribute is absent, which in Vista it never is, so the attribute is the one source in both. The attributes are set before the first paint, as the theme is, so a reload never shows the wrong appearance first.
 
 ### Upstream changes
 
