@@ -246,7 +246,7 @@ The entrance plays once, where the logo first appears. There are two, one for ea
 | Stroke | Returns along the horizon line into the opening             | 1,560 ms | 1,960 ms |
 | Bar    | Replaces the stroke; the bar and V dip 1.5 units and return | 1,940 ms | 2,300 ms |
 
-**The opening**, 1.4 s, for an in-app place where a person is waiting to start work and Single stroke would be too long; such as the start screen after a workspace closes: the arms draw down to the point, the bar rises up the opening and widens with it into place, and the letters slide out from behind the right arm.
+**The opening**, 1.4 s, for an in-app place where a person is waiting to start work and Single stroke would be too long, such as the start screen after a workspace closes: the arms draw down to the point, the bar rises up the opening and widens with it into place, and the letters slide out from behind the right arm.
 
 | Part    | Movement                                                                    | Start  | Duration |
 | ------- | --------------------------------------------------------------------------- | ------ | -------- |
