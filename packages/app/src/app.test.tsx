@@ -1938,6 +1938,23 @@ describe("App", () => {
       expect(await screen.findByRole("textbox", { name: "Raw text content of a.txt" })).toBeInTheDocument();
     });
 
+    it("keeps the switcher in the title bar with no workspace open, offering every workspace", async () => {
+      const user = userEvent.setup();
+      const { capability } = twoWorkspaces(null);
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+
+      await user.click(await screen.findByRole("button", { name: "No workspace" }));
+
+      expect(await screen.findByRole("menuitemradio", { name: "Research" })).not.toBeChecked();
+      expect(screen.getByRole("menuitemradio", { name: "Work" })).toBeInTheDocument();
+      expect(screen.getByRole("menuitem", { name: "Open Folder…" })).toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: "Close Workspace" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Go to file" })).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("menuitemradio", { name: "Work" }));
+      expect(await screen.findByRole("button", { name: "Work" })).toHaveAttribute("aria-haspopup", "menu");
+    });
+
     it("writes the logo only when the start screen is the first view, and plays the opening after a close", async () => {
       resetStartIntro();
       const user = userEvent.setup();

@@ -38,8 +38,6 @@ interface StartScreenProps {
   hints: readonly StartHint[];
   /** The desktop installer to offer in the browser, standing in for the rail's link, or null where there is none. */
   desktopDownload?: DesktopDownload | null;
-  /** A quiet notice under the Start list, such as a newer version being out; the title bar shows it otherwise. */
-  notice?: ReactNode;
 }
 
 /** A row of the start screen's lists: icon, text, and an optional detail at the right end. */
@@ -82,7 +80,6 @@ export function StartScreen({
   onRemoveRecent,
   hints,
   desktopDownload = null,
-  notice,
 }: StartScreenProps) {
   const downloadVersionId = useId();
   if (!hasWorkspace && isLoading) {
@@ -153,7 +150,6 @@ export function StartScreen({
               </li>
             )}
           </ul>
-          {notice && <div className="mt-2 flex">{notice}</div>}
         </section>
         {recents.length > 0 && (
           <section aria-labelledby="recent-workspaces" className="flex flex-col gap-1.5">

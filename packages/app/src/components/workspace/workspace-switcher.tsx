@@ -23,7 +23,8 @@ export interface RecentWorkspace {
 const MENU_OFFSET_PX = 4;
 
 interface WorkspaceSwitcherProps {
-  current: RecentWorkspace;
+  /** The open workspace, or null while none is. */
+  current: RecentWorkspace | null;
   /** Every remembered workspace, the most recent first, including the current one. */
   recents: readonly RecentWorkspace[];
   onSwitch: (workspaceId: string) => void;
@@ -35,7 +36,8 @@ interface WorkspaceSwitcherProps {
 /**
  * The button at the top left that shows the open workspace, and its menu: the recent workspaces to
  * switch to, then Open Folder, Workspace Settings, and Close Workspace. Adding a folder to the workspace lives in the
- * explorer's header, beside the folders it adds to.
+ * explorer's header, beside the folders it adds to. With no workspace open the button says so, and
+ * its menu offers the workspaces and Open Folder only.
  */
 export function WorkspaceSwitcher({
   current,
@@ -53,22 +55,26 @@ export function WorkspaceSwitcher({
       id: workspace.id,
       label: workspace.name,
       icon: <WorkspaceGlyph icon={workspace.icon} color={workspace.color} isTile className="text-xs" />,
-      selected: workspace.id === current.id,
+      selected: workspace.id === current?.id,
       onSelect: () => {
-        if (workspace.id !== current.id) {
+        if (workspace.id !== current?.id) {
           onSwitch(workspace.id);
         }
       },
     })),
-    MENU_SEPARATOR,
+    ...(recents.length > 0 ? [MENU_SEPARATOR as MenuEntry] : []),
     { label: "Open Folder…", icon: <i className="ic-folder-open" aria-hidden="true" />, onSelect: onOpenFolder },
-    MENU_SEPARATOR,
-    {
-      label: "Workspace Settings…",
-      icon: <i className="ic-settings-2" aria-hidden="true" />,
-      onSelect: onOpenSettings,
-    },
-    { label: "Close Workspace", icon: <i className="ic-folder-x" aria-hidden="true" />, onSelect: onClose },
+    ...(current
+      ? ([
+          MENU_SEPARATOR,
+          {
+            label: "Workspace Settings…",
+            icon: <i className="ic-settings-2" aria-hidden="true" />,
+            onSelect: onOpenSettings,
+          },
+          { label: "Close Workspace", icon: <i className="ic-folder-x" aria-hidden="true" />, onSelect: onClose },
+        ] satisfies MenuEntry[])
+      : []),
   ];
 
   return (
@@ -86,10 +92,18 @@ export function WorkspaceSwitcher({
           const bounds = event.currentTarget.getBoundingClientRect();
           setOpen({ x: bounds.left, y: bounds.bottom + MENU_OFFSET_PX });
         }}
-        className={`text-text-strong hover:bg-hover flex h-8 min-w-0 shrink items-center gap-2 rounded-md pr-2 pl-1.5 text-[13px] font-semibold transition-colors duration-100 ${open ? "bg-selected" : ""}`}
+        className={`hover:bg-hover flex h-8 min-w-0 shrink items-center gap-2 rounded-md pr-2 pl-1.5 text-[13px] transition-colors duration-100 ${current ? "text-text-strong font-semibold" : "text-text-muted"} ${open ? "bg-selected" : ""}`}
       >
-        <WorkspaceGlyph icon={current.icon} color={current.color} isTile className="text-xs" />
-        <span className="max-w-48 min-w-0 truncate">{current.name}</span>
+        {current ? (
+          <WorkspaceGlyph icon={current.icon} color={current.color} isTile className="text-xs" />
+        ) : (
+          // An empty tile, dashed like a hidden panel's glyph, keeps the name where a workspace's sits.
+          <span
+            aria-hidden="true"
+            className="size-5 flex-none rounded-[5px] border border-dashed border-current opacity-60"
+          />
+        )}
+        <span className="max-w-48 min-w-0 truncate">{current ? current.name : "No workspace"}</span>
         <i className="ic-chevrons-up-down text-text-faint flex-none text-xs" aria-hidden="true" />
       </button>
       {open && (
