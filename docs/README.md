@@ -46,4 +46,5 @@ Every document in `docs/` is listed here. Adding, moving, or deleting one update
 | [Stack tests](specs/stack-tests.md) | The runners, file names, configuration, scripts, and commands for Vitest, Playwright, and cargo.                                       |
 | [Errors](specs/errors.md)           | How failures are classified, shown, and logged today, and a draft direction for user-facing failure kinds.                             |
 | [Appearance](specs/appearance.md)   | A draft of the theme, scheme, contrast, and motion preferences, how each is chosen, stored, and applied, and what each theme provides. |
+| [Languages](specs/languages.md)     | A draft of the interface languages, how one is chosen, stored, and applied, and what is and is not translated.                         |
 | [Changelog](specs/changelog.md)     | The changelog pages, the check that holds a release to them, and where the app and GitHub show them.                                   |
