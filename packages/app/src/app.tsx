@@ -164,6 +164,11 @@ function AppShell({ adapter }: AppProps) {
   const theme = useTheme();
   const toast = useToast();
   const [workspace, setWorkspace] = useState<OpenWorkspace | null>(null);
+  // Whether a workspace has been open in this run, so the start screen knows it is not the first view.
+  const [hasOpenedWorkspace, setHasOpenedWorkspace] = useState(false);
+  if (workspace && !hasOpenedWorkspace) {
+    setHasOpenedWorkspace(true);
+  }
   // `documentKey`s of the expanded folders inside the workspace's folders.
   const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(() => new Set());
   const [documentsState, dispatchDocuments] = useReducer(documentsReducer, INITIAL_DOCUMENTS_STATE);
@@ -2601,6 +2606,7 @@ function AppShell({ adapter }: AppProps) {
                     <StartScreen
                       hasWorkspace={workspace !== null}
                       isLoading={isLoading}
+                      entrance={hasOpenedWorkspace ? "opening" : "single-stroke"}
                       recents={recents}
                       onOpenFolder={() => void handleOpenFolder()}
                       onOpenSettings={openSettings}

@@ -1,16 +1,22 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import type { RecentWorkspace } from "../workspace/workspace-switcher";
-import { formatLastOpened, StartScreen } from "./start-screen";
+import { formatLastOpened, resetStartIntro, StartScreen } from "./start-screen";
 
-function renderStartScreen(isLoading: boolean, recents: RecentWorkspace[] = [], hasWorkspace = false) {
+function renderStartScreen(
+  isLoading: boolean,
+  recents: RecentWorkspace[] = [],
+  hasWorkspace = false,
+  entrance?: "single-stroke" | "opening",
+) {
   const props = { onOpenRecent: vi.fn(), onRemoveRecent: vi.fn(), onOpenSettings: vi.fn() };
-  render(
+  const { container } = render(
     <StartScreen
       hasWorkspace={hasWorkspace}
       isLoading={isLoading}
+      entrance={entrance}
       recents={recents}
       onOpenFolder={vi.fn()}
       settingsShortcut="Mod+,"
@@ -18,7 +24,7 @@ function renderStartScreen(isLoading: boolean, recents: RecentWorkspace[] = [], 
       {...props}
     />,
   );
-  return props;
+  return { ...props, container };
 }
 
 describe("StartScreen", () => {
@@ -35,6 +41,29 @@ describe("StartScreen", () => {
     expect(screen.getByRole("heading", { name: "Vista" })).toBeInTheDocument();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open Folder…" })).not.toHaveAccessibleDescription();
+  });
+
+  it("writes the logo in the Single stroke when the start screen is the first view, once a run", () => {
+    resetStartIntro();
+    const first = renderStartScreen(false, [], false, "single-stroke");
+
+    // The written logo is an image of the stroke; the still logo is drawn inline.
+    expect(first.container.querySelector("img")).toBeInTheDocument();
+    expect(first.container.querySelector('svg[data-motion="enter"]')).not.toBeInTheDocument();
+
+    cleanup();
+    const second = renderStartScreen(false, [], false, "single-stroke");
+
+    expect(second.container.querySelector("img")).not.toBeInTheDocument();
+  });
+
+  it("plays the opening in the logo's place once a workspace has been open", () => {
+    resetStartIntro();
+    const { container } = renderStartScreen(false, [], false, "opening");
+
+    expect(container.querySelector("img")).not.toBeInTheDocument();
+    expect(container.querySelector('svg[data-motion="enter"]')).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Vista" })).toBeInTheDocument();
   });
 
   it("opens Settings from the Start list", async () => {

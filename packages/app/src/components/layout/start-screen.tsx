@@ -20,6 +20,12 @@ interface StartScreenProps {
   hasWorkspace: boolean;
   /** Whether a folder is still being opened or restored, so nothing is offered yet. */
   isLoading: boolean;
+  /**
+   * How the logo comes in: `single-stroke` when the start screen is the app's first view in this
+   * run, where it writes itself large and settles into place, and `opening` after a workspace was
+   * open, where it plays the shorter entrance in its place. Defaults to `opening`.
+   */
+  entrance?: "single-stroke" | "opening";
   /** The remembered workspaces, the most recent first. */
   recents: readonly RecentWorkspace[];
   onOpenFolder: () => void;
@@ -54,6 +60,7 @@ const HEADING_CLASS = "text-text-faint text-xs font-medium";
 export function StartScreen({
   hasWorkspace,
   isLoading,
+  entrance = "opening",
   recents,
   onOpenFolder,
   onOpenSettings,
@@ -92,7 +99,7 @@ export function StartScreen({
 
   return (
     <div className="flex min-h-0 flex-1 justify-center overflow-y-auto p-6">
-      <Intro>
+      <Intro entrance={entrance}>
         <section aria-labelledby="start-list" className="flex flex-col gap-1.5">
           <h2 id="start-list" className={HEADING_CLASS}>
             Start
@@ -167,7 +174,7 @@ const INTRO_SCALE = 2;
 const SETTLE = { duration: 0.35, ease: [0.4, 0, 0.2, 1] } as const;
 const REVEAL = { duration: 0.2, ease: [0.2, 0, 0, 1] } as const;
 
-/** Whether the intro has played in this run of the app; it plays on the first start screen only. */
+/** Whether the Single stroke intro has played in this run of the app; it plays at most once. */
 let hasPlayedIntro = false;
 
 /** Lets a test play the intro again. */
@@ -178,21 +185,28 @@ export function resetStartIntro() {
 type IntroPhase = "write" | "settle" | "done";
 
 /**
- * The start screen's column: the logo, then `children`. The first time it shows in a run of the
- * app, the logo writes itself large in the middle of the screen, settles into its place, and only
- * then do the lists fade in. Any key or click skips to the end, so nothing waits on it, and with
- * reduced motion it starts at the end.
+ * The start screen's column: the logo, then `children`. With the `single-stroke` entrance, the first
+ * time in a run of the app, the logo writes itself large in the middle of the screen, settles into
+ * its place, and only then do the lists fade in. Any key or click skips to the end, so nothing waits
+ * on it, and with reduced motion it starts at the end. Otherwise the logo starts in its place and
+ * plays the opening entrance beside the lists, which show at once.
  */
-function Intro({ children }: { children: ReactNode }) {
+function Intro({ entrance, children }: { entrance: "single-stroke" | "opening"; children: ReactNode }) {
   const isReduced = useReducedMotion() ?? false;
-  const [phase, setPhase] = useState<IntroPhase>(() => (hasPlayedIntro || isReduced ? "done" : "write"));
+  const [phase, setPhase] = useState<IntroPhase>(() =>
+    entrance === "single-stroke" && !hasPlayedIntro && !isReduced ? "write" : "done",
+  );
+  // The still logo that ends the Single stroke must not play the opening entrance after it.
+  const [hasWritten] = useState(phase === "write");
   const [offset, setOffset] = useState<{ x: number; y: number } | null>(null);
   const screenRef = useRef<HTMLDivElement>(null);
   const logoRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    hasPlayedIntro = true;
-  }, []);
+    if (hasWritten) {
+      hasPlayedIntro = true;
+    }
+  }, [hasWritten]);
 
   // Where the logo writes: the middle of the area the start screen fills, measured from its place.
   useLayoutEffect(() => {
@@ -242,7 +256,7 @@ function Intro({ children }: { children: ReactNode }) {
           className="relative flex-none"
         >
           {phase === "done" ? (
-            <VistaLogo hasEntrance={false} className="h-full w-full" />
+            <VistaLogo hasEntrance={!hasWritten} className="h-full w-full" />
           ) : (
             <>
               <LogoWrite height={LOGO_HEIGHT_PX} />

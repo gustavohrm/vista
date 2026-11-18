@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { version as APP_VERSION } from "../package.json";
 import { App } from "./app";
 import { changelogEntryFor } from "./changelog";
+import { resetStartIntro } from "./components/layout/start-screen";
 import { inlineParts } from "./domain/changelog";
 import {
   LEGACY_FOLDER_ID,
@@ -1935,6 +1936,22 @@ describe("App", () => {
 
       await user.click(screen.getByRole("button", { name: "Research" }));
       expect(await screen.findByRole("textbox", { name: "Raw text content of a.txt" })).toBeInTheDocument();
+    });
+
+    it("writes the logo only when the start screen is the first view, and plays the opening after a close", async () => {
+      resetStartIntro();
+      const user = userEvent.setup();
+      const { capability } = twoWorkspaces();
+      const { container } = render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("a.txt");
+
+      await user.click(screen.getByRole("button", { name: "Research" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Close Workspace" }));
+
+      await screen.findByRole("heading", { name: "Recent workspaces" });
+      // The written logo is an image of the stroke; the opening plays on the logo drawn inline.
+      expect(container.querySelector("h1 img")).not.toBeInTheDocument();
+      expect(container.querySelector('h1 svg[data-motion="enter"]')).toBeInTheDocument();
     });
 
     it("lists every remembered workspace on the start screen, without its folders", async () => {
