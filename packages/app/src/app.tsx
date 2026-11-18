@@ -2920,10 +2920,11 @@ function AppShell({ adapter }: AppProps) {
               <WorkspaceSwitcher
                 current={currentWorkspace}
                 recents={recents}
-                // Typing finds the workspaces that have been opened, as Recent lists only those.
+                // Typing finds every workspace, the most recently opened first and those never opened
+                // last, by name.
                 workspaces={workspaceStore
                   .allWorkspaces()
-                  .filter((record) => record.lastOpenedAt > 0)
+                  .toSorted((a, b) => b.lastOpenedAt - a.lastOpenedAt)
                   .map(({ id, name, icon, color }) => ({ id, name, icon, color, folders: null }))}
                 onSwitch={(workspaceId) => void handleOpenWorkspace(workspaceId)}
                 onOpenFolder={() => void handleOpenFolder()}

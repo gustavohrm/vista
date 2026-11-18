@@ -1,7 +1,16 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import {
+  Fragment,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { createPortal, flushSync } from "react-dom";
 
-import type { WorkspaceColor, WorkspaceIcon } from "../../domain/workspaces";
+import { rankWorkspacesByName, type WorkspaceColor, type WorkspaceIcon } from "../../domain/workspaces";
 import { WorkspaceGlyph } from "./workspace-glyph";
 
 /** Whether Vista can read a folder now, needs the user's permission first, or can't find it. */
@@ -23,13 +32,15 @@ export interface RecentWorkspace {
 const LIST_OFFSET_PX = 4;
 /** The least room the list leaves at the window's right edge. */
 const VIEWPORT_MARGIN_PX = 8;
+/** The most workspaces typing lists; the list says how many more match. */
+export const SWITCHER_MATCH_LIMIT = 8;
 
 interface WorkspaceSwitcherProps {
   /** The open workspace, or null while none is. */
   current: RecentWorkspace | null;
   /** The recent workspaces, the most recent first, including the current one. */
   recents: readonly RecentWorkspace[];
-  /** Every workspace, by name, which typing searches. */
+  /** Every workspace typing searches, the most recently opened first. */
   workspaces: readonly RecentWorkspace[];
   onSwitch: (workspaceId: string) => void;
   onOpenFolder: () => void;
@@ -49,7 +60,8 @@ type Option =
 /**
  * The switcher at the top left, showing the open workspace. Choosing it turns it into a search field
  * over a list: the recent workspaces, then Open Folder and Close Workspace. Typing searches every
- * workspace by name, and the actions stay below the matches; the arrow keys pick an entry and Enter chooses it. Each
+ * workspace by name and lists the best eight matches, saying how many more there are, and the actions
+ * stay below the matches; the arrow keys pick an entry and Enter chooses it. Each
  * workspace has a Settings button, shown while the pointer rests on it or it is picked, that opens its
  * page in Settings, also reached with `Ctrl+,`; each recent one but the open one can be removed from
  * Recent with its X or `Shift+Delete`, and the list stays open. Creating, editing, and deleting
@@ -82,8 +94,7 @@ export function WorkspaceSwitcher({
   const [listWidth, setListWidth] = useState<number | null>(null);
   const isOpen = anchor !== null;
 
-  const needle = query.trim().toLocaleLowerCase();
-  const matches = (text: string) => text.toLocaleLowerCase().includes(needle);
+  const isSearching = query.trim() !== "";
   const recentIds = new Set(recents.map((workspace) => workspace.id));
   const toOption = (workspace: RecentWorkspace): Option => ({
     kind: "workspace",
@@ -92,14 +103,13 @@ export function WorkspaceSwitcher({
     isCurrent: workspace.id === current?.id,
     isRecent: recentIds.has(workspace.id),
   });
-  // Typing searches every workspace, the recent ones first as they are listed, then the others by name.
-  const workspaceOptions =
-    needle === ""
-      ? recents.map(toOption)
-      : [
-          ...recents.filter((workspace) => matches(workspace.name)),
-          ...workspaces.filter((workspace) => !recentIds.has(workspace.id) && matches(workspace.name)),
-        ].map(toOption);
+  // Typing searches every workspace, the best matches first; within a kind of match, the recent ones
+  // as they are listed, then the others, the most recently opened first.
+  const found = isSearching
+    ? rankWorkspacesByName([...recents, ...workspaces.filter((workspace) => !recentIds.has(workspace.id))], query)
+    : recents;
+  const workspaceOptions = found.slice(0, SWITCHER_MATCH_LIMIT).map(toOption);
+  const hiddenCount = found.length - workspaceOptions.length;
   const actionOptions = [
     {
       kind: "action",
@@ -123,7 +133,7 @@ export function WorkspaceSwitcher({
   const options: Option[] = [...workspaceOptions, ...actionOptions];
   const active = Math.min(activeIndex, options.length - 1);
   // Typed text that finds no workspace; the actions still follow.
-  const isEmptySearch = needle !== "" && workspaceOptions.length === 0;
+  const isEmptySearch = isSearching && workspaceOptions.length === 0;
 
   useEffect(() => {
     if (isOpen) {
@@ -336,19 +346,23 @@ export function WorkspaceSwitcher({
           >
             {isEmptySearch && <p className="text-text-muted px-2 py-1.5">No matching workspaces</p>}
             {options.map((option, index) => (
-              <SwitcherOption
-                key={`${option.kind}:${option.id}`}
-                id={optionId(index)}
-                option={option}
-                isActive={index === active}
-                hasSeparatorBefore={
-                  option.kind === "action" && (index === 0 ? isEmptySearch : options[index - 1]?.kind === "workspace")
-                }
-                onHighlight={() => setActiveIndex(index)}
-                onChoose={() => choose(option)}
-                onOpenSettings={() => openSettings(option)}
-                onRemove={() => remove(option)}
-              />
+              <Fragment key={`${option.kind}:${option.id}`}>
+                {hiddenCount > 0 && index === workspaceOptions.length && (
+                  <p className="text-text-faint px-2 py-1 text-xs">{hiddenCount} more — keep typing</p>
+                )}
+                <SwitcherOption
+                  id={optionId(index)}
+                  option={option}
+                  isActive={index === active}
+                  hasSeparatorBefore={
+                    option.kind === "action" && (index === 0 ? isEmptySearch : options[index - 1]?.kind === "workspace")
+                  }
+                  onHighlight={() => setActiveIndex(index)}
+                  onChoose={() => choose(option)}
+                  onOpenSettings={() => openSettings(option)}
+                  onRemove={() => remove(option)}
+                />
+              </Fragment>
             ))}
           </div>,
           document.body,
@@ -421,7 +435,11 @@ function SwitcherOption({
         )}
         {isWorkspace && option.isCurrent && <i className="ic-check flex-none text-sm" aria-hidden="true" />}
         {canRemove && (
-          <RowButton title={`Remove "${option.workspace.name}" from Recent`} onClick={onRemove} className={revealClass}>
+          <RowButton
+            title={`Remove "${option.workspace.name}" from Recent`}
+            onClick={onRemove}
+            className={`-ml-1 ${revealClass}`}
+          >
             <i className="ic-x" />
           </RowButton>
         )}
