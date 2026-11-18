@@ -63,6 +63,17 @@ describe("parseWorkspaceList", () => {
     });
   });
 
+  it("reads a workspace removed from Recent, and ignores any other value of the mark", () => {
+    const hidden = { ...research, hiddenFromRecent: true };
+    const stored = JSON.stringify({
+      version: 1,
+      lastWorkspaceId: null,
+      workspaces: [hidden, { ...research, id: "w2", hiddenFromRecent: "yes" }],
+    });
+
+    expect(parseWorkspaceList(stored).list.workspaces).toEqual([hidden, { ...research, id: "w2" }]);
+  });
+
   it("reads which folder on this device each location of a workspace stored in its folder is", () => {
     const inFolder = {
       ...research,

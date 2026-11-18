@@ -96,30 +96,63 @@ test.describe("menus and Markdown images", () => {
         const el = document.activeElement;
         return el ? `${el.tagName}:${el.getAttribute("aria-label") ?? el.textContent?.trim().slice(0, 20)}` : "none";
       });
-    // The workspace switcher's menu, which uses the shared menu like every other.
-    const switcher = page.locator('header button[aria-haspopup="menu"]');
+    // The raw editor's settings menu, which uses the shared menu like every other.
+    await page.getByText("gallery.md").click();
+    await page.getByRole("button", { name: "Raw" }).click();
+    const trigger = page.getByRole("button", { name: "Editor settings" });
     const menu = page.getByRole("menu");
 
-    await switcher.focus();
+    await trigger.focus();
     const self = await describeFocus();
     await page.keyboard.press("Tab");
     const after = await describeFocus();
-    await switcher.focus();
+    await trigger.focus();
     await page.keyboard.press("Shift+Tab");
     const before = await describeFocus();
     expect(new Set([after, before, self]).size).toBe(3);
 
-    await switcher.focus();
+    await trigger.focus();
     await page.keyboard.press("Enter");
     await expect(menu).toBeVisible();
     await page.keyboard.press("Tab");
     await expect(menu).toBeHidden();
     expect(await describeFocus()).toBe(after);
 
-    await switcher.focus();
+    await trigger.focus();
     await page.keyboard.press("Enter");
     await page.keyboard.press("Shift+Tab");
     await expect(menu).toBeHidden();
+    expect(await describeFocus()).toBe(before);
+  });
+
+  test("lets Tab and Shift+Tab leave the workspace switcher's search in either direction", async ({ page }) => {
+    const describeFocus = () =>
+      page.evaluate(() => {
+        const el = document.activeElement;
+        return el ? `${el.tagName}:${el.getAttribute("aria-label") ?? el.textContent?.trim().slice(0, 20)}` : "none";
+      });
+    const switcher = page.locator('header button[aria-haspopup="listbox"]');
+    const list = page.getByRole("listbox", { name: "Workspaces" });
+
+    await switcher.focus();
+    await page.keyboard.press("Tab");
+    const after = await describeFocus();
+    await switcher.focus();
+    await page.keyboard.press("Shift+Tab");
+    const before = await describeFocus();
+
+    await switcher.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("combobox", { name: "Search workspaces" })).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(list).toBeHidden();
+    expect(await describeFocus()).toBe(after);
+
+    await switcher.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("combobox", { name: "Search workspaces" })).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(list).toBeHidden();
     expect(await describeFocus()).toBe(before);
   });
 

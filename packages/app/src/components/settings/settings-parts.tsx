@@ -3,13 +3,31 @@ import type { ReactNode } from "react";
 /**
  * A section's title and the one sentence that says where its settings apply.
  *
- * @param props - The title and the sentence.
+ * @param props - The title, the sentence, and an optional icon before the title and action after it.
  * @returns The section's heading block.
  */
-export function SectionHeading({ title, lead }: { title: string; lead: string }) {
+export function SectionHeading({
+  title,
+  lead,
+  icon,
+  action,
+}: {
+  title: string;
+  lead: string;
+  /** Shown before the title, such as a workspace's tile. */
+  icon?: ReactNode;
+  /** An action at the heading's right end, such as a button that adds to the section. */
+  action?: ReactNode;
+}) {
   return (
     <>
-      <h2 className="text-text-strong text-[22px] leading-tight font-semibold tracking-[-0.015em]">{title}</h2>
+      <div className="flex min-w-0 items-center gap-3">
+        {icon}
+        <h2 className="text-text-strong min-w-0 flex-1 truncate text-[22px] leading-tight font-semibold tracking-[-0.015em]">
+          {title}
+        </h2>
+        {action}
+      </div>
       <p className="text-text-muted mt-1 mb-7 text-[13px] leading-normal">{lead}</p>
     </>
   );

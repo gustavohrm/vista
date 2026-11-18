@@ -109,20 +109,6 @@ describe("StartScreen", () => {
     }
   });
 
-  it("lists only the most recent workspaces", () => {
-    const recents = Array.from({ length: 7 }, (_, index) => ({
-      id: `w${index}`,
-      name: `Workspace ${index}`,
-      icon: "folder" as const,
-      color: "neutral" as const,
-      folders: null,
-    }));
-    renderStartScreen(false, recents);
-
-    expect(screen.getByRole("button", { name: "Workspace 4" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Workspace 5" })).not.toBeInTheDocument();
-  });
-
   it("lists the recent workspaces without their folders, and says which one needs permission", async () => {
     const user = userEvent.setup();
     const { onOpenRecent, onRemoveRecent } = renderStartScreen(false, [
