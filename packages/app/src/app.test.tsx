@@ -2012,6 +2012,35 @@ describe("App", () => {
       expect(storedWorkspaces().find((workspace) => workspace.id === "w2")?.hiddenFromRecent).toBeUndefined();
     });
 
+    it("leaves a workspace that has never been opened out of the switcher, even when typing", async () => {
+      const user = userEvent.setup();
+      const { capability } = createFoldersCapability(storedFolders());
+      localStorage.setItem(
+        "vista.workspaces",
+        JSON.stringify({
+          version: 1,
+          lastWorkspaceId: "w1",
+          workspaces: [
+            { id: "w1", name: "Research", folderIds: ["notes"], lastOpenedAt: 2 },
+            { id: "w2", name: "Work", folderIds: ["sources"], lastOpenedAt: 1 },
+            { id: "w3", name: "Workshop", folderIds: ["sources"], lastOpenedAt: 0 },
+          ],
+        }),
+      );
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findExplorerPanel();
+
+      await user.click(screen.getByRole("button", { name: "Research" }));
+      const list = await screen.findByRole("listbox", { name: "Workspaces" });
+      expect(within(list).queryByRole("option", { name: "Workshop" })).not.toBeInTheDocument();
+      await user.keyboard("wo");
+      expect(
+        within(list)
+          .getAllByRole("option")
+          .map((option) => option.textContent),
+      ).toEqual(["Work", "Open Folder…", "Close Workspace"]);
+    });
+
     it("opens any workspace's page in Settings from its row in the switcher, the open one's too", async () => {
       const user = userEvent.setup();
       const { capability } = twoWorkspaces();

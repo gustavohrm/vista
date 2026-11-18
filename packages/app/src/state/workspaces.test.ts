@@ -73,6 +73,17 @@ describe("createWorkspaceStore", () => {
     expect(store.openFolder(notes).id).toBe(existing.id);
   });
 
+  it("leaves a workspace that has never been opened out of Recent until it is", () => {
+    const store = createWorkspaceStore(memoryStorage(), options());
+    const existing = store.openFolder(notes);
+
+    const created = store.createWorkspace({ id: "f2", name: "work", rootPath: "/work" });
+
+    expect(store.recentWorkspaces().map((w) => w.id)).toEqual([existing.id]);
+    store.markOpened(created.id);
+    expect(store.recentWorkspaces().map((w) => w.id)).toContain(created.id);
+  });
+
   it("keeps a workspace created from a folder picked through a directory input for this session only", () => {
     const storage = memoryStorage();
     const store = createWorkspaceStore(storage, options());

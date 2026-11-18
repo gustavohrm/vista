@@ -252,7 +252,7 @@ export function WorkspaceSwitcher({
           <div
             ref={fieldRef}
             // The selected fill over the title bar's own, opaque so the button doesn't show through.
-            className={`vista-fade bg-chrome absolute top-0 left-0 flex h-8 w-full min-w-56 items-center gap-2 rounded-md bg-[image:linear-gradient(var(--color-selected),var(--color-selected))] pr-2 pl-[7px] text-[13px] ${current ? "font-semibold" : ""}`}
+            className="vista-fade bg-chrome absolute top-0 left-0 flex h-8 w-full min-w-56 items-center gap-2 rounded-md bg-[image:linear-gradient(var(--color-selected),var(--color-selected))] pr-2 pl-[7px] text-[13px]"
           >
             <span
               aria-hidden="true"
@@ -270,7 +270,7 @@ export function WorkspaceSwitcher({
               aria-autocomplete="list"
               aria-activedescendant={options[active] ? optionId(active) : undefined}
               aria-keyshortcuts="Shift+Delete Control+,"
-              placeholder={current?.name ?? "Search workspaces"}
+              placeholder="Search workspaces"
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value);

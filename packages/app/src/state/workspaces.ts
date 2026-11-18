@@ -351,7 +351,8 @@ export function createWorkspaceStore(
 
     recentWorkspaces: () =>
       list.workspaces
-        .filter((w) => !w.hiddenFromRecent)
+        // A workspace made in Settings and never opened has nothing to come back to.
+        .filter((w) => w.lastOpenedAt > 0 && !w.hiddenFromRecent)
         .toSorted((a, b) => b.lastOpenedAt - a.lastOpenedAt || a.id.localeCompare(b.id))
         .slice(0, MAX_RECENT_WORKSPACES),
 
