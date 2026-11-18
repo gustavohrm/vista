@@ -50,8 +50,8 @@ Both hosts keep this in the webview's `localStorage`, as they already do for `vi
 
 The shared app owns everything here, through `@codenhub/i18n`'s runtime-neutral root entry and its `/browser` binding, which uses only `localStorage`, `navigator.languages`, and `document`, all available in both hosts. Nothing goes through a host adapter, and `packages/app` stays host-free as [the stack guidelines](../guidelines/stack.md#react-and-ui) require. The `/routing` entry is not used, since Vista has no URLs to localize.
 
-- **Before the first render.** The shared app starts the binding and waits for it before rendering, so the interface never shows English first and then switches. The binding sets `<html lang>` and `dir` to the language, so screen readers pronounce text correctly. The hosts' `index.html` keep `lang="en"` until then.
-- **Offline.** The dictionaries are bundled with the app, each loaded by a dynamic `import()`, so a user downloads only their own language plus English, and no language needs the network. A dictionary that fails to load is a build defect, not a network failure, and the tests below exist to catch it.
+- **Before the first render.** The shared app starts the binding and waits for it before rendering, so the interface never shows English first and then switches. The binding sets `<html lang>` to the locale, such as `pt-BR`, so screen readers pronounce text correctly, and `dir` to `ltr`, the direction of all three languages. The hosts' `index.html` keep `lang="en"` until then.
+- **Offline.** All three dictionaries are part of the app's own code, imported statically rather than as separate chunks, so switching language never needs the network, including in the web app after the connection drops. Interface text is a few kilobytes per language, so loading every language costs less than a switch that can fail; this is revisited if the dictionaries grow large. Since nothing is fetched, a dictionary that fails to load is a build defect, and the tests below exist to catch it.
 - **Re-rendering.** The interface re-renders on a language change through `i18n.subscribe()` and `useSyncExternalStore`, from the root of the shared app, so no component shows a stale language.
 - **Direction.** All three languages are left to right. Adding a right-to-left language would need the layout checked under `dir="rtl"`; this draft does not cover it.
 
@@ -64,7 +64,7 @@ Every piece of text Vista writes for the user:
 - Settings, including each section's lead and every row's name and description.
 - Command names in the command palette and in Keyboard Shortcuts, and their categories. The palette matches what it shows, so commands are searched in the current language.
 - The update notice and its offers, such as `Update to {version}` and `Install it now?`.
-- Text inside the editor libraries that Vista shows: CodeMirror's phrases, such as those of the search and vim extensions, through CodeMirror's `EditorState.phrases` facet. Which phrases Vista actually shows is listed when this is implemented.
+- Text inside the editor libraries that Vista shows: CodeMirror's phrases, such as those of the search and vim extensions, through CodeMirror's `EditorState.phrases` facet. The facet is part of the editor's state, so a re-render does not change it: on a language change, the open editor is reconfigured with the new phrases, keeping each tab's saved state. Which phrases Vista actually shows is listed when this is implemented.
 - Messages Vista writes for failures, such as `Failed to open the selected folder.`
 
 The English strings that [Workspaces](workspaces.md) and other specs quote are the `en` dictionary's text. A spec keeps quoting English; the translations follow it.
@@ -86,17 +86,18 @@ The interface is therefore only fully translated once the [Errors direction](err
 
 ## Dates and numbers
 
-Dates and numbers follow the interface language, not the browser's, through the manager's `formatDate()` and `formatNumber()`, so a Portuguese interface never shows an English date. This changes today's behavior in two places:
+Dates and numbers follow the interface language, not the browser's, through the manager's `formatDate()` and `formatNumber()`, so a Portuguese interface never shows an English date or `1.2 KB` where it writes `1,2 KB`. Every number Vista shows goes through them. This changes today's behavior in these places:
 
 - The start screen's dates and What's New's release date use the browser's locale, with `toLocaleDateString(undefined, …)`.
 - The status bar's large-table hint writes the cell limit with `"en-US"`.
+- The status bar's facts and position, such as `12 lines`, `1.2 KB`, `340 words`, and `Ln 4, Col 7`, are built with plain template strings and `toFixed()`, so their numbers, units, and plurals all become messages.
 
 Numbers inside a translated message are formatted by the message itself, as `{count, number}`, and counts that change the wording use ICU plurals, such as `{count, plural, one {# file} other {# files}}`, so every language gets its own plural rules.
 
 ## Writing translations
 
-- **Where.** One JSON dictionary per language in `packages/app`, such as `src/i18n/en.json`, `pt-BR.json`, and `es.json`. Keys are grouped by the part of the interface they belong to, such as `settings.files.maxOpenSize.label`.
-- **Typed keys.** `en.json` is the source of the key types, so a key that does not exist, or a missing placeholder value, fails to compile.
+- **Where.** One dictionary per language in `packages/app`: English as an `as const` object in `src/i18n/en.ts`, and the translations as JSON, `pt-BR.json` and `es.json`, typed as English. Keys are grouped by the part of the interface they belong to, such as `settings.files.maxOpenSize.label`.
+- **Typed keys and values.** `en.ts` is the source of the types. Because it is `as const`, TypeScript sees each English message, so a key that does not exist, or a missing or wrongly typed placeholder value, such as `version` in `Update to {version}`, fails to compile. A JSON dictionary would only check keys, since TypeScript types JSON text as `string`. The compiler cannot check that a translation uses the same placeholders as English; the message test below does.
 - **Whole sentences.** A message is one whole sentence with placeholders, never pieces joined in code, because word order differs between languages. Markup stays in components; dictionaries hold only text, since `t()` does not render HTML.
 - **Length.** Portuguese and Spanish text is often longer than English. The interface must not cut text off or overlap at any width it supports; a label that cannot fit wraps or is reworded in that language.
 - **Review.** A translation is reviewed by someone who reads that language before it ships. A string added in English without its translations falls back to English and is caught by the tests below, so it never ships unnoticed.
@@ -107,7 +108,8 @@ Numbers inside a translated message are formatted by the message itself, as `{co
 - **Messages parse.** Every message in every dictionary is valid ICU syntax and uses the same placeholders as its English source.
 - **No missing keys at runtime.** Tests run with an `onMissingKey` that throws, so a key built at runtime that does not exist fails a test.
 - **Detection and storage.** Choosing a language saves it under `vista-locale` and applies it at once; a saved language wins over the system's; an unknown saved value and unreadable storage fall back as [Storage](#storage) describes.
-- **Formatting.** Dates and numbers follow the chosen language rather than the browser's.
+- **Formatting.** Dates and numbers, including the status bar's, follow the chosen language rather than the browser's.
+- **Switching with an editor open.** Changing the language while the raw editor shows changes its phrases at once and keeps its selection, scroll position, and undo history.
 - **Existing tests.** Tests start in English, so the tests that find elements by their English text keep working.
 
 Checked by hand, as [Tests](tests.md) records for what no automated test reaches: that the desktop webview reports the operating system's language in `navigator.languages` on Windows and Linux, and that no screen cuts off Portuguese or Spanish text at the narrowest supported width.
