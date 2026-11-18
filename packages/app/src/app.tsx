@@ -845,6 +845,12 @@ function AppShell({ adapter }: AppProps) {
       let target = record;
       let slots: FolderSlot[] | null = null;
       let readText: string | null = null;
+      // A takeover queued meanwhile may have given the file to another workspace, which leaves this one on the device.
+      const ownsFile = () => {
+        const latest = workspaceStore.workspace(record.id);
+        return latest?.storage === "folder" && latest.folderIds[0] === homeId;
+      };
+      const onDevice = () => workspaceStore.workspace(record.id) ?? record;
       if (record.storage === "folder" && homeResult.status === "restored") {
         const home = homeResult.folder;
         // A change to its page still being written would otherwise be read back as it was, and undone.
@@ -853,10 +859,11 @@ function AppShell({ adapter }: AppProps) {
         if (!isCurrent()) {
           return { kind: "stale" };
         }
-        if (read.status === "unreadable") {
+        if (!ownsFile()) {
+          target = onDevice();
+        } else if (read.status === "unreadable") {
           return { kind: "unreadable", home };
-        }
-        if (read.status === "missing") {
+        } else if (read.status === "missing") {
           target = workspaceStore.storeOnDevice(record.id) ?? record;
           toast.show({
             kind: "info",
@@ -884,19 +891,24 @@ function AppShell({ adapter }: AppProps) {
           if (!isCurrent()) {
             return { kind: "stale" };
           }
-          const applied = workspaceStore.applyWorkspaceFile(record.id, read.details, located);
-          target = applied?.workspace ?? record;
-          readText = serializeWorkspaceFile(read.details);
-          // The file no longer lists these folders and no workspace holds them, so their host may forget them.
-          await Promise.all(
-            (applied?.unusedFolderIds ?? []).map(async (folderId) => {
-              try {
-                await adapter.workspace.forgetFolder(folderId);
-              } catch (err) {
-                console.error("Failed to forget a folder the workspace file dropped:", err);
-              }
-            }),
-          );
+          if (ownsFile()) {
+            const applied = workspaceStore.applyWorkspaceFile(record.id, read.details, located);
+            target = applied?.workspace ?? record;
+            readText = serializeWorkspaceFile(read.details);
+            // The file no longer lists these folders and no workspace holds them, so their host may forget them.
+            await Promise.all(
+              (applied?.unusedFolderIds ?? []).map(async (folderId) => {
+                try {
+                  await adapter.workspace.forgetFolder(folderId);
+                } catch (err) {
+                  console.error("Failed to forget a folder the workspace file dropped:", err);
+                }
+              }),
+            );
+          } else {
+            target = onDevice();
+            slots = null;
+          }
         }
       }
       if (!slots) {
@@ -1039,6 +1051,9 @@ function AppShell({ adapter }: AppProps) {
       const isNewestOpen = beginOpen();
       if (opened.accessMode !== "fallback") {
         const read = await readWorkspaceFile(opened);
+        if (!isNewestOpen()) {
+          return;
+        }
         if (read.status === "ok") {
           const record = workspaceStore.workspaceForFile(opened);
           const restored = new Map([[opened.id, { status: "restored" as const, folder: opened }]]);
@@ -1596,6 +1611,11 @@ function AppShell({ adapter }: AppProps) {
         // Queued so a rewrite queued before it can't bring the file back after it is deleted, and one queued
         // after it finds the details kept on this device.
         await queueFileWrite(async () => {
+          const record = workspaceStore.workspace(current.id);
+          // A takeover queued before this one gave the file to another workspace, whose file stays.
+          if (record?.storage !== "folder" || record.folderIds[0] !== homeFolder.id) {
+            return;
+          }
           if (await adapter.workspace.stat(homeFolder, WORKSPACE_FILE_PATH)) {
             await adapter.workspace.remove(homeFolder, WORKSPACE_FILE_PATH);
           }

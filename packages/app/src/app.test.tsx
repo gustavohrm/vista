@@ -3009,15 +3009,18 @@ describe("App", () => {
           expect(folder("sources").textOf(FILE)).toBeUndefined();
         });
 
-        it("doesn't let another workspace's queued write land in a workspace file it takes over", async () => {
-          const user = userEvent.setup();
+        /**
+         * Research keeps its details in `notes`; Copy, a second workspace of `notes`, starts taking that
+         * file over, and its write is held. Research is open unless `lastWorkspaceId` says otherwise.
+         */
+        async function startTakeover(user: ReturnType<typeof userEvent.setup>, lastWorkspaceId = "w1") {
           const { capability, folder } = createFoldersCapability([
             {
               folder: NOTES_FOLDER,
               files: { "a.txt": PLAIN_TEXT, [FILE]: JSON.stringify({ version: 1, name: "Research", folders: ["."] }) },
             },
           ]);
-          storeWorkspaces("w1", [
+          storeWorkspaces(lastWorkspaceId, [
             { id: "w1", name: "Research", folderIds: ["notes"], storage: "folder", locations: { ".": "notes" } },
             { id: "w2", name: "Copy", folderIds: ["notes"], lastOpenedAt: 1 },
           ]);
@@ -3036,6 +3039,12 @@ describe("App", () => {
           await user.click(await within(page).findByRole("radio", { name: "In notes/.vista" }));
           await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Replace" }));
           await waitFor(() => expect(capability.writeFile).toHaveBeenCalledWith(NOTES_FOLDER, FILE, expect.anything()));
+          return { capability, folder, write, page };
+        }
+
+        it("doesn't let another workspace's queued write land in a workspace file it takes over", async () => {
+          const user = userEvent.setup();
+          const { folder, write, page } = await startTakeover(user);
 
           await user.click(navigation(page).getByRole("button", { name: "Research" }));
           await user.type(within(page).getByRole("textbox", { name: "Name" }), "!");
@@ -3047,6 +3056,36 @@ describe("App", () => {
               w2: "folder",
             }),
           );
+          await settle();
+          expect(JSON.parse(folder("notes").textOf(FILE)!)).toMatchObject({ name: "Copy" });
+        });
+
+        it("keeps a page read waiting behind a takeover from applying the new owner's file", async () => {
+          const user = userEvent.setup();
+          const { folder, write, page } = await startTakeover(user, "w2");
+
+          await user.click(navigation(page).getByRole("button", { name: "Research" }));
+          write.release();
+
+          await waitFor(() => expect(within(page).getByRole("radio", { name: "On this device" })).toBeChecked());
+          await settle();
+          expect(Object.fromEntries(storedWorkspaces().map(({ id, storage }) => [id, storage]))).toEqual({
+            w1: "device",
+            w2: "folder",
+          });
+          expect(JSON.parse(folder("notes").textOf(FILE)!)).toMatchObject({ name: "Copy" });
+        });
+
+        it("doesn't delete a workspace file another workspace took over while the deletion waited", async () => {
+          const user = userEvent.setup();
+          const { folder, write, page } = await startTakeover(user);
+
+          await user.click(navigation(page).getByRole("button", { name: "Research" }));
+          await user.click(await within(page).findByRole("radio", { name: "On this device" }));
+          await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete File" }));
+          write.release();
+
+          await waitFor(() => expect(storedWorkspaces().find(({ id }) => id === "w2")?.storage).toBe("folder"));
           await settle();
           expect(JSON.parse(folder("notes").textOf(FILE)!)).toMatchObject({ name: "Copy" });
         });
