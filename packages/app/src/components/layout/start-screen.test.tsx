@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import type { RecentWorkspace } from "../workspace/workspace-switcher";
-import { formatLastOpened, resetStartIntro, StartScreen } from "./start-screen";
+import { formatLastOpened, MAX_RECENT_SHOWN, resetStartIntro, StartScreen } from "./start-screen";
 
 function renderStartScreen(
   isLoading: boolean,
@@ -106,6 +106,20 @@ describe("StartScreen", () => {
         process.env.TZ = zone;
       }
     }
+  });
+
+  it("lists only the most recent workspaces", () => {
+    const recents = Array.from({ length: MAX_RECENT_SHOWN + 2 }, (_, index) => ({
+      id: `w${index}`,
+      name: `Workspace ${index}`,
+      icon: "folder" as const,
+      color: "neutral" as const,
+      folders: null,
+    }));
+    renderStartScreen(false, recents);
+
+    expect(screen.getByRole("button", { name: `Workspace ${MAX_RECENT_SHOWN - 1}` })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: `Workspace ${MAX_RECENT_SHOWN}` })).not.toBeInTheDocument();
   });
 
   it("lists the recent workspaces without their folders, and says which one needs permission", async () => {

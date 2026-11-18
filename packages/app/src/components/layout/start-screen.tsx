@@ -40,6 +40,12 @@ interface StartScreenProps {
   desktopDownload?: DesktopDownload | null;
 }
 
+/**
+ * How many recent workspaces the start screen lists: a shortcut back to the latest few, not every
+ * workspace Vista remembers, which the switcher lists.
+ */
+export const MAX_RECENT_SHOWN = 5;
+
 /** A row of the start screen's lists: icon, text, and an optional detail at the right end. */
 const ROW_CLASS =
   "flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left text-[13px] text-text transition-colors duration-100 hover:bg-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring)]";
@@ -155,7 +161,7 @@ export function StartScreen({
           <section aria-labelledby="recent-workspaces" className="flex flex-col gap-1.5">
             <Heading id="recent-workspaces">Recent workspaces</Heading>
             <ul className="-mx-2 flex flex-col gap-px">
-              {recents.map((workspace) => (
+              {recents.slice(0, MAX_RECENT_SHOWN).map((workspace) => (
                 <RecentEntry
                   key={workspace.id}
                   workspace={workspace}
