@@ -104,7 +104,7 @@ Numbers inside a translated message are formatted by the message itself, as `{co
 
 ## Tests
 
-- **Key parity.** Every dictionary has exactly the keys of `en.json`, as the package's own test pattern does with `loadLocale()`.
+- **Key parity.** Every dictionary has exactly the keys of `en.ts`, as the package's own test pattern does with `loadLocale()`.
 - **Messages parse.** Every message in every dictionary is valid ICU syntax and uses the same placeholders as its English source.
 - **No missing keys at runtime.** Tests run with an `onMissingKey` that throws, so a key built at runtime that does not exist fails a test.
 - **Detection and storage.** Choosing a language saves it under `vista-locale` and applies it at once; a saved language wins over the system's; an unknown saved value and unreadable storage fall back as [Storage](#storage) describes.
