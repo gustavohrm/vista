@@ -92,7 +92,7 @@ export function WorkspaceSwitcher({
           const bounds = event.currentTarget.getBoundingClientRect();
           setOpen({ x: bounds.left, y: bounds.bottom + MENU_OFFSET_PX });
         }}
-        className={`hover:bg-hover flex h-8 min-w-0 shrink items-center gap-2 rounded-md pr-2 pl-1.5 text-[13px] transition-colors duration-100 ${current ? "text-text-strong font-semibold" : "text-text-muted"} ${open ? "bg-selected" : ""}`}
+        className={`hover:bg-hover flex h-8 min-w-0 shrink items-center gap-2 rounded-md pr-2 pl-[7px] text-[13px] transition-colors duration-100 ${current ? "text-text-strong font-semibold" : "text-text-muted"} ${open ? "bg-selected" : ""}`}
       >
         {current ? (
           <WorkspaceGlyph icon={current.icon} color={current.color} isTile className="text-xs" />

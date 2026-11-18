@@ -68,7 +68,12 @@ export function TitleBar({
   const explorerLabel = isSidebarOpen ? "Close explorer" : "Open explorer";
 
   return (
-    <header className="relative z-50 flex h-11 w-full flex-none items-center gap-1 px-2 select-none md:gap-2">
+    // From `md` up, with a workspace, the left padding puts the switcher's button over the rail's
+    // 34px buttons, which the 44px rail centres 5px from the edge, so its tile and theirs share a
+    // centre line. Without one there is no rail, and the button lines up with the frame's 8px edge.
+    <header
+      className={`relative z-50 flex h-11 w-full flex-none items-center gap-1 px-2 select-none md:gap-2 ${hasWorkspace ? "md:pl-[5px]" : ""}`}
+    >
       <div className="flex min-w-0 flex-1 items-center gap-0.5 md:gap-1">
         {hasWorkspace && (
           <Tooltip text={explorerLabel} position="bottom" className="flex flex-none md:hidden">
