@@ -143,7 +143,7 @@ export function StartScreen({
                   <span className="text-text-strong flex-1">{desktopDownload.label}</span>
                   {desktopDownload.version && (
                     <span id={downloadVersionId} className="text-text-faint flex-none text-xs">
-                      Vista {desktopDownload.version}
+                      v{desktopDownload.version}
                     </span>
                   )}
                 </a>

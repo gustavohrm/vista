@@ -2860,9 +2860,7 @@ describe("App", () => {
         "href",
         "/download/windows",
       );
-      expect(screen.getByRole("link", { name: "Download for Windows" })).toHaveAccessibleDescription(
-        `Vista ${APP_VERSION}`,
-      );
+      expect(screen.getByRole("link", { name: "Download for Windows" })).toHaveAccessibleDescription(`v${APP_VERSION}`);
       // Without it, a host that answers with a page rather than the installer navigates away from the app.
       expect(screen.getByRole("link", { name: "Download for Windows" })).toHaveAttribute("download");
 
