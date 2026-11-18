@@ -2410,6 +2410,7 @@ function AppShell({ adapter }: AppProps) {
                 onOpenFolder={() => void handleOpenFolder()}
                 onOpenSettings={() => setSettingsSection("workspace")}
                 onClose={() => void handleCloseWorkspace()}
+                onRemove={(workspaceId) => void handleRemoveRecent(workspaceId)}
                 // A workspace opened while the last one is restored could be replaced when that finishes.
                 isDisabled={isLoading}
               />

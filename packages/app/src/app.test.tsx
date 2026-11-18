@@ -1955,6 +1955,26 @@ describe("App", () => {
       expect(await screen.findByRole("button", { name: "Work" })).toHaveAttribute("aria-haspopup", "menu");
     });
 
+    it("forgets a workspace from the switcher", async () => {
+      const user = userEvent.setup();
+      const { capability } = twoWorkspaces();
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findExplorerPanel();
+
+      await user.click(screen.getByRole("button", { name: "Research" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Remove from Recent…" }));
+      const list = await screen.findByRole("menu", { name: "Remove from Recent" });
+      // The open workspace is closed before it is forgotten.
+      expect(within(list).queryByRole("menuitem", { name: "Research" })).not.toBeInTheDocument();
+      await user.click(within(list).getByRole("menuitem", { name: "Work" }));
+      await user.click(await screen.findByRole("button", { name: "Remove" }));
+
+      await user.click(screen.getByRole("button", { name: "Research" }));
+      expect(await screen.findByRole("menuitemradio", { name: "Research" })).toBeChecked();
+      expect(screen.queryByRole("menuitemradio", { name: "Work" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: "Remove from Recent…" })).not.toBeInTheDocument();
+    });
+
     it("holds the switcher until the last workspace has been restored", async () => {
       const { capability } = twoWorkspaces();
       const restoreFolder = capability.restoreFolder;
