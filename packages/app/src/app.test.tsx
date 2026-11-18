@@ -1991,13 +1991,20 @@ describe("App", () => {
       // Shift+Delete takes the picked workspace out of Recent; typing still finds it.
       await user.keyboard("{ArrowDown}{Shift>}{Delete}{/Shift}");
       expect(within(list).queryByRole("option", { name: "Work" })).not.toBeInTheDocument();
-      // Typing searches the actions' labels too.
-      await user.keyboard("wo");
+      // The actions stay below the matches whatever is typed, even when no workspace matches.
+      await user.keyboard("zz");
+      expect(within(list).getByText("No matching workspaces")).toBeInTheDocument();
       expect(
         within(list)
           .getAllByRole("option")
           .map((option) => option.textContent),
-      ).toEqual(["Work", "Close Workspace"]);
+      ).toEqual(["Open Folder…", "Close Workspace"]);
+      await user.keyboard("{Backspace}{Backspace}wo");
+      expect(
+        within(list)
+          .getAllByRole("option")
+          .map((option) => option.textContent),
+      ).toEqual(["Work", "Open Folder…", "Close Workspace"]);
       expect(within(list).queryByTitle('Remove "Work" from Recent')).not.toBeInTheDocument();
       await user.keyboard("{Enter}");
 

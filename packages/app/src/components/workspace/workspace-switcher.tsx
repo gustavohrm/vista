@@ -47,7 +47,7 @@ type Option =
 /**
  * The switcher at the top left, showing the open workspace. Choosing it turns it into a search field
  * over a list: the recent workspaces, then Open Folder and Close Workspace. Typing searches every
- * workspace by name, and the actions by label; the arrow keys pick an entry and Enter chooses it. Each
+ * workspace by name, and the actions stay below the matches; the arrow keys pick an entry and Enter chooses it. Each
  * workspace has a Settings button, shown while the pointer rests on it or it is picked, that opens its
  * page in Settings, also reached with `Ctrl+,`; each recent one but the open one can be removed from
  * Recent with its X or `Shift+Delete`, and the list stays open. Creating, editing, and deleting
@@ -97,30 +97,30 @@ export function WorkspaceSwitcher({
           ...recents.filter((workspace) => matches(workspace.name)),
           ...workspaces.filter((workspace) => !recentIds.has(workspace.id) && matches(workspace.name)),
         ].map(toOption);
-  const actionOptions = (
-    [
-      {
-        kind: "action",
-        id: "open-folder",
-        label: "Open Folder…",
-        icon: <i className="ic-folder-open" aria-hidden="true" />,
-        run: onOpenFolder,
-      },
-      ...(current
-        ? [
-            {
-              kind: "action",
-              id: "close-workspace",
-              label: "Close Workspace",
-              icon: <i className="ic-folder-x" aria-hidden="true" />,
-              run: onClose,
-            } as const,
-          ]
-        : []),
-    ] satisfies Option[]
-  ).filter((option) => matches(option.label));
+  const actionOptions = [
+    {
+      kind: "action",
+      id: "open-folder",
+      label: "Open Folder…",
+      icon: <i className="ic-folder-open" aria-hidden="true" />,
+      run: onOpenFolder,
+    },
+    ...(current
+      ? [
+          {
+            kind: "action",
+            id: "close-workspace",
+            label: "Close Workspace",
+            icon: <i className="ic-folder-x" aria-hidden="true" />,
+            run: onClose,
+          } as const,
+        ]
+      : []),
+  ] satisfies Option[];
   const options: Option[] = [...workspaceOptions, ...actionOptions];
   const active = Math.min(activeIndex, options.length - 1);
+  // Typed text that finds no workspace; the actions still follow.
+  const isEmptySearch = needle !== "" && workspaceOptions.length === 0;
 
   useEffect(() => {
     if (isOpen) {
@@ -295,20 +295,22 @@ export function WorkspaceSwitcher({
             style={{ left: anchor.x, top: anchor.y, minWidth: listWidth ?? undefined }}
             className="vista-menu vista-pop card soft floating fixed z-50 flex max-h-[calc(100vh-56px)] min-w-48 flex-col overflow-y-auto p-1 text-[13px] [--ui-radius-surface:8px]"
           >
+            {isEmptySearch && <p className="text-text-muted px-2 py-1.5">No matching workspaces</p>}
             {options.map((option, index) => (
               <SwitcherOption
                 key={`${option.kind}:${option.id}`}
                 id={optionId(index)}
                 option={option}
                 isActive={index === active}
-                hasSeparatorBefore={option.kind === "action" && index > 0 && options[index - 1]?.kind === "workspace"}
+                hasSeparatorBefore={
+                  option.kind === "action" && (isEmptySearch || options[index - 1]?.kind === "workspace")
+                }
                 onHighlight={() => setActiveIndex(index)}
                 onChoose={() => choose(option)}
                 onOpenSettings={() => openSettings(option)}
                 onRemove={() => remove(option)}
               />
             ))}
-            {options.length === 0 && <p className="text-text-muted px-2 py-1.5">No matching workspaces</p>}
           </div>,
           document.body,
         )}
