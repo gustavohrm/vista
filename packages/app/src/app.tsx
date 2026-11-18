@@ -850,11 +850,11 @@ function AppShell({ adapter }: AppProps) {
         // A change to its page still being written would otherwise be read back as it was, and undone.
         await fileWriteRef.current;
         const read = await readWorkspaceFile(home);
-        if (read.status === "unreadable") {
-          return { kind: "unreadable", home };
-        }
         if (!isCurrent()) {
           return { kind: "stale" };
+        }
+        if (read.status === "unreadable") {
+          return { kind: "unreadable", home };
         }
         if (read.status === "missing") {
           target = workspaceStore.storeOnDevice(record.id) ?? record;
@@ -937,6 +937,8 @@ function AppShell({ adapter }: AppProps) {
    *
    * @param record - The stored workspace.
    * @param options.restored - Folders already restored, by id, so they are not restored twice.
+   * @param options.isNewestOpen - Whether the open that led here is still the newest, for an open
+   *   that started before this one; this starts its own when none is given.
    * @returns Whether the workspace opened.
    */
   const openStoredWorkspace = useCallback(
@@ -946,9 +948,14 @@ function AppShell({ adapter }: AppProps) {
         interactive,
         approvedEdits,
         restored,
-      }: { interactive: boolean; approvedEdits?: ApprovedEdits; restored?: ReadonlyMap<string, RestoreFolderResult> },
+        isNewestOpen = beginOpen(),
+      }: {
+        interactive: boolean;
+        approvedEdits?: ApprovedEdits;
+        restored?: ReadonlyMap<string, RestoreFolderResult>;
+        isNewestOpen?: () => boolean;
+      },
     ): Promise<boolean> => {
-      const isNewestOpen = beginOpen();
       // A workspace deleted meanwhile, or one being deleted, has nothing left to open.
       const isCurrent = () =>
         isNewestOpen() && !deletingIdsRef.current.has(record.id) && workspaceStore.workspace(record.id) !== null;
@@ -1035,7 +1042,7 @@ function AppShell({ adapter }: AppProps) {
         if (read.status === "ok") {
           const record = workspaceStore.workspaceForFile(opened);
           const restored = new Map([[opened.id, { status: "restored" as const, folder: opened }]]);
-          if (await openStoredWorkspace(record, { interactive: true, approvedEdits, restored })) {
+          if (await openStoredWorkspace(record, { interactive: true, approvedEdits, restored, isNewestOpen })) {
             setIsSidebarOpen(true);
           }
           return;

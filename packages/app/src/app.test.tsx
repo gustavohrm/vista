@@ -1566,6 +1566,50 @@ describe("App", () => {
       expect(capability.writeFile).not.toHaveBeenCalled();
     });
 
+    it("keeps a workspace opened while a picked folder's file was still read", async () => {
+      const user = userEvent.setup();
+      const { capability, folder } = createFoldersCapability(thesisFolders());
+      localStorage.setItem(
+        "vista.workspaces",
+        JSON.stringify({
+          version: 1,
+          lastWorkspaceId: "w1",
+          workspaces: [
+            { id: "w1", name: "Research", folderIds: ["notes"], lastOpenedAt: 2 },
+            { id: "w2", name: "Work", folderIds: ["sources"], lastOpenedAt: 1 },
+          ],
+        }),
+      );
+      let releaseStat = () => {};
+      const held = new Promise<void>((resolve) => {
+        releaseStat = resolve;
+      });
+      capability.stat.mockImplementation(async (target, path) => {
+        if (target.id === "drafts") {
+          await held;
+        }
+        return folder(target.id).stat(target, path);
+      });
+      vi.mocked(capability.pickFolder).mockResolvedValueOnce(DRAFTS_FOLDER);
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("a.txt");
+
+      await openFolderFromSwitcher(user, "Research");
+      await waitFor(() => expect(capability.stat).toHaveBeenCalledWith(DRAFTS_FOLDER, ".vista/workspace.json"));
+      // The switcher waits while the folder loads, but Settings can still open another workspace.
+      await user.keyboard("{Control>},{/Control}");
+      const page = await screen.findByRole("region", { name: "Settings" });
+      const nav = within(within(page).getByRole("navigation", { name: "Settings sections" }));
+      await user.click(await nav.findByRole("button", { name: "Work" }));
+      await user.click(await within(page).findByRole("button", { name: "Open" }));
+      await waitFor(() => expect(switcherButton("Work")).toBeDefined());
+      releaseStat();
+
+      await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+      expect(switcherButton("Work")).toBeDefined();
+      expect(storedThesis()).toBeUndefined();
+    });
+
     it("asks for a folder the browser can't find by itself, by its name", async () => {
       const user = userEvent.setup();
       const { capability } = researchOnly(
@@ -2830,6 +2874,40 @@ describe("App", () => {
           await waitFor(() => expect(capability.readTree).toHaveResolvedTimes(2));
           await settle();
           expect(switcherButton()).toHaveAccessibleName("Research");
+        });
+
+        it("says nothing of an unreadable file when a newer open took over while it was read", async () => {
+          const user = userEvent.setup();
+          const { capability, folder } = createFoldersCapability([
+            { folder: NOTES_FOLDER, files: { "a.txt": PLAIN_TEXT } },
+            { folder: SOURCES_FOLDER, files: { "plan.txt": PLAIN_TEXT, [FILE]: "not json" } },
+          ]);
+          storeWorkspaces("w1", [
+            { id: "w1", name: "Research", folderIds: ["notes"], lastOpenedAt: 3 },
+            { id: "w2", name: "Work", folderIds: ["sources"], storage: "folder", locations: { ".": "sources" } },
+            { id: "w3", name: "Other", folderIds: ["notes"], lastOpenedAt: 1 },
+          ]);
+          render(<App adapter={{ platform: "web", workspace: capability }} />);
+          await findExplorerPanel();
+          const read = held();
+          capability.stat.mockImplementation(async (target, path) => {
+            if (target.id === "sources") {
+              await read.promise;
+            }
+            return folder(target.id).stat(target, path);
+          });
+          const page = await openSettings(user);
+          await user.click(await navigation(page).findByRole("button", { name: "Work" }));
+          await user.click(await within(page).findByRole("button", { name: "Open" }));
+          await waitFor(() => expect(capability.stat).toHaveBeenCalledWith(SOURCES_FOLDER, FILE));
+
+          await openFromSwitcher(user, "Other");
+          read.release();
+
+          await settle();
+          expect(switcherButton()).toHaveAccessibleName("Other");
+          expect(screen.queryByText(/has workspace details this version of Vista can't read/)).not.toBeInTheDocument();
+          expect(capability.readTree).not.toHaveBeenCalledWith(SOURCES_FOLDER);
         });
 
         it("doesn't open a workspace deleted while another's workspace file is written", async () => {
