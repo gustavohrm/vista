@@ -45,8 +45,21 @@ interface StartScreenProps {
 /** A row of the start screen's lists: icon, text, and an optional detail at the right end. */
 const ROW_CLASS =
   "flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left text-[13px] text-text transition-colors duration-100 hover:bg-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring)]";
-/** A list heading; it shares the left edge of the rows' icons. */
-const HEADING_CLASS = "text-text-faint text-xs font-medium";
+/**
+ * A list heading; it shares the left edge of the rows' icons, and a rule runs from it to the rows'
+ * right end, so the details aligned there have an edge to line up with.
+ */
+const HEADING_CLASS = "text-text-faint flex items-center gap-3 text-xs font-medium";
+
+/** A list heading's text and its rule. */
+function Heading({ id, children }: { id: string; children: ReactNode }) {
+  return (
+    <h2 id={id} className={HEADING_CLASS}>
+      {children}
+      <span aria-hidden="true" className="divider text-line min-w-0 flex-1" />
+    </h2>
+  );
+}
 
 /**
  * Fills the editor area while no file is open. While a folder is being opened or restored it shows
@@ -101,9 +114,7 @@ export function StartScreen({
     <div className="flex min-h-0 flex-1 justify-center overflow-y-auto p-6">
       <Intro entrance={entrance}>
         <section aria-labelledby="start-list" className="flex flex-col gap-1.5">
-          <h2 id="start-list" className={HEADING_CLASS}>
-            Start
-          </h2>
+          <Heading id="start-list">Start</Heading>
           <ul className="-mx-2 flex flex-col gap-px">
             <li>
               <button type="button" onClick={onOpenFolder} className={ROW_CLASS}>
@@ -146,9 +157,7 @@ export function StartScreen({
         </section>
         {recents.length > 0 && (
           <section aria-labelledby="recent-workspaces" className="flex flex-col gap-1.5">
-            <h2 id="recent-workspaces" className={HEADING_CLASS}>
-              Recent workspaces
-            </h2>
+            <Heading id="recent-workspaces">Recent workspaces</Heading>
             <ul className="-mx-2 flex flex-col gap-px">
               {recents.map((workspace) => (
                 <RecentEntry
