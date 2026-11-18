@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { placeBubble, Tooltip, TOOLTIP_DELAY_MS } from "./tooltip";
+import { flipVertically, placeBubble, Tooltip, TOOLTIP_DELAY_MS } from "./tooltip";
 
 function renderTooltip() {
   render(
@@ -186,5 +186,23 @@ describe("placeBubble", () => {
   it("keeps a bubble wider than the room beside its control inside the window", () => {
     expect(placeBubble({ left: 600, width: 28 }, 900, VIEWPORT)).toBe(92);
     expect(placeBubble({ left: 300, width: 28 }, 980, VIEWPORT)).toBe(8);
+  });
+});
+
+describe("flipVertically", () => {
+  const VIEWPORT = 800;
+
+  it("keeps the side asked for while the bubble fits there", () => {
+    expect(flipVertically("top", { top: 400, bottom: 428 }, 24, VIEWPORT)).toBe("top");
+    expect(flipVertically("bottom", { top: 400, bottom: 428 }, 24, VIEWPORT)).toBe("bottom");
+  });
+
+  it("opens on the other side when the bubble would cross the window's edge", () => {
+    expect(flipVertically("top", { top: 4, bottom: 32 }, 24, VIEWPORT)).toBe("bottom");
+    expect(flipVertically("bottom", { top: 768, bottom: 796 }, 24, VIEWPORT)).toBe("top");
+  });
+
+  it("keeps the side asked for when the bubble fits on neither", () => {
+    expect(flipVertically("top", { top: 4, bottom: 796 }, 24, VIEWPORT)).toBe("top");
   });
 });

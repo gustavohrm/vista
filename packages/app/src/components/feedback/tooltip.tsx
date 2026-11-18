@@ -87,6 +87,31 @@ export function placeBubble(
 }
 
 /**
+ * The side a `top` or `bottom` bubble opens on: the one asked for, unless the bubble would cross the
+ * window's edge there and fits on the other side.
+ *
+ * @param side - The side asked for.
+ * @param trigger - The trigger's top and bottom edges, in viewport pixels.
+ * @param bubbleHeight - The bubble's height.
+ * @param viewportHeight - The window's height.
+ * @returns The side it opens on.
+ */
+export function flipVertically(
+  side: "top" | "bottom",
+  trigger: { top: number; bottom: number },
+  bubbleHeight: number,
+  viewportHeight: number,
+): "top" | "bottom" {
+  const needed = BUBBLE_GAP_PX + bubbleHeight + VIEWPORT_MARGIN_PX;
+  const fitsAbove = trigger.top >= needed;
+  const fitsBelow = viewportHeight - trigger.bottom >= needed;
+  if (side === "top") {
+    return !fitsAbove && fitsBelow ? "bottom" : "top";
+  }
+  return !fitsBelow && fitsAbove ? "top" : "bottom";
+}
+
+/**
  * A control's name in a small bubble beside it. It shows after the pointer rests on the control
  * for a moment, or at once when the previous tooltip has just hidden, and at once when keyboard
  * focus reaches the control, so keyboard users see the names of icon-only buttons too. It stays while
@@ -106,7 +131,12 @@ export function Tooltip({ text, shortcut, position, className, children }: Toolt
   const bubbleRef = useRef<HTMLSpanElement>(null);
   // The bubble's place in the window and the point it grows from; measured as it opens, and kept as it
   // closes so it fades out where it was.
-  const [placement, setPlacement] = useState<{ left: number; top: number; origin: string } | null>(null);
+  const [placement, setPlacement] = useState<{
+    left: number;
+    top: number;
+    origin: string;
+    side: TooltipProps["position"];
+  } | null>(null);
 
   useLayoutEffect(() => {
     const wrapper = wrapperRef.current;
@@ -121,13 +151,14 @@ export function Tooltip({ text, shortcut, position, className, children }: Toolt
       const height = bubble.offsetHeight;
       if (position === "top" || position === "bottom") {
         const left = placeBubble(trigger, width, document.documentElement.clientWidth);
-        const top = position === "top" ? trigger.top - BUBBLE_GAP_PX - height : trigger.bottom + BUBBLE_GAP_PX;
+        const side = flipVertically(position, trigger, height, window.innerHeight);
+        const top = side === "top" ? trigger.top - BUBBLE_GAP_PX - height : trigger.bottom + BUBBLE_GAP_PX;
         const originX = trigger.left + trigger.width / 2 - left;
-        setPlacement({ left, top, origin: `${originX}px ${position === "top" ? "100%" : "0"}` });
+        setPlacement({ left, top, side, origin: `${originX}px ${side === "top" ? "100%" : "0"}` });
       } else {
         const left = position === "left" ? trigger.left - BUBBLE_GAP_PX - width : trigger.right + BUBBLE_GAP_PX;
         const top = trigger.top + (trigger.height - height) / 2;
-        setPlacement({ left, top, origin: position === "left" ? "100% 50%" : "0 50%" });
+        setPlacement({ left, top, side: position, origin: position === "left" ? "100% 50%" : "0 50%" });
       }
     };
     place();
@@ -211,7 +242,7 @@ export function Tooltip({ text, shortcut, position, className, children }: Toolt
     }
   };
 
-  const side = SIDE_CLASS[position];
+  const side = SIDE_CLASS[placement?.side ?? position];
   // Until it first opens, the hidden bubble waits at the window's corner.
   const bubbleStyle: CSSProperties = placement
     ? { left: placement.left, top: placement.top, transformOrigin: placement.origin }
