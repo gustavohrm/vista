@@ -1991,7 +1991,9 @@ function AppShell({ adapter }: AppProps) {
         id: "file.openFolder",
         category: "Workspace",
         label: "Open Folder…",
-        isEnabled: !isPromptingForUnsavedChanges,
+        // While a workspace is loading, a folder opened meanwhile could be replaced when that finishes,
+        // and a cancelled pick would end the loading early, letting the switcher choose one too.
+        isEnabled: !isPromptingForUnsavedChanges && !isLoading,
         run: handleOpenFolder,
       },
       {
@@ -2313,6 +2315,7 @@ function AppShell({ adapter }: AppProps) {
       hasReadyFolder,
       handleViewModeChange,
       hasDirtyDocuments,
+      isLoading,
       isPromptingForUnsavedChanges,
       isRawShown,
       isExplorerShown,

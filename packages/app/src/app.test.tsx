@@ -1975,7 +1975,8 @@ describe("App", () => {
       expect(screen.queryByRole("menuitem", { name: "Remove from Recent…" })).not.toBeInTheDocument();
     });
 
-    it("holds the switcher until the last workspace has been restored", async () => {
+    it("holds the switcher and Open Folder until the last workspace has been restored", async () => {
+      const user = userEvent.setup();
       const { capability } = twoWorkspaces();
       const restoreFolder = capability.restoreFolder;
       let release!: () => void;
@@ -1990,6 +1991,12 @@ describe("App", () => {
 
       // Opening another workspace now could finish first and then be replaced by the restored one.
       expect(await screen.findByRole("button", { name: "No workspace" })).toBeDisabled();
+      await user.keyboard("{Control>}{Shift>}p{/Shift}{/Control}");
+      expect(await screen.findByRole("option", { name: /^Workspace: Open Folder…/ })).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
+      await user.keyboard("{Escape}");
 
       release();
       expect(await screen.findByRole("button", { name: "Research" })).toBeEnabled();
