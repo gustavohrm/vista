@@ -166,7 +166,7 @@ export function WorkspaceNavItem({ workspace, isCurrent, onSelect }: WorkspaceNa
             role="tooltip"
             id={popoverId}
             style={position ? positionStyle(position) : undefined}
-            className={`bg-pop border-line-strong text-text-strong shadow-float fixed z-50 flex max-w-72 flex-col gap-1 overflow-y-auto rounded-md border px-2.5 py-2 text-xs leading-4 transition-opacity duration-100 motion-reduce:transition-none ${
+            className={`bg-pop border-line-strong text-text-strong fixed z-50 flex max-w-72 flex-col gap-1 overflow-y-auto rounded-md border px-2.5 py-2 text-xs leading-4 transition-opacity duration-100 motion-reduce:transition-none ${
               position ? "visible opacity-100" : "invisible opacity-0"
             }`}
           >

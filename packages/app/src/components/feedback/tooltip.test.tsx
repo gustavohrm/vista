@@ -123,6 +123,24 @@ describe("Tooltip", () => {
     expect(wrapper).not.toHaveAttribute("data-tooltip-open");
   });
 
+  it("draws the bubble over the page, outside any container that would cut it off", () => {
+    renderTooltip();
+
+    expect(screen.getByRole("tooltip", { hidden: true }).parentElement).toBe(document.body);
+  });
+
+  it("stays open while the pointer moves from the control onto the bubble", () => {
+    const { button, wrapper } = renderTooltip();
+    const bubble = screen.getByRole("tooltip", { hidden: true });
+    fireEvent.pointerEnter(wrapper);
+    act(() => vi.advanceTimersByTime(TOOLTIP_DELAY_MS));
+
+    fireEvent.pointerOut(button, { relatedTarget: bubble });
+    fireEvent.pointerOver(bubble, { relatedTarget: button });
+
+    expect(wrapper).toHaveAttribute("data-tooltip-open");
+  });
+
   it("places an open bubble again when the window is resized", () => {
     const { wrapper } = renderTooltip();
     const bubble = screen.getByRole("tooltip", { hidden: true });
@@ -134,8 +152,9 @@ describe("Tooltip", () => {
     try {
       fireEvent.pointerEnter(wrapper);
       act(() => vi.advanceTimersByTime(TOOLTIP_DELAY_MS));
-      // Centered over the control, since it fits.
-      expect(bubble.style.left).toBe("-46px");
+      // Centered below the control, since it fits.
+      expect(bubble.style.left).toBe("822px");
+      expect(bubble.style.top).toBe("34px");
 
       viewportWidth = 900;
       act(() => {
@@ -143,7 +162,7 @@ describe("Tooltip", () => {
       });
 
       // Now a centered bubble would cross the window's edge, so it lines up with the control's right edge.
-      expect(bubble.style.left).toBe("-92px");
+      expect(bubble.style.left).toBe("776px");
     } finally {
       vi.restoreAllMocks();
     }

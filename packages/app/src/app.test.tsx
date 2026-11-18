@@ -195,6 +195,8 @@ function shownPath(text: string): HTMLElement {
       element?.tagName === "SPAN" &&
       element.firstElementChild !== null &&
       element.textContent === text &&
+      // The innermost, not a wrapper around it holding the same text.
+      ![...element.children].some((child) => child.textContent === text) &&
       element.closest("[role=tooltip]") === null,
   );
 }
@@ -4622,7 +4624,7 @@ describe("App", () => {
       await user.click(screen.getByText("data.csv"));
 
       expect(shownPath("My Notes / data.csv")).toBeInTheDocument();
-      expect(within(statusBar()).getByRole("tooltip", { name: "My Notes / data.csv" })).toBeInTheDocument();
+      expect(screen.getByRole("tooltip", { name: "My Notes / data.csv" })).toBeInTheDocument();
       expect(within(statusBar()).queryByRole("button", { name: "Copy Path" })).not.toBeInTheDocument();
       expect(within(statusBar()).queryByRole("button", { name: /^Reveal/ })).not.toBeInTheDocument();
       await user.click(within(statusBar()).getByRole("button", { name: "Copy Relative Path" }));
