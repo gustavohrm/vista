@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-17
+last_updated: 2026-11-18
 scope: Index of the project documentation.
 ---
 
@@ -39,10 +39,11 @@ Every document in `docs/` is listed here. Adding, moving, or deleting one update
 
 ## Specifications
 
-| Document                            | Contains                                                                                                     |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| [Workspaces](specs/workspaces.md)   | Workspaces of one or more folders, the shell layout, view modes, platform capabilities, and file management. |
-| [Tests](specs/tests.md)             | Test categories, where each lives, coverage, and what no automated test reaches.                             |
-| [Stack tests](specs/stack-tests.md) | The runners, file names, configuration, scripts, and commands for Vitest, Playwright, and cargo.             |
-| [Errors](specs/errors.md)           | How failures are classified, shown, and logged today, and a draft direction for user-facing failure kinds.   |
-| [Changelog](specs/changelog.md)     | The changelog pages, the check that holds a release to them, and where the app and GitHub show them.         |
+| Document                            | Contains                                                                                                                               |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| [Workspaces](specs/workspaces.md)   | Workspaces of one or more folders, the shell layout, view modes, platform capabilities, and file management.                           |
+| [Tests](specs/tests.md)             | Test categories, where each lives, coverage, and what no automated test reaches.                                                       |
+| [Stack tests](specs/stack-tests.md) | The runners, file names, configuration, scripts, and commands for Vitest, Playwright, and cargo.                                       |
+| [Errors](specs/errors.md)           | How failures are classified, shown, and logged today, and a draft direction for user-facing failure kinds.                             |
+| [Appearance](specs/appearance.md)   | A draft of the theme, scheme, contrast, and motion preferences, how each is chosen, stored, and applied, and what each theme provides. |
+| [Changelog](specs/changelog.md)     | The changelog pages, the check that holds a release to them, and where the app and GitHub show them.                                   |
