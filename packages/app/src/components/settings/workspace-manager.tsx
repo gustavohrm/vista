@@ -61,118 +61,12 @@ const ICON_CHOICE_CLASS =
 const SWATCH_CLASS =
   "has-checked:outline-text-strong has-focus-visible:ring-1 has-focus-visible:ring-[var(--focus-ring)] has-focus-visible:ring-offset-4 has-focus-visible:ring-offset-frame relative block size-[22px] cursor-pointer rounded-full shadow-[inset_0_0_0_1px_rgb(255_255_255/0.12)] outline-offset-2 has-checked:outline-2";
 
-/** What a workspace's row in the manager says at its right end, or null for nothing. */
+/** Whether a workspace is the open one, waits for permission, or has none of its folders found; null for none of these. */
 export type ManagedWorkspaceStatus = "open" | "needs-permission" | "unavailable" | null;
 
-const ROW_STATUS_TEXT = {
-  open: "Open",
-  "needs-permission": "Needs access",
-  unavailable: "Not found",
-} as const;
-
-/** A workspace as the manager's list shows it. */
+/** A workspace as Settings lists it: by name, with whether it is open or can't be reached. */
 export interface ManagedWorkspace extends RecentWorkspace {
   status: ManagedWorkspaceStatus;
-}
-
-interface WorkspaceListProps {
-  /** Every workspace, by name. */
-  workspaces: readonly ManagedWorkspace[];
-  onNew: () => void;
-  onSelect: (workspaceId: string) => void;
-  /** The workspace whose row takes focus as the list shows, such as the one whose page was just left. */
-  focusedId?: string | null;
-}
-
-/**
- * The workspace manager's list: every workspace, by name, with its folders on a second line and
- * whether it is open or can't be reached at the right end, and New Workspace at the heading's end.
- * Choosing a row shows the workspace's page.
- *
- * @param props - WorkspaceList properties.
- * @returns Section content.
- */
-export function WorkspaceList({ workspaces, onNew, onSelect, focusedId = null }: WorkspaceListProps) {
-  const listRef = useRef<HTMLUListElement>(null);
-  useEffect(() => {
-    if (focusedId !== null) {
-      listRef.current?.querySelector<HTMLElement>(`[data-workspace-id="${CSS.escape(focusedId)}"]`)?.focus();
-    }
-  }, [focusedId]);
-
-  return (
-    <>
-      <SectionHeading
-        title="Workspaces"
-        lead="Each workspace's details apply to that workspace only. Your folders and files stay where they are."
-        action={
-          <Tooltip text="New Workspace" position="bottom" className="-mr-1.5 flex flex-none">
-            {(bubbleId) => (
-              <button
-                type="button"
-                onClick={onNew}
-                aria-label="New Workspace…"
-                aria-describedby={bubbleId}
-                className="icon-button size-8 text-base"
-              >
-                <i className="ic-plus" aria-hidden="true" />
-              </button>
-            )}
-          </Tooltip>
-        }
-      />
-      {workspaces.length === 0 ? (
-        <p className="text-text-muted text-[13px]">No workspaces yet.</p>
-      ) : (
-        <SettingsGroup>
-          <ul ref={listRef}>
-            {workspaces.map((workspace) => (
-              <WorkspaceListRow key={workspace.id} workspace={workspace} onSelect={() => onSelect(workspace.id)} />
-            ))}
-          </ul>
-        </SettingsGroup>
-      )}
-    </>
-  );
-}
-
-function WorkspaceListRow({ workspace, onSelect }: { workspace: ManagedWorkspace; onSelect: () => void }) {
-  const nameId = useId();
-  const foldersId = useId();
-  const statusId = useId();
-  const folderNames = workspace.folders?.map((folder) => folder.name).join(", ") ?? "";
-  const describedBy = [folderNames === "" ? null : foldersId, workspace.status ? statusId : null]
-    .filter((id) => id !== null)
-    .join(" ");
-  return (
-    <li className="border-line [&+&]:border-t">
-      <button
-        type="button"
-        data-workspace-id={workspace.id}
-        onClick={onSelect}
-        aria-labelledby={nameId}
-        aria-describedby={describedBy === "" ? undefined : describedBy}
-        className="hover:bg-hover flex w-full items-center gap-3 px-4 py-2.5 text-left text-[13px] transition-colors duration-100 outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-inset"
-      >
-        <WorkspaceGlyph icon={workspace.icon} color={workspace.color} isTile className="text-xs" />
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span id={nameId} className="text-text-strong truncate">
-            {workspace.name}
-          </span>
-          {/* Cut short when they don't fit, so every row keeps its height; the page lists them all. */}
-          <span id={foldersId} className="text-text-muted h-4 truncate text-xs">
-            {folderNames}
-          </span>
-        </span>
-        {workspace.status && (
-          <span id={statusId} className="text-text-muted flex-none text-xs">
-            {ROW_STATUS_TEXT[workspace.status]}
-          </span>
-        )}
-        <i className="ic-chevron-right text-text-faint flex-none" aria-hidden="true" />
-      </button>
-    </li>
-  );
 }
 
 /**
@@ -189,7 +83,6 @@ interface WorkspacePageProps {
   /** Whether the details may move into the home folder, which needs write access to it. */
   canStoreInFolder: boolean;
   lock: WorkspaceLock;
-  onBack: () => void;
   onOpen: () => void;
   /** Asks for permission to the home folder, while it waits for it. */
   onAllowAccess: () => void;
@@ -201,7 +94,7 @@ interface WorkspacePageProps {
 }
 
 /**
- * A workspace's page in the manager: its name, icon, colour, folders, where its details are kept, and
+ * A workspace's page in Settings: its name, icon, colour, folders, where its details are kept, and
  * Delete Workspace. Any workspace's page can be edited, open or not, and each change applies as soon
  * as it is made and valid. While the details kept in the home folder can't be read, the fields are
  * disabled and say why, and Delete Workspace still works.
@@ -215,7 +108,6 @@ export function WorkspacePage({
   storage,
   canStoreInFolder,
   lock,
-  onBack,
   onOpen,
   onAllowAccess,
   onChange,
@@ -238,14 +130,6 @@ export function WorkspacePage({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={onBack}
-        className="text-text-muted hover:bg-hover hover:text-text mb-4 -ml-2 flex h-7 items-center gap-1 rounded-md pr-2.5 pl-1.5 text-[13px] transition-colors duration-100 outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)]"
-      >
-        <i className="ic-chevron-left text-base" aria-hidden="true" />
-        Workspaces
-      </button>
       <SectionHeading
         title={workspace.name}
         icon={<WorkspaceGlyph icon={workspace.icon} color={workspace.color} isTile className="text-xs" />}

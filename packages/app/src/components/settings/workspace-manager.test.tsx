@@ -4,7 +4,7 @@ import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { FolderStatus } from "../workspace/workspace-switcher";
-import { WorkspaceList, WorkspacePage, type WorkspaceLock } from "./workspace-manager";
+import { WorkspacePage, type WorkspaceLock } from "./workspace-manager";
 
 function renderPage(overrides: Partial<ComponentProps<typeof WorkspacePage>> = {}, homeStatus: FolderStatus = "ready") {
   const props: ComponentProps<typeof WorkspacePage> = {
@@ -19,7 +19,6 @@ function renderPage(overrides: Partial<ComponentProps<typeof WorkspacePage>> = {
     storage: "folder",
     canStoreInFolder: homeStatus === "ready",
     lock: null,
-    onBack: vi.fn(),
     onOpen: vi.fn(),
     onAllowAccess: vi.fn(),
     onChange: vi.fn(),
@@ -33,67 +32,14 @@ function renderPage(overrides: Partial<ComponentProps<typeof WorkspacePage>> = {
   return props;
 }
 
-describe("WorkspaceList", () => {
-  it("lists each workspace with its folders and status, and shows a workspace's page when chosen", async () => {
-    const user = userEvent.setup();
-    const onSelect = vi.fn();
-    render(
-      <WorkspaceList
-        workspaces={[
-          {
-            id: "a",
-            name: "Archive",
-            icon: "folder",
-            color: "neutral",
-            folders: [{ id: "f1", name: "old", status: "unavailable" }],
-            status: "unavailable",
-          },
-          {
-            id: "r",
-            name: "Research",
-            icon: "book-open",
-            color: "indigo",
-            folders: [
-              { id: "f2", name: "notes", status: "ready" },
-              { id: "f3", name: "sources", status: "ready" },
-            ],
-            status: "open",
-          },
-        ]}
-        onNew={vi.fn()}
-        onSelect={onSelect}
-      />,
-    );
-
-    const research = screen.getByRole("button", { name: "Research" });
-    expect(research).toHaveAccessibleDescription("notes, sources Open");
-    expect(screen.getByRole("button", { name: "Archive" })).toHaveAccessibleDescription("old Not found");
-
-    await user.click(research);
-    expect(onSelect).toHaveBeenCalledWith("r");
-  });
-
-  it("creates a workspace from the heading's plus button, and says when there are none", async () => {
-    const user = userEvent.setup();
-    const onNew = vi.fn();
-    render(<WorkspaceList workspaces={[]} onNew={onNew} onSelect={vi.fn()} />);
-
-    expect(screen.getByText("No workspaces yet.")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "New Workspace…" }));
-    expect(onNew).toHaveBeenCalledOnce();
-  });
-});
-
 describe("WorkspacePage", () => {
-  it("offers Open for a workspace that isn't open, and goes back to the list", async () => {
+  it("offers Open for a workspace that isn't open", async () => {
     const user = userEvent.setup();
     const props = renderPage();
 
     await user.click(screen.getByRole("button", { name: "Open" }));
-    await user.click(screen.getByRole("button", { name: "Workspaces" }));
 
     expect(props.onOpen).toHaveBeenCalledOnce();
-    expect(props.onBack).toHaveBeenCalledOnce();
   });
 
   it("has no Open button for the open workspace", () => {

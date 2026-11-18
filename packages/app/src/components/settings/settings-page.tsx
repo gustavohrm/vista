@@ -2,8 +2,10 @@ import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { Tooltip } from "../feedback/tooltip";
+import type { ManagedWorkspace } from "./workspace-manager";
+import { WorkspaceNavItem } from "./workspace-nav-item";
 
-/** A section of Settings: the workspace manager, or one of Vista's own. */
+/** A section of Settings: a workspace's page, or one of Vista's own. */
 export type SettingsSection = "workspaces" | "appearance" | "editor" | "files" | "shortcuts" | "about";
 
 const VISTA_SECTIONS: readonly { id: Exclude<SettingsSection, "workspaces">; label: string; icon: ReactNode }[] = [
@@ -17,10 +19,16 @@ const VISTA_SECTIONS: readonly { id: Exclude<SettingsSection, "workspaces">; lab
 const EASE_ENTER = [0.2, 0, 0, 1] as const;
 
 interface SettingsPageProps {
+  /** The shown section; "workspaces" shows the page of `shownWorkspaceId`. */
   section: SettingsSection;
-  onSectionChange: (section: SettingsSection) => void;
-  /** Tells apart two views of one section, such as the manager's list and a workspace's page, so each fades in. */
-  viewKey?: string;
+  /** Shows one of Vista's sections. */
+  onSectionChange: (section: Exclude<SettingsSection, "workspaces">) => void;
+  /** Every workspace, by name, each an item of the Workspaces group. */
+  workspaces: readonly ManagedWorkspace[];
+  /** The workspace whose page shows while the section is "workspaces". */
+  shownWorkspaceId: string | null;
+  onSelectWorkspace: (workspaceId: string) => void;
+  onNewWorkspace: () => void;
   onClose: () => void;
   /** The shown section's content. */
   children: ReactNode;
@@ -28,7 +36,8 @@ interface SettingsPageProps {
 
 /**
  * Settings, shown in the frame in place of the document: a header with the close button, the
- * sections on the left, grouped by where they apply, and the shown one on the right. It rises into
+ * sections on the left, grouped by where they apply, and the shown one on the right. The Workspaces
+ * group lists every workspace, each opening its page, with New Workspace at the group's label. It rises into
  * the frame as it opens, and a new section fades in. Escape closes it, as does the close button.
  * Focus moves to the shown section's item as it opens and, when it closes with focus inside it,
  * goes back to where it was.
@@ -36,7 +45,16 @@ interface SettingsPageProps {
  * @param props - SettingsPage properties.
  * @returns Page element.
  */
-export function SettingsPage({ section, onSectionChange, viewKey = "", onClose, children }: SettingsPageProps) {
+export function SettingsPage({
+  section,
+  onSectionChange,
+  workspaces,
+  shownWorkspaceId,
+  onSelectWorkspace,
+  onNewWorkspace,
+  onClose,
+  children,
+}: SettingsPageProps) {
   const isReducedMotion = useReducedMotion() ?? false;
   const navRef = useRef<HTMLElement>(null);
 
@@ -93,13 +111,31 @@ export function SettingsPage({ section, onSectionChange, viewKey = "", onClose, 
           aria-label="Settings sections"
           className="border-line flex flex-none [scrollbar-width:none] gap-0.5 overflow-x-auto border-b px-2 py-2 md:block md:w-[232px] md:overflow-y-auto md:border-r md:border-b-0 md:px-3 md:py-5"
         >
-          <GroupLabel isFirst>Workspace</GroupLabel>
-          <NavItem isCurrent={section === "workspaces"} onSelect={() => onSectionChange("workspaces")}>
-            <span className="text-text-faint flex text-[15px]">
-              <i className="ic-layers" aria-hidden="true" />
-            </span>
-            Workspaces
-          </NavItem>
+          {/* Below md the label hides with the others, and New Workspace starts the row. */}
+          <div className="flex flex-none items-center md:mb-1 md:pl-2.5">
+            <span className="text-text-faint hidden flex-1 text-xs font-medium md:block">Workspaces</span>
+            <Tooltip text="New Workspace" position="bottom" className="flex flex-none">
+              {(bubbleId) => (
+                <button
+                  type="button"
+                  onClick={onNewWorkspace}
+                  aria-label="New Workspace…"
+                  aria-describedby={bubbleId}
+                  className="icon-button size-7 text-base md:size-6 md:text-sm"
+                >
+                  <i className="ic-plus" aria-hidden="true" />
+                </button>
+              )}
+            </Tooltip>
+          </div>
+          {workspaces.map((workspace) => (
+            <WorkspaceNavItem
+              key={workspace.id}
+              workspace={workspace}
+              isCurrent={section === "workspaces" && shownWorkspaceId === workspace.id}
+              onSelect={() => onSelectWorkspace(workspace.id)}
+            />
+          ))}
           <GroupLabel>Vista</GroupLabel>
           {VISTA_SECTIONS.map(({ id, label, icon }) => (
             <NavItem key={id} isCurrent={section === id} onSelect={() => onSectionChange(id)}>
@@ -110,7 +146,7 @@ export function SettingsPage({ section, onSectionChange, viewKey = "", onClose, 
         </nav>
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-8 md:px-14 md:py-10">
           <motion.div
-            key={`${section}:${viewKey}`}
+            key={section === "workspaces" ? `workspace:${shownWorkspaceId ?? ""}` : section}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.12, ease: EASE_ENTER }}
@@ -124,12 +160,8 @@ export function SettingsPage({ section, onSectionChange, viewKey = "", onClose, 
   );
 }
 
-function GroupLabel({ isFirst = false, children }: { isFirst?: boolean; children: ReactNode }) {
-  return (
-    <div className={`text-text-faint mb-1.5 hidden px-2.5 text-xs font-medium md:block ${isFirst ? "" : "mt-[18px]"}`}>
-      {children}
-    </div>
-  );
+function GroupLabel({ children }: { children: ReactNode }) {
+  return <div className="text-text-faint mt-[18px] mb-1.5 hidden px-2.5 text-xs font-medium md:block">{children}</div>;
 }
 
 interface NavItemProps {

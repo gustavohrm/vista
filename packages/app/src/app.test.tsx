@@ -975,7 +975,8 @@ describe("App", () => {
         within(within(dialog).getByRole("navigation", { name: "Settings sections" }))
           .getAllByRole("button")
           .map((item) => item.textContent),
-      ).toEqual(["Workspaces", "Appearance", "Editor", "Files", "Keyboard Shortcuts", "About"]);
+        // New Workspace, then Vista's sections, with no workspace to list.
+      ).toEqual(["", "Appearance", "Editor", "Files", "Keyboard Shortcuts", "About"]);
       expect(within(dialog).getByRole("button", { name: "Appearance" })).toHaveAttribute("aria-current", "page");
       expect(within(dialog).getByRole("button", { name: "Appearance" })).toHaveFocus();
       await user.click(within(dialog).getByRole("button", { name: "Editor" }));
@@ -2043,51 +2044,55 @@ describe("App", () => {
       expect(storedWorkspaces()).toHaveLength(2);
       expect(capability.forgetFolder).not.toHaveBeenCalled();
 
-      await user.click(screen.getByRole("button", { name: "No workspace" }));
-      await user.click(screen.getByRole("menuitem", { name: "Manage Workspaces…" }));
-      await user.click(await screen.findByRole("button", { name: "Work" }));
-      await user.click(await screen.findByRole("button", { name: "Open" }));
+      await user.keyboard("{Control>},{/Control}");
+      const settings = await screen.findByRole("region", { name: "Settings" });
+      await user.click(within(settings).getByRole("button", { name: "Work" }));
+      await user.click(await within(settings).findByRole("button", { name: "Open" }));
 
       await user.click(await screen.findByRole("button", { name: "Work" }));
       expect(await screen.findByRole("menuitemradio", { name: "Work" })).toBeChecked();
       expect(storedWorkspaces().find((workspace) => workspace.id === "w2")?.hiddenFromRecent).toBeUndefined();
     });
 
-    describe("workspace manager", () => {
-      async function openManager(user: ReturnType<typeof userEvent.setup>, current = "Research") {
-        const buttons = await screen.findAllByRole("button", { name: current });
-        await user.click(buttons.find((button) => button.getAttribute("aria-haspopup") === "menu")!);
-        await user.click(screen.getByRole("menuitem", { name: "Manage Workspaces…" }));
+    describe("workspaces in Settings", () => {
+      /** Opens Settings, at the open workspace's page, or at Appearance with none open. */
+      async function openSettings(user: ReturnType<typeof userEvent.setup>) {
+        await user.keyboard("{Control>},{/Control}");
         return screen.findByRole("region", { name: "Settings" });
+      }
+
+      function navigation(page: HTMLElement) {
+        return within(within(page).getByRole("navigation", { name: "Settings sections" }));
       }
 
       function switcherButton() {
         return screen.getAllByRole("button").find((button) => button.getAttribute("aria-haspopup") === "menu");
       }
 
-      it("lists every workspace by name, with its folders and whether it is open", async () => {
+      it("lists every workspace by name in the navigation, opening at the open one's page", async () => {
         const user = userEvent.setup();
         const { capability } = twoWorkspaces();
         render(<App adapter={{ platform: "web", workspace: capability }} />);
         await findExplorerPanel();
 
-        const page = await openManager(user);
+        const page = await openSettings(user);
+        const nav = navigation(page);
 
-        expect(within(page).getByRole("heading", { name: "Workspaces" })).toBeInTheDocument();
-        expect(within(page).getByRole("button", { name: "Research" })).toHaveAccessibleDescription("notes Open");
-        await waitFor(() =>
-          expect(within(page).getByRole("button", { name: "Work" })).toHaveAccessibleDescription("sources"),
-        );
-        // Looking up a folder for the list never asks for permission.
+        expect(within(page).getByRole("heading", { name: "Research" })).toBeInTheDocument();
+        expect(nav.getByRole("button", { name: "Research" })).toHaveAttribute("aria-current", "page");
+        // Its page shows, so it has no folder list; Work's one folder is named unlike it, so it has one.
+        expect(nav.getByRole("button", { name: "Research" })).toHaveAccessibleDescription("Open");
+        await waitFor(() => expect(nav.getByRole("button", { name: "Work" })).toHaveAccessibleDescription("sources"));
+        // Looking up a folder for the navigation never asks for permission.
         expect(capability.restoreFolder).not.toHaveBeenCalledWith("sources", { interactive: true });
       });
 
-      it("changes a workspace that isn't open without opening it, and goes back to its row", async () => {
+      it("changes a workspace that isn't open without opening it", async () => {
         const user = userEvent.setup();
         const { capability } = twoWorkspaces();
         render(<App adapter={{ platform: "web", workspace: capability }} />);
         await findExplorerPanel();
-        const page = await openManager(user);
+        const page = await openSettings(user);
 
         await user.click(within(page).getByRole("button", { name: "Work" }));
         const name = await within(page).findByRole("textbox", { name: "Name" });
@@ -2097,12 +2102,7 @@ describe("App", () => {
 
         expect(storedWorkspaces().find((workspace) => workspace.id === "w2")?.name).toBe("Job");
         expect(switcherButton()).toHaveAccessibleName("Research");
-        // The back button, not the section's item in the navigation.
-        const back = within(page)
-          .getAllByRole("button", { name: "Workspaces" })
-          .find((button) => button.closest("nav") === null)!;
-        await user.click(back);
-        expect(await within(page).findByRole("button", { name: "Job" })).toHaveFocus();
+        expect(navigation(page).getByRole("button", { name: "Job" })).toHaveAttribute("aria-current", "page");
       });
 
       it("opens a workspace from its page and closes Settings", async () => {
@@ -2110,7 +2110,7 @@ describe("App", () => {
         const { capability } = twoWorkspaces();
         render(<App adapter={{ platform: "web", workspace: capability }} />);
         await findExplorerPanel();
-        const page = await openManager(user);
+        const page = await openSettings(user);
 
         await user.click(within(page).getByRole("button", { name: "Work" }));
         await user.click(await within(page).findByRole("button", { name: "Open" }));
@@ -2125,7 +2125,7 @@ describe("App", () => {
         vi.mocked(capability.pickFolder).mockResolvedValueOnce(null).mockResolvedValueOnce(NOTES_FOLDER);
         render(<App adapter={{ platform: "web", workspace: capability }} />);
         await findExplorerPanel();
-        const page = await openManager(user);
+        const page = await openSettings(user);
 
         await user.click(within(page).getByRole("button", { name: "New Workspace…" }));
         expect(storedWorkspaces()).toHaveLength(2);
@@ -2146,8 +2146,7 @@ describe("App", () => {
         const { capability, folder } = twoWorkspaces();
         render(<App adapter={{ platform: "web", workspace: capability }} />);
         await findExplorerPanel();
-        const page = await openManager(user);
-        await user.click(within(page).getByRole("button", { name: "Research" }));
+        const page = await openSettings(user);
 
         await user.click(within(page).getByRole("button", { name: "Delete Workspace…" }));
         const dialog = await screen.findByRole("dialog", { name: 'Delete "Research"?' });
@@ -2156,12 +2155,27 @@ describe("App", () => {
         );
         await user.click(within(dialog).getByRole("button", { name: "Delete" }));
 
-        await waitFor(() => expect(within(page).queryByRole("button", { name: "Research" })).not.toBeInTheDocument());
-        expect(within(page).getByRole("button", { name: "Work" })).toBeInTheDocument();
+        // The next workspace by name shows in its place.
+        expect(await within(page).findByRole("heading", { name: "Work" })).toBeInTheDocument();
+        expect(navigation(page).queryByRole("button", { name: "Research" })).not.toBeInTheDocument();
         expect(switcherButton()).toHaveAccessibleName("No workspace");
         expect(storedWorkspaces().map((workspace) => workspace.id)).toEqual(["w2"]);
         expect(capability.forgetFolder).toHaveBeenCalledWith("notes");
         expect(folder("notes").textOf("a.txt")).toBe(PLAIN_TEXT);
+      });
+
+      it("shows Appearance once the last workspace is deleted", async () => {
+        const user = userEvent.setup();
+        render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+        await openFolderFromWelcome(user);
+        const page = await openSettings(user);
+
+        await user.click(within(page).getByRole("button", { name: "Delete Workspace…" }));
+        await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" }));
+
+        expect(await within(page).findByRole("radio", { name: "System" })).toBeInTheDocument();
+        expect(navigation(page).getByRole("button", { name: "Appearance" })).toHaveAttribute("aria-current", "page");
+        expect(storedWorkspaces()).toEqual([]);
       });
 
       it("keeps a workspace when deleting it is cancelled", async () => {
@@ -2169,7 +2183,7 @@ describe("App", () => {
         const { capability } = twoWorkspaces();
         render(<App adapter={{ platform: "web", workspace: capability }} />);
         await findExplorerPanel();
-        const page = await openManager(user);
+        const page = await openSettings(user);
         await user.click(within(page).getByRole("button", { name: "Work" }));
 
         await user.click(await within(page).findByRole("button", { name: "Delete Workspace…" }));
@@ -2207,7 +2221,7 @@ describe("App", () => {
         }
 
         async function chooseInFolder(user: ReturnType<typeof userEvent.setup>) {
-          const page = await openManager(user, "No workspace");
+          const page = await openSettings(user);
           await user.click(await within(page).findByRole("button", { name: "Copy" }));
           await user.click(await within(page).findByRole("radio", { name: "In notes/.vista" }));
           return page;
@@ -2269,7 +2283,7 @@ describe("App", () => {
           const text = JSON.stringify({ version: 2, name: "Research" });
           const { capability } = sharedNotes(text);
           render(<App adapter={{ platform: "web", workspace: capability }} />);
-          const page = await openManager(user, "No workspace");
+          const page = await openSettings(user);
 
           await user.click(await within(page).findByRole("button", { name: "Research" }));
 
@@ -2573,7 +2587,7 @@ describe("App", () => {
       const page = await screen.findByRole("region", { name: "Settings" });
       expect(
         within(within(page).getByRole("navigation", { name: "Settings sections" })).getByRole("button", {
-          name: "Workspaces",
+          name: "My Notes",
         }),
       ).toHaveAttribute("aria-current", "page");
       expect(within(page).getByRole("heading", { name: "My Notes" })).toBeInTheDocument();
@@ -3039,7 +3053,7 @@ describe("App", () => {
       const page = await screen.findByRole("region", { name: "Settings" });
       expect(
         within(within(page).getByRole("navigation", { name: "Settings sections" })).getByRole("button", {
-          name: "Workspaces",
+          name: "My Notes",
         }),
       ).toHaveAttribute("aria-current", "page");
       expect(within(page).getByRole("heading", { name: "My Notes" })).toBeInTheDocument();

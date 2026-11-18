@@ -29,9 +29,7 @@ interface WorkspaceSwitcherProps {
   recents: readonly RecentWorkspace[];
   onSwitch: (workspaceId: string) => void;
   onOpenFolder: () => void;
-  /** Opens the workspace manager. */
-  onManage: () => void;
-  /** Opens the current workspace's page in the manager. */
+  /** Opens the current workspace's page in Settings. */
   onOpenSettings: () => void;
   onClose: () => void;
   /** Takes a workspace out of Recent without forgetting it. */
@@ -42,17 +40,16 @@ interface WorkspaceSwitcherProps {
 
 /**
  * The button at the top left that shows the open workspace, and its menu: the recent workspaces to
- * switch to, then Open Folder and Manage Workspaces, then Workspace Settings and Close Workspace while
+ * switch to, then Open Folder, then Workspace Settings and Close Workspace while
  * a workspace is open. Each recent row but the current one's can be removed from Recent, with its X
- * or the Delete key, and the menu stays open. Creating, editing, and deleting workspaces live in the
- * manager; adding a folder lives in the explorer's header, beside the folders it adds to.
+ * or the Delete key, and the menu stays open. Creating, editing, and deleting workspaces live in
+ * Settings; adding a folder lives in the explorer's header, beside the folders it adds to.
  */
 export function WorkspaceSwitcher({
   current,
   recents,
   onSwitch,
   onOpenFolder,
-  onManage,
   onOpenSettings,
   onClose,
   onRemoveFromRecent,
@@ -82,7 +79,6 @@ export function WorkspaceSwitcher({
     }),
     ...(recents.length > 0 ? [MENU_SEPARATOR as MenuEntry] : []),
     { label: "Open Folder…", icon: <i className="ic-folder-open" aria-hidden="true" />, onSelect: onOpenFolder },
-    { label: "Manage Workspaces…", icon: <i className="ic-layers" aria-hidden="true" />, onSelect: onManage },
     ...(current
       ? ([
           MENU_SEPARATOR,

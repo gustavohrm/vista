@@ -41,12 +41,7 @@ import {
   FilesSection,
   ShortcutsSection,
 } from "./components/settings/vista-sections";
-import {
-  WorkspaceList,
-  WorkspacePage,
-  type ManagedWorkspace,
-  type WorkspaceLock,
-} from "./components/settings/workspace-manager";
+import { WorkspacePage, type ManagedWorkspace, type WorkspaceLock } from "./components/settings/workspace-manager";
 import { WorkspaceSwitcher, type FolderStatus, type RecentWorkspace } from "./components/workspace/workspace-switcher";
 import { type CpuArchitecture, type DesktopDownload, desktopDownloadFor } from "./domain/desktop-download";
 import { documentLocation } from "./domain/document-location";
@@ -132,7 +127,7 @@ interface OpenWorkspace {
   folders: OpenFolder[];
 }
 
-/** A workspace that isn't open, as its page in the workspace manager shows it, read without opening it. */
+/** A workspace that isn't open, as its page in Settings shows it, read without opening it. */
 interface ManagedPage {
   /** Its folders carry no tree: the page lists them, and the explorer never shows them. */
   workspace: OpenWorkspace;
@@ -234,12 +229,10 @@ function AppShell({ adapter }: AppProps) {
   const [newEntryRequest, setNewEntryRequest] = useState<NewEntryRequest | null>(null);
   /** The Settings section shown in the frame, in place of the document; `null` while Settings is closed. */
   const [settingsSection, setSettingsSection] = useState<SettingsSection | null>(null);
-  // The workspace whose page the manager shows, or null for its list.
+  // The workspace whose page Settings shows while its section is "workspaces"; Appearance shows without one.
   const [managedId, setManagedId] = useState<string | null>(null);
   // That workspace as read for its page, while it isn't the open one.
   const [managed, setManaged] = useState<ManagedPage | null>(null);
-  // The workspace whose row the manager's list focuses, such as the one whose page was just left.
-  const [listFocusId, setListFocusId] = useState<string | null>(null);
   // Re-renders after a change only the workspace store holds, such as removing a workspace from Recent.
   const [, rerenderStore] = useReducer((count: number) => count + 1, 0);
   // Raw editor state of each open tab: selection, scroll position, and undo history.
@@ -255,7 +248,7 @@ function AppShell({ adapter }: AppProps) {
   workspaceRef.current = workspace;
   const managedRef = useRef(managed);
   managedRef.current = managed;
-  /** The open workspace, or the one whose page the manager shows, by id; the open one when none is given. */
+  /** The open workspace, or the one whose page Settings shows, by id; the open one when none is given. */
   const targetWorkspace = useCallback((workspaceId?: string): OpenWorkspace | null => {
     const open = workspaceRef.current;
     if (workspaceId === undefined || open?.id === workspaceId) {
@@ -264,7 +257,7 @@ function AppShell({ adapter }: AppProps) {
     const page = managedRef.current;
     return page?.workspace.id === workspaceId && page.lock === null ? page.workspace : null;
   }, []);
-  /** Changes a workspace wherever it shows: as the open one, or on its page in the manager. */
+  /** Changes a workspace wherever it shows: as the open one, or on its page in Settings. */
   const updateWorkspace = useCallback((workspaceId: string, change: (previous: OpenWorkspace) => OpenWorkspace) => {
     setWorkspace((previous) => (previous?.id === workspaceId ? change(previous) : previous));
     setManaged((previous) =>
@@ -1069,8 +1062,8 @@ function AppShell({ adapter }: AppProps) {
     [workspaceStore],
   );
 
-  /** Shows a workspace's page in the manager, or the list with null. */
-  const showManaged = useCallback((workspaceId: string | null) => {
+  /** Shows a workspace's page in Settings. */
+  const showManaged = useCallback((workspaceId: string) => {
     setManagedId(workspaceId);
     setSettingsSection("workspaces");
   }, []);
@@ -1102,8 +1095,9 @@ function AppShell({ adapter }: AppProps) {
   }, [adapter.workspace, showManaged, toast, workspaceStore]);
 
   /**
-   * Forgets a workspace and its session after asking, closing it first when it is open, and goes back
-   * to the manager's list. Its folders and any `.vista/workspace.json` stay on disk.
+   * Forgets a workspace and its session after asking, closing it first when it is open, and shows the
+   * next workspace's page by name, the one before it for the last, or Appearance once none is left.
+   * Its folders and any `.vista/workspace.json` stay on disk.
    */
   const handleDeleteWorkspace = useCallback(
     async (workspaceId: string) => {
@@ -1125,11 +1119,15 @@ function AppShell({ adapter }: AppProps) {
       }
       // A rewrite of its file still under way finishes first, so nothing writes for it afterwards.
       await fileWriteRef.current;
+      const others = workspaceStore.allWorkspaces();
+      const index = others.findIndex((other) => other.id === workspaceId);
+      const nextId = (others[index + 1] ?? others[index - 1])?.id ?? null;
       const { unusedFolderIds } = workspaceStore.removeWorkspace(workspaceId);
       writtenFileRef.current.delete(workspaceId);
       setManaged((page) => (page?.workspace.id === workspaceId ? null : page));
-      setManagedId((shown) => (shown === workspaceId ? null : shown));
-      setListFocusId(null);
+      if (managedId === workspaceId) {
+        setManagedId(nextId);
+      }
       setRecentFolders((known) => {
         const next = new Map(known);
         next.delete(workspaceId);
@@ -1146,7 +1144,7 @@ function AppShell({ adapter }: AppProps) {
         }),
       );
     },
-    [adapter.workspace, handleCloseWorkspace, toast, workspaceStore],
+    [adapter.workspace, handleCloseWorkspace, managedId, toast, workspaceStore],
   );
 
   // The page being read, so a read the user has since left behind is dropped.
@@ -1249,9 +1247,9 @@ function AppShell({ adapter }: AppProps) {
           lastOpenedAt: record.lastOpenedAt,
         },
   );
-  // Every workspace, by name, while the manager's list may show.
+  // Every workspace, by name, while Settings lists them in its navigation.
   const managedWorkspaces: ManagedWorkspace[] =
-    settingsSection === "workspaces"
+    settingsSection !== null
       ? workspaceStore.allWorkspaces().map((record) => {
           const isOpen = currentWorkspace?.id === record.id;
           const folders = isOpen ? currentWorkspace.folders : (recentFolders.get(record.id) ?? null);
@@ -1264,7 +1262,7 @@ function AppShell({ adapter }: AppProps) {
   ].join("\n");
 
   // Looks up the folders of the workspaces Vista hasn't opened or restored in this run, without
-  // asking for permission, so their entries and rows in the manager can name them.
+  // asking for permission, so their entries and items in Settings can name them.
   const probedRecentIdsRef = useRef(new Set<string>());
   useEffect(() => {
     if (isLoading || unknownRecentIds === "") {
@@ -2264,7 +2262,7 @@ function AppShell({ adapter }: AppProps) {
       setIsSidebarOpen(false);
     }
   }, [isSettingsShown]);
-  /** Opens Settings at the open workspace's page in the manager, or at Appearance with none open. */
+  /** Opens Settings at the open workspace's page, or at Appearance with none open. */
   const openSettings = useCallback(() => {
     const open = workspaceRef.current;
     if (open) {
@@ -2280,16 +2278,15 @@ function AppShell({ adapter }: AppProps) {
       setSettingsSection(null);
     }
   }, [openSettings, settingsSection]);
-  /** Opens the open workspace's page in the manager. */
+  /** Opens the open workspace's page in Settings. */
   const openWorkspaceSettings = useCallback(() => {
     const open = workspaceRef.current;
     if (open) {
       showManaged(open.id);
     }
   }, [showManaged]);
-  const openManager = useCallback(() => showManaged(null), [showManaged]);
 
-  // A page for a workspace that isn't open is read as it shows, and dropped as Settings leaves the manager.
+  // A page for a workspace that isn't open is read as it shows, and dropped as Settings leaves the workspaces' pages.
   useEffect(() => {
     if (settingsSection !== "workspaces") {
       managedLoadRef.current = null;
@@ -2335,13 +2332,6 @@ function AppShell({ adapter }: AppProps) {
         label: "Workspace Settings…",
         isEnabled: !isPromptingForUnsavedChanges && workspace !== null,
         run: openWorkspaceSettings,
-      },
-      {
-        id: "workspace.manage",
-        category: "Workspace",
-        label: "Manage Workspaces…",
-        isEnabled: !isPromptingForUnsavedChanges,
-        run: openManager,
       },
       {
         id: "workspace.close",
@@ -2646,7 +2636,6 @@ function AppShell({ adapter }: AppProps) {
       handleCloseWorkspace,
       handleNewWorkspace,
       handleOpenFolder,
-      openManager,
       openWorkspaceSettings,
       hasReadyFolder,
       handleViewModeChange,
@@ -2717,8 +2706,9 @@ function AppShell({ adapter }: AppProps) {
   const handleJumpApplied = useCallback(() => setPendingJump(null), []);
   const activeCursor = isRawShown && cursor?.key === documentInView.key ? cursor.position : null;
   const activeVimMode = isRawShown && vimMode?.key === documentInView.key ? vimMode.mode : null;
-  const shownSettingsSection = settingsSection;
-  // The workspace whose page the manager shows, as the open one or as read for its page.
+  // A workspace's page needs a workspace: with none to show, as after reading it failed, Appearance shows.
+  const shownSettingsSection = settingsSection === "workspaces" && managedId === null ? "appearance" : settingsSection;
+  // The workspace whose page Settings shows, as the open one or as read for its page.
   let pageTarget: ManagedPage | null = null;
   if (managedId !== null && workspace?.id === managedId) {
     pageTarget = { workspace, lock: lockOf(workspace) };
@@ -2753,7 +2743,6 @@ function AppShell({ adapter }: AppProps) {
                 recents={recents}
                 onSwitch={(workspaceId) => void handleOpenWorkspace(workspaceId)}
                 onOpenFolder={() => void handleOpenFolder()}
-                onManage={openManager}
                 onOpenSettings={openWorkspaceSettings}
                 onClose={() => void handleCloseWorkspace()}
                 onRemoveFromRecent={handleRemoveFromRecent}
@@ -2859,59 +2848,44 @@ function AppShell({ adapter }: AppProps) {
             {shownSettingsSection !== null && (
               <SettingsPage
                 section={shownSettingsSection}
-                onSectionChange={(section) => {
-                  // The Workspaces item goes back to the list from a workspace's page.
-                  if (section === "workspaces") {
-                    setManagedId(null);
-                  }
-                  setSettingsSection(section);
-                }}
-                viewKey={managedId ?? ""}
+                onSectionChange={setSettingsSection}
+                workspaces={managedWorkspaces}
+                shownWorkspaceId={managedId}
+                onSelectWorkspace={showManaged}
+                onNewWorkspace={() => void handleNewWorkspace()}
                 onClose={() => setSettingsSection(null)}
               >
                 {shownSettingsSection === "workspaces" ? (
-                  managedId === null ? (
-                    <WorkspaceList
-                      workspaces={managedWorkspaces}
-                      onNew={() => void handleNewWorkspace()}
-                      onSelect={showManaged}
-                      focusedId={listFocusId}
+                  managedId !== null &&
+                  pageTarget && (
+                    <WorkspacePage
+                      // A new name draft for each workspace, and once its details are read.
+                      key={`${pageTarget.workspace.id}:${pageTarget.lock === "loading" ? "loading" : "read"}`}
+                      workspace={{
+                        id: pageTarget.workspace.id,
+                        name: pageTarget.workspace.name,
+                        icon: pageTarget.workspace.icon,
+                        color: pageTarget.workspace.color,
+                        folders: summarizeFolders(pageTarget.workspace.folders),
+                      }}
+                      isOpen={pageTarget.workspace.id === workspace?.id}
+                      storage={pageTarget.workspace.storage}
+                      canStoreInFolder={canStoreInFolder(pageTarget.workspace)}
+                      lock={pageTarget.lock}
+                      onOpen={() => {
+                        void (async () => {
+                          if (await handleOpenWorkspace(managedId)) {
+                            setSettingsSection(null);
+                          }
+                        })();
+                      }}
+                      onAllowAccess={() => void handlePageAllowAccess(managedId)}
+                      onChange={(changes) => handleChangeWorkspaceDetails(changes, managedId)}
+                      onAddFolder={() => void handleAddFolder(managedId)}
+                      onRemoveFolder={(folderId) => void handleRemoveFolder(folderId, managedId)}
+                      onChangeStorage={(storage) => void handleChangeStorage(storage, managedId)}
+                      onDelete={() => void handleDeleteWorkspace(managedId)}
                     />
-                  ) : (
-                    pageTarget && (
-                      <WorkspacePage
-                        // A new name draft for each workspace, and once its details are read.
-                        key={`${pageTarget.workspace.id}:${pageTarget.lock === "loading" ? "loading" : "read"}`}
-                        workspace={{
-                          id: pageTarget.workspace.id,
-                          name: pageTarget.workspace.name,
-                          icon: pageTarget.workspace.icon,
-                          color: pageTarget.workspace.color,
-                          folders: summarizeFolders(pageTarget.workspace.folders),
-                        }}
-                        isOpen={pageTarget.workspace.id === workspace?.id}
-                        storage={pageTarget.workspace.storage}
-                        canStoreInFolder={canStoreInFolder(pageTarget.workspace)}
-                        lock={pageTarget.lock}
-                        onBack={() => {
-                          setListFocusId(managedId);
-                          setManagedId(null);
-                        }}
-                        onOpen={() => {
-                          void (async () => {
-                            if (await handleOpenWorkspace(managedId)) {
-                              setSettingsSection(null);
-                            }
-                          })();
-                        }}
-                        onAllowAccess={() => void handlePageAllowAccess(managedId)}
-                        onChange={(changes) => handleChangeWorkspaceDetails(changes, managedId)}
-                        onAddFolder={() => void handleAddFolder(managedId)}
-                        onRemoveFolder={(folderId) => void handleRemoveFolder(folderId, managedId)}
-                        onChangeStorage={(storage) => void handleChangeStorage(storage, managedId)}
-                        onDelete={() => void handleDeleteWorkspace(managedId)}
-                      />
-                    )
                   )
                 ) : shownSettingsSection === "editor" ? (
                   <EditorSection settings={settings} onChange={updateSettings} />
@@ -3265,7 +3239,7 @@ function lockOf(workspace: OpenWorkspace): WorkspaceLock {
   return homeStatus === "needs-permission" ? "needs-permission" : "unavailable";
 }
 
-/** What a workspace's row in the manager says: open, waiting for permission, or none of its folders found. */
+/** What a workspace's item in Settings says: open, waiting for permission, or none of its folders found. */
 function managedStatusOf(folders: RecentWorkspace["folders"], isOpen: boolean): ManagedWorkspace["status"] {
   if (isOpen) {
     return "open";
