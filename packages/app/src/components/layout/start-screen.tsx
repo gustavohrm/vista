@@ -44,7 +44,7 @@ interface StartScreenProps {
  * How many recent workspaces the start screen lists: a shortcut back to the latest few, not every
  * workspace Vista remembers, which the switcher lists.
  */
-export const MAX_RECENT_SHOWN = 5;
+const MAX_RECENT_SHOWN = 5;
 
 /** A row of the start screen's lists: icon, text, and an optional detail at the right end. */
 const ROW_CLASS =
