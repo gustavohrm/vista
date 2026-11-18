@@ -110,6 +110,8 @@ export function createWorkspaceStore(
   let needsBackup = loaded.isDamaged;
   let hasStoredList = raw !== null;
   const sessionOnlyIds = new Set<string>();
+  // A session-only workspace's sessions, kept for the run like the workspace, so it reopens with its tabs.
+  const sessionOnlySessions = new Map<string, Session>();
 
   function save(next: WorkspaceList): void {
     list = next;
@@ -390,6 +392,7 @@ export function createWorkspaceStore(
         workspaces: list.workspaces.filter((w) => w.id !== workspaceId),
       };
       if (sessionOnlyIds.delete(workspaceId)) {
+        sessionOnlySessions.delete(workspaceId);
         list = next;
       } else {
         save(next);
@@ -402,10 +405,12 @@ export function createWorkspaceStore(
       return { unusedFolderIds: workspace.folderIds.filter((id) => !isUsed(id)) };
     },
 
-    loadSession: (workspaceId) => parseSession(read(storage, sessionStorageKey(workspaceId))),
+    loadSession: (workspaceId) =>
+      sessionOnlySessions.get(workspaceId) ?? parseSession(read(storage, sessionStorageKey(workspaceId))),
 
     saveSession(workspaceId, session) {
       if (sessionOnlyIds.has(workspaceId)) {
+        sessionOnlySessions.set(workspaceId, session);
         return;
       }
       try {

@@ -417,6 +417,25 @@ describe("recent workspaces", () => {
     expect(store.recentWorkspaces().map((w) => w.id)).toEqual([first.id, second.id]);
   });
 
+  it("keeps a session-only workspace's session for the run, out of storage, until the workspace is removed", () => {
+    const storage = memoryStorage();
+    const store = createWorkspaceStore(storage, options());
+    const workspace = store.openFolder({ ...notes, accessMode: "fallback" });
+    const session: Session = {
+      version: 1,
+      tabs: [{ folderId: notes.id, path: "a.md", viewMode: "raw" }],
+      activeIndex: 0,
+      expanded: {},
+    };
+
+    store.saveSession(workspace.id, session);
+
+    expect(store.loadSession(workspace.id)).toEqual(session);
+    expect(storage.values.has(sessionStorageKey(workspace.id))).toBe(false);
+    store.removeWorkspace(workspace.id);
+    expect(store.loadSession(workspace.id)).not.toEqual(session);
+  });
+
   it("lists a session-only workspace too, since it can be switched to until Vista closes", () => {
     const store = clockedStore();
     const workspace = store.openFolder({ ...notes, accessMode: "fallback" });
