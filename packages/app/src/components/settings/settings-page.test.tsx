@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SettingsPage } from "./settings-page";
 import type { ManagedWorkspace } from "./workspace-manager";
-import { NAV_FIRST_COUNT } from "./workspace-nav";
+import { NAV_LIST_COUNT } from "./workspace-nav";
 
 const WORKSPACES: ManagedWorkspace[] = [
   {
@@ -193,24 +193,20 @@ describe("SettingsPage", () => {
         .map((button) => button.dataset.workspaceId);
     }
 
-    it("lists eight, then four more, then See all lists every one in place of Vista's sections", async () => {
+    it("lists eight, then See all lists every one in place of Vista's sections", async () => {
       const user = userEvent.setup();
       renderSettings({ workspaces: many(20) });
 
-      expect(listedNames()).toHaveLength(NAV_FIRST_COUNT);
-      await user.click(screen.getByRole("button", { name: "Show 4 more" }));
-      expect(listedNames()).toHaveLength(12);
-      expect(screen.getByRole("button", { name: "W09" })).toHaveFocus();
-
+      expect(listedNames()).toHaveLength(NAV_LIST_COUNT);
       await user.click(screen.getByRole("button", { name: "See all" }));
       expect(listedNames()).toHaveLength(20);
-      expect(screen.getByRole("button", { name: "W13" })).toHaveFocus();
+      expect(screen.getByRole("button", { name: "W09" })).toHaveFocus();
       expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("SettingsWorkspaces");
       expect(screen.queryByRole("button", { name: "Appearance" })).not.toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: "Settings" }));
       expect(screen.getByRole("button", { name: "Appearance" })).toBeInTheDocument();
-      expect(listedNames()).toHaveLength(12);
+      expect(listedNames()).toHaveLength(NAV_LIST_COUNT);
       expect(screen.getByRole("button", { name: "See all" })).toHaveFocus();
     });
 
@@ -218,7 +214,6 @@ describe("SettingsPage", () => {
       const user = userEvent.setup();
       const props = settingsProps({ workspaces: many(20) });
       const { rerender } = render(<SettingsPage {...props} />);
-      await user.click(screen.getByRole("button", { name: "Show 4 more" }));
       await user.click(screen.getByRole("button", { name: "See all" }));
       expect(screen.queryByRole("button", { name: "Appearance" })).not.toBeInTheDocument();
 
@@ -227,17 +222,14 @@ describe("SettingsPage", () => {
 
       expect(screen.getByRole("button", { name: "Keyboard Shortcuts" })).toHaveAttribute("aria-current", "page");
       // As many as before See all, as when its heading brings the sections back.
-      expect(listedNames()).toHaveLength(12);
+      expect(listedNames()).toHaveLength(NAV_LIST_COUNT);
     });
 
-    it("shows only as many more as there are", async () => {
-      const user = userEvent.setup();
-      renderSettings({ workspaces: many(10) });
+    it("has no See all while every workspace is listed", () => {
+      renderSettings({ workspaces: many(NAV_LIST_COUNT) });
 
-      await user.click(screen.getByRole("button", { name: "Show 2 more" }));
-
-      expect(listedNames()).toHaveLength(10);
-      expect(screen.queryByRole("button", { name: /^(Show|See)/ })).not.toBeInTheDocument();
+      expect(listedNames()).toHaveLength(NAV_LIST_COUNT);
+      expect(screen.queryByRole("button", { name: "See all" })).not.toBeInTheDocument();
     });
 
     it("always lists the open workspace and the one whose page shows, in their place", () => {
@@ -247,7 +239,7 @@ describe("SettingsPage", () => {
       renderSettings({ workspaces, section: "workspaces", shownWorkspaceId: "W18" });
 
       expect(listedNames()).toEqual(["W01", "W02", "W03", "W04", "W05", "W06", "W07", "W08", "W15", "W18"]);
-      expect(screen.getByRole("button", { name: "Show 4 more" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "See all" })).toBeInTheDocument();
     });
 
     it("searches every workspace by name, uncapped, until the search closes", async () => {
@@ -259,7 +251,7 @@ describe("SettingsPage", () => {
       expect(field).toHaveFocus();
       await user.type(field, "w1");
       expect(listedNames()).toEqual(["W10", "W11", "W12", "W13", "W14", "W15", "W16", "W17", "W18", "W19"]);
-      expect(screen.queryByRole("button", { name: /^(Show|See)/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "See all" })).not.toBeInTheDocument();
 
       await user.clear(field);
       await user.type(field, "zz");
@@ -269,7 +261,22 @@ describe("SettingsPage", () => {
       await user.keyboard("{Escape}");
       expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Search Workspaces" })).toHaveFocus();
-      expect(listedNames()).toHaveLength(NAV_FIRST_COUNT);
+      expect(listedNames()).toHaveLength(NAV_LIST_COUNT);
+    });
+
+    it("searches names without regard to accents", async () => {
+      const user = userEvent.setup();
+      renderSettings({
+        workspaces: [
+          { id: "p", name: "Programação", icon: "folder", color: "neutral", folders: null, status: null },
+          { id: "r", name: "Research", icon: "folder", color: "neutral", folders: null, status: null },
+        ],
+      });
+
+      await user.click(screen.getByRole("button", { name: "Search Workspaces" }));
+      await user.type(screen.getByRole("searchbox"), "programacao");
+
+      expect(listedNames()).toEqual(["p"]);
     });
 
     it("closes the search with the button that opened it", async () => {

@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { placeBubble, Tooltip, TOOLTIP_DELAY_MS } from "./tooltip";
+import { flipVertically, placeBubble, Tooltip, TOOLTIP_DELAY_MS } from "./tooltip";
 
 function renderTooltip() {
   render(
@@ -123,6 +123,24 @@ describe("Tooltip", () => {
     expect(wrapper).not.toHaveAttribute("data-tooltip-open");
   });
 
+  it("draws the bubble over the page, outside any container that would cut it off", () => {
+    renderTooltip();
+
+    expect(screen.getByRole("tooltip", { hidden: true }).parentElement).toBe(document.body);
+  });
+
+  it("stays open while the pointer moves from the control onto the bubble", () => {
+    const { button, wrapper } = renderTooltip();
+    const bubble = screen.getByRole("tooltip", { hidden: true });
+    fireEvent.pointerEnter(wrapper);
+    act(() => vi.advanceTimersByTime(TOOLTIP_DELAY_MS));
+
+    fireEvent.pointerOut(button, { relatedTarget: bubble });
+    fireEvent.pointerOver(bubble, { relatedTarget: button });
+
+    expect(wrapper).toHaveAttribute("data-tooltip-open");
+  });
+
   it("places an open bubble again when the window is resized", () => {
     const { wrapper } = renderTooltip();
     const bubble = screen.getByRole("tooltip", { hidden: true });
@@ -134,8 +152,9 @@ describe("Tooltip", () => {
     try {
       fireEvent.pointerEnter(wrapper);
       act(() => vi.advanceTimersByTime(TOOLTIP_DELAY_MS));
-      // Centered over the control, since it fits.
-      expect(bubble.style.left).toBe("-46px");
+      // Centered below the control, since it fits.
+      expect(bubble.style.left).toBe("822px");
+      expect(bubble.style.top).toBe("34px");
 
       viewportWidth = 900;
       act(() => {
@@ -143,7 +162,31 @@ describe("Tooltip", () => {
       });
 
       // Now a centered bubble would cross the window's edge, so it lines up with the control's right edge.
-      expect(bubble.style.left).toBe("-92px");
+      expect(bubble.style.left).toBe("776px");
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("follows its control when the layout moves it, with no resize or scroll", () => {
+    const { wrapper } = renderTooltip();
+    const bubble = screen.getByRole("tooltip", { hidden: true });
+    vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(1000);
+    vi.spyOn(bubble, "offsetWidth", "get").mockReturnValue(40);
+    let triggerLeft = 400;
+    vi.spyOn(wrapper, "getBoundingClientRect").mockImplementation(() =>
+      DOMRect.fromRect({ x: triggerLeft, width: 28, height: 28 }),
+    );
+    try {
+      fireEvent.pointerEnter(wrapper);
+      act(() => vi.advanceTimersByTime(TOOLTIP_DELAY_MS));
+      expect(bubble.style.left).toBe("394px");
+
+      // Such as a neighbor that animates open and pushes the control along.
+      triggerLeft = 460;
+      act(() => vi.advanceTimersByTime(50));
+
+      expect(bubble.style.left).toBe("454px");
     } finally {
       vi.restoreAllMocks();
     }
@@ -167,5 +210,23 @@ describe("placeBubble", () => {
   it("keeps a bubble wider than the room beside its control inside the window", () => {
     expect(placeBubble({ left: 600, width: 28 }, 900, VIEWPORT)).toBe(92);
     expect(placeBubble({ left: 300, width: 28 }, 980, VIEWPORT)).toBe(8);
+  });
+});
+
+describe("flipVertically", () => {
+  const VIEWPORT = 800;
+
+  it("keeps the side asked for while the bubble fits there", () => {
+    expect(flipVertically("top", { top: 400, bottom: 428 }, 24, VIEWPORT)).toBe("top");
+    expect(flipVertically("bottom", { top: 400, bottom: 428 }, 24, VIEWPORT)).toBe("bottom");
+  });
+
+  it("opens on the other side when the bubble would cross the window's edge", () => {
+    expect(flipVertically("top", { top: 4, bottom: 32 }, 24, VIEWPORT)).toBe("bottom");
+    expect(flipVertically("bottom", { top: 768, bottom: 796 }, 24, VIEWPORT)).toBe("top");
+  });
+
+  it("keeps the side asked for when the bubble fits on neither", () => {
+    expect(flipVertically("top", { top: 4, bottom: 796 }, 24, VIEWPORT)).toBe("top");
   });
 });

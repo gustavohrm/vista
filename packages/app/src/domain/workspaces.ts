@@ -189,6 +189,56 @@ export function findWorkspaceForFolder(list: WorkspaceList, folderId: string): W
   return found;
 }
 
+/** How well a workspace's name matches typed text: its start, a word's start, or anywhere in it. */
+export type NameMatch = "start" | "word" | "inside";
+const NAME_MATCH_ORDER: readonly NameMatch[] = ["start", "word", "inside"];
+
+/**
+ * Lowercase, without accents, so `programacao` finds `Programação`. The lowercasing ignores the
+ * device's language, so `idea` finds `IDEA` under Turkish too, where `I` would lower to a dotless `ı`.
+ */
+function foldForSearch(text: string): string {
+  return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+}
+
+/**
+ * Finds typed text in a workspace's name, ignoring case, accents, and the text's outer spaces. Empty
+ * text matches every name at its start.
+ *
+ * @returns Where it matches best, or null when the name doesn't hold it.
+ */
+export function matchWorkspaceName(name: string, query: string): NameMatch | null {
+  const needle = foldForSearch(query.trim());
+  const haystack = foldForSearch(name);
+  if (haystack.startsWith(needle)) {
+    return "start";
+  }
+  let index = haystack.indexOf(needle);
+  if (index === -1) {
+    return null;
+  }
+  for (; index !== -1; index = haystack.indexOf(needle, index + 1)) {
+    // The whole character before the match, which outside the Basic Multilingual Plane is two code
+    // units. Not `[\p{L}\p{N}]$`: V8 (Node 26) misses such a character with a class before `$`.
+    if (!/(?:\p{L}|\p{N})$/u.test(haystack.slice(0, index))) {
+      return "word";
+    }
+  }
+  return "inside";
+}
+
+/**
+ * The workspaces whose names hold typed text, best match first: those it starts, then those with a
+ * word it starts, then the rest. Within each, they keep the order given.
+ */
+export function rankWorkspacesByName<T extends { name: string }>(workspaces: readonly T[], query: string): T[] {
+  return workspaces
+    .map((workspace) => ({ workspace, match: matchWorkspaceName(workspace.name, query) }))
+    .filter((entry): entry is { workspace: T; match: NameMatch } => entry.match !== null)
+    .sort((a, b) => NAME_MATCH_ORDER.indexOf(a.match) - NAME_MATCH_ORDER.indexOf(b.match))
+    .map((entry) => entry.workspace);
+}
+
 export type NameCheck = { ok: true; name: string } | { ok: false; message: string };
 
 export function validateWorkspaceName(name: string): NameCheck {

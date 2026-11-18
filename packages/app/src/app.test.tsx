@@ -195,6 +195,8 @@ function shownPath(text: string): HTMLElement {
       element?.tagName === "SPAN" &&
       element.firstElementChild !== null &&
       element.textContent === text &&
+      // The innermost, not a wrapper around it holding the same text.
+      ![...element.children].some((child) => child.textContent === text) &&
       element.closest("[role=tooltip]") === null,
   );
 }
@@ -2263,7 +2265,7 @@ describe("App", () => {
       expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
     });
 
-    it("leaves a workspace that has never been opened out of the switcher, even when typing", async () => {
+    it("leaves a workspace that has never been opened out of Recent, and finds it by typing after those opened", async () => {
       const user = userEvent.setup();
       const { capability } = createFoldersCapability(storedFolders());
       localStorage.setItem(
@@ -2289,7 +2291,7 @@ describe("App", () => {
         within(list)
           .getAllByRole("option")
           .map((option) => option.textContent),
-      ).toEqual(["Work", "Open Folder…", "Close Workspace"]);
+      ).toEqual(["Work", "Workshop", "Open Folder…", "Close Workspace"]);
     });
 
     it("opens any workspace's page in Settings from its row in the switcher, the open one's too", async () => {
@@ -4622,7 +4624,7 @@ describe("App", () => {
       await user.click(screen.getByText("data.csv"));
 
       expect(shownPath("My Notes / data.csv")).toBeInTheDocument();
-      expect(within(statusBar()).getByRole("tooltip", { name: "My Notes / data.csv" })).toBeInTheDocument();
+      expect(screen.getByRole("tooltip", { name: "My Notes / data.csv" })).toBeInTheDocument();
       expect(within(statusBar()).queryByRole("button", { name: "Copy Path" })).not.toBeInTheDocument();
       expect(within(statusBar()).queryByRole("button", { name: /^Reveal/ })).not.toBeInTheDocument();
       await user.click(within(statusBar()).getByRole("button", { name: "Copy Relative Path" }));

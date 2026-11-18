@@ -6,10 +6,12 @@ import {
   EMPTY_WORKSPACE_LIST,
   MAX_WORKSPACE_NAME_LENGTH,
   findWorkspaceForFolder,
+  matchWorkspaceName,
   parseSession,
   parseWorkspaceColor,
   parseWorkspaceFile,
   parseWorkspaceList,
+  rankWorkspacesByName,
   serializeWorkspaceFile,
   validateWorkspaceName,
   type WorkspaceFileDetails,
@@ -373,5 +375,51 @@ describe("serializeWorkspaceFile", () => {
       status: "ok",
       details,
     });
+  });
+});
+
+describe("matchWorkspaceName", () => {
+  it("tells a match at the name's start from one at a word's start and one inside a word", () => {
+    expect(matchWorkspaceName("Notes", "no")).toBe("start");
+    expect(matchWorkspaceName("Work Notes", "no")).toBe("word");
+    expect(matchWorkspaceName("my-notes", "no")).toBe("word");
+    expect(matchWorkspaceName("Piano", "no")).toBe("inside");
+    expect(matchWorkspaceName("Piano", "x")).toBeNull();
+  });
+
+  it("finds a word's start past an earlier match inside a word", () => {
+    expect(matchWorkspaceName("Piano notes", "no")).toBe("word");
+  });
+
+  it("reads a letter outside the Basic Multilingual Plane as one character", () => {
+    expect(matchWorkspaceName("\u{10400}foo", "foo")).toBe("inside");
+  });
+
+  it("ignores case, accents, and the text's outer spaces", () => {
+    expect(matchWorkspaceName("Programação", "  PROGRAMACAO ")).toBe("start");
+    expect(matchWorkspaceName("São Paulo", "sao")).toBe("start");
+    expect(matchWorkspaceName("Cafe", "café")).toBe("start");
+  });
+
+  it("matches every name with empty text", () => {
+    expect(matchWorkspaceName("Notes", "  ")).toBe("start");
+  });
+});
+
+describe("rankWorkspacesByName", () => {
+  it("lists the best matches first, keeping the given order within each", () => {
+    const names = ["Piano", "Work Notes", "Notes B", "Archive", "Notes A", "Old notes"];
+    const ranked = rankWorkspacesByName(
+      names.map((name) => ({ name })),
+      "notes",
+    ).map(({ name }) => name);
+
+    expect(ranked).toEqual(["Notes B", "Notes A", "Work Notes", "Old notes"]);
+  });
+
+  it("lists a match inside a word after one at a start", () => {
+    const ranked = rankWorkspacesByName([{ name: "Piano" }, { name: "Notes" }], "no").map(({ name }) => name);
+
+    expect(ranked).toEqual(["Notes", "Piano"]);
   });
 });

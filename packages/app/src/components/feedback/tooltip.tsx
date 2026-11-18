@@ -9,6 +9,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 
 import { formatShortcut } from "../../commands/shortcuts";
 
@@ -37,17 +38,20 @@ interface TooltipProps {
 }
 
 /**
- * Where the bubble opens, and a strip across the gap to the trigger: the bubble keeps the pointer, so
- * it stays while the pointer moves onto it, and the strip keeps it open on the way. The strip covers
- * only the gap, 7px past the bubble's padding to clear its 1px border, never the trigger, so it
- * takes no click meant for the control.
+ * A strip across the gap to the trigger: the bubble keeps the pointer, so it stays while the pointer
+ * moves onto it, and the strip keeps it open on the way. The strip covers only the gap, 7px past the
+ * bubble's padding to clear its 1px border, never the trigger, so it takes no click meant for the
+ * control.
  */
 const SIDE_CLASS = {
-  top: "bottom-full mb-1.5 before:top-full before:inset-x-0 before:h-[7px]",
-  bottom: "top-full mt-1.5 before:bottom-full before:inset-x-0 before:h-[7px]",
-  left: "right-full mr-1.5 top-1/2 -translate-y-1/2 origin-right before:left-full before:inset-y-0 before:w-[7px]",
-  right: "left-full ml-1.5 top-1/2 -translate-y-1/2 origin-left before:right-full before:inset-y-0 before:w-[7px]",
+  top: "before:top-full before:inset-x-0 before:h-[7px]",
+  bottom: "before:bottom-full before:inset-x-0 before:h-[7px]",
+  left: "before:left-full before:inset-y-0 before:w-[7px]",
+  right: "before:right-full before:inset-y-0 before:w-[7px]",
 } as const;
+
+/** The gap between the trigger and its bubble, in pixels. */
+const BUBBLE_GAP_PX = 6;
 
 /** The least room a bubble keeps from the window's edges, in pixels. */
 const VIEWPORT_MARGIN_PX = 8;
@@ -83,11 +87,37 @@ export function placeBubble(
 }
 
 /**
+ * The side a `top` or `bottom` bubble opens on: the one asked for, unless the bubble would cross the
+ * window's edge there and fits on the other side.
+ *
+ * @param side - The side asked for.
+ * @param trigger - The trigger's top and bottom edges, in viewport pixels.
+ * @param bubbleHeight - The bubble's height.
+ * @param viewportHeight - The window's height.
+ * @returns The side it opens on.
+ */
+export function flipVertically(
+  side: "top" | "bottom",
+  trigger: { top: number; bottom: number },
+  bubbleHeight: number,
+  viewportHeight: number,
+): "top" | "bottom" {
+  const needed = BUBBLE_GAP_PX + bubbleHeight + VIEWPORT_MARGIN_PX;
+  const fitsAbove = trigger.top >= needed;
+  const fitsBelow = viewportHeight - trigger.bottom >= needed;
+  if (side === "top") {
+    return !fitsAbove && fitsBelow ? "bottom" : "top";
+  }
+  return !fitsBelow && fitsAbove ? "top" : "bottom";
+}
+
+/**
  * A control's name in a small bubble beside it. It shows after the pointer rests on the control
  * for a moment, or at once when the previous tooltip has just hidden, and at once when keyboard
  * focus reaches the control, so keyboard users see the names of icon-only buttons too. It stays while
  * the pointer is on the bubble. A bubble above or below is centered on the control unless that would
- * cross the window's edge, as `placeBubble` describes. A click or Escape hides it until the pointer enters again or focus leaves, so a clicked button doesn't keep
+ * cross the window's edge, as `placeBubble` describes. It is drawn over the page, in `document.body`,
+ * so a scrolling container around the control, such as Settings' navigation, doesn't cut it off. A click or Escape hides it until the pointer enters again or focus leaves, so a clicked button doesn't keep
  * its bubble. It grows in from the control and is instant with reduced motion. The bubble is always
  * in the document, so the trigger's `aria-describedby` names it whether or not it shows.
  *
@@ -99,27 +129,59 @@ export function Tooltip({ text, shortcut, position, className, children }: Toolt
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef<HTMLSpanElement>(null);
   const bubbleRef = useRef<HTMLSpanElement>(null);
-  const isHorizontal = position === "top" || position === "bottom";
-  // The bubble's left edge and the point it grows from, relative to the wrapper; measured as it opens.
-  const [placement, setPlacement] = useState<{ left: number; originX: number } | null>(null);
+  // The bubble's place in the window and the point it grows from; measured as it opens, and kept as it
+  // closes so it fades out where it was.
+  const [placement, setPlacement] = useState<{
+    left: number;
+    top: number;
+    origin: string;
+    side: TooltipProps["position"];
+  } | null>(null);
 
   useLayoutEffect(() => {
     const wrapper = wrapperRef.current;
     const bubble = bubbleRef.current;
-    if (!isOpen || !isHorizontal || !wrapper || !bubble) {
-      return;
+    if (!isOpen || !wrapper || !bubble) {
+      return undefined;
     }
     const place = () => {
       const trigger = wrapper.getBoundingClientRect();
-      // `offsetWidth` ignores the scale the bubble grows from, so it is the width it settles at.
-      const left = placeBubble(trigger, bubble.offsetWidth, document.documentElement.clientWidth) - trigger.left;
-      setPlacement({ left, originX: trigger.width / 2 - left });
+      // `offsetWidth` and `offsetHeight` ignore the scale the bubble grows from, so they are its settled size.
+      const width = bubble.offsetWidth;
+      const height = bubble.offsetHeight;
+      if (position === "top" || position === "bottom") {
+        const left = placeBubble(trigger, width, document.documentElement.clientWidth);
+        const side = flipVertically(position, trigger, height, window.innerHeight);
+        const top = side === "top" ? trigger.top - BUBBLE_GAP_PX - height : trigger.bottom + BUBBLE_GAP_PX;
+        const originX = trigger.left + trigger.width / 2 - left;
+        setPlacement({ left, top, side, origin: `${originX}px ${side === "top" ? "100%" : "0"}` });
+      } else {
+        const left = position === "left" ? trigger.left - BUBBLE_GAP_PX - width : trigger.right + BUBBLE_GAP_PX;
+        const top = trigger.top + (trigger.height - height) / 2;
+        setPlacement({ left, top, side: position, origin: position === "left" ? "100% 50%" : "0 50%" });
+      }
     };
     place();
-    // A resized window can move the control or narrow the room beside it while the bubble shows.
+    // The control can move while the bubble shows, by a scrolled container or a layout that animates
+    // around it, and no event says so, so each frame compares where it is with where it was.
+    let last = wrapper.getBoundingClientRect();
+    let frame = 0;
+    const follow = () => {
+      const now = wrapper.getBoundingClientRect();
+      if (now.left !== last.left || now.top !== last.top || now.width !== last.width || now.height !== last.height) {
+        last = now;
+        place();
+      }
+      frame = window.requestAnimationFrame(follow);
+    };
+    frame = window.requestAnimationFrame(follow);
+    // A resized window can narrow the room beside a control that stays put.
     window.addEventListener("resize", place);
-    return () => window.removeEventListener("resize", place);
-  }, [isOpen, isHorizontal, text, shortcut]);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", place);
+    };
+  }, [isOpen, position, text, shortcut]);
   const isDismissedRef = useRef(false);
   const timerRef = useRef(0);
 
@@ -191,16 +253,11 @@ export function Tooltip({ text, shortcut, position, className, children }: Toolt
     }
   };
 
-  const side = SIDE_CLASS[position];
-  // Until it is measured, the bubble is centered on the trigger.
-  const bubbleStyle: CSSProperties | undefined = isHorizontal
-    ? placement
-      ? {
-          left: placement.left,
-          transformOrigin: `${placement.originX}px ${position === "top" ? "100%" : "0"}`,
-        }
-      : { left: "50%", translate: "-50% 0", transformOrigin: position === "top" ? "50% 100%" : "50% 0" }
-    : undefined;
+  const side = SIDE_CLASS[placement?.side ?? position];
+  // Until it first opens, the hidden bubble waits at the window's corner.
+  const bubbleStyle: CSSProperties = placement
+    ? { left: placement.left, top: placement.top, transformOrigin: placement.origin }
+    : { left: 0, top: 0 };
 
   return (
     // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- the handlers only show and hide the bubble; the trigger inside is the interactive element
@@ -216,19 +273,22 @@ export function Tooltip({ text, shortcut, position, className, children }: Toolt
       onKeyDown={handleKeyDown}
     >
       {children(bubbleId)}
-      <span
-        ref={bubbleRef}
-        role="tooltip"
-        id={bubbleId}
-        style={bubbleStyle}
-        className={`bg-pop border-line-strong text-text-strong shadow-float absolute z-50 flex min-h-6 w-max max-w-[min(48rem,calc(100vw-2rem))] items-center gap-2 rounded-md border px-2 py-0.5 text-xs leading-4 font-normal break-all whitespace-normal transition-[opacity,scale,visibility] ease-(--ease-enter) before:absolute before:content-[''] motion-reduce:transition-none ${side} ${
-          isOpen ? "visible scale-100 opacity-100 duration-150" : "invisible scale-96 opacity-0 duration-100"
-        }`}
-      >
-        {/* The space keeps the name and shortcut apart when read aloud; the gap does it on screen. */}
-        {shortcut ? `${text} ` : text}
-        {shortcut && <span className="text-text-faint flex-none">{formatShortcut(shortcut)}</span>}
-      </span>
+      {createPortal(
+        <span
+          ref={bubbleRef}
+          role="tooltip"
+          id={bubbleId}
+          style={bubbleStyle}
+          className={`bg-pop border-line-strong text-text-strong fixed z-50 flex min-h-6 w-max max-w-[min(48rem,calc(100vw-2rem))] items-center gap-2 rounded-md border px-2 py-0.5 text-xs leading-4 font-normal break-all whitespace-normal transition-[opacity,scale,visibility] ease-(--ease-enter) before:absolute before:content-[''] motion-reduce:transition-none ${side} ${
+            isOpen ? "visible scale-100 opacity-100 duration-150" : "invisible scale-96 opacity-0 duration-100"
+          }`}
+        >
+          {/* The space keeps the name and shortcut apart when read aloud; the gap does it on screen. */}
+          {shortcut ? `${text} ` : text}
+          {shortcut && <span className="text-text-faint flex-none">{formatShortcut(shortcut)}</span>}
+        </span>,
+        document.body,
+      )}
     </span>
   );
 }

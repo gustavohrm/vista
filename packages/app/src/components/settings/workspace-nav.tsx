@@ -1,13 +1,12 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
+import { matchWorkspaceName } from "../../domain/workspaces";
 import { Tooltip } from "../feedback/tooltip";
 import type { ManagedWorkspace } from "./workspace-manager";
 import { WorkspaceNavItem } from "./workspace-nav-item";
 
-/** How many workspaces the group lists at first, how many more each Show More adds, and how many it lists before See All. */
-export const NAV_FIRST_COUNT = 8;
-export const NAV_STEP_COUNT = 4;
-export const NAV_MOST_COUNT = 12;
+/** How many workspaces the group lists before See All. */
+export const NAV_LIST_COUNT = 8;
 
 interface WorkspaceNavProps {
   /** Every workspace, by name. */
@@ -23,9 +22,9 @@ interface WorkspaceNavProps {
 
 /**
  * The Workspaces group of Settings' navigation: its label, with Search and New Workspace beside it,
- * then the workspaces by name. It lists the first eight, then four more with Show More, then See All
- * past twelve. The open workspace and the one whose page shows are always listed, in their place.
- * Search swaps the label for a field that lists every workspace whose name holds the text, uncapped.
+ * then the workspaces by name. It lists the first eight, then See All. The open workspace and the one
+ * whose page shows are always listed, in their place. Search swaps the label for a field that lists
+ * every workspace whose name holds the text, uncapped.
  *
  * @param props - WorkspaceNav properties.
  * @returns The group's elements, laid out by the navigation.
@@ -39,26 +38,22 @@ export function WorkspaceNav({
   onSeeAll,
 }: WorkspaceNavProps) {
   const [query, setQuery] = useState<string | null>(null);
-  const [limit, setLimit] = useState(NAV_FIRST_COUNT);
   const searchButtonRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  // The item to focus once it is listed, such as the first one Show More adds.
+  // The item to focus once it is listed, such as the first one See All adds.
   const [focusId, setFocusId] = useState<string | null>(null);
 
   const isSearching = query !== null;
-  const needle = query?.trim().toLocaleLowerCase() ?? "";
+  const hasQuery = query !== null && query.trim() !== "";
   const isPinned = (workspace: ManagedWorkspace) => workspace.status === "open" || workspace.id === shownWorkspaceId;
-  const listed =
-    needle !== ""
-      ? workspaces.filter((workspace) => workspace.name.toLocaleLowerCase().includes(needle))
-      : isFullList
-        ? workspaces
-        : workspaces.filter((workspace, index) => index < limit || isPinned(workspace));
+  const listed = hasQuery
+    ? workspaces.filter((workspace) => matchWorkspaceName(workspace.name, query) !== null)
+    : isFullList
+      ? workspaces
+      : workspaces.filter((workspace, index) => index < NAV_LIST_COUNT || isPinned(workspace));
   const unlisted = workspaces.filter((workspace) => !listed.includes(workspace));
-  // What Show More adds: the next four by name, less any already listed for being open or shown.
-  const nextBatch = workspaces.slice(limit, limit + NAV_STEP_COUNT).filter((workspace) => !isPinned(workspace));
-  const hasMore = needle === "" && !isFullList && unlisted.length > 0;
+  const hasMore = !hasQuery && !isFullList && unlisted.length > 0;
 
   useEffect(() => {
     if (focusId !== null) {
@@ -145,53 +140,24 @@ export function WorkspaceNav({
           />
         ))}
       </div>
-      {needle !== "" && listed.length === 0 && (
+      {hasQuery && listed.length === 0 && (
         <p className="text-text-muted flex h-7 flex-none items-center px-2.5 text-[13px] whitespace-nowrap">
           No matching workspaces
         </p>
       )}
-      {hasMore &&
-        (limit < NAV_MOST_COUNT && nextBatch.length > 0 ? (
-          <MoreButton
-            onClick={() => {
-              setLimit(limit + NAV_STEP_COUNT);
-              setFocusId(nextBatch[0]!.id);
-            }}
-          >
-            Show {nextBatch.length} more
-          </MoreButton>
-        ) : (
-          <MoreButton
-            onClick={() => {
-              onSeeAll();
-              setFocusId(unlisted[0]?.id ?? null);
-            }}
-            isSeeAll
-          >
-            See all
-          </MoreButton>
-        ))}
+      {hasMore && (
+        <button
+          type="button"
+          onClick={() => {
+            onSeeAll();
+            setFocusId(unlisted[0]?.id ?? null);
+          }}
+          data-see-all
+          className="text-text-muted hover:text-text hover:bg-hover flex h-7 flex-none cursor-pointer items-center rounded-md px-2.5 text-[13px] whitespace-nowrap transition-colors duration-100 outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] md:w-full"
+        >
+          See all
+        </button>
+      )}
     </>
-  );
-}
-
-function MoreButton({
-  onClick,
-  isSeeAll = false,
-  children,
-}: {
-  onClick: () => void;
-  isSeeAll?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      data-see-all={isSeeAll || undefined}
-      className="text-text-muted hover:text-text hover:bg-hover flex h-7 flex-none cursor-pointer items-center rounded-md px-2.5 text-[13px] whitespace-nowrap transition-colors duration-100 outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] md:w-full"
-    >
-      {children}
-    </button>
   );
 }
