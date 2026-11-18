@@ -309,6 +309,7 @@ export function WorkspaceSwitcher({
               aria-autocomplete="list"
               aria-activedescendant={options[active] ? optionId(active) : undefined}
               aria-keyshortcuts="Shift+Delete Control+,"
+              aria-describedby={hiddenCount > 0 ? `${listId}-more` : undefined}
               placeholder="Search workspaces"
               value={query}
               onChange={(event) => {
@@ -318,6 +319,12 @@ export function WorkspaceSwitcher({
               onKeyDown={handleKeyDown}
               className="text-text-strong placeholder:text-text-muted min-w-0 flex-1 bg-transparent p-0 outline-none"
             />
+            {/* The field's description, outside the list, which holds only its options for a screen reader. */}
+            {hiddenCount > 0 && (
+              <span id={`${listId}-more`} className="visually-hidden">
+                {hiddenCount} more matches. Keep typing to narrow them down.
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -348,7 +355,10 @@ export function WorkspaceSwitcher({
             {options.map((option, index) => (
               <Fragment key={`${option.kind}:${option.id}`}>
                 {hiddenCount > 0 && index === workspaceOptions.length && (
-                  <p className="text-text-faint px-2 py-1 text-xs">{hiddenCount} more — keep typing</p>
+                  // Seen here; a screen reader hears it as the field's description.
+                  <p aria-hidden="true" className="text-text-faint px-2 py-1 text-xs">
+                    {hiddenCount} more — keep typing
+                  </p>
                 )}
                 <SwitcherOption
                   id={optionId(index)}

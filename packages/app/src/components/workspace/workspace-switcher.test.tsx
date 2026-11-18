@@ -64,11 +64,15 @@ describe("WorkspaceSwitcher search", () => {
     const list = await search("work");
 
     expect(within(list).getAllByRole("option")).toHaveLength(SWITCHER_MATCH_LIMIT + 2);
-    expect(within(list).getByText("3 more — keep typing")).toBeInTheDocument();
+    expect(within(list).getByText("3 more — keep typing")).toHaveAttribute("aria-hidden", "true");
+    // A screen reader hears the count with the field, since the list holds only options.
+    const field = screen.getByRole("combobox", { name: "Search workspaces" });
+    expect(field).toHaveAccessibleDescription("3 more matches. Keep typing to narrow them down.");
 
     await userEvent.setup().keyboard(" 1");
     expect(optionNames(list)).toEqual(["Work 1", "Work 10", "Open Folder…", "Close Workspace"]);
     expect(within(list).queryByText(/more — keep typing/)).not.toBeInTheDocument();
+    expect(field).not.toHaveAccessibleDescription();
   });
 
   it("finds a name without regard to accents", async () => {
