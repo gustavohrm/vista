@@ -228,7 +228,8 @@ function AppShell({ adapter }: AppProps) {
   const restoreFolder = useCallback(
     async (id: string, options: { interactive: boolean }): Promise<RestoreFolderResult> => {
       const known = sessionFoldersRef.current.get(id);
-      return known ? { status: "restored", folder: known } : adapter.workspace.restoreFolder(id, options);
+      // A copy for each opening, as the host gives, so a read the last opening left pending is told apart.
+      return known ? { status: "restored", folder: { ...known } } : adapter.workspace.restoreFolder(id, options);
     },
     [adapter.workspace],
   );
@@ -869,12 +870,23 @@ function AppShell({ adapter }: AppProps) {
     [adapter.workspace, readWorkspaceFile, toast, workspaceStore],
   );
 
-  /** Opens a folder as the one-folder workspace on the device that is exactly it. */
+  /**
+   * Opens a folder as the one-folder workspace on the device that is exactly it.
+   *
+   * @param insteadOf - The workspace it opens in place of, whose file can't be read; nothing opens
+   *   once that one is deleted meanwhile.
+   */
   const openPlainFolder = useCallback(
-    async (folder: WorkspaceFolder, approvedEdits?: ApprovedEdits) => {
+    async (folder: WorkspaceFolder, approvedEdits?: ApprovedEdits, insteadOf?: string) => {
       const tree = await adapter.workspace.readTree(folder);
       const entry: OpenFolder = { id: folder.id, name: folder.name, folder, status: "ready", tree };
-      return adoptWorkspace(() => withLocations(workspaceStore.openFolder(folder), [entry]), approvedEdits);
+      return adoptWorkspace(
+        () =>
+          insteadOf !== undefined && !workspaceStore.workspace(insteadOf)
+            ? null
+            : withLocations(workspaceStore.openFolder(folder), [entry]),
+        approvedEdits,
+      );
     },
     [adapter.workspace, adoptWorkspace, workspaceStore],
   );
@@ -902,7 +914,7 @@ function AppShell({ adapter }: AppProps) {
       const read = await readStoredWorkspace(record, restore);
       if (read.kind === "unreadable") {
         toast.show({ kind: "info", text: describeUnreadableFile(read.home.name) });
-        return openPlainFolder(read.home, approvedEdits);
+        return openPlainFolder(read.home, approvedEdits, record.id);
       }
       const { target, slots, readText } = read;
       const results = slots.flatMap((slot): [string, RestoreFolderResult][] =>
@@ -2340,7 +2352,10 @@ function AppShell({ adapter }: AppProps) {
       setManaged(null);
       return;
     }
-    if (managedId !== null && workspace?.id !== managedId && managed?.workspace.id !== managedId) {
+    if (managedId === null || workspace?.id === managedId) {
+      // The open workspace's page shows it live, so a read still under way for another page is moot.
+      managedLoadRef.current = null;
+    } else if (managed?.workspace.id !== managedId) {
       void loadManaged(managedId);
     }
   }, [loadManaged, managed?.workspace.id, managedId, settingsSection, workspace?.id]);

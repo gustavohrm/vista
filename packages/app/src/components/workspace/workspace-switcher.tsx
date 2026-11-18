@@ -1,5 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 
 import type { WorkspaceColor, WorkspaceIcon } from "../../domain/workspaces";
 import { WorkspaceGlyph } from "./workspace-glyph";
@@ -21,6 +21,8 @@ export interface RecentWorkspace {
 
 /** Space between the switcher and its list, in pixels. */
 const LIST_OFFSET_PX = 4;
+/** The least room the list leaves at the window's right edge. */
+const VIEWPORT_MARGIN_PX = 8;
 
 interface WorkspaceSwitcherProps {
   /** The open workspace, or null while none is. */
@@ -76,7 +78,7 @@ export function WorkspaceSwitcher({
   // Set as the field closes by keyboard or by a choice, so focus goes back to the button once it is back.
   const [isReturningFocus, setIsReturningFocus] = useState(false);
   // The list's width as it opened, kept as its least while typing so it doesn't narrow with fewer
-  // matches; it still grows for a longer name, which would otherwise be cut off.
+  // matches; it still grows for a longer name, up to the window's edge.
   const [listWidth, setListWidth] = useState<number | null>(null);
   const isOpen = anchor !== null;
 
@@ -184,10 +186,17 @@ export function WorkspaceSwitcher({
       onSwitch(option.id);
     }
   };
+  /**
+   * Closes the field with focus back on the button at once, where the browser and Settings expect it:
+   * Tab then moves on from the button in either direction, and Settings gives focus back to it.
+   */
+  const closeToButton = () => {
+    flushSync(() => setAnchor(null));
+    buttonRef.current?.focus();
+  };
   const openSettings = (option: Option | undefined) => {
     if (option?.kind === "workspace") {
-      // Settings takes focus as it opens, so nothing goes back to the button.
-      setAnchor(null);
+      closeToButton();
       onOpenSettings(option.id);
     }
   };
@@ -200,6 +209,10 @@ export function WorkspaceSwitcher({
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    // A key that composes text, such as Enter taking an input method's candidate, is the field's.
+    if (event.nativeEvent.isComposing) {
+      return;
+    }
     const option = options[active];
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       if (options.length > 0) {
@@ -212,7 +225,7 @@ export function WorkspaceSwitcher({
       close();
     } else if (event.key === "Tab") {
       // Focus moves on, either way, as it leaves any other menu.
-      setAnchor(null);
+      closeToButton();
       return;
     } else if (event.key === "Delete" && event.shiftKey) {
       if (!canRemove(option)) {
@@ -223,7 +236,7 @@ export function WorkspaceSwitcher({
     } else if (event.key === "," && (event.ctrlKey || event.metaKey)) {
       if (option?.kind !== "workspace") {
         // Not a workspace's row, so Settings opens as the shortcut opens it anywhere else.
-        setAnchor(null);
+        closeToButton();
         return;
       }
       // Settings' own shortcut, here for the picked workspace rather than the open one.
@@ -308,7 +321,13 @@ export function WorkspaceSwitcher({
             aria-label="Workspaces"
             // Choosing with the pointer keeps the typing in the field.
             onPointerDown={(event) => event.preventDefault()}
-            style={{ left: anchor.x, top: anchor.y, minWidth: listWidth ?? undefined }}
+            style={{
+              left: anchor.x,
+              top: anchor.y,
+              minWidth: listWidth ?? undefined,
+              // A long name is cut off rather than push the row's buttons past the window's edge.
+              maxWidth: `calc(100vw - ${anchor.x + VIEWPORT_MARGIN_PX}px)`,
+            }}
             className="vista-menu vista-pop card soft floating fixed z-50 flex max-h-[calc(100vh-56px)] min-w-48 flex-col overflow-y-auto p-1 text-[13px] [--ui-radius-surface:8px]"
           >
             {isEmptySearch && <p className="text-text-muted px-2 py-1.5">No matching workspaces</p>}
@@ -386,7 +405,7 @@ function SwitcherOption({
             option.icon
           )}
         </span>
-        <span className="flex-1 text-left whitespace-nowrap">{isWorkspace ? option.workspace.name : option.label}</span>
+        <span className="min-w-0 flex-1 truncate text-left">{isWorkspace ? option.workspace.name : option.label}</span>
         {isWorkspace && (
           <RowButton
             title={`Settings for "${option.workspace.name}"`}

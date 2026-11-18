@@ -47,7 +47,7 @@ Open Folder was once the only way to start a workspace, because a New Workspace 
 
 - **Folders may not overlap.** Adding `C:\notes\work` to a workspace that has `C:\notes`, or the reverse, is refused with `"{name}" is already part of this workspace, inside "{other}".` or `"{name}" contains "{other}", which is already part of this workspace.` Overlapping folders would show the same file twice and open it in two tabs, and saving one tab would overwrite the other's edits. Adding a folder that is already in the workspace is refused too. Hosts compare folders with `relate`, as [Platform capability contract](#platform-capability-contract) describes.
 - **A folder may belong to several workspaces**, such as a shared `notes` folder in both a Work and a Personal workspace. The workspaces do not share sessions.
-- **Removing a folder from a workspace, or deleting a workspace, never touches the disk.** Both confirmations say so: `Your folders and files aren't changed.`
+- **Removing a folder from a workspace, or deleting a workspace, never changes the user's folders or files.** Both confirmations say so: `Your folders and files aren't changed.` Only Vista's own file can change: removing a folder from a workspace kept in its folder rewrites its `.vista/workspace.json` without it.
 - **Files do not move between folders.** Renaming and moving work within one folder. Dragging an entry onto another workspace folder shows `Moving between folders isn't supported yet.` and moves nothing. A move across folders needs a host operation that copies between two folders, which the contract does not have yet; it is a later change, not a limitation to work around.
 
 ### Where a workspace's details live
