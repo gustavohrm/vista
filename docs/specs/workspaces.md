@@ -79,7 +79,7 @@ A window shows one workspace at a time. Switching closes the current workspace's
 
 ### Workspace switcher
 
-The switcher at the top left of the title bar is the one home for workspace actions. Its button shows the current workspace's icon and name; with none open it shows `No workspace` beside an empty dashed tile, so another workspace is a click away from anywhere, including the start screen. Its menu lists:
+The switcher at the top left of the title bar is the one home for workspace actions. Its button shows the current workspace's icon and name; with none open it shows `No workspace` beside an empty dashed tile, so another workspace is a click away from anywhere, including the start screen. While the last workspace is still being reopened at start, the button is unavailable, so a workspace opened meanwhile is not replaced when that finishes. Its menu lists:
 
 - Every remembered workspace, the most recent first, each with its icon tile in its colour and its name, the current one checked; a long list scrolls. The start screen lists only the five most recent, as a shortcut, so the switcher is where every workspace is reached. Choosing one switches to it. The folders are not repeated here: for a one-folder workspace the name usually is the folder's, and Settings lists them.
 - **Open Folder…**, as [Opening a folder](#opening-a-folder) describes.

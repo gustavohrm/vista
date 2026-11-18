@@ -31,6 +31,8 @@ interface WorkspaceSwitcherProps {
   onOpenFolder: () => void;
   onOpenSettings: () => void;
   onClose: () => void;
+  /** Whether the button is unavailable, as while the last workspace is still being restored. */
+  isDisabled?: boolean;
 }
 
 /**
@@ -46,6 +48,7 @@ export function WorkspaceSwitcher({
   onOpenFolder,
   onOpenSettings,
   onClose,
+  isDisabled = false,
 }: WorkspaceSwitcherProps) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState<{ x: number; y: number } | null>(null);
@@ -84,6 +87,7 @@ export function WorkspaceSwitcher({
         type="button"
         aria-haspopup="menu"
         aria-expanded={open !== null}
+        disabled={isDisabled}
         onClick={(event) => {
           if (open) {
             setOpen(null);
@@ -92,7 +96,7 @@ export function WorkspaceSwitcher({
           const bounds = event.currentTarget.getBoundingClientRect();
           setOpen({ x: bounds.left, y: bounds.bottom + MENU_OFFSET_PX });
         }}
-        className={`hover:bg-hover flex h-8 min-w-0 shrink items-center gap-2 rounded-md pr-2 pl-[7px] text-[13px] transition-colors duration-100 ${current ? "text-text-strong font-semibold" : "text-text-muted"} ${open ? "bg-selected" : ""}`}
+        className={`enabled:hover:bg-hover flex h-8 min-w-0 shrink items-center gap-2 rounded-md pr-2 pl-[7px] text-[13px] transition-colors duration-100 disabled:opacity-60 ${current ? "text-text-strong font-semibold" : "text-text-muted"} ${open ? "bg-selected" : ""}`}
       >
         {current ? (
           <WorkspaceGlyph icon={current.icon} color={current.color} isTile className="text-xs" />

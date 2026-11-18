@@ -1955,6 +1955,26 @@ describe("App", () => {
       expect(await screen.findByRole("button", { name: "Work" })).toHaveAttribute("aria-haspopup", "menu");
     });
 
+    it("holds the switcher until the last workspace has been restored", async () => {
+      const { capability } = twoWorkspaces();
+      const restoreFolder = capability.restoreFolder;
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      capability.restoreFolder = vi.fn(async (id, options) => {
+        await held;
+        return restoreFolder(id, options);
+      });
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+
+      // Opening another workspace now could finish first and then be replaced by the restored one.
+      expect(await screen.findByRole("button", { name: "No workspace" })).toBeDisabled();
+
+      release();
+      expect(await screen.findByRole("button", { name: "Research" })).toBeEnabled();
+    });
+
     it("writes the logo only when the start screen is the first view, and plays the opening after a close", async () => {
       resetStartIntro();
       const user = userEvent.setup();
