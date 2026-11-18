@@ -138,7 +138,9 @@ interface ManagedPage {
 type StoredRead =
   | { kind: "read"; target: WorkspaceRecord; slots: FolderSlot[]; readText: string | null }
   /** The home folder holds a file this Vista can't read, so nothing was read from it. */
-  | { kind: "unreadable"; home: WorkspaceFolder };
+  | { kind: "unreadable"; home: WorkspaceFolder }
+  /** A newer action took over while it read, so it changed nothing. */
+  | { kind: "stale" };
 
 const GO_TO_FILE_SHORTCUT = "Mod+P";
 const COMMANDS_SHORTCUT = "Mod+Shift+P";
@@ -781,6 +783,32 @@ function AppShell({ adapter }: AppProps) {
   // The file text last read, written, or being written for each workspace, so a change rewrites it once.
   const writtenFileRef = useRef(new Map<string, string>());
   const fileWriteRef = useRef<Promise<void>>(Promise.resolve());
+  /** Runs a change to a workspace file after every one queued before it, so the writes land in order. */
+  const queueFileWrite = useCallback(<T,>(task: () => Promise<T>): Promise<T> => {
+    const previous = fileWriteRef.current;
+    const run = (async () => {
+      await previous;
+      return task();
+    })();
+    fileWriteRef.current = (async () => {
+      try {
+        await run;
+      } catch {
+        // The caller reports its own failure; the writes queued after it still run.
+      }
+    })();
+    return run;
+  }, []);
+  // The newest open the user asked for, so an older one still reading its folders doesn't replace it.
+  const openRequestRef = useRef<object | null>(null);
+  /** Starts an open, superseding any still under way; the result says whether it is still the newest. */
+  const beginOpen = useCallback(() => {
+    const request = {};
+    openRequestRef.current = request;
+    return () => openRequestRef.current === request;
+  }, []);
+  // Workspaces being deleted, which nothing opens meanwhile.
+  const deletingIdsRef = useRef(new Set<string>());
   const readWorkspaceFile = useCallback(
     async (home: WorkspaceFolder): Promise<WorkspaceFileRead | { status: "missing" }> => {
       const stat = await adapter.workspace.stat(home, WORKSPACE_FILE_PATH);
@@ -803,9 +831,15 @@ function AppShell({ adapter }: AppProps) {
    *
    * @param record - The stored workspace.
    * @param restore - Restores one of its folders by id.
+   * @param isCurrent - Whether the action that asked for the read is still current; once it isn't,
+   *   the read stops before it changes the store.
    */
   const readStoredWorkspace = useCallback(
-    async (record: WorkspaceRecord, restore: (id: string) => Promise<RestoreFolderResult>): Promise<StoredRead> => {
+    async (
+      record: WorkspaceRecord,
+      restore: (id: string) => Promise<RestoreFolderResult>,
+      isCurrent: () => boolean,
+    ): Promise<StoredRead> => {
       const homeId = record.folderIds[0]!;
       const homeResult = await restore(homeId);
       let target = record;
@@ -818,6 +852,9 @@ function AppShell({ adapter }: AppProps) {
         const read = await readWorkspaceFile(home);
         if (read.status === "unreadable") {
           return { kind: "unreadable", home };
+        }
+        if (!isCurrent()) {
+          return { kind: "stale" };
         }
         if (read.status === "missing") {
           target = workspaceStore.storeOnDevice(record.id) ?? record;
@@ -842,6 +879,10 @@ function AppShell({ adapter }: AppProps) {
             } else {
               slots.push({ kind: "missing", location });
             }
+          }
+          // The workspace may have changed while its folders were found, and the file as read would undo that.
+          if (!isCurrent()) {
+            return { kind: "stale" };
           }
           const applied = workspaceStore.applyWorkspaceFile(record.id, read.details, located);
           target = applied?.workspace ?? record;
@@ -873,18 +914,15 @@ function AppShell({ adapter }: AppProps) {
   /**
    * Opens a folder as the one-folder workspace on the device that is exactly it.
    *
-   * @param insteadOf - The workspace it opens in place of, whose file can't be read; nothing opens
-   *   once that one is deleted meanwhile.
+   * @param isCurrent - Whether the open is still wanted once the folder is read; nothing opens when
+   *   a newer action took over meanwhile.
    */
   const openPlainFolder = useCallback(
-    async (folder: WorkspaceFolder, approvedEdits?: ApprovedEdits, insteadOf?: string) => {
+    async (folder: WorkspaceFolder, isCurrent: () => boolean, approvedEdits?: ApprovedEdits) => {
       const tree = await adapter.workspace.readTree(folder);
       const entry: OpenFolder = { id: folder.id, name: folder.name, folder, status: "ready", tree };
       return adoptWorkspace(
-        () =>
-          insteadOf !== undefined && !workspaceStore.workspace(insteadOf)
-            ? null
-            : withLocations(workspaceStore.openFolder(folder), [entry]),
+        () => (isCurrent() ? withLocations(workspaceStore.openFolder(folder), [entry]) : null),
         approvedEdits,
       );
     },
@@ -910,11 +948,18 @@ function AppShell({ adapter }: AppProps) {
         restored,
       }: { interactive: boolean; approvedEdits?: ApprovedEdits; restored?: ReadonlyMap<string, RestoreFolderResult> },
     ): Promise<boolean> => {
+      const isNewestOpen = beginOpen();
+      // A workspace deleted meanwhile, or one being deleted, has nothing left to open.
+      const isCurrent = () =>
+        isNewestOpen() && !deletingIdsRef.current.has(record.id) && workspaceStore.workspace(record.id) !== null;
       const restore = async (id: string) => restored?.get(id) ?? (await restoreFolder(id, { interactive }));
-      const read = await readStoredWorkspace(record, restore);
+      const read = await readStoredWorkspace(record, restore, isCurrent);
+      if (read.kind === "stale") {
+        return false;
+      }
       if (read.kind === "unreadable") {
         toast.show({ kind: "info", text: describeUnreadableFile(read.home.name) });
-        return openPlainFolder(read.home, approvedEdits, record.id);
+        return openPlainFolder(read.home, isCurrent, approvedEdits);
       }
       const { target, slots, readText } = read;
       const results = slots.flatMap((slot): [string, RestoreFolderResult][] =>
@@ -943,8 +988,7 @@ function AppShell({ adapter }: AppProps) {
       );
       const opened = withLocations(target, folders);
       const wasAdopted = await adoptWorkspace(() => {
-        // Deleted while its folders were read, so there is nothing left to open.
-        if (!workspaceStore.workspace(target.id)) {
+        if (!isCurrent()) {
           return null;
         }
         workspaceStore.markOpened(target.id);
@@ -958,7 +1002,16 @@ function AppShell({ adapter }: AppProps) {
       }, approvedEdits);
       return wasAdopted;
     },
-    [adoptWorkspace, openPlainFolder, readStoredWorkspace, restoreFolder, toOpenFolder, toast, workspaceStore],
+    [
+      adoptWorkspace,
+      beginOpen,
+      openPlainFolder,
+      readStoredWorkspace,
+      restoreFolder,
+      toOpenFolder,
+      toast,
+      workspaceStore,
+    ],
   );
 
   const handleOpenFolder = useCallback(async () => {
@@ -976,6 +1029,7 @@ function AppShell({ adapter }: AppProps) {
         return;
       }
       setIsLoading(true);
+      const isNewestOpen = beginOpen();
       if (opened.accessMode !== "fallback") {
         const read = await readWorkspaceFile(opened);
         if (read.status === "ok") {
@@ -992,13 +1046,18 @@ function AppShell({ adapter }: AppProps) {
       }
       const tree = await adapter.workspace.readTree(opened);
       const folder: OpenFolder = { id: opened.id, name: opened.name, folder: opened, status: "ready", tree };
-      await adoptWorkspace(() => {
+      const wasAdopted = await adoptWorkspace(() => {
+        if (!isNewestOpen()) {
+          return null;
+        }
         // The workspace that is exactly this folder, which has no other folder.
         const record = workspaceStore.openFolder(opened);
         return withLocations(record, [folder]);
       }, approvedEdits);
-      // Shows the files of the folder the user just picked, also where the explorer is a drawer.
-      setIsSidebarOpen(true);
+      if (wasAdopted) {
+        // Shows the files of the folder the user just picked, also where the explorer is a drawer.
+        setIsSidebarOpen(true);
+      }
     } catch (err) {
       console.error("Failed to open folder:", err);
       const message = err instanceof Error ? err.message : "Failed to open the selected folder.";
@@ -1009,6 +1068,7 @@ function AppShell({ adapter }: AppProps) {
   }, [
     adapter.workspace,
     adoptWorkspace,
+    beginOpen,
     confirmUnsavedChangesInAllDocuments,
     openStoredWorkspace,
     pickFolder,
@@ -1164,15 +1224,23 @@ function AppShell({ adapter }: AppProps) {
       if (!confirmed) {
         return;
       }
-      if (workspaceRef.current?.id === workspaceId && !(await handleCloseWorkspace())) {
-        return;
+      // An open of it still under way would otherwise finish while this waits, and its tabs would stay.
+      deletingIdsRef.current.add(workspaceId);
+      let unusedFolderIds: string[];
+      let nextId: string | null;
+      try {
+        if (workspaceRef.current?.id === workspaceId && !(await handleCloseWorkspace())) {
+          return;
+        }
+        // A rewrite of its file still under way finishes first, so nothing writes for it afterwards.
+        await fileWriteRef.current;
+        const others = workspaceStore.allWorkspaces();
+        const index = others.findIndex((other) => other.id === workspaceId);
+        nextId = (others[index + 1] ?? others[index - 1])?.id ?? null;
+        ({ unusedFolderIds } = workspaceStore.removeWorkspace(workspaceId));
+      } finally {
+        deletingIdsRef.current.delete(workspaceId);
       }
-      // A rewrite of its file still under way finishes first, so nothing writes for it afterwards.
-      await fileWriteRef.current;
-      const others = workspaceStore.allWorkspaces();
-      const index = others.findIndex((other) => other.id === workspaceId);
-      const nextId = (others[index + 1] ?? others[index - 1])?.id ?? null;
-      const { unusedFolderIds } = workspaceStore.removeWorkspace(workspaceId);
       writtenFileRef.current.delete(workspaceId);
       setManaged((page) => (page?.workspace.id === workspaceId ? null : page));
       if (managedId === workspaceId) {
@@ -1221,7 +1289,10 @@ function AppShell({ adapter }: AppProps) {
       );
       try {
         const restore = async (id: string) => restored?.get(id) ?? (await restoreFolder(id, { interactive: false }));
-        const read = await readStoredWorkspace(record, restore);
+        const read = await readStoredWorkspace(record, restore, () => managedLoadRef.current === load);
+        if (read.kind === "stale") {
+          return;
+        }
         const { target, slots, readText } =
           read.kind === "read"
             ? read
@@ -1391,9 +1462,15 @@ function AppShell({ adapter }: AppProps) {
         return;
       }
       written.set(target.id, text);
-      const previous = fileWriteRef.current;
-      const write = async () => {
-        await previous;
+      void queueFileWrite(async () => {
+        // A change queued before this one may have moved the details out of this folder, or to another workspace.
+        const record = workspaceStore.workspace(target.id);
+        if (record?.storage !== "folder" || record.folderIds[0] !== home.id) {
+          if (written.get(target.id) === text) {
+            written.delete(target.id);
+          }
+          return;
+        }
         try {
           await writeWorkspaceFile(home, text);
         } catch (err) {
@@ -1403,10 +1480,9 @@ function AppShell({ adapter }: AppProps) {
           }
           toast.show({ kind: "error", text: describeFileWriteFailure(home.name, err) });
         }
-      };
-      fileWriteRef.current = write();
+      });
     },
-    [toast, writeWorkspaceFile],
+    [queueFileWrite, toast, workspaceStore, writeWorkspaceFile],
   );
   useEffect(() => syncWorkspaceFile(workspace, null), [syncWorkspaceFile, workspace]);
   useEffect(() => syncWorkspaceFile(managed?.workspace ?? null, managed?.lock ?? null), [managed, syncWorkspaceFile]);
@@ -1461,21 +1537,31 @@ function AppShell({ adapter }: AppProps) {
             location: located.get(entry.id) ?? HOME_FOLDER_LOCATION,
           }));
           const text = serializeWorkspaceFile(describeWorkspaceFile({ ...current, folders }));
-          await fileWriteRef.current;
-          await writeWorkspaceFile(homeFolder, text);
-          // Two workspaces reading one file would become copies of each other, so the one it held keeps its details here.
-          for (const other of workspaceStore.allWorkspaces()) {
-            if (other.id !== current.id && other.storage === "folder" && other.folderIds[0] === homeFolder.id) {
-              workspaceStore.storeOnDevice(other.id);
-              writtenFileRef.current.delete(other.id);
-              updateWorkspace(other.id, withoutLocations);
+          // Queued with the automatic writes, and taking the file over before the next one runs, so a write
+          // another workspace queued meanwhile finds it no longer holds the file.
+          const isStored = await queueFileWrite(async () => {
+            if (workspaceStore.workspace(current.id)?.folderIds[0] !== homeFolder.id) {
+              return false;
             }
+            await writeWorkspaceFile(homeFolder, text);
+            // Two workspaces reading one file would become copies of each other, so the one it held keeps its details here.
+            for (const other of workspaceStore.allWorkspaces()) {
+              if (other.id !== current.id && other.storage === "folder" && other.folderIds[0] === homeFolder.id) {
+                workspaceStore.storeOnDevice(other.id);
+                writtenFileRef.current.delete(other.id);
+                updateWorkspace(other.id, withoutLocations);
+              }
+            }
+            workspaceStore.storeInFolder(
+              current.id,
+              Object.fromEntries([...located].map(([folderId, location]) => [location, folderId])),
+            );
+            writtenFileRef.current.set(current.id, text);
+            return true;
+          });
+          if (!isStored) {
+            return;
           }
-          workspaceStore.storeInFolder(
-            current.id,
-            Object.fromEntries([...located].map(([folderId, location]) => [location, folderId])),
-          );
-          writtenFileRef.current.set(current.id, text);
           updateWorkspace(current.id, (previous) => ({
             ...previous,
             storage: "folder",
@@ -1500,24 +1586,27 @@ function AppShell({ adapter }: AppProps) {
         return;
       }
       try {
-        // A rewrite still under way would bring the file back after it is deleted.
-        await fileWriteRef.current;
-        if (await adapter.workspace.stat(homeFolder, WORKSPACE_FILE_PATH)) {
-          await adapter.workspace.remove(homeFolder, WORKSPACE_FILE_PATH);
-        }
+        // Queued so a rewrite queued before it can't bring the file back after it is deleted, and one queued
+        // after it finds the details kept on this device.
+        await queueFileWrite(async () => {
+          if (await adapter.workspace.stat(homeFolder, WORKSPACE_FILE_PATH)) {
+            await adapter.workspace.remove(homeFolder, WORKSPACE_FILE_PATH);
+          }
+          workspaceStore.storeOnDevice(current.id);
+        });
       } catch (err) {
         console.error("Failed to delete the workspace file:", err);
         const reason = err instanceof Error ? ` ${err.message}` : "";
         toast.show({ kind: "error", text: `Couldn't delete "${home.name}/${WORKSPACE_FILE_PATH}".${reason}` });
         return;
       }
-      workspaceStore.storeOnDevice(current.id);
       writtenFileRef.current.delete(current.id);
       updateWorkspace(current.id, withoutLocations);
     },
     [
       adapter.workspace,
       locateFolder,
+      queueFileWrite,
       readWorkspaceFile,
       targetWorkspace,
       toast,
@@ -1533,7 +1622,6 @@ function AppShell({ adapter }: AppProps) {
       if (!current) {
         return;
       }
-      const isOpen = current.id === workspaceRef.current?.id;
       try {
         const picked = await pickFolder();
         if (!picked) {
@@ -1564,7 +1652,8 @@ function AppShell({ adapter }: AppProps) {
           }
           return;
         }
-        // Only the open workspace's folders show their files.
+        // Only the open workspace's folders show their files; it may have opened while the folder was checked.
+        const isOpen = current.id === workspaceRef.current?.id;
         const tree = isOpen ? await adapter.workspace.readTree(picked) : [];
         if (targetWorkspace(current.id) === null) {
           return;
@@ -1758,7 +1847,8 @@ function AppShell({ adapter }: AppProps) {
       }
       try {
         const result = await restoreFolder(homeId, { interactive: true });
-        if (result.status !== "needs-permission") {
+        // The user may have moved on to another page while the host asked, and that page's read stays.
+        if (result.status !== "needs-permission" && managedRef.current?.workspace.id === workspaceId) {
           await loadManaged(workspaceId, new Map([[homeId, result]]));
         }
       } catch (err) {

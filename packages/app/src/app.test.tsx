@@ -2781,6 +2781,267 @@ describe("App", () => {
           expect(within(page).getByRole("button", { name: "Delete Workspace…" })).toBeEnabled();
         });
       });
+
+      describe("a slow step overtaken by a newer action", () => {
+        const EXTRA_FOLDER: WorkspaceFolder = { id: "extra", name: "extra", rootPath: "/extra" };
+        const FILE = ".vista/workspace.json";
+
+        function held() {
+          let release = () => {};
+          const promise = new Promise<void>((resolve) => {
+            release = resolve;
+          });
+          return { promise, release: () => release() };
+        }
+
+        function storeWorkspaces(lastWorkspaceId: string | null, workspaces: object[]) {
+          localStorage.setItem("vista.workspaces", JSON.stringify({ version: 1, lastWorkspaceId, workspaces }));
+        }
+
+        async function settle() {
+          await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+        }
+
+        async function openFromSwitcher(user: ReturnType<typeof userEvent.setup>, name: string) {
+          await user.click(switcherButton()!);
+          await user.click(await screen.findByRole("option", { name }));
+          await waitFor(() => expect(switcherButton()).toHaveAccessibleName(name));
+        }
+
+        it("keeps a workspace opened while an earlier open still read its folders", async () => {
+          const user = userEvent.setup();
+          const { capability, folder } = twoWorkspaces(null);
+          const read = held();
+          capability.readTree.mockImplementation(async (target) => {
+            if (target.id === "sources") {
+              await read.promise;
+            }
+            return folder(target.id).readTree(target);
+          });
+          render(<App adapter={{ platform: "web", workspace: capability }} />);
+          const page = await openSettings(user);
+          await user.click(await navigation(page).findByRole("button", { name: "Work" }));
+          await user.click(await within(page).findByRole("button", { name: "Open" }));
+          await waitFor(() => expect(capability.readTree).toHaveBeenCalledWith(SOURCES_FOLDER));
+
+          await openFromSwitcher(user, "Research");
+          read.release();
+
+          await waitFor(() => expect(capability.readTree).toHaveResolvedTimes(2));
+          await settle();
+          expect(switcherButton()).toHaveAccessibleName("Research");
+        });
+
+        it("doesn't open a workspace deleted while another's workspace file is written", async () => {
+          const user = userEvent.setup();
+          const { capability, folder } = createFoldersCapability([
+            {
+              folder: NOTES_FOLDER,
+              files: { "a.txt": PLAIN_TEXT, [FILE]: JSON.stringify({ version: 1, name: "Research", folders: ["."] }) },
+            },
+            { folder: SOURCES_FOLDER, files: { "plan.txt": PLAIN_TEXT } },
+          ]);
+          storeWorkspaces("w1", [
+            { id: "w1", name: "Research", folderIds: ["notes"], storage: "folder", locations: { ".": "notes" } },
+            { id: "w2", name: "Work", folderIds: ["sources"], lastOpenedAt: 1 },
+          ]);
+          render(<App adapter={{ platform: "web", workspace: capability }} />);
+          await findExplorerPanel();
+          await settle();
+          const write = held();
+          capability.writeFile.mockImplementation(async (target, path, bytes, options) => {
+            if (path === FILE) {
+              await write.promise;
+            }
+            return folder(target.id).writeFile(target, path, bytes, options);
+          });
+          const read = held();
+          capability.readTree.mockImplementation(async (target) => {
+            if (target.id === "sources") {
+              await read.promise;
+            }
+            return folder(target.id).readTree(target);
+          });
+          const page = await openSettings(user);
+          await user.type(within(page).getByRole("textbox", { name: "Name" }), "!");
+          await waitFor(() => expect(capability.writeFile).toHaveBeenCalledWith(NOTES_FOLDER, FILE, expect.anything()));
+
+          await user.click(navigation(page).getByRole("button", { name: "Work" }));
+          await user.click(await within(page).findByRole("button", { name: "Open" }));
+          await waitFor(() => expect(capability.readTree).toHaveBeenCalledWith(SOURCES_FOLDER));
+          await user.click(within(page).getByRole("button", { name: "Delete Workspace…" }));
+          await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" }));
+          read.release();
+          await settle();
+          write.release();
+
+          await waitFor(() => expect(storedWorkspaces().map((workspace) => workspace.id)).toEqual(["w1"]));
+          await settle();
+          expect(switcherButton()).toHaveAccessibleName("Research!");
+          expect(localStorage.getItem("vista.session.w2")).toBeNull();
+        });
+
+        it("keeps the changes made to a workspace opened while its page still read its file", async () => {
+          const user = userEvent.setup();
+          const { capability, folder } = createFoldersCapability([
+            {
+              folder: SOURCES_FOLDER,
+              files: {
+                "plan.txt": PLAIN_TEXT,
+                [FILE]: JSON.stringify({ version: 1, name: "Work", folders: [".", "../notes"] }),
+              },
+            },
+            { folder: NOTES_FOLDER, files: { "a.txt": PLAIN_TEXT } },
+            { folder: EXTRA_FOLDER, files: { "e.txt": PLAIN_TEXT } },
+          ]);
+          storeWorkspaces(null, [
+            {
+              id: "w2",
+              name: "Work",
+              folderIds: ["sources", "notes"],
+              storage: "folder",
+              locations: { ".": "sources", "../notes": "notes" },
+              lastOpenedAt: 1,
+            },
+          ]);
+          const restore = held();
+          const restoreFolder = capability.restoreFolder.getMockImplementation()!;
+          capability.restoreFolder.mockImplementation(async (id, options) => {
+            if (id === "notes" && !options?.interactive) {
+              await restore.promise;
+            }
+            return restoreFolder(id, options);
+          });
+          render(<App adapter={{ platform: "web", workspace: capability }} />);
+          const page = await openSettings(user);
+          await user.click(await navigation(page).findByRole("button", { name: "Work" }));
+          await waitFor(() => expect(capability.readFile).toHaveBeenCalledWith(SOURCES_FOLDER, FILE));
+
+          await openFromSwitcher(user, "Work");
+          await user.click(await within(page).findByRole("radio", { name: "On this device" }));
+          await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete File" }));
+          await waitFor(() => expect(storedWorkspaces()[0]?.storage).toBe("device"));
+          vi.mocked(capability.pickFolder).mockResolvedValueOnce(EXTRA_FOLDER);
+          await user.click(within(page).getByRole("button", { name: "Add Folder to Workspace" }));
+          await waitFor(() => expect(storedWorkspaces()[0]?.folderIds).toEqual(["sources", "notes", "extra"]));
+          restore.release();
+
+          await settle();
+          expect(storedWorkspaces()[0]).toMatchObject({ storage: "device", folderIds: ["sources", "notes", "extra"] });
+          expect(folder("sources").textOf(FILE)).toBeUndefined();
+        });
+
+        it("doesn't let another workspace's queued write land in a workspace file it takes over", async () => {
+          const user = userEvent.setup();
+          const { capability, folder } = createFoldersCapability([
+            {
+              folder: NOTES_FOLDER,
+              files: { "a.txt": PLAIN_TEXT, [FILE]: JSON.stringify({ version: 1, name: "Research", folders: ["."] }) },
+            },
+          ]);
+          storeWorkspaces("w1", [
+            { id: "w1", name: "Research", folderIds: ["notes"], storage: "folder", locations: { ".": "notes" } },
+            { id: "w2", name: "Copy", folderIds: ["notes"], lastOpenedAt: 1 },
+          ]);
+          render(<App adapter={{ platform: "web", workspace: capability }} />);
+          await findExplorerPanel();
+          await settle();
+          const write = held();
+          capability.writeFile.mockImplementation(async (target, path, bytes, options) => {
+            if (path === FILE) {
+              await write.promise;
+            }
+            return folder(target.id).writeFile(target, path, bytes, options);
+          });
+          const page = await openSettings(user);
+          await user.click(navigation(page).getByRole("button", { name: "Copy" }));
+          await user.click(await within(page).findByRole("radio", { name: "In notes/.vista" }));
+          await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Replace" }));
+          await waitFor(() => expect(capability.writeFile).toHaveBeenCalledWith(NOTES_FOLDER, FILE, expect.anything()));
+
+          await user.click(navigation(page).getByRole("button", { name: "Research" }));
+          await user.type(within(page).getByRole("textbox", { name: "Name" }), "!");
+          write.release();
+
+          await waitFor(() =>
+            expect(Object.fromEntries(storedWorkspaces().map(({ id, storage }) => [id, storage]))).toEqual({
+              w1: "device",
+              w2: "folder",
+            }),
+          );
+          await settle();
+          expect(JSON.parse(folder("notes").textOf(FILE)!)).toMatchObject({ name: "Copy" });
+        });
+
+        it("reads the tree of a folder added on a page whose workspace opened meanwhile", async () => {
+          const user = userEvent.setup();
+          const { capability } = createFoldersCapability([
+            ...storedFolders(),
+            { folder: EXTRA_FOLDER, files: { "e.txt": PLAIN_TEXT } },
+          ]);
+          storeWorkspaces(null, [
+            { id: "w1", name: "Research", folderIds: ["notes"], lastOpenedAt: 2 },
+            { id: "w2", name: "Work", folderIds: ["sources"], lastOpenedAt: 1 },
+          ]);
+          render(<App adapter={{ platform: "web", workspace: capability }} />);
+          const page = await openSettings(user);
+          await user.click(await navigation(page).findByRole("button", { name: "Work" }));
+          const add = await within(page).findByRole("button", { name: "Add Folder to Workspace" });
+          await waitFor(() => expect(add).toBeEnabled());
+          const check = held();
+          capability.relate.mockImplementation(async () => {
+            await check.promise;
+            return "separate";
+          });
+          vi.mocked(capability.pickFolder).mockResolvedValueOnce(EXTRA_FOLDER);
+          await user.click(add);
+          await waitFor(() => expect(capability.relate).toHaveBeenCalled());
+
+          await openFromSwitcher(user, "Work");
+          check.release();
+
+          await waitFor(() => expect(capability.readTree).toHaveBeenCalledWith(EXTRA_FOLDER));
+        });
+
+        it("doesn't read a page the user left while its folder access was asked for", async () => {
+          const user = userEvent.setup();
+          const { capability } = createFoldersCapability([
+            { folder: NOTES_FOLDER, files: { "a.txt": PLAIN_TEXT } },
+            {
+              folder: SOURCES_FOLDER,
+              files: { "plan.txt": PLAIN_TEXT, [FILE]: JSON.stringify({ version: 1, name: "Work", folders: ["."] }) },
+            },
+          ]);
+          storeWorkspaces(null, [
+            { id: "w1", name: "Research", folderIds: ["notes"], lastOpenedAt: 2 },
+            { id: "w2", name: "Work", folderIds: ["sources"], storage: "folder", locations: { ".": "sources" } },
+          ]);
+          const access = held();
+          capability.restoreFolder.mockImplementation(async (id, options) => {
+            if (id !== "sources") {
+              return { status: "restored", folder: NOTES_FOLDER };
+            }
+            if (!options?.interactive) {
+              return { status: "needs-permission", name: "sources" };
+            }
+            await access.promise;
+            return { status: "restored", folder: SOURCES_FOLDER };
+          });
+          render(<App adapter={{ platform: "web", workspace: capability }} />);
+          const page = await openSettings(user);
+          await user.click(await navigation(page).findByRole("button", { name: "Work" }));
+          await user.click(await within(page).findByRole("button", { name: "Allow access" }));
+          await waitFor(() => expect(capability.restoreFolder).toHaveBeenCalledWith("sources", { interactive: true }));
+
+          await user.click(navigation(page).getByRole("button", { name: "Research" }));
+          expect(await within(page).findByRole("heading", { name: "Research" })).toBeInTheDocument();
+          access.release();
+
+          await settle();
+          expect(within(page).getByRole("heading", { name: "Research" })).toBeInTheDocument();
+          expect(capability.stat).not.toHaveBeenCalledWith(SOURCES_FOLDER, FILE);
+        });
+      });
     });
   });
 
