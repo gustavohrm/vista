@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -28,11 +28,29 @@ function renderPage(overrides: Partial<ComponentProps<typeof WorkspacePage>> = {
     onDelete: vi.fn(),
     ...overrides,
   };
-  render(<WorkspacePage {...props} />);
-  return props;
+  const { rerender } = render(<WorkspacePage {...props} />);
+  return {
+    ...props,
+    rerender: (changes: Partial<ComponentProps<typeof WorkspacePage>>) =>
+      rerender(<WorkspacePage {...props} {...changes} />),
+  };
 }
 
 describe("WorkspacePage", () => {
+  it("drops a colour the picker showed but didn't commit once another colour is chosen", () => {
+    const props = renderPage();
+    const picker = screen.getByLabelText("Custom colour");
+    const swatch = picker.closest("label")!;
+    const idle = swatch.style.background;
+
+    fireEvent.input(picker, { target: { value: "#123456" } });
+    expect(swatch.style.background).not.toBe(idle);
+    // The picker is dismissed, and a palette swatch is chosen instead.
+    props.rerender({ workspace: { ...props.workspace, color: "rose" } });
+
+    expect(swatch.style.background).toBe(idle);
+  });
+
   it("offers Open for a workspace that isn't open", async () => {
     const user = userEvent.setup();
     const props = renderPage();

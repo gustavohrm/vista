@@ -60,6 +60,15 @@ export function SettingsPage({
   const navRef = useRef<HTMLElement>(null);
   const [isFullList, setIsFullList] = useState(false);
   const [isLeavingFullList, setIsLeavingFullList] = useState(false);
+  // A section of Vista's own opened from elsewhere, such as the command palette, brings the sections
+  // back; the full list has no item for it.
+  const [listedSection, setListedSection] = useState(section);
+  if (section !== listedSection) {
+    setListedSection(section);
+    if (section !== "workspaces") {
+      setIsFullList(false);
+    }
+  }
 
   // Taken as the page first renders, before it moves focus: StrictMode runs the effect below twice,
   // and the second run would find the page's own item focused.

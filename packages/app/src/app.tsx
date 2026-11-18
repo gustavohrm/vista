@@ -812,6 +812,8 @@ function AppShell({ adapter }: AppProps) {
       let readText: string | null = null;
       if (record.storage === "folder" && homeResult.status === "restored") {
         const home = homeResult.folder;
+        // A change to its page still being written would otherwise be read back as it was, and undone.
+        await fileWriteRef.current;
         const read = await readWorkspaceFile(home);
         if (read.status === "unreadable") {
           return { kind: "unreadable", home };
@@ -1602,23 +1604,30 @@ function AppShell({ adapter }: AppProps) {
         ...previous,
         folders: previous.folders.filter((candidate) => candidate.id !== folderId),
       });
-      if (isMissingFolder(entry)) {
-        updateWorkspace(current.id, withoutFolder);
-        return;
-      }
-      const removed = workspaceStore.removeFolder(current.id, folderId);
-      if (!removed) {
+      // A folder not found at its location keeps the one this device found there before, if any, in the
+      // store; it goes too, or it would come back with the workspace's details kept on the device.
+      const isMissing = isMissingFolder(entry);
+      const record = isMissing ? workspaceStore.workspace(current.id) : undefined;
+      const storedId = !isMissing
+        ? folderId
+        : record?.storage === "folder" &&
+            entry.location !== undefined &&
+            Object.hasOwn(record.locations, entry.location)
+          ? record.locations[entry.location]
+          : undefined;
+      const removed = storedId === undefined ? null : workspaceStore.removeFolder(current.id, storedId);
+      if (!removed && !isMissing) {
         return;
       }
       updateWorkspace(current.id, withoutFolder);
       // Another workspace may hold the folder too; only the open one's explorer shows it.
-      if (isOpen) {
+      if (isOpen && !isMissing) {
         const prefix = documentKey(folderId, "");
         setExpandedKeys((previous) => new Set([...previous].filter((key) => !key.startsWith(prefix))));
       }
-      if (removed.isFolderUnused) {
+      if (removed?.isFolderUnused && storedId !== undefined) {
         try {
-          await adapter.workspace.forgetFolder(folderId);
+          await adapter.workspace.forgetFolder(storedId);
         } catch (err) {
           // Quiet: the folder is out of the workspace; the host only keeps a record it no longer needs.
           console.error("Failed to forget a removed folder:", err);

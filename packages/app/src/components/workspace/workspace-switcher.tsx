@@ -75,7 +75,8 @@ export function WorkspaceSwitcher({
   const [activeIndex, setActiveIndex] = useState(0);
   // Set as the field closes by keyboard or by a choice, so focus goes back to the button once it is back.
   const [isReturningFocus, setIsReturningFocus] = useState(false);
-  // The list's width as it opened, kept while typing so it doesn't narrow and widen with the matches.
+  // The list's width as it opened, kept as its least while typing so it doesn't narrow with fewer
+  // matches; it still grows for a longer name, which would otherwise be cut off.
   const [listWidth, setListWidth] = useState<number | null>(null);
   const isOpen = anchor !== null;
 

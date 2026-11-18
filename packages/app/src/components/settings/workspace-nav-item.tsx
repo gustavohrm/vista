@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type FocusEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type FocusEvent } from "react";
 import { createPortal } from "react-dom";
 
 import { TOOLTIP_DELAY_MS } from "../feedback/tooltip";
@@ -37,6 +37,7 @@ export function WorkspaceNavItem({ workspace, isCurrent, onSelect }: WorkspaceNa
   const popoverId = useId();
   const statusId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef(0);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   const folders = workspace.folders ?? [];
@@ -55,6 +56,14 @@ export function WorkspaceNavItem({ workspace, isCurrent, onSelect }: WorkspaceNa
       setPosition(null);
     }
   }, [hasPopover]);
+  // Placed by its item, it moves up as far as needed to end inside the window, as measured once shown.
+  useLayoutEffect(() => {
+    const height = popoverRef.current?.offsetHeight ?? 0;
+    const lowest = Math.max(VIEWPORT_MARGIN_PX, window.innerHeight - VIEWPORT_MARGIN_PX - height);
+    if (position !== null && position.top > lowest) {
+      setPosition({ ...position, top: lowest });
+    }
+  }, [position]);
   useEffect(() => {
     if (position === null) {
       return undefined;
@@ -153,10 +162,11 @@ export function WorkspaceNavItem({ workspace, isCurrent, onSelect }: WorkspaceNa
       {hasPopover &&
         createPortal(
           <div
+            ref={popoverRef}
             role="tooltip"
             id={popoverId}
             style={position ? positionStyle(position) : undefined}
-            className={`bg-pop border-line-strong text-text-strong shadow-float fixed z-50 flex max-w-72 flex-col gap-1 rounded-md border px-2.5 py-2 text-xs leading-4 transition-opacity duration-100 motion-reduce:transition-none ${
+            className={`bg-pop border-line-strong text-text-strong shadow-float fixed z-50 flex max-w-72 flex-col gap-1 overflow-y-auto rounded-md border px-2.5 py-2 text-xs leading-4 transition-opacity duration-100 motion-reduce:transition-none ${
               position ? "visible opacity-100" : "invisible opacity-0"
             }`}
           >
@@ -181,7 +191,7 @@ export function WorkspaceNavItem({ workspace, isCurrent, onSelect }: WorkspaceNa
   );
 }
 
-/** Where `show` placed it, kept inside the window's height. */
+/** Where it was placed, no taller than the window, scrolling past that. */
 function positionStyle({ left, top }: { left: number; top: number }) {
   return {
     left,

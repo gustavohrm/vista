@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode, type ComponentProps } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SettingsPage } from "./settings-page";
 import type { ManagedWorkspace } from "./workspace-manager";
@@ -37,7 +37,7 @@ const WORKSPACES: ManagedWorkspace[] = [
   },
 ];
 
-function renderSettings(overrides: Partial<ComponentProps<typeof SettingsPage>> = {}) {
+function settingsProps(overrides: Partial<ComponentProps<typeof SettingsPage>> = {}) {
   const props: ComponentProps<typeof SettingsPage> = {
     section: "appearance",
     onSectionChange: vi.fn(),
@@ -49,6 +49,11 @@ function renderSettings(overrides: Partial<ComponentProps<typeof SettingsPage>> 
     children: <p>Section</p>,
     ...overrides,
   };
+  return props;
+}
+
+function renderSettings(overrides: Partial<ComponentProps<typeof SettingsPage>> = {}) {
+  const props = settingsProps(overrides);
   render(<SettingsPage {...props} />);
   return props;
 }
@@ -140,6 +145,29 @@ describe("SettingsPage", () => {
     expect(popover).toHaveClass("invisible");
   });
 
+  describe("placed near the window's bottom", () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("moves a workspace's folder list up to end inside the window", async () => {
+      const user = userEvent.setup();
+      renderSettings({ section: "appearance" });
+      const research = screen.getByRole("button", { name: "Research" });
+      vi.spyOn(research, "getBoundingClientRect").mockReturnValue(
+        DOMRect.fromRect({ x: 0, y: window.innerHeight - 28, width: 200, height: 28 }),
+      );
+      const popover = document.getElementById(research.getAttribute("aria-describedby")!.split(" ")[1]!)!;
+      vi.spyOn(popover, "offsetHeight", "get").mockReturnValue(100);
+
+      screen.getByRole("button", { name: "Notes" }).focus();
+      await user.tab();
+
+      expect(popover).toHaveClass("visible");
+      expect(popover.style.top).toBe(`${window.innerHeight - 8 - 100}px`);
+    });
+  });
+
   it("has no folder list for a workspace that is just its one folder, nor for the one whose page shows", () => {
     renderSettings({ section: "workspaces", shownWorkspaceId: "r" });
 
@@ -184,6 +212,22 @@ describe("SettingsPage", () => {
       expect(screen.getByRole("button", { name: "Appearance" })).toBeInTheDocument();
       expect(listedNames()).toHaveLength(12);
       expect(screen.getByRole("button", { name: "See all" })).toHaveFocus();
+    });
+
+    it("brings Vista's sections back when one is opened from elsewhere while every workspace is listed", async () => {
+      const user = userEvent.setup();
+      const props = settingsProps({ workspaces: many(20) });
+      const { rerender } = render(<SettingsPage {...props} />);
+      await user.click(screen.getByRole("button", { name: "Show 4 more" }));
+      await user.click(screen.getByRole("button", { name: "See all" }));
+      expect(screen.queryByRole("button", { name: "Appearance" })).not.toBeInTheDocument();
+
+      // As the command palette opens Keyboard Shortcuts.
+      rerender(<SettingsPage {...props} section="shortcuts" />);
+
+      expect(screen.getByRole("button", { name: "Keyboard Shortcuts" })).toHaveAttribute("aria-current", "page");
+      // As many as before See all, as when its heading brings the sections back.
+      expect(listedNames()).toHaveLength(12);
     });
 
     it("shows only as many more as there are", async () => {

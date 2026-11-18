@@ -1597,6 +1597,85 @@ describe("App", () => {
       expect(capability.writeFile).not.toHaveBeenCalled();
     });
 
+    /** Thesis, kept in `drafts`, which this device found `../sources` for before; Research holds `notes`. */
+    function storedThesisToo(lastWorkspaceId: string) {
+      localStorage.setItem(
+        "vista.workspaces",
+        JSON.stringify({
+          version: 1,
+          lastWorkspaceId,
+          workspaces: [
+            { id: "w1", name: "Research", folderIds: ["notes"], lastOpenedAt: 1 },
+            {
+              id: "w2",
+              name: "Thesis",
+              icon: "book-open",
+              folderIds: ["drafts", "sources"],
+              lastOpenedAt: 2,
+              storage: "folder",
+              locations: { ".": "drafts", "../sources": "sources" },
+            },
+          ],
+        }),
+      );
+    }
+
+    it("drops the folder this device had found at a location that isn't found now, along with it", async () => {
+      const user = userEvent.setup();
+      const { capability } = createFoldersCapability(thesisFolders());
+      storedThesisToo("w2");
+      // The host has nothing for the folder anymore, and can't find one at its location.
+      capability.restoreFolder.mockImplementation(async (id) =>
+        id === "sources"
+          ? { status: "none" }
+          : { status: "restored", folder: id === "drafts" ? DRAFTS_FOLDER : NOTES_FOLDER },
+      );
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await within(await findExplorerPanel()).findByRole("button", { name: "Locate…" });
+
+      await user.click(within(explorerPanel()).getByRole("button", { name: "Remove Folder from Workspace" }));
+      const dialog = await screen.findByRole("dialog", { name: 'Remove "sources" from the workspace?' });
+      await user.click(within(dialog).getByRole("button", { name: "Remove" }));
+
+      await waitFor(() =>
+        expect(storedThesis()).toMatchObject({ folderIds: ["drafts"], locations: { ".": "drafts" } }),
+      );
+      expect(storedThesis().locations).not.toHaveProperty("../sources");
+      await waitFor(() => expect(capability.forgetFolder).toHaveBeenCalledWith("sources"));
+    });
+
+    it("opens a workspace kept in its folder with a change to its page still being written", async () => {
+      const user = userEvent.setup();
+      const { capability, folder } = createFoldersCapability(thesisFolders());
+      storedThesisToo("w1");
+      let release = () => {};
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const write = capability.writeFile.getMockImplementation()!;
+      capability.writeFile.mockImplementation(async (...args) => {
+        await held;
+        return write(...args);
+      });
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findFileRows("a.txt");
+      await user.keyboard("{Control>},{/Control}");
+      const page = await screen.findByRole("region", { name: "Settings" });
+      await user.click(within(page).getByRole("button", { name: "Thesis" }));
+      const name = await within(page).findByRole("textbox", { name: "Name" });
+
+      await user.type(name, " 2");
+      await waitFor(() => expect(capability.writeFile).toHaveBeenCalled());
+      await user.click(within(page).getByRole("button", { name: "Open" }));
+      release();
+
+      await waitFor(() => expect(screen.queryByRole("region", { name: "Settings" })).not.toBeInTheDocument());
+      expect(switcherButton("Thesis 2")).toBeDefined();
+      expect(storedThesis()).toBeUndefined();
+      expect(JSON.parse(localStorage.getItem("vista.workspaces") ?? "null").workspaces[1].name).toBe("Thesis 2");
+      expect(JSON.parse(folder("drafts").textOf(".vista/workspace.json") ?? "null")?.name).toBe("Thesis 2");
+    });
+
     it("drops a folder that wasn't found from the workspace and its file", async () => {
       const user = userEvent.setup();
       const { capability, folder } = researchOnly(createFoldersCapability(thesisFolders()));

@@ -379,6 +379,13 @@ function CustomColorSwatch({ color, onChange }: { color: WorkspaceColor; onChang
   const inputRef = useRef<HTMLInputElement>(null);
   const isCustom = !isPaletteColor(color);
   const [preview, setPreview] = useState<string | null>(null);
+  // A colour chosen otherwise, such as a palette swatch after the picker was dismissed, replaces one
+  // the picker showed without committing.
+  const [previewedColor, setPreviewedColor] = useState(color);
+  if (color !== previewedColor) {
+    setPreviewedColor(color);
+    setPreview(null);
+  }
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
