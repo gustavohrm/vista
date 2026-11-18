@@ -162,13 +162,24 @@ export function Tooltip({ text, shortcut, position, className, children }: Toolt
       }
     };
     place();
-    // A resized window or a scrolled container can move the control, or narrow the room beside it,
-    // while the bubble shows.
+    // The control can move while the bubble shows, by a scrolled container or a layout that animates
+    // around it, and no event says so, so each frame compares where it is with where it was.
+    let last = wrapper.getBoundingClientRect();
+    let frame = 0;
+    const follow = () => {
+      const now = wrapper.getBoundingClientRect();
+      if (now.left !== last.left || now.top !== last.top || now.width !== last.width || now.height !== last.height) {
+        last = now;
+        place();
+      }
+      frame = window.requestAnimationFrame(follow);
+    };
+    frame = window.requestAnimationFrame(follow);
+    // A resized window can narrow the room beside a control that stays put.
     window.addEventListener("resize", place);
-    window.addEventListener("scroll", place, true);
     return () => {
+      window.cancelAnimationFrame(frame);
       window.removeEventListener("resize", place);
-      window.removeEventListener("scroll", place, true);
     };
   }, [isOpen, position, text, shortcut]);
   const isDismissedRef = useRef(false);

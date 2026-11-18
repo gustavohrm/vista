@@ -167,6 +167,30 @@ describe("Tooltip", () => {
       vi.restoreAllMocks();
     }
   });
+
+  it("follows its control when the layout moves it, with no resize or scroll", () => {
+    const { wrapper } = renderTooltip();
+    const bubble = screen.getByRole("tooltip", { hidden: true });
+    vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(1000);
+    vi.spyOn(bubble, "offsetWidth", "get").mockReturnValue(40);
+    let triggerLeft = 400;
+    vi.spyOn(wrapper, "getBoundingClientRect").mockImplementation(() =>
+      DOMRect.fromRect({ x: triggerLeft, width: 28, height: 28 }),
+    );
+    try {
+      fireEvent.pointerEnter(wrapper);
+      act(() => vi.advanceTimersByTime(TOOLTIP_DELAY_MS));
+      expect(bubble.style.left).toBe("394px");
+
+      // Such as a neighbor that animates open and pushes the control along.
+      triggerLeft = 460;
+      act(() => vi.advanceTimersByTime(50));
+
+      expect(bubble.style.left).toBe("454px");
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
 });
 
 describe("placeBubble", () => {
