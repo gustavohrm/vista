@@ -58,6 +58,31 @@ describe("createWorkspaceStore", () => {
     expect(stored(storage).workspaces.map((w: { id: string }) => w.id)).not.toContain(workspace.id);
   });
 
+  it("creates a new workspace for a folder that already is one, without opening it", () => {
+    const storage = memoryStorage();
+    const store = createWorkspaceStore(storage, options());
+    const existing = store.openFolder(notes);
+
+    const created = store.createWorkspace(notes);
+
+    expect(created).toMatchObject({ name: "notes", folderIds: ["f1"], storage: "device", lastOpenedAt: 0 });
+    expect(created.id).not.toBe(existing.id);
+    expect(stored(storage).workspaces).toHaveLength(2);
+    expect(store.lastWorkspace()?.id).toBe(existing.id);
+    // Open Folder still opens the workspace that was there first.
+    expect(store.openFolder(notes).id).toBe(existing.id);
+  });
+
+  it("keeps a workspace created from a folder picked through a directory input for this session only", () => {
+    const storage = memoryStorage();
+    const store = createWorkspaceStore(storage, options());
+
+    const created = store.createWorkspace({ ...notes, accessMode: "fallback" });
+
+    expect(store.workspace(created.id)).not.toBeNull();
+    expect(storage.values.has(WORKSPACES_STORAGE_KEY)).toBe(false);
+  });
+
   it("copies a damaged list aside before its first save", () => {
     const storage = memoryStorage({ [WORKSPACES_STORAGE_KEY]: "{broken" });
     const store = createWorkspaceStore(storage, options());
@@ -386,6 +411,55 @@ describe("recent workspaces", () => {
     const workspace = store.openFolder({ ...notes, accessMode: "fallback" });
 
     expect(store.recentWorkspaces().map((w) => w.id)).toEqual([workspace.id]);
+  });
+
+  it("lists only the five most recently opened", () => {
+    const store = clockedStore();
+    const ids = ["a", "b", "c", "d", "e", "f"].map(
+      (name) => store.openFolder({ id: name, name, rootPath: `/${name}` }).id,
+    );
+
+    expect(store.recentWorkspaces().map((w) => w.id)).toEqual(ids.slice(1).toReversed());
+    expect(store.allWorkspaces()).toHaveLength(6);
+  });
+
+  it("leaves out a workspace removed from Recent, without forgetting it, until it is opened again", () => {
+    const storage = memoryStorage();
+    const store = clockedStore(storage);
+    const first = store.openFolder(notes);
+    const second = store.openFolder({ id: "f2", name: "work", rootPath: "/work" });
+
+    store.hideFromRecent(first.id);
+
+    expect(store.recentWorkspaces().map((w) => w.id)).toEqual([second.id]);
+    expect(store.workspace(first.id)).toMatchObject({ hiddenFromRecent: true });
+    expect(
+      createWorkspaceStore(storage, options())
+        .recentWorkspaces()
+        .map((w) => w.id),
+    ).toEqual([second.id]);
+    store.markOpened(first.id);
+    expect(store.recentWorkspaces().map((w) => w.id)).toEqual([first.id, second.id]);
+    expect(stored(storage).workspaces.some((w: object) => "hiddenFromRecent" in w)).toBe(false);
+  });
+
+  it("brings a workspace removed from Recent back when its folder is opened again", () => {
+    const store = clockedStore();
+    const workspace = store.openFolder(notes);
+    store.hideFromRecent(workspace.id);
+
+    store.openFolder(notes);
+
+    expect(store.recentWorkspaces().map((w) => w.id)).toEqual([workspace.id]);
+  });
+
+  it("lists every workspace by name", () => {
+    const store = clockedStore();
+    store.openFolder({ id: "f2", name: "work", rootPath: "/work" });
+    store.openFolder(notes);
+    store.openFolder({ id: "f3", name: "Archive", rootPath: "/archive" });
+
+    expect(store.allWorkspaces().map((w) => w.name)).toEqual(["Archive", "notes", "work"]);
   });
 
   it("forgets a removed workspace and its session, and names the folders no workspace holds anymore", () => {

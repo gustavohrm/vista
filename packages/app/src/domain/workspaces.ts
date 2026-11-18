@@ -71,6 +71,8 @@ interface WorkspaceRecordFields {
   folderIds: string[];
   /** Milliseconds since the epoch, or 0 when unknown. */
   lastOpenedAt: number;
+  /** Set once the workspace is removed from Recent, until it is opened again; absent otherwise. */
+  hiddenFromRecent?: true;
 }
 
 export type WorkspaceRecord = WorkspaceRecordFields &
@@ -143,6 +145,7 @@ function parseWorkspaceRecord(value: unknown): WorkspaceRecord | null {
       typeof value.lastOpenedAt === "number" && Number.isFinite(value.lastOpenedAt) && value.lastOpenedAt >= 0
         ? value.lastOpenedAt
         : 0,
+    ...(value.hiddenFromRecent === true ? { hiddenFromRecent: true } : {}),
   };
   if (value.storage !== "folder") {
     return { ...fields, storage: "device" };

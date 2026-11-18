@@ -30,13 +30,22 @@ export const WORKSPACES_BACKUP_KEY = "vista.workspaces.damaged";
 
 const UNTITLED_NAME = "Untitled workspace";
 
-/** The details Workspace Settings changes. */
+/** How many workspaces Recent lists: few enough to read at a glance; the manager lists them all. */
+export const MAX_RECENT_WORKSPACES = 5;
+
+/** The details a workspace's page in the manager changes. */
 export type WorkspaceDetails = Partial<Pick<WorkspaceRecord, "name" | "icon" | "color">>;
 
 export interface WorkspaceStore {
   lastWorkspace(): WorkspaceRecord | null;
-  /** Every workspace, the most recently opened first. */
+  /** The few most recently opened workspaces, the most recent first, leaving out any removed from Recent. */
   recentWorkspaces(): WorkspaceRecord[];
+  /** Every workspace, by name. */
+  allWorkspaces(): WorkspaceRecord[];
+  /** Leaves a workspace out of Recent, without forgetting it, until it is opened again. */
+  hideFromRecent(workspaceId: string): void;
+  /** A new workspace holding just this folder, even when the folder already is one; it is not opened. */
+  createWorkspace(folder: WorkspaceFolder): WorkspaceRecord;
   workspace(workspaceId: string): WorkspaceRecord | null;
   /** The workspace Open Folder opens for a folder: the one that is exactly it, or a new one. */
   openFolder(folder: WorkspaceFolder): WorkspaceRecord;
@@ -124,7 +133,7 @@ export function createWorkspaceStore(
   }
 
   function opened(workspace: WorkspaceRecord): WorkspaceRecord {
-    const updated = { ...workspace, lastOpenedAt: now() };
+    const updated = { ...shownInRecent(workspace), lastOpenedAt: now() };
     const others = list.workspaces.filter((w) => w.id !== workspace.id);
     save({ version: 1, lastWorkspaceId: updated.id, workspaces: [...others, updated] });
     return updated;
@@ -184,7 +193,7 @@ export function createWorkspaceStore(
     markOpened(workspaceId) {
       const workspace = list.workspaces.find((w) => w.id === workspaceId);
       if (workspace && sessionOnlyIds.has(workspaceId)) {
-        replace({ ...workspace, lastOpenedAt: now() });
+        replace({ ...shownInRecent(workspace), lastOpenedAt: now() });
       } else if (workspace) {
         opened(workspace);
       }
@@ -281,8 +290,20 @@ export function createWorkspaceStore(
       if (!workspace) {
         return null;
       }
-      const { id, name, icon, color, folderIds, lastOpenedAt } = workspace;
-      return replace({ id, name, icon, color, folderIds, lastOpenedAt, storage: "device" });
+      if (workspace.storage === "device") {
+        return workspace;
+      }
+      const { id, name, icon, color, folderIds, lastOpenedAt, hiddenFromRecent } = workspace;
+      return replace({
+        id,
+        name,
+        icon,
+        color,
+        folderIds,
+        lastOpenedAt,
+        storage: "device",
+        ...(hiddenFromRecent ? { hiddenFromRecent } : {}),
+      });
     },
 
     removeFolder(workspaceId, folderId) {
@@ -329,7 +350,33 @@ export function createWorkspaceStore(
     },
 
     recentWorkspaces: () =>
-      list.workspaces.toSorted((a, b) => b.lastOpenedAt - a.lastOpenedAt || a.id.localeCompare(b.id)),
+      list.workspaces
+        .filter((w) => !w.hiddenFromRecent)
+        .toSorted((a, b) => b.lastOpenedAt - a.lastOpenedAt || a.id.localeCompare(b.id))
+        .slice(0, MAX_RECENT_WORKSPACES),
+
+    allWorkspaces: () =>
+      list.workspaces.toSorted(
+        (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }) || a.id.localeCompare(b.id),
+      ),
+
+    hideFromRecent(workspaceId) {
+      const workspace = list.workspaces.find((w) => w.id === workspaceId);
+      if (workspace && !workspace.hiddenFromRecent) {
+        replace({ ...workspace, hiddenFromRecent: true });
+      }
+    },
+
+    createWorkspace(folder) {
+      const workspace = createFor(folder.id, folder.name);
+      if (folder.accessMode === "fallback") {
+        sessionOnlyIds.add(workspace.id);
+        list = { ...list, workspaces: [...list.workspaces, workspace] };
+      } else {
+        save({ ...list, workspaces: [...list.workspaces, workspace] });
+      }
+      return workspace;
+    },
 
     removeWorkspace(workspaceId) {
       const workspace = list.workspaces.find((w) => w.id === workspaceId);
@@ -402,4 +449,9 @@ export async function checkFolderOverlap(
     }
   }
   return null;
+}
+
+/** A workspace back in Recent, as opening it puts it. */
+function shownInRecent({ hiddenFromRecent: _, ...shown }: WorkspaceRecord): WorkspaceRecord {
+  return shown;
 }
