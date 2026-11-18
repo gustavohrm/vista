@@ -620,6 +620,11 @@ body,
   }
 }
 
+/* A control turning into another in its place, such as a button into a search field over it. */
+.vista-fade {
+  animation: vista-appear 120ms var(--ease-enter) both;
+}
+
 @keyframes vista-appear {
   from {
     opacity: 0;
@@ -636,6 +641,7 @@ body,
    it still has to show that something is happening. */
 @media (prefers-reduced-motion: reduce) {
   .vista-pop,
+  .vista-fade,
   .vista-logo[data-motion="enter"] .vista-logo-arm,
   .vista-logo[data-motion="enter"] .vista-logo-rise,
   .vista-logo[data-motion="enter"] .vista-logo-letter {

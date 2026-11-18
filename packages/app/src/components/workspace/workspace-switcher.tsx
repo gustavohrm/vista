@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import type { WorkspaceColor, WorkspaceIcon } from "../../domain/workspaces";
@@ -75,6 +75,8 @@ export function WorkspaceSwitcher({
   const [activeIndex, setActiveIndex] = useState(0);
   // Set as the field closes by keyboard or by a choice, so focus goes back to the button once it is back.
   const [isReturningFocus, setIsReturningFocus] = useState(false);
+  // The list's width as it opened, kept while typing so it doesn't narrow and widen with the matches.
+  const [listWidth, setListWidth] = useState<number | null>(null);
   const isOpen = anchor !== null;
 
   const needle = query.trim().toLocaleLowerCase();
@@ -124,6 +126,10 @@ export function WorkspaceSwitcher({
     if (isOpen) {
       inputRef.current?.focus();
     }
+  }, [isOpen]);
+
+  useLayoutEffect(() => {
+    setListWidth(isOpen ? (listRef.current?.offsetWidth ?? null) : null);
   }, [isOpen]);
 
   useEffect(() => {
@@ -217,42 +223,16 @@ export function WorkspaceSwitcher({
 
   return (
     <>
-      {isOpen ? (
-        <div
-          ref={fieldRef}
-          className="bg-selected flex h-8 w-56 min-w-0 shrink items-center gap-2 rounded-md pr-2 pl-[7px] text-[13px]"
-        >
-          <i
-            className="ic-search text-text-faint flex size-5 flex-none items-center justify-center text-sm"
-            aria-hidden="true"
-          />
-          <input
-            ref={inputRef}
-            type="text"
-            role="combobox"
-            aria-label="Search workspaces"
-            aria-expanded="true"
-            aria-controls={listId}
-            aria-autocomplete="list"
-            aria-activedescendant={options[active] ? optionId(active) : undefined}
-            aria-keyshortcuts="Shift+Delete Control+,"
-            placeholder={current?.name ?? "Search workspaces"}
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setActiveIndex(0);
-            }}
-            onKeyDown={handleKeyDown}
-            className="text-text-strong placeholder:text-text-muted min-w-0 flex-1 bg-transparent outline-none"
-          />
-        </div>
-      ) : (
+      {/* The field lies over the button, which keeps its place, so nothing beside it moves: the
+          search icon fades in over the tile, and the placeholder over the name. */}
+      <div className="relative flex min-w-0 shrink">
         <button
           ref={buttonRef}
           type="button"
           aria-haspopup="listbox"
           aria-expanded="false"
           disabled={isDisabled}
+          inert={isOpen}
           onClick={open}
           className={`enabled:hover:bg-hover flex h-8 min-w-0 shrink items-center gap-2 rounded-md pr-2 pl-[7px] text-[13px] transition-colors duration-100 disabled:opacity-60 ${current ? "text-text-strong font-semibold" : "text-text-muted"}`}
         >
@@ -268,7 +248,40 @@ export function WorkspaceSwitcher({
           <span className="max-w-48 min-w-0 truncate">{current ? current.name : "No workspace"}</span>
           <i className="ic-chevrons-up-down text-text-faint flex-none text-xs" aria-hidden="true" />
         </button>
-      )}
+        {isOpen && (
+          <div
+            ref={fieldRef}
+            // The selected fill over the title bar's own, opaque so the button doesn't show through.
+            className={`vista-fade bg-chrome absolute top-0 left-0 flex h-8 w-full min-w-56 items-center gap-2 rounded-md bg-[image:linear-gradient(var(--color-selected),var(--color-selected))] pr-2 pl-[7px] text-[13px] ${current ? "font-semibold" : ""}`}
+          >
+            <span
+              aria-hidden="true"
+              className="text-text-faint flex size-5 flex-none items-center justify-center text-sm"
+            >
+              <i className="ic-search" />
+            </span>
+            <input
+              ref={inputRef}
+              type="text"
+              role="combobox"
+              aria-label="Search workspaces"
+              aria-expanded="true"
+              aria-controls={listId}
+              aria-autocomplete="list"
+              aria-activedescendant={options[active] ? optionId(active) : undefined}
+              aria-keyshortcuts="Shift+Delete Control+,"
+              placeholder={current?.name ?? "Search workspaces"}
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setActiveIndex(0);
+              }}
+              onKeyDown={handleKeyDown}
+              className="text-text-strong placeholder:text-text-muted min-w-0 flex-1 bg-transparent p-0 outline-none"
+            />
+          </div>
+        )}
+      </div>
       {anchor &&
         createPortal(
           <div
@@ -279,8 +292,8 @@ export function WorkspaceSwitcher({
             aria-label="Workspaces"
             // Choosing with the pointer keeps the typing in the field.
             onPointerDown={(event) => event.preventDefault()}
-            style={{ left: anchor.x, top: anchor.y }}
-            className="vista-menu vista-pop card soft floating fixed z-50 flex max-h-[calc(100vh-56px)] w-64 flex-col overflow-y-auto p-1 text-[13px] [--ui-radius-surface:8px]"
+            style={{ left: anchor.x, top: anchor.y, minWidth: listWidth ?? undefined }}
+            className="vista-menu vista-pop card soft floating fixed z-50 flex max-h-[calc(100vh-56px)] min-w-48 flex-col overflow-y-auto p-1 text-[13px] [--ui-radius-surface:8px]"
           >
             {options.map((option, index) => (
               <SwitcherOption
@@ -326,6 +339,10 @@ function SwitcherOption({
 }: SwitcherOptionProps) {
   const isWorkspace = option.kind === "workspace";
   const canRemove = isWorkspace && option.isRecent && !option.isCurrent;
+  // The row is the menu's own: the icon column, the label, and the check at the right end. A workspace
+  // adds its Settings button before the check, or before its X, shown while it is picked or under the
+  // pointer and holding its space otherwise, so the list keeps its width.
+  const revealClass = isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100";
   return (
     <>
       {/* oxlint-disable-next-line jsx-a11y/control-has-associated-label, jsx-a11y/prefer-tag-over-role -- a hairline with no label, not a control */}
@@ -340,41 +357,49 @@ function SwitcherOption({
         aria-checked={isWorkspace ? option.isCurrent : undefined}
         onPointerMove={onHighlight}
         onClick={onChoose}
-        className={`group relative flex min-h-7 flex-none cursor-pointer items-center gap-2 rounded px-2 ${
+        className={`text-text group flex min-h-7 w-full flex-none cursor-pointer items-center gap-2 rounded px-2 text-left ${
           isActive ? "bg-selected" : ""
-        } ${isWorkspace ? (canRemove ? "pr-14" : "pr-8") : ""}`}
+        } ${isWorkspace && !option.isCurrent ? "pr-1" : ""}`}
       >
-        {isWorkspace ? (
-          <WorkspaceGlyph icon={option.workspace.icon} color={option.workspace.color} isTile className="text-xs" />
-        ) : (
-          <span aria-hidden="true" className="flex size-5 flex-none items-center justify-center text-sm">
-            {option.icon}
-          </span>
-        )}
-        <span className="text-text min-w-0 flex-1 truncate">{isWorkspace ? option.workspace.name : option.label}</span>
-        {isWorkspace && option.isCurrent && <i className="ic-check flex-none text-sm" aria-hidden="true" />}
+        <span aria-hidden="true" className="flex w-4 flex-none justify-center text-sm">
+          {isWorkspace ? (
+            <WorkspaceGlyph icon={option.workspace.icon} color={option.workspace.color} isTile className="text-xs" />
+          ) : (
+            option.icon
+          )}
+        </span>
+        <span className="flex-1 text-left whitespace-nowrap">{isWorkspace ? option.workspace.name : option.label}</span>
         {isWorkspace && (
-          <span
-            className={`absolute top-1/2 right-1 flex -translate-y-1/2 items-center gap-0.5 ${
-              isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-            }`}
+          <RowButton
+            title={`Settings for "${option.workspace.name}"`}
+            onClick={onOpenSettings}
+            className={`ml-4 ${revealClass}`}
           >
-            <RowButton title={`Settings for "${option.workspace.name}"`} onClick={onOpenSettings}>
-              <i className="ic-sliders-horizontal" />
-            </RowButton>
-            {canRemove && (
-              <RowButton title={`Remove "${option.workspace.name}" from Recent`} onClick={onRemove}>
-                <i className="ic-x" />
-              </RowButton>
-            )}
-          </span>
+            <i className="ic-sliders-horizontal" />
+          </RowButton>
+        )}
+        {isWorkspace && option.isCurrent && <i className="ic-check flex-none text-sm" aria-hidden="true" />}
+        {canRemove && (
+          <RowButton title={`Remove "${option.workspace.name}" from Recent`} onClick={onRemove} className={revealClass}>
+            <i className="ic-x" />
+          </RowButton>
         )}
       </div>
     </>
   );
 }
 
-function RowButton({ title, onClick, children }: { title: string; onClick: () => void; children: ReactNode }) {
+function RowButton({
+  title,
+  onClick,
+  className,
+  children,
+}: {
+  title: string;
+  onClick: () => void;
+  className: string;
+  children: ReactNode;
+}) {
   return (
     <button
       type="button"
@@ -387,7 +412,7 @@ function RowButton({ title, onClick, children }: { title: string; onClick: () =>
         event.stopPropagation();
         onClick();
       }}
-      className="icon-button text-text-faint bg-pop size-5 text-xs"
+      className={`icon-button text-text-faint size-5 text-xs ${className}`}
     >
       {children}
     </button>

@@ -89,7 +89,8 @@ export function WorkspaceNav({
 
   return (
     <>
-      {/* Below md the label hides with the others, and the buttons start the row. */}
+      {/* Below md the label hides with the others, and the buttons start the row. From md up the
+          search field takes the label's place exactly, its text where the label's was. */}
       <div className="flex flex-none items-center gap-0.5 md:mb-1 md:pl-2.5">
         {isSearching ? (
           <input
@@ -100,7 +101,7 @@ export function WorkspaceNav({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={handleSearchKeyDown}
-            className="text-text-strong placeholder:text-text-faint border-line h-6 w-32 min-w-0 rounded-md border bg-transparent px-1.5 text-xs outline-none focus-visible:border-[var(--focus-ring)] md:w-auto md:flex-1"
+            className="vista-fade text-text-strong placeholder:text-text-faint border-line h-6 w-32 min-w-0 rounded-md border bg-transparent px-1.5 text-xs outline-none focus-visible:border-[var(--focus-ring)] md:w-auto md:flex-1 md:rounded-none md:border-0 md:px-0 md:font-medium"
           />
         ) : (
           <span className="text-text-faint hidden flex-1 text-xs font-medium md:block">Workspaces</span>
