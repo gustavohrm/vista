@@ -2019,6 +2019,26 @@ describe("App", () => {
       expect(storedWorkspaces().find((workspace) => workspace.id === "w2")?.hiddenFromRecent).toBeUndefined();
     });
 
+    it("closes the switcher's list as Tab or Shift+Tab moves focus on", async () => {
+      const user = userEvent.setup();
+      const { capability } = twoWorkspaces();
+      render(<App adapter={{ platform: "web", workspace: capability }} />);
+      await findExplorerPanel();
+      const switcher = screen.getByRole("button", { name: "Research" });
+
+      const leaveWith = async (key: string) => {
+        await user.click(switcher);
+        expect(screen.getByRole("combobox", { name: "Search workspaces" })).toHaveFocus();
+        await user.keyboard(key);
+
+        expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+        expect(switcher).not.toHaveFocus();
+        expect(document.activeElement).not.toBe(document.body);
+      };
+      await leaveWith("{Tab}");
+      await leaveWith("{Shift>}{Tab}{/Shift}");
+    });
+
     it("leaves Shift+Delete to the search field, and Ctrl+, to Settings, on a row they don't act on", async () => {
       const user = userEvent.setup();
       const { capability } = twoWorkspaces();

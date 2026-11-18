@@ -207,8 +207,12 @@ export function WorkspaceSwitcher({
       }
     } else if (event.key === "Enter") {
       choose(option);
-    } else if (event.key === "Escape" || event.key === "Tab") {
+    } else if (event.key === "Escape") {
       close();
+    } else if (event.key === "Tab") {
+      // Focus moves on, either way, as it leaves any other menu.
+      setAnchor(null);
+      return;
     } else if (event.key === "Delete" && event.shiftKey) {
       if (!canRemove(option)) {
         // Left to the field, where it cuts the selection.
