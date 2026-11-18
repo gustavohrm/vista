@@ -1,6 +1,6 @@
 ---
 status: DRAFT
-last_updated: 2026-11-16
+last_updated: 2026-11-18
 scope: Repo-wide direction for Vista, limited to work already stated in the repository's docs and READMEs.
 ---
 
@@ -22,6 +22,7 @@ Durable direction for Vista: the current focus, what is planned, what is possibl
 - **Moving files between workspace folders.** Moves work within one folder until the host contract gains a copy between folders. Source: `docs/specs/workspaces.md`, "Folder rules".
 - **More file formats.** `.json`, `.yaml`, canvas representations, and embedded graph links. Source: `docs/specs/workspaces.md`, "Supported formats & view modes".
 - **More interface themes.** Daylight as a theme of its own, and a monochrome one, beside today's light and dark appearances. Source: `docs/guidelines/brand.md`, "Colours".
+- **Interface languages.** English, Brazilian Portuguese, and Spanish, chosen in Settings or detected from the system, with dates and numbers following the language. Fully translated only once failures carry a kind instead of platform text. Sources: `docs/specs/languages.md`; `docs/specs/errors.md`, "Direction".
 - **Mobile folder access (Android and iOS).** The Tauri host builds for both, but opening, remembering, and restoring folders is desktop-only until mobile folder access and platform permissions are designed and tested. Support is not claimed before validation on those platforms. Sources: `apps/native/README.md`, "Mobile preparation"; `docs/architecture.md`, "Platform scope".
 - **App-store distribution and operating-system code signing for the native app.** Installers are signed for the updater, not by a code-signing certificate, and are not in any app store. Source: `apps/native/README.md`.
 
