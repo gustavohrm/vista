@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-17
+last_updated: 2026-11-23
 scope: The changelog under docs/changelog/, the check that holds a release to it, and where its entries are shown.
 ---
 
@@ -84,6 +84,8 @@ Keeping every released version linked is otherwise a review rule: removing a cor
 Only the current version's page is checked. An older page that was written before a rule existed is brought in line when it is next edited, rather than failing every run. `pnpm verify` runs the check, so the pull request that raises the version fails without its entry. The release workflow runs it again, in `Check the tag`, before anything is built, so a tag cannot publish a version that has no entry.
 
 ## Where entries are shown
+
+Every entry is shown in English today. [Languages → The changelog](languages.md#the-changelog), which is approved and not yet implemented, adds a translated page per language beside each entry, shown in the interface language on the surfaces below except GitHub; this document takes those pages in when they are implemented.
 
 - **In the app.** `packages/app/src/changelog.ts` inlines `docs/changelog/` at build time, so each build carries the entries up to its own version, in the browser and on the desktop, and reads them without a network request. **About** in Settings shows the running version's release date and summary, and **What's New** opens the entry, as [the workspace spec](workspaces.md#settings) describes. In the browser, the start screen's desktop download names the version it downloads, which is the running one, since a release deploys the web app. The release deploys the web app a moment before it publishes `latest.json`, which the download links follow, so for that moment, or until a rerun if the manifest upload fails, the label names the new version beside the previous installer. Reading the version from the manifest instead would cost a request on every start for that window alone.
 - **In the update offer.** A newer version cannot be in the running build, so `scripts/release-manifest.mjs` writes the entry's `description` into the `notes` field of `latest.json`, and the desktop updater passes it to the app. The offer and the update notice show it as plain text.
