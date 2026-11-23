@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-18
+last_updated: 2026-11-23
 scope: Index of the project documentation.
 ---
 
