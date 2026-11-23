@@ -86,7 +86,7 @@ Most review findings that hold up are about these, not about style: a [study of 
 - Prefer observable behavior to implementation details.
 - A change in behavior changes its tests in the same change.
 
-Rejected: mocking the filesystem and storage everywhere, because a mock answers only what the test tells it, so it cannot show containment, symlink, and stale-output bugs, such as those found in review threads on [codenhub/codenhub#24](https://github.com/codenhub/codenhub/pull/24#discussion_r3875960231), [#25](https://github.com/codenhub/codenhub/pull/25#discussion_r3888570403), and [#293](https://github.com/codenhub/codenhub/pull/293#discussion_r4304630356); a real temporary directory does. In Vista's TypeScript, file access goes through the File System Access API or Tauri, which a test cannot reach without a browser or a window, so those adapters stay mocked in unit tests; the rule bites on code that runs under Node.js, such as `scripts/`, and on Rust.
+Rejected: mocking the filesystem and storage everywhere, because a mock answers only what the test tells it, so it cannot show containment, symlink, and stale-output bugs, such as one found in [codenhub/codenhub#24](https://github.com/codenhub/codenhub/pull/24#discussion_r3875960231); a real temporary directory does. In Vista's TypeScript, file access goes through the File System Access API or Tauri, which a test cannot reach without a browser or a window, so those adapters stay mocked in unit tests; the rule bites on code that runs under Node.js, such as `scripts/`, and on Rust.
 
 The [testing specification](../specs/tests.md) defines the test categories, configuration, scripts, and coverage target.
 

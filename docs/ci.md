@@ -101,7 +101,7 @@ The groups take minor and patch updates only, so a week is one grouped pull requ
 
 A dependency held back for a known breakage gets an `ignore` entry with the reason and the condition for removing it.
 
-Rejected: upgrading the pins by hand. Dependabot moves the SHA pin and its version comment together, so an automated upgrade is still a pinned, reviewable diff, without the cost of tracking every action's releases. Renovate does the same job and was rejected: it runs as a GitHub App with a configuration of its own, while Dependabot is built into GitHub and already raises the repository's security updates.
+Rejected: relying on hand upgrades alone, which the procedure above stays for, such as an update Dependabot cannot make. Dependabot moves the SHA pin and its version comment together, so an automated upgrade is still a pinned, reviewable diff, without the cost of tracking every action's releases. Renovate does the same job and was rejected: it runs as a GitHub App with a configuration of its own, while Dependabot is built into GitHub and already raises the repository's security updates.
 
 ## Labels
 

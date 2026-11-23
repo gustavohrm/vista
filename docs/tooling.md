@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-17
+last_updated: 2026-11-23
 scope: Setup, how the root scripts are implemented, the TypeScript and Vitest configuration, the order of `pnpm verify`, narrowing a run, adding a package, and generated and ignored output.
 ---
 
@@ -118,4 +118,4 @@ These paths are produced by the tools and ignored by git. None is edited by hand
 | `*.tsbuildinfo`                          | `tsc` incremental builds                             |
 | `*.local`, `.env`, `.env.*`, `.dev.vars` | Local configuration and credentials, never committed |
 
-The formatters and linters skip the build output and generated paths through their own ignore lists, so generated files are never reformatted or reported. `.prettierignore` carries the same set for Markdown.
+The formatters and linters skip the build output and generated paths through their own ignore lists, so generated files are never reformatted or reported. `.prettierignore` carries the same set for Markdown, and oxfmt reads it as well.
