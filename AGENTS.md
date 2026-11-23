@@ -10,14 +10,45 @@ This repository is docs-first. [`docs/README.md`](docs/README.md) indexes every 
 - A defect found while working on something else is filed and worked around, not fixed on the spot, as [`CONTRIBUTING.md`](CONTRIBUTING.md#a-defect-found-mid-task) describes. That includes a defect in a dependency you also maintain, such as an `@codenhub/*` package: the fix belongs in that dependency's repository.
 - Never put a secret, token, password, or personal data in a log, an error, a test snapshot, a commit, or a message to the user, including test values you generate. Note and document content in a user's folder counts as personal data; [`SECURITY.md`](SECURITY.md) describes what Vista protects, and [`docs/guidelines/security.md`](docs/guidelines/security.md) how code keeps it.
 - Report failing checks, skipped steps, and unfinished work plainly, with the output that shows it. Never describe a partial result as complete.
-- Close by listing material judgment calls and assumptions so they can be confirmed or reversed.
+- Close with the material judgment calls and assumptions, so they can be confirmed or reversed, in the one list [Reporting to the maintainer](#reporting-to-the-maintainer) describes.
+
+## Reporting to the maintainer
+
+The maintainer decides from what your message says, not from the work behind it, and usually sees only your last message: not your reasoning, your tool output, or the messages in between. A message they cannot act on without that context gets approved unread, and that is how unnecessary changes reach `main`.
+
+- **Stand alone.** Say what was asked, what you did, and what is left, in the message itself. Do not lean on "the option from before", "finding 7", or "as discussed" without restating what it was.
+- **Plain words first.** Lead with what changes for someone using what the project ships or working in the repository. Specification names, framework behavior, and file paths come after, as evidence for the explanation, never in place of it. A question that names a spec, a framework, or a code path without an example of what changes for the user is not ready to ask.
+- **Ask only what is the maintainer's to give.** A question is for a choice about behavior, public surface, a security property, or a recorded decision; for approval of an outward-facing action, as [Collaboration](#collaboration) requires; or for information the task needs that you cannot get yourself, such as a log only the maintainer can see. Settle anything else with the conventional choice and list it as an assumption.
+- **Keep what you did short.** A few lines on what changed for the user; the diff carries the rest.
+- **Put everything that needs an answer in one numbered list.** Questions, decisions, and judgment calls worth reversing are one list, not separate sections that overlap or repeat each other. Each item carries its recommendation, so it can be answered with its number and a word, and an assumption takes one line with what undoing it would cost.
+- **End with how to reply.** Say what reply takes every recommendation, as in "Reply 'go' to take all of them, or name the numbers to change." A message with nothing to answer says so. Writing the reply should take less effort than reading the message.
+- **Raise what a realistic case supports.** Every finding you report invites a change. Leave out what no case supports, and say plainly when the right answer is to change nothing.
+- **Give each question what it takes to answer it:**
+  - The situation, in a sentence or two that someone new to the area follows.
+  - A concrete example: the code someone writes or the input they give, and what happens today.
+  - The options, each with what it does to that example and what it costs: what breaks, what is added and then maintained, who has to change their code. "Change nothing" is one of them whenever it is viable.
+  - A recommendation and its reason.
+
+Before, not answerable without the research behind it:
+
+> ECMA-402 defaults `roundingMode` to `halfExpand`, while IEEE 754 and much accounting software use `halfEven`. Should `formatPrice` follow `halfEven` for ties?
+
+After:
+
+> `formatPrice(2.345)` shows `$2.35` today. Some accounting software shows `$2.34` for the same value, because it rounds a half to the even digit, so a total built from our prices can be a cent off from an invoice.
+>
+> - (a) Change nothing. It matches what browsers do with `Intl.NumberFormat`. No new code.
+> - (b) Round halves to even by default. Breaking: about half the displayed prices that end in a half cent change, such as `$2.35` to `$2.34`, in every app.
+> - (c) Add a `rounding` option. Nothing breaks, but it is one more option to document, test, and keep.
+>
+> Recommendation: (a) until someone reports a mismatch. (b) breaks every app for a case nobody has hit, and (c) adds surface nobody has asked for.
 
 ## Judgment
 
-- Documentation records decisions; it does not prove them right. Follow a decision while it stands, and judge it too: when reviewing or auditing, ask both whether the work matches the decision and whether the decision is right, and report each finding as the one it is. `docs/guidelines/documentation.md` owns this distinction and the rules for recording and reversing decisions.
+- Documentation records decisions; it does not prove them right. Follow a decision while it stands, and judge it too: when reviewing or auditing, ask both whether the work matches the decision and whether the decision is right, and report each finding as the one it is. [`docs/guidelines/documentation.md`](docs/guidelines/documentation.md) owns this distinction and the rules for recording and reversing decisions.
 - Recorded decisions carry across sessions; a session's preferences do not. Do not reverse a recorded decision, or recommend reversing it, without naming what it did not weigh.
 - Ground each finding in a realistic case: the input or action, what goes wrong, and for whom. A concern you cannot ground is a question; state it as one.
-- A fix that adds or changes a contract, such as a workspace export, a host adapter capability, a Tauri command or capability, a persisted setting or on-disk format, a default, a limit, or a dependency, is a decision, not a fix. Present it as the problem, the options, your recommendation, and why, and wait for approval before making it.
+- A fix that adds or changes a contract, such as a workspace export, a host adapter capability, a Tauri command or capability, a persisted setting or on-disk format, a default, a limit, or a dependency, is a decision, not a fix. Ask it as [Reporting to the maintainer](#reporting-to-the-maintainer) describes, and wait for approval before making it.
 
 ## Project specifics
 

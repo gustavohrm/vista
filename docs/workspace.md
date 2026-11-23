@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-17
+last_updated: 2026-11-23
 scope: The root script names and what each guarantees, the shared tool configurations, the pinned toolchain, install rules, how dependency versions are declared, and how the git hooks are wired.
 ---
 
@@ -57,7 +57,7 @@ There is no `pnpm format` script. When a name matches no pnpm script, pnpm runs 
 | `.gitattributes`                     | LF line endings in the repository and the working tree on every platform, and the binary file types.                                                   |
 | `.oxfmtrc.json`                      | oxfmt: 120 columns, double quotes, semicolons, trailing commas, sorted imports and `package.json` keys. Markdown is excluded; Prettier owns it.        |
 | `.prettierrc.json5`                  | Prettier, for Markdown only: `proseWrap: "never"`, so a paragraph is one line and a diff shows the sentence that changed.                              |
-| `.prettierignore`                    | Paths inside the Markdown set Prettier leaves alone: build output and caches.                                                                          |
+| `.prettierignore`                    | Paths Prettier and oxfmt both leave alone: build output and caches.                                                                                    |
 | `.oxlintrc.json`                     | oxlint's plugins and rules, described [below](#lint-rules).                                                                                            |
 | `apps/native/src-tauri/rustfmt.toml` | rustfmt at width 120, the same as oxfmt's, so both languages wrap at the same column.                                                                  |
 | `tsconfig*.json`, `vitest.config.ts` | The compiler and test runner configuration, which [Tooling](tooling.md#typescript-and-vitest) describes file by file.                                  |
