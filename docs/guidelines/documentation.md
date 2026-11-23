@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-17
+last_updated: 2026-11-23
 scope: How durable project documentation under `docs/` is structured, maintained, interpreted, and written, including this document.
 ---
 
@@ -65,13 +65,19 @@ When APPROVED or IMPLEMENTED documents conflict with each other, the conflict MU
 
 Each rule has one owning document; others link to it rather than repeat it. A rule stated twice drifts into two rules. Prefer updating existing documents over creating overlapping ones. Prefer updating documentation before changing code, so the intended direction is clear before implementation follows.
 
-Delete a document once it no longer describes current or intended direction, in the same change that makes it stale. Git keeps its history; an outdated document kept in the tree only competes with the current one in search and review.
+Delete a document once it no longer describes current or intended direction, in the same change that makes it stale. The same holds for a section or a sentence: the plan for a version once it ships, a design note for one version, a roadmap item once it is built, and a statement about behavior the code no longer has. In a project that releases, a release is the change that makes most of these stale, so the release removes them. Git keeps their history; outdated text kept in the tree only competes with the current one in search and review.
 
 ## Recording decisions
 
 A document that settles a choice MUST say why. Where real alternatives existed, it SHOULD name the ones it rejected and, briefly, why each lost. A decision recorded without its reason can only be obeyed or overruled, not judged, and the next reader reopens it.
 
-A change that reverses a recorded decision MUST name what the decision did not weigh: a concrete case it gets wrong, a measurement, or a constraint that has changed since. Preferring another option is not enough; without new evidence, the recorded decision stands. The reversing change records the old choice among the rejected alternatives, with the evidence that reversed it, so the decision is not reopened on arguments already heard.
+Record the reason, not the history behind it. A document states what is true now: "Do X", "Don't do Y", "Do X when Y", and the reason X is right. It does not tell how the decision came about, what was measured on which date, how many files did something when the rule was written, or what an earlier version of the document said. That evidence belongs in the commit and the pull request that make the change, where Git keeps it with the date it held. A count goes stale the day after it is written, and a story of how a rule arose makes the reader dig the rule out of it.
+
+A decision MAY link the issue, pull request, or commit that holds its evidence, as in "Decided in #203". A link points to the history without retelling it, so someone judging the decision can find what it weighed. One link per decision, next to its reason; a list of everything tried, measured, and dropped stays in Git. Rejected: no links at all, which leaves a reader no way to check a decision before reopening it. Rejected: the evidence written into the document, which turns it into a record of what happened, long and describing behavior the code no longer has.
+
+A change that reverses a recorded decision MUST name what the decision did not weigh: a concrete case it gets wrong, a measurement, or a constraint that has changed since. Preferring another option is not enough; without new evidence, the recorded decision stands. The evidence goes in the reversing change's pull request. The document records the old choice among the rejected alternatives, with the reason it lost, so the decision is not reopened on arguments already heard.
+
+Two kinds of document record history by design and are outside this rule: a changelog, which describes a release, and a trap in a scoped `AGENTS.md`, which names the versions and evidence it held under so it can be checked again.
 
 This applies to every document that uses this status model, wherever it lives in the repository.
 
@@ -96,7 +102,7 @@ Each document has one role, and its wording follows from it:
 - **Agent guidance** is what only an agent needs: `AGENTS.md` for behavior, and a scoped `AGENTS.md` for the traps of its directory. It does not restate guidance.
 - **Leaf documentation** is everything else: specifications, architecture, references, `SECURITY.md`, and app and package READMEs. A leaf describes; it does not route. It says what another document covers ("`docs/ci.md` explains the job split"), never when to read it ("read `docs/ci.md` before changing CI", "start with", "see X for details"). The reader judges from the task whether to open it.
 
-Routing instructions go stale as documents move and multiply, and they presume the reader's task. A description stays true as long as the document it names does.
+Routing instructions go stale as documents move and multiply, and they presume the reader's task. A description stays true as long as the document it names still covers that subject.
 
 ## What belongs here
 
@@ -167,7 +173,7 @@ A guide, a README, or any page meant to teach what the project ships to someone 
 
 Documents that teach, such as guides, READMEs, and tutorials, use the voice below. Everything else a person reads to check or decide, such as specifications, guidelines, changelogs, issues, and pull request descriptions, is plain: precise and friendly, without the jokes. A reader of a specification is checking compliance, and a reader of a changelog is deciding whether to upgrade; neither is helped by a wink. The guardrails below hold for plain text too.
 
-An earlier version of this section applied the playful voice to every document, changelogs and pull request descriptions included. It was narrowed because those are read to check or decide, where a joke costs the reader time and rewards nothing.
+Rejected: the playful voice in every document, changelogs and pull request descriptions included, because those are read to check or decide, where a joke costs the reader time and rewards nothing.
 
 Write like a knowledgeable friend explaining something they built: precise, a little dry, and happy to grin about the odd parts. Humor lives in the connective prose, such as introductions, transitions, and asides, and in notes, tips, informational callouts, and anything else where nothing is at risk. There it rewards the reader without slowing them down.
 
@@ -184,3 +190,5 @@ Guardrails:
 - **Keep it out of warnings, security notes, error explanations, and copyable code.** A reader in those places needs the fact, nothing else. Example code may use playful names in snippets meant only to be read; code meant to be pasted uses realistic names.
 - **One wink, not a stand-up set.** A light touch every few paragraphs is enough. If a joke needs explaining or has to be forced in, cut it.
 - **Leave existing tone to its owner.** A writer does not change the tone of existing text, adding jokes to it or sanding them off, without the approval of whoever owns that text. Fix what is wrong or unclear; keep the voice it was written in.
+
+A project's brand guideline, when it has one, MAY refine this voice: move it toward formal or toward playful, extend it to other documents, add principles and words to use or avoid, and set the voice for surfaces this section does not cover, such as a website or marketing copy. Where the two differ on tone, the brand guideline wins for that project. The guardrails above hold either way. The [documentation index](../README.md) links it.

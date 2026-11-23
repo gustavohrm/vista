@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-17
+last_updated: 2026-11-23
 scope: The root script names and what each guarantees, the shared tool configurations, the pinned toolchain, install rules, how dependency versions are declared, and how the git hooks are wired.
 ---
 
@@ -30,7 +30,7 @@ This document is the workspace's contract: the names of the root scripts and wha
 
 `pnpm verify` is what CI runs ([CI](ci.md)), so a green local `verify` predicts a green run. [Tooling](tooling.md#verification) gives the order of its steps and why.
 
-Keep these names as they are: CI, the git hooks and the agent instructions call them by name.
+Keep these names as they are: CI, the git hooks and the agent instructions call them by name. There is no plain `format` script on purpose: when a name matches no script, pnpm runs the program of that name from `PATH` instead, and on Windows `format` is the system disk formatter. The explicit `format:check` and `format:fix` names avoid that.
 
 Vista's own root scripts:
 

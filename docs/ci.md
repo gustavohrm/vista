@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-17
+last_updated: 2026-11-23
 scope: Continuous integration, the pinned toolchain, action pinning, dependency updates, and the checks that report on pull requests.
 ---
 
@@ -16,7 +16,7 @@ CI reads those same files rather than repeating a version: `pnpm/action-setup` t
 
 `rust-toolchain.toml` sits at the repository root rather than in `apps/native/` because rustup resolves it from the working directory, and the Rust scripts run cargo from the package with `--manifest-path`, so the root file applies to every Rust command.
 
-`engineStrict` is deliberate friction. A patch-level difference rarely matters, and the one time it does, the failure looks like a bug in the change under review rather than a difference in the runtime. It is set in `pnpm-workspace.yaml` because pnpm 11 ignores `engine-strict` in `.npmrc`, where it used to be: `pnpm config get engine-strict` printed `undefined`, and an install outside `engines` only warned.
+`engineStrict` is deliberate friction. A patch-level difference rarely matters, and the one time it does, the failure looks like a bug in the change under review rather than a difference in the runtime. It is set in `pnpm-workspace.yaml` because pnpm 11 ignores `engine-strict` in `.npmrc`, where an install outside `engines` would only warn.
 
 ## Jobs
 
@@ -101,7 +101,7 @@ The groups take minor and patch updates only, so a week is one grouped pull requ
 
 A dependency held back for a known breakage gets an `ignore` entry with the reason and the condition for removing it.
 
-Upgrades used to be manual: nothing updated the pins automatically, a cost the pinning rule accepted rather than overlooked. That decision did not weigh that Dependabot moves the SHA pin and its version comment together, so an automated upgrade is still a pinned, reviewable diff, and the cost no longer has to be paid. Renovate does the same job and was rejected: it runs as a GitHub App with a configuration of its own, while Dependabot is built into GitHub and already raises the repository's security updates.
+Rejected: upgrading the pins by hand. Dependabot moves the SHA pin and its version comment together, so an automated upgrade is still a pinned, reviewable diff, without the cost of tracking every action's releases. Renovate does the same job and was rejected: it runs as a GitHub App with a configuration of its own, while Dependabot is built into GitHub and already raises the repository's security updates.
 
 ## Labels
 
