@@ -23,12 +23,12 @@ export function SectionHeading({
     <>
       <div className="flex min-w-0 items-center gap-3">
         {icon}
-        <h2 className="text-text-strong min-w-0 flex-1 truncate text-[22px] leading-tight font-semibold tracking-[-0.015em]">
+        <h2 className="text-text-strong min-w-0 flex-1 truncate text-[22px] leading-7 font-semibold tracking-[-0.015em]">
           {title}
         </h2>
         {action}
       </div>
-      <p className="text-text-muted mt-1 mb-7 text-[13px] leading-normal">{lead}</p>
+      <p className="text-text-muted mt-1 mb-7 text-[13px] leading-5">{lead}</p>
     </>
   );
 }
@@ -54,7 +54,7 @@ export function GroupHeading({
 }) {
   const spacing = `mb-2.5 ${isFirst ? "" : "mt-8"}`;
   const heading = (
-    <h3 id={id} className={`text-text-strong text-[13px] font-semibold ${action ? "" : spacing}`}>
+    <h3 id={id} className={`text-text-strong text-[13px] leading-5 font-semibold ${action ? "" : spacing}`}>
       {children}
     </h3>
   );
@@ -110,7 +110,7 @@ interface SettingsRowProps {
  * @returns Row element.
  */
 export function SettingsRow({ label, description, htmlFor, labelId, descriptionId, children }: SettingsRowProps) {
-  const labelClass = "text-text-strong block text-[13px] font-medium";
+  const labelClass = "text-text-strong block text-[13px] leading-5 font-medium";
   return (
     <div className="border-line flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3.5 [&+&]:border-t">
       <div className="min-w-48 flex-1">
@@ -124,7 +124,7 @@ export function SettingsRow({ label, description, htmlFor, labelId, descriptionI
           </span>
         )}
         {description && (
-          <span id={descriptionId} className="text-text-muted mt-0.5 block text-[12.5px] leading-[1.45]">
+          <span id={descriptionId} className="text-text-muted mt-0.5 block text-[12.5px] leading-[18px]">
             {description}
           </span>
         )}

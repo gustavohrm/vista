@@ -20,4 +20,5 @@ export type {
   WorkspaceNode,
 } from "./ports";
 export { LEGACY_FOLDER_ID, WorkspaceError } from "./ports";
+export { initAppearance } from "./theme/appearance";
 export { getThemeInstance, useTheme } from "./theme/theme-manager";

@@ -1,10 +1,11 @@
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 
 import { joinWorkspacePath } from "../../domain/path-validation";
 import { isDesktopViewport } from "../../domain/viewport";
 import type { WorkspaceNode } from "../../ports";
 import { documentKey } from "../../state/documents";
+import { useReducedMotion } from "../../theme/appearance";
 import { Tooltip } from "../feedback/tooltip";
 import { Menu, MENU_SEPARATOR, type MenuEntry } from "../menu/menu";
 import { FileIcon } from "./file-icon";
@@ -575,7 +576,7 @@ const EASE_MOVE = [0.4, 0, 0.2, 1] as const;
  * @returns The rows, in a box that animates its height.
  */
 function FolderChildren({ children }: { children: ReactNode }) {
-  const isReduced = useReducedMotion() ?? false;
+  const isReduced = useReducedMotion();
   return (
     <motion.div
       initial={{ height: 0, opacity: 0, overflow: "hidden" }}

@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 
+import type { AppearanceSettings } from "../domain/appearance";
 import {
   parseSettings,
   SETTINGS_STORAGE_KEY,
@@ -11,6 +12,7 @@ import {
 
 /** Changes to apply to some settings, by section. */
 export interface SettingsChanges {
+  appearance?: Partial<AppearanceSettings>;
   editor?: Partial<EditorSettings>;
   files?: Partial<FileSettings>;
   updates?: Partial<UpdateSettings>;
@@ -29,6 +31,7 @@ export function useSettings(): [Settings, (changes: SettingsChanges) => void] {
     setSettings((previous) => {
       const next: Settings = {
         ...previous,
+        appearance: { ...previous.appearance, ...changes.appearance },
         editor: { ...previous.editor, ...changes.editor },
         files: { ...previous.files, ...changes.files },
         updates: { ...previous.updates, ...changes.updates },

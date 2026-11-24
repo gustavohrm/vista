@@ -121,7 +121,7 @@ export function VistaLoader({ label, className }: { label: string; className?: s
           </g>
         </g>
       </svg>
-      <span className="visually-hidden">{label}</span>
+      <span className="vista-loader-label">{label}</span>
     </output>
   );
 }

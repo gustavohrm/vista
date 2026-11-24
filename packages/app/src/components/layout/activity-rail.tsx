@@ -1,7 +1,8 @@
-import { motion, useAnimate, useReducedMotion } from "motion/react";
+import { motion, useAnimate } from "motion/react";
 import { useId, type ReactNode } from "react";
 
 import type { DesktopDownload } from "../../domain/desktop-download";
+import { useReducedMotion } from "../../theme/appearance";
 import { Tooltip } from "../feedback/tooltip";
 
 interface ActivityRailProps {
@@ -163,7 +164,7 @@ function RailButton({
   indicatorId,
   children,
 }: RailButtonProps) {
-  const isReduced = useReducedMotion() ?? false;
+  const isReduced = useReducedMotion();
   const isActive = isPressed === true || isCurrent === true;
   return (
     <Tooltip text={tooltip} position={position} className="flex flex-none">

@@ -1,7 +1,7 @@
-import { useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, type KeyboardEvent } from "react";
 
 import { parseCsv, serializeCsv } from "../../domain/csv";
+import { useReducedMotion } from "../../theme/appearance";
 import { useReorderDrag } from "../use-reorder-drag";
 
 /** Body rows run down the table; each row carries its index among the records. */
@@ -59,7 +59,7 @@ export function CsvTableEditor({ content, onChange }: CsvTableEditorProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   // Set when a row is moved from the keyboard, so its handle takes focus again in its new place.
   const movedRowRef = useRef<number | null>(null);
-  const isReducedMotion = useReducedMotion() ?? false;
+  const isReducedMotion = useReducedMotion();
 
   /** Moves the body row at record index `rowIndex` to the place `toIndex` among the body rows. */
   const moveRow = useCallback(

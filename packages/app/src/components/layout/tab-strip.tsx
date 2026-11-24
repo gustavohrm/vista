@@ -1,4 +1,4 @@
-import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import {
   useEffect,
   useRef,
@@ -11,6 +11,7 @@ import {
 
 import { shortenPath, type DocumentLocation } from "../../domain/document-location";
 import type { OpenDocument } from "../../state/documents";
+import { useReducedMotion } from "../../theme/appearance";
 import { Menu, MENU_SEPARATOR, type MenuEntry } from "../menu/menu";
 import { useReorderDrag } from "../use-reorder-drag";
 import { FileIcon } from "./file-icon";
@@ -65,7 +66,7 @@ export function TabStrip({
   // order. Chromium keeps focus on an element React moves, so the e2e tests pass without this; the
   // HTML focus fixup rule drops focus from a removed element, which other engines may apply to a move.
   const movedKeyRef = useRef<string | null>(null);
-  const isReducedMotion = useReducedMotion() ?? false;
+  const isReducedMotion = useReducedMotion();
   const { drag, startDrag } = useReorderDrag(listRef, onReorder, isReducedMotion, TAB_DRAG_OPTIONS);
 
   const closeTabs = async (focusedKey: string | null, close: () => Promise<boolean>) => {
@@ -322,7 +323,7 @@ function Tab({
   // A closed tab stays a moment while it shrinks away; meanwhile it is not a tab any more, so the
   // row's keys, focus, and drag measure only the tabs that remain.
   const isPresent = useIsPresent();
-  const isReduced = useReducedMotion() ?? false;
+  const isReduced = useReducedMotion();
 
   const handleAuxClick = (event: MouseEvent) => {
     if (event.button === MIDDLE_BUTTON) {

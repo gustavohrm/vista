@@ -1,3 +1,7 @@
+/* Read before the package's own order, so `essential-motion` comes before its `base` layer, whose
+   reduced-motion reset is a layered `!important` no later rule can undo. */
+@layer essential-motion, theme, base, components, utilities;
+
 @import "@codenhub/styles/tw";
 @import "@codenhub/icons";
 @import "@codenhub/toaster/styles";
@@ -11,6 +15,54 @@
 @theme {
   --font-default: "Inter Variable", "Segoe UI", system-ui, sans-serif;
   --font-mono: ui-monospace, "Cascadia Mono", "Cascadia Code", Consolas, "DejaVu Sans Mono", monospace;
+  /* The themed colours. These are names only, so Tailwind makes their utilities, such as `bg-chrome`;
+     each theme's block below gives every one of them its value. */
+  --color-chrome: currentColor;
+  --color-frame: currentColor;
+  --color-line: currentColor;
+  --color-line-strong: currentColor;
+  --color-hover: currentColor;
+  --color-selected: currentColor;
+  --color-text-muted: currentColor;
+  --color-text-faint: currentColor;
+  --color-pop: currentColor;
+  --color-scrim: currentColor;
+  --color-selection: currentColor;
+  --color-selection-text: currentColor;
+  --color-highlight: currentColor;
+  --color-highlight-soft: currentColor;
+  --color-action: currentColor;
+  --color-action-hover: currentColor;
+  --color-action-text: currentColor;
+  --shadow-float:
+    0 8px 24px light-dark(rgb(0 0 0 / 10%), rgb(0 0 0 / 45%)), 0 1px 3px light-dark(rgb(0 0 0 / 6%), rgb(0 0 0 / 30%));
+  /* Daylight, the brand colour, whatever the theme: the logo's bar, and the Daylight theme's
+     selection, find matches, and dark primary button. */
+  --color-daylight: #c5f03b;
+  /* The window's close button under the pointer, the red Windows uses, so it reads as the system's. */
+  --color-window-close: #c42b1c;
+  --radius-frame: 10px;
+  --ease-enter: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 1, 1);
+  --ease-move: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:root {
+  --ui-ink: var(--color-line);
+}
+
+/* The themes, as `docs/specs/appearance.md` defines them. Each sets every themed colour above and
+   every `@codenhub/styles` colour Vista draws with, as `light-dark()` pairs: `@codenhub/theme` puts
+   the theme's class on <html> and sets `color-scheme`, which picks the half. A theme's class on any
+   element shows that theme inside it, which is how Settings previews them. Every variant is measured
+   against the ratios Contrast sets, in `apps/web/tests/e2e/appearance.spec.ts`, and its pairings are
+   recorded in `docs/guidelines/brand.md`. Unlayered, so they win over the package's layered tokens. */
+
+/* Daylight: ink and paper, with Daylight as the selection, the find matches, and the dark primary
+   button. Selection is full Daylight with ink text on both grounds: a translucent Daylight over the
+   dark frame mixed to olive. Also the root's, so the page has colours before the class is set. */
+:root,
+.theme-daylight {
   --color-chrome: light-dark(#f4f4f4, #0a0a0a);
   --color-frame: light-dark(#ffffff, #161616);
   --color-line: light-dark(#e8e8e8, #262626);
@@ -23,26 +75,142 @@
      step lighter than the frame in dark mode, where a shadow alone barely shows. */
   --color-pop: light-dark(#ffffff, #1c1c1c);
   --color-scrim: light-dark(rgb(0 0 0 / 28%), rgb(0 0 0 / 55%));
-  --shadow-float:
-    0 8px 24px light-dark(rgb(0 0 0 / 10%), rgb(0 0 0 / 45%)), 0 1px 3px light-dark(rgb(0 0 0 / 6%), rgb(0 0 0 / 30%));
-  /* Daylight, the brand colour: text selection, find matches, and the dark primary button. Selection
-     is full Daylight with ink text on both grounds: a translucent Daylight over the dark frame mixed
-     to olive. */
-  --color-daylight: #c5f03b;
   --color-selection: var(--color-daylight);
   --color-selection-text: #0a0a0a;
   --color-highlight: light-dark(rgb(197 240 59 / 75%), rgb(197 240 59 / 35%));
   --color-highlight-soft: light-dark(rgb(197 240 59 / 35%), rgb(197 240 59 / 16%));
-  /* The window's close button under the pointer, the red Windows uses, so it reads as the system's. */
-  --color-window-close: #c42b1c;
-  --radius-frame: 10px;
-  --ease-enter: cubic-bezier(0.2, 0, 0, 1);
-  --ease-exit: cubic-bezier(0.3, 0, 1, 1);
-  --ease-move: cubic-bezier(0.4, 0, 0.2, 1);
+  /* The primary button: ink on light grounds, Daylight on dark ones, where Daylight is strongest
+     and the one action per view is the right place to spend it. */
+  --color-action: light-dark(#0a0a0a, var(--color-daylight));
+  --color-action-hover: light-dark(#404040, #d6f670);
+  --color-action-text: light-dark(#fafafa, #0a0a0a);
+  /* The package's own colours, as it ships them: the focus ring and checkboxes stay ink. */
+  --color-background: light-dark(#fafafa, #0a0a0a);
+  --color-foreground: light-dark(#f5f5f5, #171717);
+  --color-surface: light-dark(#e5e5e5, #262626);
+  --color-border: light-dark(#a1a1a1, #404040);
+  --color-border-hover: light-dark(#525252, #737373);
+  --color-control-border: #737373;
+  --color-text: light-dark(#0a0a0a, #fafafa);
+  --color-text-secondary: light-dark(#404040, #a1a1a1);
+  --color-text-strong: light-dark(#171717, #f5f5f5);
+  --color-text-hover: light-dark(#404040, #e5e5e5);
+  --color-text-contrast: light-dark(#fafafa, #0a0a0a);
+  --color-primary: light-dark(#0a0a0a, #fafafa);
+  --color-primary-hover: light-dark(#404040, #e5e5e5);
+  --color-primary-contrast: light-dark(#fafafa, #0a0a0a);
+  --color-primary-subtle: light-dark(#e5e5e5, #171717);
+  --color-primary-strong: light-dark(#171717, #f5f5f5);
+  --color-tooltip: light-dark(#ffffff, #404040);
+  --color-tooltip-contrast: light-dark(#171717, #f5f5f5);
+  --focus-ring: color-mix(in oklab, var(--color-primary) 64%, transparent);
 }
 
-:root {
-  --ui-ink: var(--color-line);
+/* Neutral: Daylight's greys with no colour at all, selection and find matches included. */
+.theme-neutral {
+  --color-chrome: light-dark(#f4f4f4, #0a0a0a);
+  --color-frame: light-dark(#ffffff, #161616);
+  --color-line: light-dark(#e8e8e8, #262626);
+  --color-line-strong: light-dark(#d4d4d4, #333333);
+  --color-hover: light-dark(rgb(0 0 0 / 4.5%), rgb(255 255 255 / 5.5%));
+  --color-selected: light-dark(rgb(0 0 0 / 7%), rgb(255 255 255 / 9%));
+  --color-text-muted: light-dark(#5c5c5c, #a3a3a3);
+  --color-text-faint: light-dark(#737373, #737373);
+  --color-pop: light-dark(#ffffff, #1c1c1c);
+  --color-scrim: light-dark(rgb(0 0 0 / 28%), rgb(0 0 0 / 55%));
+  --color-selection: light-dark(#d4d4d4, #525252);
+  --color-selection-text: light-dark(#0a0a0a, #fafafa);
+  --color-highlight: light-dark(rgb(0 0 0 / 22%), rgb(255 255 255 / 30%));
+  --color-highlight-soft: light-dark(rgb(0 0 0 / 9%), rgb(255 255 255 / 12%));
+  --color-action: light-dark(#0a0a0a, #fafafa);
+  --color-action-hover: light-dark(#404040, #d4d4d4);
+  --color-action-text: light-dark(#fafafa, #0a0a0a);
+  --color-background: light-dark(#fafafa, #0a0a0a);
+  --color-foreground: light-dark(#f5f5f5, #171717);
+  --color-surface: light-dark(#e5e5e5, #262626);
+  --color-border: light-dark(#a1a1a1, #404040);
+  --color-border-hover: light-dark(#525252, #737373);
+  --color-control-border: #737373;
+  --color-text: light-dark(#0a0a0a, #fafafa);
+  --color-text-secondary: light-dark(#404040, #a1a1a1);
+  --color-text-strong: light-dark(#171717, #f5f5f5);
+  --color-text-hover: light-dark(#404040, #e5e5e5);
+  --color-text-contrast: light-dark(#fafafa, #0a0a0a);
+  --color-primary: light-dark(#0a0a0a, #fafafa);
+  --color-primary-hover: light-dark(#404040, #e5e5e5);
+  --color-primary-contrast: light-dark(#fafafa, #0a0a0a);
+  --color-primary-subtle: light-dark(#e5e5e5, #171717);
+  --color-primary-strong: light-dark(#171717, #f5f5f5);
+  --color-tooltip: light-dark(#ffffff, #404040);
+  --color-tooltip-contrast: light-dark(#171717, #f5f5f5);
+  --focus-ring: color-mix(in oklab, var(--color-primary) 64%, transparent);
+}
+
+/* Ocean: blue-grey grounds and lines, with teal as the primary colour, the selection, and the find
+   matches. */
+.theme-ocean {
+  --color-chrome: light-dark(#ecf1f6, #08111c);
+  --color-frame: light-dark(#fbfdff, #0f1b29);
+  --color-line: light-dark(#dbe4ed, #1c2b3c);
+  --color-line-strong: light-dark(#c3d0dd, #2a3c50);
+  --color-hover: light-dark(rgb(16 42 72 / 5%), rgb(176 208 240 / 6.5%));
+  --color-selected: light-dark(rgb(16 42 72 / 8.5%), rgb(176 208 240 / 10.5%));
+  --color-text-muted: light-dark(#4a5d72, #9cafc3);
+  --color-text-faint: light-dark(#63768b, #6f8499);
+  --color-pop: light-dark(#ffffff, #142334);
+  --color-scrim: light-dark(rgb(4 18 36 / 30%), rgb(0 4 10 / 60%));
+  --color-selection: light-dark(#99f0de, #2dd4bf);
+  --color-selection-text: light-dark(#0a1622, #04201d);
+  --color-highlight: light-dark(rgb(45 212 191 / 55%), rgb(45 212 191 / 40%));
+  --color-highlight-soft: light-dark(rgb(45 212 191 / 24%), rgb(45 212 191 / 16%));
+  --color-action: light-dark(#0f766e, #2dd4bf);
+  --color-action-hover: light-dark(#115e59, #5eead4);
+  --color-action-text: light-dark(#ffffff, #04201d);
+  --color-background: light-dark(#f5f8fb, #08111c);
+  --color-foreground: light-dark(#eaf0f6, #0f1b29);
+  --color-surface: light-dark(#d9e3ed, #1c2b3c);
+  --color-border: light-dark(#8fa2b6, #3a4e64);
+  --color-border-hover: light-dark(#4f647b, #6a8097);
+  --color-control-border: light-dark(#6b7f94, #61778e);
+  --color-text: light-dark(#08121d, #e8f0f8);
+  --color-text-secondary: light-dark(#3a4e64, #a9bccf);
+  --color-text-strong: light-dark(#050d16, #f1f6fb);
+  --color-text-hover: light-dark(#33475d, #c7d6e5);
+  --color-text-contrast: light-dark(#f5f8fb, #08111c);
+  --color-primary: light-dark(#0f766e, #2dd4bf);
+  --color-primary-hover: light-dark(#115e59, #5eead4);
+  --color-primary-contrast: light-dark(#ffffff, #04201d);
+  --color-primary-subtle: light-dark(#ccfbf1, #0b3b3a);
+  --color-primary-strong: light-dark(#134e4a, #99f6e4);
+  --color-tooltip: light-dark(#ffffff, #2a3c50);
+  --color-tooltip-contrast: light-dark(#0a1622, #f1f6fb);
+  /* At full strength: teal at the other themes' 64% falls under 3:1 on the light frame. */
+  --focus-ring: var(--color-primary);
+}
+
+/* More contrast, over whichever theme is shown: muted and faint text reach 4.5:1, and every line,
+   border, and hover or selected fill 3:1, against the grounds they sit on. Each is mixed from the
+   theme's own text and frame, so a new theme needs no rules of its own here, only measuring. After
+   the themes, so it wins over them, also over a theme class on the same element. `contrast-more` shows
+   the level inside one element, as a preview in Settings does. */
+:root[data-contrast="more"],
+.contrast-more {
+  --color-text-muted: color-mix(in oklab, var(--color-text) 78%, var(--color-frame));
+  --color-text-faint: color-mix(in oklab, var(--color-text) 72%, var(--color-frame));
+  --color-line: color-mix(in oklab, var(--color-text) 52%, var(--color-frame));
+  --color-line-strong: color-mix(in oklab, var(--color-text) 60%, var(--color-frame));
+  --color-border: var(--color-line-strong);
+  --color-control-border: var(--color-line-strong);
+  /* A fill at 3:1 leaves little room for the text on it to keep 4.5:1, and less on dark grounds,
+     where the same share of light text is brighter, so each scheme takes its own share. */
+  --color-hover: light-dark(
+    color-mix(in oklab, var(--color-text) 46%, transparent),
+    color-mix(in oklab, var(--color-text) 37%, transparent)
+  );
+  --color-selected: light-dark(
+    color-mix(in oklab, var(--color-text) 49%, transparent),
+    color-mix(in oklab, var(--color-text) 39%, transparent)
+  );
 }
 
 /* A shortcut written out beside its action, as in `Ctrl + P`. Vista's own rather than the package's
@@ -60,14 +228,14 @@
   @apply text-text-muted hover:bg-hover hover:text-text aria-expanded:bg-selected aria-expanded:text-text-strong aria-pressed:bg-selected aria-pressed:text-text-strong inline-flex flex-none cursor-pointer items-center justify-center rounded-md transition-colors duration-100 outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] disabled:pointer-events-none disabled:opacity-40;
 }
 
-/* The primary button: ink on light grounds, Daylight with ink text on dark ones, where Daylight is
-   strongest and the one action per view is the right place to spend it. Scoped to the button: the
-   package derives the focus ring and checkboxes from `--color-primary`, which stay neutral.
-   Unlayered, so it wins over the package's layered `.primary` intent. */
+/* The primary button, in the theme's action colour, which can differ from its primary: Daylight's is
+   ink on light grounds and Daylight on dark ones, while its focus ring and checkboxes, which the
+   package derives from `--color-primary`, stay ink. Unlayered, so it wins over the package's layered
+   `.primary` intent. */
 .btn.primary {
-  --intent-color: light-dark(var(--color-neutral-950), var(--color-daylight));
-  --intent-hover: light-dark(var(--color-neutral-700), #d6f670);
-  --intent-contrast: light-dark(var(--color-neutral-50), var(--color-neutral-950));
+  --intent-color: var(--color-action);
+  --intent-hover: var(--color-action-hover);
+  --intent-contrast: var(--color-action-text);
   --intent-border: var(--intent-color);
 }
 
@@ -189,13 +357,13 @@ dialog[data-toast-instance] .toast-dialog-btn-cancel:hover {
   background: var(--color-hover);
 }
 
-/* The confirming button follows `.btn.primary` below: ink on light, Daylight on dark. The toaster
+/* The confirming button follows `.btn.primary` above, in the theme's action colour. The toaster
    colours it from `--color-primary`, so the primary tokens are set on Vista's confirm dialogs only
    (`vista-dialog`, given in `toast.tsx`), leaving the package's focus ring and checkboxes as they are. */
 .vista-dialog {
-  --color-primary: light-dark(var(--color-neutral-950), var(--color-daylight));
-  --color-primary-hover: light-dark(var(--color-neutral-700), #d6f670);
-  --color-primary-contrast: light-dark(var(--color-neutral-50), var(--color-neutral-950));
+  --color-primary: var(--color-action);
+  --color-primary-hover: var(--color-action-hover);
+  --color-primary-contrast: var(--color-action-text);
 }
 
 /* Toasts sit on the floating surface the menus and tooltips use, so a routine notice is no louder
@@ -467,7 +635,7 @@ body,
 /* Find matches in rendered views. Text matches are painted with the CSS Custom Highlight API, so
    the rendered editors' DOM is left alone, and matching form fields such as CSV cells carry
    `data-find-match` (see `components/editor/dom-find.ts`). Colors match the raw editor's: every
-   match in soft Daylight, the current one in full. */
+   match in the theme's soft highlight, the current one in its full highlight. */
 ::highlight(vista-find) {
   background-color: var(--color-highlight-soft);
 }
@@ -546,7 +714,33 @@ body,
 }
 
 .vista-loader {
+  position: relative;
   animation: vista-appear 200ms ease-out 300ms both;
+}
+
+/* With reduced motion the loader pulses in place, the one animation kept, since it still has to show
+   that something is happening. `!important` in a layer before the package's `base`, the one way past
+   its reset, as the package's accessibility guide shows for an essential animation. */
+@layer essential-motion {
+  :root[data-motion="reduce"] .vista-logo[data-motion="loop"] .vista-logo-sun {
+    animation: vista-pulse 800ms ease-in-out infinite alternate !important;
+  }
+
+  /* A motion level's preview in Settings plays while the pointer is over its card or the card has
+     keyboard focus, whatever the level in effect, since it moves only when asked to. */
+  .vista-motion-card:is(:hover, :has(:focus-visible)) .vista-motion-mark[data-preview="all"] {
+    animation: vista-motion-slide 1200ms var(--ease-move) infinite alternate !important;
+  }
+
+  .vista-motion-card:is(:hover, :has(:focus-visible)) .vista-motion-mark[data-preview="reduced"] {
+    animation: vista-pulse 800ms ease-in-out infinite alternate !important;
+  }
+}
+
+@keyframes vista-motion-slide {
+  to {
+    left: calc(100% - 0.625rem);
+  }
 }
 
 @keyframes vista-draw {
@@ -637,9 +831,11 @@ body,
   }
 }
 
-/* Reduced motion: the entrance shows its last frame at once, and the loader pulses in place, since
-   it still has to show that something is happening. */
-@media (prefers-reduced-motion: reduce) {
+/* Reduced and no motion, as `data-motion` on <html> says; Vista's CSS never reads the media query,
+   since `theme/appearance.ts` resolves it into the attribute. The package's reset already ends every
+   keyframe animation at once, but keeps its delay, so the logo's staggered entrance would still
+   appear piece by piece: the entrance is removed instead, and each element shows its last frame. */
+:root:is([data-motion="reduce"], [data-motion="none"]) {
   .vista-pop,
   .vista-fade,
   .vista-logo[data-motion="enter"] .vista-logo-arm,
@@ -647,8 +843,37 @@ body,
   .vista-logo[data-motion="enter"] .vista-logo-letter {
     animation: none;
   }
+}
 
+/* With no motion at all, the loader is a still mark with its label shown under it, since it still
+   has to say that something is happening. */
+:root[data-motion="none"] {
   .vista-logo[data-motion="loop"] .vista-logo-sun {
-    animation: vista-pulse 800ms ease-in-out infinite alternate;
+    animation: none;
   }
+
+  .vista-loader-label {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    width: max-content;
+    height: auto;
+    margin: 0.75rem 0 0;
+    clip-path: none;
+    overflow: visible;
+    translate: -50% 0;
+    color: var(--color-text-muted);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+  }
+}
+
+/* The loader's label, announced as a status and hidden unless there is no motion to show the wait. */
+.vista-loader-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

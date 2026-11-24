@@ -1,5 +1,7 @@
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 import { useState, type ReactNode } from "react";
+
+import { useReducedMotion } from "../../theme/appearance";
 
 /** How long a shell part takes to come in, in seconds. Leaving takes two thirds of it. */
 const ENTER_SECONDS = 0.3;
@@ -22,7 +24,7 @@ interface ShellRevealProps {
  * @returns The part, in a box that animates its size.
  */
 export function ShellReveal({ axis, children }: ShellRevealProps) {
-  const isReduced = useReducedMotion() ?? false;
+  const isReduced = useReducedMotion();
   // Clipped only while the size changes: once in, tooltips in the part reach past its edge.
   const [isResizing, setIsResizing] = useState(false);
   const closed = { [axis]: 0, opacity: 0 };

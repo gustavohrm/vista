@@ -1,6 +1,14 @@
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 
 import { COMMAND_CATEGORIES, formatShortcut, type Command } from "../../commands";
+import {
+  THEMES,
+  type ContrastLevel,
+  type ContrastPreference,
+  type MotionPreference,
+  type SchemePreference,
+  type ThemeId,
+} from "../../domain/appearance";
 import type { ChangelogEntry } from "../../domain/changelog";
 import {
   isValidOpenSizeMb,
@@ -10,61 +18,387 @@ import {
   type Settings,
 } from "../../domain/settings";
 import type { SettingsChanges } from "../../state/settings";
-import type { ThemePreference, ThemeState } from "../../theme/theme-manager";
+import { useAppearanceLevels } from "../../theme/appearance";
+import type { ThemeState } from "../../theme/theme-manager";
+import { Tooltip } from "../feedback/tooltip";
 import { GroupHeading, SectionHeading, SettingsGroup, SettingsRow, Switch } from "./settings-parts";
 import { formatReleaseDate, WhatsNewDialog } from "./whats-new-dialog";
 
-const THEME_OPTIONS: readonly { value: ThemePreference; label: string }[] = [
-  { value: "system", label: "System" },
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
+// Each icon up a pixel: centred on the text box, a glyph sits below the middle of the capitals beside it.
+const SCHEME_OPTIONS: readonly { value: SchemePreference; label: string; icon: ReactNode }[] = [
+  { value: "system", label: "System", icon: <i className="ic-monitor -translate-y-px text-sm" aria-hidden="true" /> },
+  { value: "light", label: "Light", icon: <i className="ic-sun -translate-y-px text-sm" aria-hidden="true" /> },
+  { value: "dark", label: "Dark", icon: <i className="ic-moon -translate-y-px text-sm" aria-hidden="true" /> },
+];
+
+type ContrastCard = Exclude<ContrastPreference, "system">;
+type MotionCard = Exclude<MotionPreference, "system">;
+
+const CONTRAST_CARDS: readonly { value: ContrastCard; label: string }[] = [
+  { value: "standard", label: "Standard" },
+  { value: "more", label: "More" },
+];
+
+const MOTION_CARDS: readonly { value: MotionCard; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "reduced", label: "Reduced" },
+  { value: "none", label: "None" },
 ];
 
 /** The segments of a choice of a few short options, in one hairline box like the view switch. */
 const SEGMENT_CLASS =
-  "text-text-muted hover:text-text has-checked:bg-selected has-checked:text-text-strong has-focus-visible:ring-1 has-focus-visible:ring-[var(--focus-ring)] relative flex h-6 cursor-pointer items-center rounded-[5px] px-3 text-[13px] transition-colors duration-100";
+  "text-text-muted hover:text-text has-checked:bg-selected has-checked:text-text-strong has-focus-visible:ring-1 has-focus-visible:ring-[var(--focus-ring)] relative flex h-6 cursor-pointer items-center gap-1.5 rounded-[5px] px-3 text-[13px] transition-colors duration-100";
 
 /**
- * The theme.
+ * A choice of a few short options as one row of segments, named and described by its settings row.
  *
- * @param props - The theme and the way to change it.
+ * @param props - The options, each with an optional icon before its label, the one chosen, what to do on a choice, and the ids of the row's name and description.
+ * @returns Radio group element.
+ */
+function SegmentedChoice<T extends string>({
+  options,
+  value,
+  onChange,
+  labelId,
+  descriptionId,
+}: {
+  options: readonly { value: T; label: string; icon?: ReactNode }[];
+  value: T;
+  onChange: (value: T) => void;
+  labelId: string;
+  descriptionId: string;
+}) {
+  const name = useId();
+  return (
+    <div
+      role="radiogroup"
+      aria-labelledby={labelId}
+      aria-describedby={descriptionId}
+      className="border-line flex rounded-md border p-0.5"
+    >
+      {options.map((option) => (
+        <label key={option.value} className={SEGMENT_CLASS}>
+          <input
+            type="radio"
+            name={name}
+            value={option.value}
+            checked={value === option.value}
+            onChange={() => onChange(option.value)}
+            className="sr-only"
+          />
+          {option.icon}
+          {option.label}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+/** Each theme's class, written out whole, since Tailwind finds only literal class names. */
+const THEME_CLASS: Record<ThemeId, string> = {
+  daylight: "theme-daylight",
+  neutral: "theme-neutral",
+  ocean: "theme-ocean",
+};
+
+/**
+ * A theme as a small window in its own colours, in the scheme now in effect: a title, lines of text,
+ * a selection, and the primary action, on the frame within the chrome.
+ *
+ * @param props - The theme to show, and the contrast level to show it at.
+ * @returns Decorative preview element.
+ */
+function ThemePreview({ theme, contrast }: { theme: ThemeId; contrast: ContrastLevel }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`${THEME_CLASS[theme]} ${contrast === "more" ? "contrast-more" : ""} bg-chrome block rounded-md p-1.5`}
+    >
+      <span className="bg-frame border-line flex h-14 flex-col gap-1.5 rounded-[5px] border p-2">
+        <span className="bg-text-strong block h-1.5 w-1/2 rounded-full" />
+        <span className="flex gap-1">
+          <span className="bg-text-muted block h-1 w-1/4 rounded-full" />
+          <span className="bg-selection block h-1 w-1/4 rounded-full" />
+        </span>
+        <span className="bg-text-faint block h-1 w-2/3 rounded-full" />
+        <span className="bg-action mt-auto block h-2 w-1/4 self-end rounded-sm" />
+      </span>
+    </span>
+  );
+}
+
+/**
+ * A motion level as a mark on a track: it slides under All and fades in place under Reduced while
+ * its card is pointed at or focused, and stays still under None, as `style.css` sets.
+ *
+ * @param props - The level to show.
+ * @returns Decorative preview element.
+ */
+function MotionPreview({ level }: { level: MotionCard }) {
+  return (
+    <span aria-hidden="true" className="bg-chrome block rounded-md p-1.5">
+      <span className="bg-frame border-line flex h-14 items-center rounded-[5px] border px-3">
+        <span className="relative block h-2.5 w-full">
+          <span className="bg-line absolute inset-x-0 top-1/2 block h-px" />
+          <span
+            data-preview={level}
+            className={`vista-motion-mark bg-action absolute top-0 block size-2.5 rounded-full ${level === "all" ? "left-0" : "left-[calc(50%-0.3125rem)]"}`}
+          />
+        </span>
+      </span>
+    </span>
+  );
+}
+
+/**
+ * A card in a grid: its preview over its name, with the selected fill and edge once chosen. The name's
+ * line is a whole 20px, since 12.5px text at the default 1.5 is 18.75px, which leaves everything below
+ * on a fractional pixel, so the same icon renders differently in each group.
+ */
+const THEME_CARD_CLASS =
+  "text-text-muted hover:bg-hover hover:text-text has-checked:text-text-strong has-checked:bg-selected has-checked:shadow-[inset_0_0_0_1px_var(--color-line-strong)] has-focus-visible:ring-1 has-focus-visible:ring-[var(--focus-ring)] flex cursor-pointer flex-col gap-1.5 rounded-lg p-1.5 text-[12.5px] leading-5 transition-colors duration-100";
+
+/**
+ * A choice among preview cards, with a _System_ badge on the card the operating system asks for.
+ *
+ * @param props - The cards, each with its preview; the one selected; the one the operating system
+ *   asks for; what to do on a choice; the radio group's name and description; and a class for each card.
+ * @returns Radio group element.
+ */
+function PreviewChoice<T extends string>({
+  cards,
+  value,
+  systemValue,
+  onChoose,
+  labelId,
+  descriptionId,
+  cardClassName = "",
+}: {
+  cards: readonly { value: T; label: string; preview: ReactNode }[];
+  value: T;
+  systemValue: T;
+  onChoose: (value: T) => void;
+  labelId: string;
+  descriptionId?: string;
+  cardClassName?: string;
+}) {
+  const name = useId();
+  const badgeId = useId();
+  return (
+    <div
+      role="radiogroup"
+      aria-labelledby={labelId}
+      aria-describedby={descriptionId}
+      className="grid basis-full grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2"
+    >
+      {cards.map((card) => {
+        const isSystem = card.value === systemValue;
+        return (
+          <label key={card.value} className={`${THEME_CARD_CLASS} ${cardClassName}`}>
+            {/* Click as well as change: choosing the card already selected while Match system is on
+                pins it, and a radio that is already checked fires no change. */}
+            <input
+              type="radio"
+              name={name}
+              value={card.value}
+              checked={value === card.value}
+              onChange={() => onChoose(card.value)}
+              onClick={() => onChoose(card.value)}
+              aria-describedby={isSystem ? badgeId : undefined}
+              className="sr-only"
+            />
+            {card.preview}
+            <span className="flex items-center justify-between gap-1 px-0.5">
+              <span className="font-medium">{card.label}</span>
+              {isSystem && (
+                <span
+                  id={badgeId}
+                  aria-hidden="true"
+                  className="border-line text-text-muted rounded border px-1 text-[10.5px] leading-4"
+                >
+                  System
+                </span>
+              )}
+            </span>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The Match system toggle: a small text button with an icon, in the shell's hover and pressed fills. */
+const MATCH_SYSTEM_CLASS =
+  "text-text-muted hover:bg-hover hover:text-text aria-pressed:bg-selected aria-pressed:text-text-strong inline-flex h-7 flex-none cursor-pointer items-center gap-1.5 rounded-md px-2 text-[12.5px] font-medium transition-colors duration-100 outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)]";
+
+/**
+ * The _System_ choice of a group of preview cards, at the right of the group's name: pressed while
+ * the operating system decides which card applies. Its tooltip says what it follows.
+ *
+ * @param props - The tooltip, which says what it follows; whether it is on; and what to do when it is pressed.
+ * @returns Toggle button inside its tooltip.
+ */
+function MatchSystemToggle({
+  hint,
+  isOn,
+  onToggle,
+}: {
+  hint: string;
+  isOn: boolean;
+  onToggle: (isOn: boolean) => void;
+}) {
+  return (
+    <Tooltip text={hint} position="bottom" className="-mr-2 flex flex-none">
+      {(bubbleId) => (
+        <button
+          type="button"
+          onClick={() => onToggle(!isOn)}
+          aria-pressed={isOn}
+          aria-describedby={bubbleId}
+          className={MATCH_SYSTEM_CLASS}
+        >
+          {/* Up a pixel: centred on the text box, the monitor's stand pulls it below the capitals' middle. */}
+          <i className="ic-monitor -translate-y-px text-sm" aria-hidden="true" />
+          Match system
+        </button>
+      )}
+    </Tooltip>
+  );
+}
+
+interface AppearanceSectionProps {
+  theme: ThemeState;
+  settings: Settings;
+  onChange: (changes: SettingsChanges) => void;
+}
+
+/**
+ * The appearance in three groups: Colour, which is the scheme and the theme; Contrast; and Motion.
+ * Contrast and Motion offer _System_ as a Match system switch, as `docs/specs/appearance.md` describes.
+ *
+ * @param props - The theme, the saved contrast and motion, and the ways to change them.
  * @returns Section content.
  */
-export function AppearanceSection({ theme }: { theme: ThemeState }) {
-  const name = useId();
-  const labelId = useId();
-  const descriptionId = useId();
+export function AppearanceSection({ theme, settings, onChange }: AppearanceSectionProps) {
+  const idPrefix = useId();
+  const id = (part: string) => `${idPrefix}-${part}`;
+  const themeName = useId();
+  const levels = useAppearanceLevels();
+  const { contrast, motion } = settings.appearance;
+  const systemMotion: MotionCard = levels.systemMotion === "reduce" ? "reduced" : "all";
+  const shownContrast: ContrastCard = contrast === "system" ? levels.systemContrast : contrast;
+  const shownMotion: MotionCard = motion === "system" ? systemMotion : motion;
+  const chooseContrast = (value: ContrastPreference) => {
+    if (value !== contrast) {
+      onChange({ appearance: { contrast: value } });
+    }
+  };
+  const chooseMotion = (value: MotionPreference) => {
+    if (value !== motion) {
+      onChange({ appearance: { motion: value } });
+    }
+  };
   return (
     <>
       <SectionHeading title="Appearance" lead="How Vista looks, in every workspace." />
-      <SettingsGroup>
+      <GroupHeading id={id("color")} isFirst>
+        Colour
+      </GroupHeading>
+      <SettingsGroup labelledBy={id("color")}>
+        <SettingsRow
+          label="Scheme"
+          labelId={id("scheme")}
+          description="Light or dark. System follows your operating system and changes with it."
+          descriptionId={id("scheme-description")}
+        >
+          <SegmentedChoice
+            options={SCHEME_OPTIONS}
+            value={theme.scheme}
+            onChange={theme.setScheme}
+            labelId={id("scheme")}
+            descriptionId={id("scheme-description")}
+          />
+        </SettingsRow>
         <SettingsRow
           label="Theme"
-          labelId={labelId}
-          description="System follows your operating system and changes with it."
-          descriptionId={descriptionId}
+          labelId={id("theme")}
+          description="The interface's colours. Each theme has a light and a dark version."
+          descriptionId={id("theme-description")}
         >
           <div
             role="radiogroup"
-            aria-labelledby={labelId}
-            aria-describedby={descriptionId}
-            className="border-line flex rounded-md border p-0.5"
+            aria-labelledby={id("theme")}
+            aria-describedby={id("theme-description")}
+            className="grid basis-full grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2"
           >
-            {THEME_OPTIONS.map(({ value, label }) => (
-              <label key={value} className={SEGMENT_CLASS}>
+            {THEMES.map((option) => (
+              <label key={option.id} className={THEME_CARD_CLASS}>
                 <input
                   type="radio"
-                  name={name}
-                  value={value}
-                  checked={theme.preference === value}
-                  onChange={() => theme.setPreference(value)}
+                  name={themeName}
+                  value={option.id}
+                  checked={theme.theme === option.id}
+                  onChange={() => theme.setTheme(option.id)}
                   className="sr-only"
                 />
-                {label}
+                <ThemePreview theme={option.id} contrast={levels.contrast} />
+                <span className="px-0.5 font-medium">{option.label}</span>
               </label>
             ))}
           </div>
         </SettingsRow>
+      </SettingsGroup>
+
+      <GroupHeading
+        id={id("contrast")}
+        action={
+          <MatchSystemToggle
+            hint="Follow your operating system's contrast setting"
+            isOn={contrast === "system"}
+            onToggle={(isOn) => chooseContrast(isOn ? "system" : shownContrast)}
+          />
+        }
+      >
+        Contrast
+      </GroupHeading>
+      <SettingsGroup>
+        <div className="p-3">
+          <PreviewChoice
+            cards={CONTRAST_CARDS.map((card) => ({
+              ...card,
+              preview: <ThemePreview theme={theme.theme} contrast={card.value} />,
+            }))}
+            value={shownContrast}
+            systemValue={levels.systemContrast}
+            onChoose={chooseContrast}
+            labelId={id("contrast")}
+          />
+        </div>
+      </SettingsGroup>
+
+      <GroupHeading
+        id={id("motion")}
+        action={
+          <MatchSystemToggle
+            hint="Follow your operating system's reduced-motion setting"
+            isOn={motion === "system"}
+            onToggle={(isOn) => chooseMotion(isOn ? "system" : shownMotion)}
+          />
+        }
+      >
+        Motion
+      </GroupHeading>
+      <SettingsGroup>
+        <div className="p-3">
+          <PreviewChoice
+            cards={MOTION_CARDS.map((card) => ({ ...card, preview: <MotionPreview level={card.value} /> }))}
+            value={shownMotion}
+            systemValue={systemMotion}
+            onChoose={chooseMotion}
+            labelId={id("motion")}
+            cardClassName="vista-motion-card"
+          />
+        </div>
       </SettingsGroup>
     </>
   );

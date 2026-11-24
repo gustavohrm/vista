@@ -1,12 +1,12 @@
 ---
-status: APPROVED
+status: IMPLEMENTED
 last_updated: 2026-11-24
 scope: The appearance preferences, which are theme, scheme, contrast, and motion, how each is chosen, stored, and applied, what each theme must provide, and the package versions they need.
 ---
 
 # Appearance
 
-This document describes how Vista's appearance becomes configurable beyond today's light, dark, and system choice. It is approved and not yet implemented. Until it is, today's behavior is in [Workspaces → Settings](workspaces.md#settings) and [Architecture → Shared presentation](../architecture.md#shared-presentation).
+This document describes how Vista's appearance is configured: its scheme, theme, contrast, and motion. It is implemented with the first step of [themes](#themes), Daylight, Neutral, and Ocean; the other themes it lists are not built yet.
 
 ## The preferences
 
@@ -25,7 +25,7 @@ Each applies at once, in every workspace, and _System_ follows the operating sys
 
 The Appearance section shows them in three groups:
 
-- **Colour**: the scheme, as three buttons with an icon each, a monitor for _System_, a sun for _Light_, and a moon for _Dark_, above the theme grid.
+- **Colour**: the scheme, as three buttons with an icon each, a monitor for _System_, a sun for _Light_, and a moon for _Dark_, above the theme grid. A light-dark switch inside the grid was not chosen: a switch has two states, and _System_, the default, is a third.
 - **Contrast**: a card for _Standard_ and one for _More_, each a preview of the interface at that level, in the theme in effect.
 - **Motion**: a card for _All_, _Reduced_, and _None_, each a small mark that moves as that level allows: it slides under _All_, fades in place under _Reduced_, and stays still under _None_. A preview plays only while the pointer is over its card or the card has focus, whatever the level in effect, so it moves only when asked to.
 
@@ -62,7 +62,7 @@ Cyberpunk and Tokyo were proposed as two themes and merged into Midnight, since 
 
 A theme is a value, as a `light-dark()` pair, for every colour token `packages/app/src/style.css` defines or sets, including the `@codenhub/styles` tokens it overrides, as [Architecture](../architecture.md#shared-presentation) describes. The stylesheet is the list: a theme sets every token in it, and a token added later gets a value in every theme. No component names a theme. Every variant meets the ratios [Contrast](#contrast) sets for each level, and adding a theme records its measured pairings in [the brand guidelines](../guidelines/brand.md#colours).
 
-Themes ship in steps: Daylight and Neutral first, with one more, to prove the token set, then the rest.
+Themes ship in steps: Daylight and Neutral first, with one more, to prove the token set, then the rest. The first step shipped with Ocean as the third theme, since blues and teals are furthest from Daylight's ink and paper and so test the token set hardest; Midnight, Forest, Ember, and Cappuccino follow.
 
 ## Contrast
 
@@ -105,7 +105,7 @@ Contrast and motion are written as attributes on `<html>`, each resolved to one 
 | `data-contrast` | `standard`, `more`       |
 | `data-motion`   | `full`, `reduce`, `none` |
 
-The values are the ones `@codenhub/styles` reads; `reduce` is spelled as in `prefers-reduced-motion: reduce`, the query it stands in for, while the setting is labelled _Reduced_. Vista always sets both attributes. While a preference is _System_, Vista resolves it from the media query and follows its changes. Vista's own CSS reads only the attributes, never `prefers-contrast` or `prefers-reduced-motion`, so one place decides and a new interaction only has to say which kind of motion it is. `@codenhub/styles` falls back to the media queries only when an attribute is absent, which in Vista it never is, so the attribute is the one source in both. The attributes are set before the first paint, as the theme is, so a reload never shows the wrong appearance first.
+The values are the ones `@codenhub/styles` reads; `reduce` is spelled as in `prefers-reduced-motion: reduce`, the query it stands in for, while the setting is labelled _Reduced_. Vista always sets both attributes. While a preference is _System_, Vista resolves it from the media query and follows its changes. Vista's own CSS reads only the attributes, never `prefers-contrast` or `prefers-reduced-motion`, so one place decides and a new interaction only has to say which kind of motion it is. `@codenhub/styles` falls back to the media queries only when an attribute is absent, which in Vista it never is, so the attribute is the one source in both. The attributes are set before the app renders, as the theme is, at the start of the app's module script, since the content security policy allows no inline script in the page's `<head>`; a slow load may therefore briefly show the Daylight fallback before the saved appearance applies.
 
 ### Package versions
 
@@ -123,7 +123,3 @@ Keeping the theme outside `@codenhub/theme`, as a separate attribute with its ow
 The theme and scheme are saved by `@codenhub/theme` under `vista-theme`, as the scheme is today. A saved theme that no longer exists, such as one removed in a later version, falls back to Daylight following the system. A choice saved before themes, `light` or `dark`, is one of these: it is not migrated, since Vista had no users to keep when this was decided, and the fallback is the default anyway.
 
 Contrast and motion join the editor settings under `vista.settings`, described in [Workspaces → Editor settings](workspaces.md#editor-settings), as `"appearance": { "contrast": "system", "motion": "system" }`, with the same field-by-field fallback.
-
-## Open questions
-
-- **The scheme as the first control.** Whether the scheme stays a three-way choice above the theme grid or becomes a switch inside it. Settled during implementation.

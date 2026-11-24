@@ -26,11 +26,19 @@ test("sets the theme from Settings", async ({ page }) => {
 
   await page.keyboard.press("Control+Comma");
   const settings = page.getByRole("region", { name: "Settings" });
-  await settings.getByText("Light", { exact: true }).click();
-  await expect(settings.getByRole("radio", { name: "Light" })).toBeChecked();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  const scheme = settings.getByRole("radiogroup", { name: "Scheme" });
+  const html = page.locator("html");
+  await scheme.getByText("Light", { exact: true }).click();
+  await expect(scheme.getByRole("radio", { name: "Light" })).toBeChecked();
+  await expect(html).toHaveAttribute("data-theme", "daylight-light");
 
-  await settings.getByText("Dark", { exact: true }).click();
-  await expect(settings.getByRole("radio", { name: "Dark" })).toBeChecked();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await scheme.getByText("Dark", { exact: true }).click();
+  await expect(scheme.getByRole("radio", { name: "Dark" })).toBeChecked();
+  await expect(html).toHaveAttribute("data-theme", "daylight-dark");
+
+  const themes = settings.getByRole("radiogroup", { name: "Theme" });
+  await themes.getByText("Ocean", { exact: true }).click();
+  await expect(themes.getByRole("radio", { name: "Ocean" })).toBeChecked();
+  await expect(html).toHaveAttribute("data-theme", "ocean-dark");
+  await expect(html).toHaveClass(/\btheme-ocean\b/);
 });

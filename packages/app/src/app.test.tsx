@@ -1001,13 +1001,87 @@ describe("App", () => {
 
       await user.keyboard("{Control>},{/Control}");
       const dialog = await settingsDialog();
-      await user.click(within(dialog).getByRole("radio", { name: "Light" }));
-      expect(document.documentElement).toHaveAttribute("data-theme", "light");
-      expect(localStorage.getItem("vista-theme")).toBe("light");
+      const scheme = within(dialog).getByRole("radiogroup", { name: "Scheme" });
+      const theme = within(dialog).getByRole("radiogroup", { name: "Theme" });
+      await user.click(within(scheme).getByRole("radio", { name: "Light" }));
+      expect(document.documentElement).toHaveAttribute("data-theme", "daylight-light");
+      expect(localStorage.getItem("vista-theme")).toBe("daylight-light");
 
-      await user.click(within(dialog).getByRole("radio", { name: "System" }));
+      // Choosing a theme keeps the scheme, and choosing a scheme keeps the theme.
+      await user.click(within(theme).getByRole("radio", { name: "Ocean" }));
+      expect(document.documentElement).toHaveAttribute("data-theme", "ocean-light");
+      expect(document.documentElement).toHaveClass("theme-ocean");
+      expect(within(scheme).getByRole("radio", { name: "Light" })).toBeChecked();
+
+      await user.click(within(scheme).getByRole("radio", { name: "System" }));
+      expect(JSON.parse(localStorage.getItem("vista-theme") ?? "null")).toEqual({
+        name: "ocean-light",
+        followSystem: true,
+      });
+      expect(within(scheme).getByRole("radio", { name: "System" })).toBeChecked();
+      expect(within(theme).getByRole("radio", { name: "Ocean" })).toBeChecked();
+
+      // Daylight following the system is the default, so nothing is kept for it.
+      await user.click(within(theme).getByRole("radio", { name: "Daylight" }));
+      await user.click(within(scheme).getByRole("radio", { name: "Dark" }));
+      await user.click(within(scheme).getByRole("radio", { name: "System" }));
       expect(localStorage.getItem("vista-theme")).toBeNull();
-      expect(within(dialog).getByRole("radio", { name: "System" })).toBeChecked();
+      expect(within(theme).getByRole("radio", { name: "Daylight" })).toBeChecked();
+    });
+
+    it("sets contrast and motion in Appearance, on <html> and in the saved settings", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await screen.findByRole("button", { name: "Open Folder…" });
+      // System resolves from the operating system, which asks for neither here.
+      expect(document.documentElement).toHaveAttribute("data-contrast", "standard");
+      expect(document.documentElement).toHaveAttribute("data-motion", "full");
+
+      await user.keyboard("{Control>},{/Control}");
+      const dialog = await settingsDialog();
+      const contrast = within(dialog).getByRole("radiogroup", { name: "Contrast" });
+      const motion = within(dialog).getByRole("radiogroup", { name: "Motion" });
+      // Both are named Match system; the tooltip that describes each says what it follows.
+      const matchContrast = within(dialog).getByRole("button", { name: "Match system", description: /contrast/ });
+      const matchMotion = within(dialog).getByRole("button", { name: "Match system", description: /motion/ });
+
+      // While matching the system, the cards show what it asks for, marked as the system's.
+      expect(matchContrast).toHaveAttribute("aria-pressed", "true");
+      expect(within(contrast).getByRole("radio", { name: "Standard" })).toBeChecked();
+      expect(within(contrast).getByRole("radio", { name: "Standard" })).toHaveAccessibleDescription("System");
+      expect(within(motion).getByRole("radio", { name: "All" })).toBeChecked();
+
+      await user.click(within(contrast).getByRole("radio", { name: "More" }));
+      await user.click(within(motion).getByRole("radio", { name: "None" }));
+      expect(matchContrast).toHaveAttribute("aria-pressed", "false");
+      expect(matchMotion).toHaveAttribute("aria-pressed", "false");
+      expect(document.documentElement).toHaveAttribute("data-contrast", "more");
+      expect(document.documentElement).toHaveAttribute("data-motion", "none");
+      expect(JSON.parse(localStorage.getItem("vista.settings") ?? "{}").appearance).toEqual({
+        contrast: "more",
+        motion: "none",
+      });
+
+      await user.click(within(motion).getByRole("radio", { name: "Reduced" }));
+      expect(document.documentElement).toHaveAttribute("data-motion", "reduce");
+      await user.click(matchContrast);
+      await user.click(matchMotion);
+      expect(document.documentElement).toHaveAttribute("data-contrast", "standard");
+      expect(document.documentElement).toHaveAttribute("data-motion", "full");
+      expect(JSON.parse(localStorage.getItem("vista.settings") ?? "{}").appearance).toEqual({
+        contrast: "system",
+        motion: "system",
+      });
+
+      // Choosing the card the system already asks for pins it; turning the switch off keeps the card.
+      await user.click(within(contrast).getByRole("radio", { name: "Standard" }));
+      expect(matchContrast).toHaveAttribute("aria-pressed", "false");
+      await user.click(matchMotion);
+      expect(within(motion).getByRole("radio", { name: "All" })).toBeChecked();
+      expect(JSON.parse(localStorage.getItem("vista.settings") ?? "{}").appearance).toEqual({
+        contrast: "standard",
+        motion: "all",
+      });
     });
 
     it("shows the version in About, and checks for updates on request where the host has an updater", async () => {
@@ -2529,7 +2603,7 @@ describe("App", () => {
         await user.click(within(page).getByRole("button", { name: "Delete Workspace…" }));
         await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" }));
 
-        expect(await within(page).findByRole("radio", { name: "System" })).toBeInTheDocument();
+        expect(await within(page).findByRole("radiogroup", { name: "Scheme" })).toBeInTheDocument();
         expect(navigation(page).getByRole("button", { name: "Appearance" })).toHaveAttribute("aria-current", "page");
         expect(storedWorkspaces()).toEqual([]);
       });

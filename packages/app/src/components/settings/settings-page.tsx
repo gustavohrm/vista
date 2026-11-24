@@ -1,6 +1,7 @@
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
+import { useReducedMotion } from "../../theme/appearance";
 import { Tooltip } from "../feedback/tooltip";
 import type { ManagedWorkspace } from "./workspace-manager";
 import { WorkspaceNav } from "./workspace-nav";
@@ -56,7 +57,7 @@ export function SettingsPage({
   onClose,
   children,
 }: SettingsPageProps) {
-  const isReducedMotion = useReducedMotion() ?? false;
+  const isReducedMotion = useReducedMotion();
   const navRef = useRef<HTMLElement>(null);
   const [isFullList, setIsFullList] = useState(false);
   const [isLeavingFullList, setIsLeavingFullList] = useState(false);
