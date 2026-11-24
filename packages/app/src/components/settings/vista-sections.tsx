@@ -24,10 +24,11 @@ import { Tooltip } from "../feedback/tooltip";
 import { GroupHeading, SectionHeading, SettingsGroup, SettingsRow, Switch } from "./settings-parts";
 import { formatReleaseDate, WhatsNewDialog } from "./whats-new-dialog";
 
+// Each icon up a pixel: centred on the text box, a glyph sits below the middle of the capitals beside it.
 const SCHEME_OPTIONS: readonly { value: SchemePreference; label: string; icon: ReactNode }[] = [
-  { value: "system", label: "System", icon: <i className="ic-monitor text-sm" aria-hidden="true" /> },
-  { value: "light", label: "Light", icon: <i className="ic-sun text-sm" aria-hidden="true" /> },
-  { value: "dark", label: "Dark", icon: <i className="ic-moon text-sm" aria-hidden="true" /> },
+  { value: "system", label: "System", icon: <i className="ic-monitor -translate-y-px text-sm" aria-hidden="true" /> },
+  { value: "light", label: "Light", icon: <i className="ic-sun -translate-y-px text-sm" aria-hidden="true" /> },
+  { value: "dark", label: "Dark", icon: <i className="ic-moon -translate-y-px text-sm" aria-hidden="true" /> },
 ];
 
 type ContrastCard = Exclude<ContrastPreference, "system">;
@@ -252,7 +253,8 @@ function MatchSystemToggle({
           aria-describedby={bubbleId}
           className={MATCH_SYSTEM_CLASS}
         >
-          <i className="ic-monitor text-sm" aria-hidden="true" />
+          {/* Up a pixel: centred on the text box, the monitor's stand pulls it below the capitals' middle. */}
+          <i className="ic-monitor -translate-y-px text-sm" aria-hidden="true" />
           Match system
         </button>
       )}
