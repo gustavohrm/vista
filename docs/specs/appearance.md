@@ -21,6 +21,18 @@ The Appearance section of [Settings](workspaces.md#settings) holds four preferen
 
 Each applies at once, in every workspace, and _System_ follows the operating system and changes with it.
 
+### In Settings
+
+The Appearance section shows them in three groups:
+
+- **Color**: the scheme, as three buttons with an icon each, a monitor for _System_, a sun for _Light_, and a moon for _Dark_, above the theme grid.
+- **Contrast**: a card for _Standard_ and one for _More_, each a preview of the interface at that level, in the theme in effect.
+- **Motion**: a card for _All_, _Reduced_, and _None_, each a small mark that moves as that level allows: it slides under _All_, fades in place under _Reduced_, and stays still under _None_. A preview plays only while the pointer is over its card or the card has focus, whatever the level in effect, so it moves only when asked to.
+
+Contrast and Motion each start with a **Match system** switch, which is their _System_ choice. While it is on, the card the operating system asks for is selected. Whether it is on or off, a _System_ badge marks that card. Choosing a card turns the switch off, and turning the switch off keeps the card that was selected, so nothing changes until another card is chosen.
+
+Two other ways to offer _System_ were rejected. A _System_ card would look the same as the card it stands for, so two cards would show alike, and its preview would change whenever the operating system did. A badge alone leaves no way to choose _System_ while the operating system asks for the card already chosen, nor to keep _Standard_ when it later asks for more.
+
 ## Scheme and theme
 
 The scheme decides whether the interface is light or dark; the theme decides its colours. They are separate choices: the scheme is chosen first, then the theme from a grid of every theme, each shown as a preview in the scheme now in effect. The list is the same in both schemes; only the previews change.
