@@ -14,9 +14,23 @@ import { getThemeInstance } from "./theme-manager";
 const MORE_CONTRAST_QUERY = "(prefers-contrast: more)";
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
+/** The contrast and motion levels in effect, and the ones the operating system asks for. */
+export interface AppearanceLevels {
+  contrast: ContrastLevel;
+  motion: MotionLevel;
+  systemContrast: ContrastLevel;
+  /** What the operating system asks for, which is never `none`. */
+  systemMotion: Exclude<MotionLevel, "none">;
+}
+
 let preferences: AppearanceSettings | null = null;
-let motionLevel: MotionLevel = "full";
-const motionListeners = new Set<() => void>();
+let levels: AppearanceLevels = {
+  contrast: "standard",
+  motion: "full",
+  systemContrast: "standard",
+  systemMotion: "full",
+};
+const listeners = new Set<() => void>();
 let isFollowingSystem = false;
 // What the motion library was set to before Vista applied a level, such as by a test that has every
 // animation finish at once; only `none` overrides it.
@@ -34,17 +48,28 @@ function apply(): void {
   if (!preferences || typeof document === "undefined") {
     return;
   }
-  const contrast: ContrastLevel = resolveContrast(preferences.contrast, matches(MORE_CONTRAST_QUERY));
-  const motion: MotionLevel = resolveMotion(preferences.motion, matches(REDUCED_MOTION_QUERY));
+  const wantsMore = matches(MORE_CONTRAST_QUERY);
+  const wantsLess = matches(REDUCED_MOTION_QUERY);
+  const next: AppearanceLevels = {
+    contrast: resolveContrast(preferences.contrast, wantsMore),
+    motion: resolveMotion(preferences.motion, wantsLess),
+    systemContrast: wantsMore ? "more" : "standard",
+    systemMotion: wantsLess ? "reduce" : "full",
+  };
   const root = document.documentElement;
-  root.dataset.contrast = contrast;
-  root.dataset.motion = motion;
+  root.dataset.contrast = next.contrast;
+  root.dataset.motion = next.motion;
   // The stylesheet reaches only CSS; the motion library animates from script. Under `reduce` each
   // animation takes its reduced form from `useReducedMotion`, and under `none` none runs at all.
-  MotionGlobalConfig.skipAnimations = motion === "none" || skipsAnimationsByDefault;
-  if (motion !== motionLevel) {
-    motionLevel = motion;
-    for (const listener of motionListeners) {
+  MotionGlobalConfig.skipAnimations = next.motion === "none" || skipsAnimationsByDefault;
+  if (
+    next.contrast !== levels.contrast ||
+    next.motion !== levels.motion ||
+    next.systemContrast !== levels.systemContrast ||
+    next.systemMotion !== levels.systemMotion
+  ) {
+    levels = next;
+    for (const listener of listeners) {
       listener();
     }
   }
@@ -96,13 +121,22 @@ export function useApplyAppearance(appearance: AppearanceSettings): void {
   }, [appearance]);
 }
 
-function subscribeMotion(listener: () => void): () => void {
-  motionListeners.add(listener);
-  return () => motionListeners.delete(listener);
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }
 
-const getMotionLevel = () => motionLevel;
-const getServerMotionLevel = (): MotionLevel => "full";
+const getLevels = () => levels;
+
+/**
+ * The contrast and motion levels in effect, and the ones the operating system asks for, updated as
+ * either changes.
+ *
+ * @returns The current levels.
+ */
+export function useAppearanceLevels(): AppearanceLevels {
+  return useSyncExternalStore(subscribe, getLevels, getLevels);
+}
 
 /**
  * Whether animations take their reduced form: under the _Reduced_ and _None_ motion settings, and
@@ -112,5 +146,5 @@ const getServerMotionLevel = (): MotionLevel => "full";
  * @returns True when movement should land at once.
  */
 export function useReducedMotion(): boolean {
-  return useSyncExternalStore(subscribeMotion, getMotionLevel, getServerMotionLevel) !== "full";
+  return useAppearanceLevels().motion !== "full";
 }

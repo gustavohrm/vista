@@ -1039,11 +1039,23 @@ describe("App", () => {
 
       await user.keyboard("{Control>},{/Control}");
       const dialog = await settingsDialog();
-      const contrast = within(dialog).getByRole("radiogroup", { name: "Contrast" });
-      const motion = within(dialog).getByRole("radiogroup", { name: "Motion" });
+      const contrastGroup = within(dialog).getByRole("group", { name: "Contrast" });
+      const motionGroup = within(dialog).getByRole("group", { name: "Motion" });
+      const contrast = within(contrastGroup).getByRole("radiogroup", { name: "Contrast" });
+      const motion = within(motionGroup).getByRole("radiogroup", { name: "Motion" });
+      const matchContrast = within(contrastGroup).getByRole("switch", { name: "Match system" });
+      const matchMotion = within(motionGroup).getByRole("switch", { name: "Match system" });
+
+      // Matching the system, the cards show what it asks for, marked as the system's.
+      expect(matchContrast).toBeChecked();
+      expect(within(contrast).getByRole("radio", { name: "Standard" })).toBeChecked();
+      expect(within(contrast).getByRole("radio", { name: "Standard" })).toHaveAccessibleDescription("System");
+      expect(within(motion).getByRole("radio", { name: "All" })).toBeChecked();
+
       await user.click(within(contrast).getByRole("radio", { name: "More" }));
       await user.click(within(motion).getByRole("radio", { name: "None" }));
-
+      expect(matchContrast).not.toBeChecked();
+      expect(matchMotion).not.toBeChecked();
       expect(document.documentElement).toHaveAttribute("data-contrast", "more");
       expect(document.documentElement).toHaveAttribute("data-motion", "none");
       expect(JSON.parse(localStorage.getItem("vista.settings") ?? "{}").appearance).toEqual({
@@ -1053,10 +1065,24 @@ describe("App", () => {
 
       await user.click(within(motion).getByRole("radio", { name: "Reduced" }));
       expect(document.documentElement).toHaveAttribute("data-motion", "reduce");
-      await user.click(within(contrast).getByRole("radio", { name: "System" }));
-      await user.click(within(motion).getByRole("radio", { name: "System" }));
+      await user.click(matchContrast);
+      await user.click(matchMotion);
       expect(document.documentElement).toHaveAttribute("data-contrast", "standard");
       expect(document.documentElement).toHaveAttribute("data-motion", "full");
+      expect(JSON.parse(localStorage.getItem("vista.settings") ?? "{}").appearance).toEqual({
+        contrast: "system",
+        motion: "system",
+      });
+
+      // Choosing the card the system already asks for pins it; turning the switch off keeps the card.
+      await user.click(within(contrast).getByRole("radio", { name: "Standard" }));
+      expect(matchContrast).not.toBeChecked();
+      await user.click(matchMotion);
+      expect(within(motion).getByRole("radio", { name: "All" })).toBeChecked();
+      expect(JSON.parse(localStorage.getItem("vista.settings") ?? "{}").appearance).toEqual({
+        contrast: "standard",
+        motion: "all",
+      });
     });
 
     it("shows the version in About, and checks for updates on request where the host has an updater", async () => {

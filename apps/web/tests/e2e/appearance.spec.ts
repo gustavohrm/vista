@@ -207,3 +207,23 @@ test("follows the operating system's contrast and motion while both are System",
   await expect(html).toHaveAttribute("data-contrast", "standard");
   await expect(html).toHaveAttribute("data-motion", "full");
 });
+
+test("plays a motion preview only while its card is pointed at, even with motion set to None", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("vista.settings", JSON.stringify({ version: 1, appearance: { motion: "none" } }));
+  });
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveAttribute("data-motion", "none");
+  await page.keyboard.press("Control+Comma");
+  const motion = page.getByRole("radiogroup", { name: "Motion" });
+  const mark = (level: string) => motion.locator(`.vista-motion-mark[data-preview="${level}"]`);
+  await expect(mark("all")).toHaveCSS("animation-name", "none");
+
+  await motion.getByText("All", { exact: true }).hover();
+  await expect(mark("all")).toHaveCSS("animation-name", "vista-motion-slide");
+  await motion.getByText("Reduced", { exact: true }).hover();
+  await expect(mark("all")).toHaveCSS("animation-name", "none");
+  await expect(mark("reduced")).toHaveCSS("animation-name", "vista-pulse");
+  await motion.getByText("None", { exact: true }).hover();
+  await expect(mark("none")).toHaveCSS("animation-name", "none");
+});

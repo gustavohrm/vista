@@ -191,8 +191,10 @@
 /* More contrast, over whichever theme is shown: muted and faint text reach 4.5:1, and every line,
    border, and hover or selected fill 3:1, against the grounds they sit on. Each is mixed from the
    theme's own text and frame, so a new theme needs no rules of its own here, only measuring. After
-   the themes, so it wins over them; scoped to <html>, so a theme preview keeps its standard look. */
-:root[data-contrast="more"] {
+   the themes, so it wins over them, also over a theme class on the same element. `contrast-more` shows
+   the level inside one element, as a preview in Settings does. */
+:root[data-contrast="more"],
+.contrast-more {
   --color-text-muted: color-mix(in oklab, var(--color-text) 78%, var(--color-frame));
   --color-text-faint: color-mix(in oklab, var(--color-text) 72%, var(--color-frame));
   --color-line: color-mix(in oklab, var(--color-text) 52%, var(--color-frame));
@@ -722,6 +724,22 @@ body,
 @layer essential-motion {
   :root[data-motion="reduce"] .vista-logo[data-motion="loop"] .vista-logo-sun {
     animation: vista-pulse 800ms ease-in-out infinite alternate !important;
+  }
+
+  /* A motion level's preview in Settings plays while the pointer is over its card or the card has
+     keyboard focus, whatever the level in effect, since it moves only when asked to. */
+  .vista-motion-card:is(:hover, :has(:focus-visible)) .vista-motion-mark[data-preview="all"] {
+    animation: vista-motion-slide 1200ms var(--ease-move) infinite alternate !important;
+  }
+
+  .vista-motion-card:is(:hover, :has(:focus-visible)) .vista-motion-mark[data-preview="reduced"] {
+    animation: vista-pulse 800ms ease-in-out infinite alternate !important;
+  }
+}
+
+@keyframes vista-motion-slide {
+  to {
+    left: calc(100% - 0.625rem);
   }
 }
 

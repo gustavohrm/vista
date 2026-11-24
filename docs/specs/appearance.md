@@ -25,7 +25,7 @@ Each applies at once, in every workspace, and _System_ follows the operating sys
 
 The Appearance section shows them in three groups:
 
-- **Color**: the scheme, as three buttons with an icon each, a monitor for _System_, a sun for _Light_, and a moon for _Dark_, above the theme grid.
+- **Color**: the scheme, as three buttons with an icon each, a monitor for _System_, a sun for _Light_, and a moon for _Dark_, above the theme grid. A light-dark switch inside the grid was not chosen: a switch has two states, and _System_, the default, is a third.
 - **Contrast**: a card for _Standard_ and one for _More_, each a preview of the interface at that level, in the theme in effect.
 - **Motion**: a card for _All_, _Reduced_, and _None_, each a small mark that moves as that level allows: it slides under _All_, fades in place under _Reduced_, and stays still under _None_. A preview plays only while the pointer is over its card or the card has focus, whatever the level in effect, so it moves only when asked to.
 
@@ -123,7 +123,3 @@ Keeping the theme outside `@codenhub/theme`, as a separate attribute with its ow
 The theme and scheme are saved by `@codenhub/theme` under `vista-theme`, as the scheme is today. A saved theme that no longer exists, such as one removed in a later version, falls back to Daylight following the system. A choice saved before themes, `light` or `dark`, is one of these: it is not migrated, since Vista had no users to keep when this was decided, and the fallback is the default anyway.
 
 Contrast and motion join the editor settings under `vista.settings`, described in [Workspaces → Editor settings](workspaces.md#editor-settings), as `"appearance": { "contrast": "system", "motion": "system" }`, with the same field-by-field fallback.
-
-## The scheme control
-
-The scheme is a three-way choice, _System_, _Light_, and _Dark_, in its own row above the theme grid, built like the Contrast and Motion choices below it. A light-dark switch inside the grid was not chosen: a switch has two states, and _System_, the default, is a third.

@@ -3,6 +3,7 @@ import { useId, useState, type ReactNode } from "react";
 import { COMMAND_CATEGORIES, formatShortcut, type Command } from "../../commands";
 import {
   THEMES,
+  type ContrastLevel,
   type ContrastPreference,
   type MotionPreference,
   type SchemePreference,
@@ -17,6 +18,7 @@ import {
   type Settings,
 } from "../../domain/settings";
 import type { SettingsChanges } from "../../state/settings";
+import { useAppearanceLevels } from "../../theme/appearance";
 import type { ThemeState } from "../../theme/theme-manager";
 import { GroupHeading, SectionHeading, SettingsGroup, SettingsRow, Switch } from "./settings-parts";
 import { formatReleaseDate, WhatsNewDialog } from "./whats-new-dialog";
@@ -27,14 +29,15 @@ const SCHEME_OPTIONS: readonly { value: SchemePreference; label: string; icon: R
   { value: "dark", label: "Dark", icon: <i className="ic-moon text-sm" aria-hidden="true" /> },
 ];
 
-const CONTRAST_OPTIONS: readonly { value: ContrastPreference; label: string }[] = [
-  { value: "system", label: "System" },
+type ContrastCard = Exclude<ContrastPreference, "system">;
+type MotionCard = Exclude<MotionPreference, "system">;
+
+const CONTRAST_CARDS: readonly { value: ContrastCard; label: string }[] = [
   { value: "standard", label: "Standard" },
   { value: "more", label: "More" },
 ];
 
-const MOTION_OPTIONS: readonly { value: MotionPreference; label: string }[] = [
-  { value: "system", label: "System" },
+const MOTION_CARDS: readonly { value: MotionCard; label: string }[] = [
   { value: "all", label: "All" },
   { value: "reduced", label: "Reduced" },
   { value: "none", label: "None" },
@@ -97,15 +100,18 @@ const THEME_CLASS: Record<ThemeId, string> = {
 };
 
 /**
- * A theme as a small window in its own colours, in the scheme now in effect: the chrome, the frame,
- * a title, lines of text, a selection, and the primary action.
+ * A theme as a small window in its own colours, in the scheme now in effect: a title, lines of text,
+ * a selection, and the primary action, on the frame within the chrome.
  *
- * @param props - The theme to show.
+ * @param props - The theme to show, and the contrast level to show it at.
  * @returns Decorative preview element.
  */
-function ThemePreview({ theme }: { theme: ThemeId }) {
+function ThemePreview({ theme, contrast }: { theme: ThemeId; contrast: ContrastLevel }) {
   return (
-    <span aria-hidden="true" className={`${THEME_CLASS[theme]} bg-chrome block rounded-md p-1.5`}>
+    <span
+      aria-hidden="true"
+      className={`${THEME_CLASS[theme]} ${contrast === "more" ? "contrast-more" : ""} bg-chrome block rounded-md p-1.5`}
+    >
       <span className="bg-frame border-line flex h-14 flex-col gap-1.5 rounded-[5px] border p-2">
         <span className="bg-text-strong block h-1.5 w-1/2 rounded-full" />
         <span className="flex gap-1">
@@ -119,9 +125,101 @@ function ThemePreview({ theme }: { theme: ThemeId }) {
   );
 }
 
+/**
+ * A motion level as a mark on a track: it slides under All and fades in place under Reduced while
+ * its card is pointed at or focused, and stays still under None, as `style.css` sets.
+ *
+ * @param props - The level to show.
+ * @returns Decorative preview element.
+ */
+function MotionPreview({ level }: { level: MotionCard }) {
+  return (
+    <span aria-hidden="true" className="bg-chrome block rounded-md p-1.5">
+      <span className="bg-frame border-line flex h-14 items-center rounded-[5px] border px-3">
+        <span className="relative block h-2.5 w-full">
+          <span className="bg-line absolute inset-x-0 top-1/2 block h-px" />
+          <span
+            data-preview={level}
+            className={`vista-motion-mark bg-action absolute top-0 block size-2.5 rounded-full ${level === "all" ? "left-0" : "left-[calc(50%-0.3125rem)]"}`}
+          />
+        </span>
+      </span>
+    </span>
+  );
+}
+
 /** A theme in the grid: its preview over its name, with the selected fill and edge once chosen. */
 const THEME_CARD_CLASS =
   "text-text-muted hover:bg-hover hover:text-text has-checked:text-text-strong has-checked:bg-selected has-checked:shadow-[inset_0_0_0_1px_var(--color-line-strong)] has-focus-visible:ring-1 has-focus-visible:ring-[var(--focus-ring)] flex cursor-pointer flex-col gap-1.5 rounded-lg p-1.5 text-[12.5px] transition-colors duration-100";
+
+/**
+ * A choice among preview cards, with a _System_ badge on the card the operating system asks for.
+ *
+ * @param props - The cards, each with its preview; the one selected; the one the operating system
+ *   asks for; what to do on a choice; the radio group's name and description; and a class for each card.
+ * @returns Radio group element.
+ */
+function PreviewChoice<T extends string>({
+  cards,
+  value,
+  systemValue,
+  onChoose,
+  labelId,
+  descriptionId,
+  cardClassName = "",
+}: {
+  cards: readonly { value: T; label: string; preview: ReactNode }[];
+  value: T;
+  systemValue: T;
+  onChoose: (value: T) => void;
+  labelId: string;
+  descriptionId: string;
+  cardClassName?: string;
+}) {
+  const name = useId();
+  const badgeId = useId();
+  return (
+    <div
+      role="radiogroup"
+      aria-labelledby={labelId}
+      aria-describedby={descriptionId}
+      className="grid basis-full grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2"
+    >
+      {cards.map((card) => {
+        const isSystem = card.value === systemValue;
+        return (
+          <label key={card.value} className={`${THEME_CARD_CLASS} ${cardClassName}`}>
+            {/* Click as well as change: choosing the card already selected while Match system is on
+                pins it, and a radio that is already checked fires no change. */}
+            <input
+              type="radio"
+              name={name}
+              value={card.value}
+              checked={value === card.value}
+              onChange={() => onChoose(card.value)}
+              onClick={() => onChoose(card.value)}
+              aria-describedby={isSystem ? badgeId : undefined}
+              className="sr-only"
+            />
+            {card.preview}
+            <span className="flex items-center justify-between gap-1 px-0.5">
+              <span className="font-medium">{card.label}</span>
+              {isSystem && (
+                <span
+                  id={badgeId}
+                  aria-hidden="true"
+                  className="border-line text-text-muted rounded border px-1 text-[10.5px] leading-4"
+                >
+                  System
+                </span>
+              )}
+            </span>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
 
 interface AppearanceSectionProps {
   theme: ThemeState;
@@ -130,7 +228,8 @@ interface AppearanceSectionProps {
 }
 
 /**
- * The scheme, theme, contrast, and motion.
+ * The appearance in three groups: Color, which is the scheme and the theme; Contrast; and Motion.
+ * Contrast and Motion offer _System_ as a Match system switch, as `docs/specs/appearance.md` describes.
  *
  * @param props - The theme, the saved contrast and motion, and the ways to change them.
  * @returns Section content.
@@ -139,11 +238,28 @@ export function AppearanceSection({ theme, settings, onChange }: AppearanceSecti
   const idPrefix = useId();
   const id = (part: string) => `${idPrefix}-${part}`;
   const themeName = useId();
+  const levels = useAppearanceLevels();
   const { contrast, motion } = settings.appearance;
+  const systemMotion: MotionCard = levels.systemMotion === "reduce" ? "reduced" : "all";
+  const shownContrast: ContrastCard = contrast === "system" ? levels.systemContrast : contrast;
+  const shownMotion: MotionCard = motion === "system" ? systemMotion : motion;
+  const chooseContrast = (value: ContrastPreference) => {
+    if (value !== contrast) {
+      onChange({ appearance: { contrast: value } });
+    }
+  };
+  const chooseMotion = (value: MotionPreference) => {
+    if (value !== motion) {
+      onChange({ appearance: { motion: value } });
+    }
+  };
   return (
     <>
       <SectionHeading title="Appearance" lead="How Vista looks, in every workspace." />
-      <SettingsGroup>
+      <GroupHeading id={id("color")} isFirst>
+        Color
+      </GroupHeading>
+      <SettingsGroup labelledBy={id("color")}>
         <SettingsRow
           label="Scheme"
           labelId={id("scheme")}
@@ -180,38 +296,78 @@ export function AppearanceSection({ theme, settings, onChange }: AppearanceSecti
                   onChange={() => theme.setTheme(option.id)}
                   className="sr-only"
                 />
-                <ThemePreview theme={option.id} />
+                <ThemePreview theme={option.id} contrast={levels.contrast} />
                 <span className="px-0.5 font-medium">{option.label}</span>
               </label>
             ))}
           </div>
         </SettingsRow>
+      </SettingsGroup>
+
+      <GroupHeading id={id("contrast")}>Contrast</GroupHeading>
+      <SettingsGroup labelledBy={id("contrast")}>
         <SettingsRow
-          label="Contrast"
-          labelId={id("contrast")}
-          description="More draws lines and faint text darker. System follows your operating system."
+          label="Match system"
+          htmlFor={id("contrast-system")}
+          description="Follows your operating system's contrast setting and changes with it."
+          descriptionId={id("contrast-system-description")}
+        >
+          <Switch
+            id={id("contrast-system")}
+            checked={contrast === "system"}
+            onChange={(checked) => chooseContrast(checked ? "system" : shownContrast)}
+            describedBy={id("contrast-system-description")}
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Level"
+          labelId={id("contrast-level")}
+          description="More draws lines, borders, and faint text darker."
           descriptionId={id("contrast-description")}
         >
-          <SegmentedChoice
-            options={CONTRAST_OPTIONS}
-            value={contrast}
-            onChange={(value) => onChange({ appearance: { contrast: value } })}
+          <PreviewChoice
+            cards={CONTRAST_CARDS.map((card) => ({
+              ...card,
+              preview: <ThemePreview theme={theme.theme} contrast={card.value} />,
+            }))}
+            value={shownContrast}
+            systemValue={levels.systemContrast}
+            onChoose={chooseContrast}
             labelId={id("contrast")}
             descriptionId={id("contrast-description")}
           />
         </SettingsRow>
+      </SettingsGroup>
+
+      <GroupHeading id={id("motion")}>Motion</GroupHeading>
+      <SettingsGroup labelledBy={id("motion")}>
         <SettingsRow
-          label="Motion"
-          labelId={id("motion")}
-          description="Reduced keeps fades and drops movement. None stops every animation. System follows your operating system."
+          label="Match system"
+          htmlFor={id("motion-system")}
+          description="Follows your operating system's reduced-motion setting and changes with it."
+          descriptionId={id("motion-system-description")}
+        >
+          <Switch
+            id={id("motion-system")}
+            checked={motion === "system"}
+            onChange={(checked) => chooseMotion(checked ? "system" : shownMotion)}
+            describedBy={id("motion-system-description")}
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Level"
+          labelId={id("motion-level")}
+          description="Reduced keeps fades and drops movement. None stops every animation. Point at a card to see it."
           descriptionId={id("motion-description")}
         >
-          <SegmentedChoice
-            options={MOTION_OPTIONS}
-            value={motion}
-            onChange={(value) => onChange({ appearance: { motion: value } })}
+          <PreviewChoice
+            cards={MOTION_CARDS.map((card) => ({ ...card, preview: <MotionPreview level={card.value} /> }))}
+            value={shownMotion}
+            systemValue={systemMotion}
+            onChoose={chooseMotion}
             labelId={id("motion")}
             descriptionId={id("motion-description")}
+            cardClassName="vista-motion-card"
           />
         </SettingsRow>
       </SettingsGroup>
