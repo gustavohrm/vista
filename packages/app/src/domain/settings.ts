@@ -1,3 +1,5 @@
+import { DEFAULT_APPEARANCE_SETTINGS, parseAppearanceSettings, type AppearanceSettings } from "./appearance";
+
 /** Presentation and input options of the raw editor. */
 export interface EditorSettings {
   lineNumbers: boolean;
@@ -26,6 +28,7 @@ export interface UpdateSettings {
 /** User preferences, stored by the browser or webview under `SETTINGS_STORAGE_KEY`. */
 export interface Settings {
   version: 1;
+  appearance: AppearanceSettings;
   editor: EditorSettings;
   files: FileSettings;
   updates: UpdateSettings;
@@ -55,6 +58,7 @@ const MAX_VERSION_LENGTH = 64;
 
 export const DEFAULT_SETTINGS: Settings = {
   version: 1,
+  appearance: DEFAULT_APPEARANCE_SETTINGS,
   editor: DEFAULT_EDITOR_SETTINGS,
   files: DEFAULT_FILE_SETTINGS,
   updates: DEFAULT_UPDATE_SETTINGS,
@@ -91,6 +95,7 @@ export function parseSettings(stored: string | null): Settings {
   }
   return {
     version: 1,
+    appearance: parseAppearanceSettings(value.appearance),
     editor: parseEditorSettings(value.editor),
     files: parseFileSettings(value.files),
     updates: parseUpdateSettings(value.updates),

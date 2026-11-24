@@ -1,10 +1,11 @@
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useId, useMemo, type ReactNode } from "react";
 
 import type { EditorSettings } from "../../domain/settings";
 import { canShowEnriched, getViewer } from "../../domain/viewers";
 import type { ViewMode } from "../../ports";
 import type { OpenDocument } from "../../state/documents";
+import { useReducedMotion } from "../../theme/appearance";
 import { Tooltip } from "../feedback/tooltip";
 import { EditorSettingsMenu } from "./editor-settings-menu";
 
@@ -43,7 +44,7 @@ export function DocumentActions({
   onEditorSettingsChange,
   onOpenEditorSettings,
 }: DocumentActionsProps) {
-  const isReduced = useReducedMotion() ?? false;
+  const isReduced = useReducedMotion();
   const viewer = getViewer(doc.extension);
   const isRawShown = doc.viewMode !== "enriched" || viewer.enriched === undefined;
   // A CSV with too many cells for the table shows only raw, as the status bar notes.
@@ -138,7 +139,7 @@ interface ViewModeToggleProps {
  */
 function ViewModeToggle({ viewMode, enriched, onViewModeChange }: ViewModeToggleProps) {
   const indicatorId = useId();
-  const isReduced = useReducedMotion() ?? false;
+  const isReduced = useReducedMotion();
   const segment = (mode: ViewMode, label: string, icon: ReactNode) => {
     const isPressed = viewMode === mode;
     return (

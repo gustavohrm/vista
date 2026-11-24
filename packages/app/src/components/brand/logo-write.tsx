@@ -21,11 +21,11 @@ const LOGO_HEIGHT_UNITS = 78.32;
  * @returns The animated logo as an image.
  */
 export function LogoWrite({ height }: { height: number }) {
-  const { theme } = useTheme();
+  const { colorScheme } = useTheme();
   const margin = (MARGIN_UNITS / LOGO_HEIGHT_UNITS) * height;
   return (
     <img
-      src={theme === "dark" ? writeOnDark : writeOnLight}
+      src={colorScheme === "dark" ? writeOnDark : writeOnLight}
       alt=""
       draggable={false}
       style={{ top: -margin, left: -margin, height: height + 2 * margin }}

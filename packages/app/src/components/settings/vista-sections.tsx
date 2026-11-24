@@ -1,6 +1,13 @@
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 
 import { COMMAND_CATEGORIES, formatShortcut, type Command } from "../../commands";
+import {
+  THEMES,
+  type ContrastPreference,
+  type MotionPreference,
+  type SchemePreference,
+  type ThemeId,
+} from "../../domain/appearance";
 import type { ChangelogEntry } from "../../domain/changelog";
 import {
   isValidOpenSizeMb,
@@ -10,60 +17,202 @@ import {
   type Settings,
 } from "../../domain/settings";
 import type { SettingsChanges } from "../../state/settings";
-import type { ThemePreference, ThemeState } from "../../theme/theme-manager";
+import type { ThemeState } from "../../theme/theme-manager";
 import { GroupHeading, SectionHeading, SettingsGroup, SettingsRow, Switch } from "./settings-parts";
 import { formatReleaseDate, WhatsNewDialog } from "./whats-new-dialog";
 
-const THEME_OPTIONS: readonly { value: ThemePreference; label: string }[] = [
+const SCHEME_OPTIONS: readonly { value: SchemePreference; label: string; icon: ReactNode }[] = [
+  { value: "system", label: "System", icon: <i className="ic-monitor text-sm" aria-hidden="true" /> },
+  { value: "light", label: "Light", icon: <i className="ic-sun text-sm" aria-hidden="true" /> },
+  { value: "dark", label: "Dark", icon: <i className="ic-moon text-sm" aria-hidden="true" /> },
+];
+
+const CONTRAST_OPTIONS: readonly { value: ContrastPreference; label: string }[] = [
   { value: "system", label: "System" },
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
+  { value: "standard", label: "Standard" },
+  { value: "more", label: "More" },
+];
+
+const MOTION_OPTIONS: readonly { value: MotionPreference; label: string }[] = [
+  { value: "system", label: "System" },
+  { value: "all", label: "All" },
+  { value: "reduced", label: "Reduced" },
+  { value: "none", label: "None" },
 ];
 
 /** The segments of a choice of a few short options, in one hairline box like the view switch. */
 const SEGMENT_CLASS =
-  "text-text-muted hover:text-text has-checked:bg-selected has-checked:text-text-strong has-focus-visible:ring-1 has-focus-visible:ring-[var(--focus-ring)] relative flex h-6 cursor-pointer items-center rounded-[5px] px-3 text-[13px] transition-colors duration-100";
+  "text-text-muted hover:text-text has-checked:bg-selected has-checked:text-text-strong has-focus-visible:ring-1 has-focus-visible:ring-[var(--focus-ring)] relative flex h-6 cursor-pointer items-center gap-1.5 rounded-[5px] px-3 text-[13px] transition-colors duration-100";
 
 /**
- * The theme.
+ * A choice of a few short options as one row of segments, named and described by its settings row.
  *
- * @param props - The theme and the way to change it.
+ * @param props - The options, each with an optional icon before its label, the one chosen, what to do on a choice, and the ids of the row's name and description.
+ * @returns Radio group element.
+ */
+function SegmentedChoice<T extends string>({
+  options,
+  value,
+  onChange,
+  labelId,
+  descriptionId,
+}: {
+  options: readonly { value: T; label: string; icon?: ReactNode }[];
+  value: T;
+  onChange: (value: T) => void;
+  labelId: string;
+  descriptionId: string;
+}) {
+  const name = useId();
+  return (
+    <div
+      role="radiogroup"
+      aria-labelledby={labelId}
+      aria-describedby={descriptionId}
+      className="border-line flex rounded-md border p-0.5"
+    >
+      {options.map((option) => (
+        <label key={option.value} className={SEGMENT_CLASS}>
+          <input
+            type="radio"
+            name={name}
+            value={option.value}
+            checked={value === option.value}
+            onChange={() => onChange(option.value)}
+            className="sr-only"
+          />
+          {option.icon}
+          {option.label}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+/** Each theme's class, written out whole, since Tailwind finds only literal class names. */
+const THEME_CLASS: Record<ThemeId, string> = {
+  daylight: "theme-daylight",
+  neutral: "theme-neutral",
+  ocean: "theme-ocean",
+};
+
+/**
+ * A theme as a small window in its own colours, in the scheme now in effect: the chrome, the frame,
+ * a title, lines of text, a selection, and the primary action.
+ *
+ * @param props - The theme to show.
+ * @returns Decorative preview element.
+ */
+function ThemePreview({ theme }: { theme: ThemeId }) {
+  return (
+    <span aria-hidden="true" className={`${THEME_CLASS[theme]} bg-chrome block rounded-md p-1.5`}>
+      <span className="bg-frame border-line flex h-14 flex-col gap-1.5 rounded-[5px] border p-2">
+        <span className="bg-text-strong block h-1.5 w-1/2 rounded-full" />
+        <span className="flex gap-1">
+          <span className="bg-text-muted block h-1 w-1/4 rounded-full" />
+          <span className="bg-selection block h-1 w-1/4 rounded-full" />
+        </span>
+        <span className="bg-text-faint block h-1 w-2/3 rounded-full" />
+        <span className="bg-action mt-auto block h-2 w-1/4 self-end rounded-sm" />
+      </span>
+    </span>
+  );
+}
+
+/** A theme in the grid: its preview over its name, with the selected fill and edge once chosen. */
+const THEME_CARD_CLASS =
+  "text-text-muted hover:bg-hover hover:text-text has-checked:text-text-strong has-checked:bg-selected has-checked:shadow-[inset_0_0_0_1px_var(--color-line-strong)] has-focus-visible:ring-1 has-focus-visible:ring-[var(--focus-ring)] flex cursor-pointer flex-col gap-1.5 rounded-lg p-1.5 text-[12.5px] transition-colors duration-100";
+
+interface AppearanceSectionProps {
+  theme: ThemeState;
+  settings: Settings;
+  onChange: (changes: SettingsChanges) => void;
+}
+
+/**
+ * The scheme, theme, contrast, and motion.
+ *
+ * @param props - The theme, the saved contrast and motion, and the ways to change them.
  * @returns Section content.
  */
-export function AppearanceSection({ theme }: { theme: ThemeState }) {
-  const name = useId();
-  const labelId = useId();
-  const descriptionId = useId();
+export function AppearanceSection({ theme, settings, onChange }: AppearanceSectionProps) {
+  const idPrefix = useId();
+  const id = (part: string) => `${idPrefix}-${part}`;
+  const themeName = useId();
+  const { contrast, motion } = settings.appearance;
   return (
     <>
       <SectionHeading title="Appearance" lead="How Vista looks, in every workspace." />
       <SettingsGroup>
         <SettingsRow
+          label="Scheme"
+          labelId={id("scheme")}
+          description="Light or dark. System follows your operating system and changes with it."
+          descriptionId={id("scheme-description")}
+        >
+          <SegmentedChoice
+            options={SCHEME_OPTIONS}
+            value={theme.scheme}
+            onChange={theme.setScheme}
+            labelId={id("scheme")}
+            descriptionId={id("scheme-description")}
+          />
+        </SettingsRow>
+        <SettingsRow
           label="Theme"
-          labelId={labelId}
-          description="System follows your operating system and changes with it."
-          descriptionId={descriptionId}
+          labelId={id("theme")}
+          description="The interface's colours. Each theme has a light and a dark version."
+          descriptionId={id("theme-description")}
         >
           <div
             role="radiogroup"
-            aria-labelledby={labelId}
-            aria-describedby={descriptionId}
-            className="border-line flex rounded-md border p-0.5"
+            aria-labelledby={id("theme")}
+            aria-describedby={id("theme-description")}
+            className="grid basis-full grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2"
           >
-            {THEME_OPTIONS.map(({ value, label }) => (
-              <label key={value} className={SEGMENT_CLASS}>
+            {THEMES.map((option) => (
+              <label key={option.id} className={THEME_CARD_CLASS}>
                 <input
                   type="radio"
-                  name={name}
-                  value={value}
-                  checked={theme.preference === value}
-                  onChange={() => theme.setPreference(value)}
+                  name={themeName}
+                  value={option.id}
+                  checked={theme.theme === option.id}
+                  onChange={() => theme.setTheme(option.id)}
                   className="sr-only"
                 />
-                {label}
+                <ThemePreview theme={option.id} />
+                <span className="px-0.5 font-medium">{option.label}</span>
               </label>
             ))}
           </div>
+        </SettingsRow>
+        <SettingsRow
+          label="Contrast"
+          labelId={id("contrast")}
+          description="More draws lines and faint text darker. System follows your operating system."
+          descriptionId={id("contrast-description")}
+        >
+          <SegmentedChoice
+            options={CONTRAST_OPTIONS}
+            value={contrast}
+            onChange={(value) => onChange({ appearance: { contrast: value } })}
+            labelId={id("contrast")}
+            descriptionId={id("contrast-description")}
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Motion"
+          labelId={id("motion")}
+          description="Reduced keeps fades and drops movement. None stops every animation. System follows your operating system."
+          descriptionId={id("motion-description")}
+        >
+          <SegmentedChoice
+            options={MOTION_OPTIONS}
+            value={motion}
+            onChange={(value) => onChange({ appearance: { motion: value } })}
+            labelId={id("motion")}
+            descriptionId={id("motion-description")}
+          />
         </SettingsRow>
       </SettingsGroup>
     </>

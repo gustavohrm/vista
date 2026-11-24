@@ -91,6 +91,7 @@ import {
 import { loadFile } from "./state/load-file";
 import { useSettings } from "./state/settings";
 import { browserStorage, checkFolderOverlap, createWorkspaceStore, type WorkspaceDetails } from "./state/workspaces";
+import { useApplyAppearance } from "./theme/appearance";
 import { useTheme } from "./theme/theme-manager";
 
 interface AppProps {
@@ -240,6 +241,7 @@ function AppShell({ adapter }: AppProps) {
   const [cursor, setCursor] = useState<{ key: string; position: CursorInfo } | null>(null);
   const [vimMode, setVimMode] = useState<{ key: string; mode: string | null } | null>(null);
   const [settings, updateSettings] = useSettings();
+  useApplyAppearance(settings.appearance);
   const [find, setFind] = useState<FindRequest | null>(null);
   // The text the go-to picker opens with, or null while it is closed.
   const [goToQuery, setGoToQuery] = useState<string | null>(null);
@@ -3088,7 +3090,7 @@ function AppShell({ adapter }: AppProps) {
                     onChange={updateSettings}
                   />
                 ) : (
-                  <AppearanceSection theme={theme} />
+                  <AppearanceSection theme={theme} settings={settings} onChange={updateSettings} />
                 )}
               </SettingsPage>
             )}

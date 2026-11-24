@@ -1,8 +1,9 @@
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { formatShortcut } from "../../commands";
 import type { DesktopDownload } from "../../domain/desktop-download";
+import { useReducedMotion } from "../../theme/appearance";
 import { LOGO_WRITE_MS, LogoWrite } from "../brand/logo-write";
 import { VistaLoader, VistaLogo } from "../brand/vista-logo";
 import { WorkspaceGlyph } from "../workspace/workspace-glyph";
@@ -198,7 +199,7 @@ type IntroPhase = "write" | "settle" | "done";
  * plays the opening entrance beside the lists, which show at once.
  */
 function Intro({ entrance, children }: { entrance: "single-stroke" | "opening"; children: ReactNode }) {
-  const isReduced = useReducedMotion() ?? false;
+  const isReduced = useReducedMotion();
   const [phase, setPhase] = useState<IntroPhase>(() =>
     entrance === "single-stroke" && !hasPlayedIntro && !isReduced ? "write" : "done",
   );
