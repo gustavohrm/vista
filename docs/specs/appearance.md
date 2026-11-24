@@ -25,7 +25,7 @@ Each applies at once, in every workspace, and _System_ follows the operating sys
 
 The Appearance section shows them in three groups:
 
-- **Color**: the scheme, as three buttons with an icon each, a monitor for _System_, a sun for _Light_, and a moon for _Dark_, above the theme grid.
+- **Colour**: the scheme, as three buttons with an icon each, a monitor for _System_, a sun for _Light_, and a moon for _Dark_, above the theme grid.
 - **Contrast**: a card for _Standard_ and one for _More_, each a preview of the interface at that level, in the theme in effect.
 - **Motion**: a card for _All_, _Reduced_, and _None_, each a small mark that moves as that level allows: it slides under _All_, fades in place under _Reduced_, and stays still under _None_. A preview plays only while the pointer is over its card or the card has focus, whatever the level in effect, so it moves only when asked to.
 
