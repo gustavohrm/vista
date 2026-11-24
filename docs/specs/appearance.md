@@ -40,13 +40,13 @@ A theme changes everything coloured in the interface: grounds, lines, text, the 
 | ---------- | -------------------------------------------------------------------------------------------- |
 | Daylight   | Today's appearance: ink and paper with Daylight as the primary, selection, and match colour. |
 | Neutral    | Monochrome, in the Coden style: greys only, including selection and find matches.            |
-| Neon       | A night city: deep indigo grounds with neon magenta and cyan accents.                        |
+| Midnight   | Deep indigo grounds with magenta and cyan accents.                                           |
 | Ocean      | Blues and teals.                                                                             |
 | Forest     | Greens and warm earth tones.                                                                 |
 | Ember      | Charcoal with a vivid red-orange accent.                                                     |
 | Cappuccino | Coffee: soft browns and cream, low in chroma.                                                |
 
-Cyberpunk and Tokyo were proposed as two themes and merged into Neon, since both were neon accents on a near-black navy. Each theme's palette is Vista's own; none reproduces an existing editor theme.
+Cyberpunk and Tokyo were proposed as two themes and merged into Midnight, since both were bright accents on a near-black navy. The name describes colours, as every theme's does: Neon and Cyberpunk suggest glow or a futuristic look, which a theme does not change, and Tokyo suggests the Tokyo Night editor theme. Each theme's palette is Vista's own; none reproduces an existing editor theme.
 
 A theme is a value, as a `light-dark()` pair, for every colour token `packages/app/src/style.css` defines or sets, including the `@codenhub/styles` tokens it overrides, as [Architecture](../architecture.md#shared-presentation) describes. The stylesheet is the list: a theme sets every token in it, and a token added later gets a value in every theme. No component names a theme. Every variant meets the ratios [Contrast](#contrast) sets for each level, and adding a theme records its measured pairings in [the brand guidelines](../guidelines/brand.md#colours).
 
@@ -114,5 +114,4 @@ Contrast and motion join the editor settings under `vista.settings`, described i
 
 ## Open questions
 
-- **Neon's name.** Neon is a placeholder for the merged Cyberpunk and Tokyo theme.
 - **The scheme as the first control.** Whether the scheme stays a three-way choice above the theme grid or becomes a switch inside it. Settled during implementation.
