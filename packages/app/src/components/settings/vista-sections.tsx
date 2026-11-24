@@ -273,7 +273,7 @@ interface AppearanceSectionProps {
 }
 
 /**
- * The appearance in three groups: Color, which is the scheme and the theme; Contrast; and Motion.
+ * The appearance in three groups: Colour, which is the scheme and the theme; Contrast; and Motion.
  * Contrast and Motion offer _System_ as a Match system switch, as `docs/specs/appearance.md` describes.
  *
  * @param props - The theme, the saved contrast and motion, and the ways to change them.
@@ -302,7 +302,7 @@ export function AppearanceSection({ theme, settings, onChange }: AppearanceSecti
     <>
       <SectionHeading title="Appearance" lead="How Vista looks, in every workspace." />
       <GroupHeading id={id("color")} isFirst>
-        Color
+        Colour
       </GroupHeading>
       <SettingsGroup labelledBy={id("color")}>
         <SettingsRow

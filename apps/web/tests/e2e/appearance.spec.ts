@@ -177,7 +177,7 @@ for (const theme of THEMES) {
         const ratios = await measure(page, list);
         const results = list.map((pairing, index) => ({
           ...pairing,
-          ratio: Math.round((ratios[index] ?? 0) * 100) / 100,
+          ratio: ratios[index] ?? 0,
         }));
         if (process.env.VISTA_PRINT_CONTRAST) {
           process.stdout.write(
@@ -189,7 +189,7 @@ for (const theme of THEMES) {
         }
         const failing = results
           .filter(({ ratio, min }) => ratio < min)
-          .map(({ name, ratio, min }) => `${name}: ${ratio} < ${min}`);
+          .map(({ name, ratio, min }) => `${name}: ${ratio.toFixed(2)} < ${min}`);
         expect(failing).toEqual([]);
       });
     }

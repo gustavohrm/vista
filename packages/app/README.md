@@ -22,6 +22,7 @@ The package root exports:
 - `ViewMode`: document presentation mode, `"raw"` or `"enriched"`.
 - `getFileKind`, `normalizeExtension`, `supportsEnrichedView`: file-type helpers that classify a file, normalize its extension, and report whether its enriched view is available.
 - `useTheme`, `getThemeInstance`: access to the theme state and the underlying theme manager.
+- `initAppearance`: applies the saved theme, contrast, and motion to the page. Each host calls it before it renders.
 
 The `@vista/app/style.css` subpath exports the shared base stylesheet. Import it from each host's CSS entrypoint and process it with Tailwind's Vite plugin. It includes Tailwind, `@codenhub/styles/tw`, `@codenhub/icons`, and the `@codenhub/toaster` styles.
 
@@ -35,7 +36,7 @@ Icons are supplied by `@codenhub/icons` configured in Vite with `mode: "svg"`. I
 
 ## Theming
 
-Theming is powered by `@codenhub/theme` and `@codenhub/styles`. The appearance is light, dark, or following the operating system, which is the default.
+Theming is powered by `@codenhub/theme` and `@codenhub/styles`. Settings → Appearance sets the scheme (light, dark, or following the operating system, the default), the theme, the contrast, and the motion, as [Appearance](../../docs/specs/appearance.md) describes.
 
 ## Tests
 
