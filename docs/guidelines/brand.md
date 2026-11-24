@@ -1,6 +1,6 @@
 ---
 status: DRAFT
-last_updated: 2026-11-16
+last_updated: 2026-11-24
 scope: Vista's name, brand idea, logo, wordmark, colours, and typefaces, and why each was chosen.
 ---
 
@@ -159,7 +159,7 @@ Rejected marks:
 
 **Daylight is Vista's colour.** It is the light seen through the opening, and a highlighter's colour, the one colour people add to plain text. It also sets Vista apart in a category of purple, blue, teal, green, red, and black and white, and from Haku and Coden, which are monochrome.
 
-The interface has a light and a dark appearance, set through `@codenhub/theme` with the `@codenhub/styles` palette. Both use Daylight where a highlighter would: selected text is full Daylight with ink text on both grounds, and find matches are Daylight at 75% on light grounds and 35% on dark ones, with the current match full and the others soft. A translucent selection was rejected: over the dark frame it mixed to olive, which read as a different colour rather than Daylight. The dark appearance also fills its primary buttons with Daylight, with ink text; the light one fills them with ink, since Daylight on paper is invisible. The logo and loader the interface shows also carry it, as [Motion](#motion) describes. Brand surfaces, which are the logo, the app icon, a website, and release notes, always use Daylight. More interface themes are planned: Daylight as a theme of its own, and a monochrome one beside it, as the [roadmap](../roadmap.md) records.
+The interface has themes, each with a light and a dark variant, as [Appearance](../specs/appearance.md#themes) describes. The Daylight theme, the default, uses Daylight where a highlighter would: selected text is full Daylight with ink text on both grounds, and find matches are Daylight at 75% on light grounds and 35% on dark ones, with the current match full and the others soft. A translucent selection was rejected: over the dark frame it mixed to olive, which read as a different colour rather than Daylight. Its dark variant also fills primary buttons with Daylight, with ink text; the light one fills them with ink, since Daylight on paper is invisible. Other themes set their own selection, matches, and primary colour. The logo and loader the interface shows carry Daylight in every theme, as [Motion](#motion) describes, and so do brand surfaces, which are the logo, the app icon, a website, and release notes.
 
 The neutrals are the `@codenhub/styles` palette's, so the brand and the interface share them. OKLCH values are the source; hex and RGB are their sRGB conversions.
 
@@ -193,6 +193,55 @@ Contrast ratios per WCAG 2.2. The logo is exempt as a logotype; its bar tones ar
 | `daylight`      | `paper`       | 1.27:1  | Never                               |
 
 Daylight on a bright ground is invisible, which is why `daylight-deep` exists: it is the same hue, darkened until it reaches 4.5:1 on paper, at the highest chroma sRGB holds there.
+
+### Interface themes
+
+The ratios each theme's tokens reach, as painted in the browser by `apps/web/tests/e2e/appearance.spec.ts`, which fails when one falls below what [Contrast](../specs/appearance.md#contrast) sets. Each is the lowest over the grounds the pairing appears on, the frame, the chrome, and the floating surface for text, and the frame and chrome for the rest. At Standard, text and the primary button reach 4.5:1 and the focus ring and control border 3:1; faint text, lines, and fills sit lower by design. At More, every row reaches 4.5:1 for text and 3:1 for the rest. Run the test with `VISTA_PRINT_CONTRAST=1` to print every pairing.
+
+| Daylight                         | Light   | Dark    | Light, More | Dark, More |
+| -------------------------------- | ------- | ------- | ----------- | ---------- |
+| Text                             | 18.00:1 | 16.33:1 | 18.00:1     | 16.33:1    |
+| Muted text                       | 6.08:1  | 6.76:1  | 10.99:1     | 9.47:1     |
+| Secondary text                   | 9.43:1  | 6.60:1  | 9.43:1      | 6.60:1     |
+| Faint text                       | 4.31:1  | 3.59:1  | 9.00:1      | 8.13:1     |
+| Text on a hover or selected fill | 13.84:1 | 12.99:1 | 4.60:1      | 4.68:1     |
+| Focus ring                       | 5.90:1  | 7.52:1  | 5.90:1      | 7.52:1     |
+| Control border                   | 4.74:1  | 3.82:1  | 6.39:1      | 6.04:1     |
+| Lines                            | 1.11:1  | 1.20:1  | 4.31:1      | 4.77:1     |
+| Hover and selected fills         | 1.10:1  | 1.10:1  | 3.18:1      | 3.25:1     |
+| Primary button text              | 9.93:1  | 14.99:1 | 9.93:1      | 14.99:1    |
+| Selected text                    | 14.99:1 | 14.99:1 | 14.99:1     | 14.99:1    |
+| Text on a find match             | 15.99:1 | 6.41:1  | 15.99:1     | 6.41:1     |
+
+| Neutral                          | Light   | Dark    | Light, More | Dark, More |
+| -------------------------------- | ------- | ------- | ----------- | ---------- |
+| Text                             | 18.00:1 | 16.33:1 | 18.00:1     | 16.33:1    |
+| Muted text                       | 6.08:1  | 6.76:1  | 10.99:1     | 9.47:1     |
+| Secondary text                   | 9.43:1  | 6.60:1  | 9.43:1      | 6.60:1     |
+| Faint text                       | 4.31:1  | 3.59:1  | 9.00:1      | 8.13:1     |
+| Text on a hover or selected fill | 13.84:1 | 12.99:1 | 4.60:1      | 4.68:1     |
+| Focus ring                       | 5.90:1  | 7.52:1  | 5.90:1      | 7.52:1     |
+| Control border                   | 4.74:1  | 3.82:1  | 6.39:1      | 6.04:1     |
+| Lines                            | 1.11:1  | 1.20:1  | 4.31:1      | 4.77:1     |
+| Hover and selected fills         | 1.10:1  | 1.10:1  | 3.18:1      | 3.25:1     |
+| Primary button text              | 9.93:1  | 13.36:1 | 9.93:1      | 13.36:1    |
+| Selected text                    | 13.36:1 | 7.49:1  | 13.36:1     | 7.49:1     |
+| Text on a find match             | 11.71:1 | 6.41:1  | 11.71:1     | 6.41:1     |
+
+| Ocean                            | Light   | Dark    | Light, More | Dark, More |
+| -------------------------------- | ------- | ------- | ----------- | ---------- |
+| Text                             | 16.58:1 | 13.83:1 | 16.58:1     | 13.83:1    |
+| Muted text                       | 5.96:1  | 7.07:1  | 9.58:1      | 8.26:1     |
+| Secondary text                   | 7.53:1  | 8.17:1  | 7.53:1      | 8.17:1     |
+| Faint text                       | 4.11:1  | 4.12:1  | 7.91:1      | 7.07:1     |
+| Text on a hover or selected fill | 14.62:1 | 12.71:1 | 5.14:1      | 4.84:1     |
+| Focus ring                       | 4.82:1  | 9.33:1  | 4.82:1      | 9.33:1     |
+| Control border                   | 4.05:1  | 3.75:1  | 5.79:1      | 5.56:1     |
+| Lines                            | 1.13:1  | 1.21:1  | 3.93:1      | 4.38:1     |
+| Hover and selected fills         | 1.10:1  | 1.12:1  | 3.06:1      | 3.08:1     |
+| Primary button text              | 5.47:1  | 9.18:1  | 5.47:1      | 9.18:1     |
+| Selected text                    | 13.79:1 | 9.18:1  | 13.79:1     | 9.18:1     |
+| Text on a find match             | 12.95:1 | 5.90:1  | 12.95:1     | 5.90:1     |
 
 ## Typefaces
 

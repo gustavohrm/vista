@@ -1,12 +1,12 @@
 ---
-status: APPROVED
+status: IMPLEMENTED
 last_updated: 2026-11-24
 scope: The appearance preferences, which are theme, scheme, contrast, and motion, how each is chosen, stored, and applied, what each theme must provide, and the package versions they need.
 ---
 
 # Appearance
 
-This document describes how Vista's appearance becomes configurable beyond today's light, dark, and system choice. It is approved and not yet implemented. Until it is, today's behavior is in [Workspaces → Settings](workspaces.md#settings) and [Architecture → Shared presentation](../architecture.md#shared-presentation).
+This document describes how Vista's appearance is configured: its scheme, theme, contrast, and motion. It is implemented with the first step of [themes](#themes), Daylight, Neutral, and Ocean; the other themes it lists are not built yet.
 
 ## The preferences
 
@@ -62,7 +62,7 @@ Cyberpunk and Tokyo were proposed as two themes and merged into Midnight, since 
 
 A theme is a value, as a `light-dark()` pair, for every colour token `packages/app/src/style.css` defines or sets, including the `@codenhub/styles` tokens it overrides, as [Architecture](../architecture.md#shared-presentation) describes. The stylesheet is the list: a theme sets every token in it, and a token added later gets a value in every theme. No component names a theme. Every variant meets the ratios [Contrast](#contrast) sets for each level, and adding a theme records its measured pairings in [the brand guidelines](../guidelines/brand.md#colours).
 
-Themes ship in steps: Daylight and Neutral first, with one more, to prove the token set, then the rest.
+Themes ship in steps: Daylight and Neutral first, with one more, to prove the token set, then the rest. The first step shipped with Ocean as the third theme, since blues and teals are furthest from Daylight's ink and paper and so test the token set hardest; Midnight, Forest, Ember, and Cappuccino follow.
 
 ## Contrast
 
@@ -124,6 +124,6 @@ The theme and scheme are saved by `@codenhub/theme` under `vista-theme`, as the 
 
 Contrast and motion join the editor settings under `vista.settings`, described in [Workspaces → Editor settings](workspaces.md#editor-settings), as `"appearance": { "contrast": "system", "motion": "system" }`, with the same field-by-field fallback.
 
-## Open questions
+## The scheme control
 
-- **The scheme as the first control.** Whether the scheme stays a three-way choice above the theme grid or becomes a switch inside it. Settled during implementation.
+The scheme is a three-way choice, _System_, _Light_, and _Dark_, in its own row above the theme grid, built like the Contrast and Motion choices below it. A light-dark switch inside the grid was not chosen: a switch has two states, and _System_, the default, is a third.
