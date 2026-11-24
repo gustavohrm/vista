@@ -150,9 +150,13 @@ function MotionPreview({ level }: { level: MotionCard }) {
   );
 }
 
-/** A theme in the grid: its preview over its name, with the selected fill and edge once chosen. */
+/**
+ * A card in a grid: its preview over its name, with the selected fill and edge once chosen. The name's
+ * line is a whole 20px, since 12.5px text at the default 1.5 is 18.75px, which leaves everything below
+ * on a fractional pixel, so the same icon renders differently in each group.
+ */
 const THEME_CARD_CLASS =
-  "text-text-muted hover:bg-hover hover:text-text has-checked:text-text-strong has-checked:bg-selected has-checked:shadow-[inset_0_0_0_1px_var(--color-line-strong)] has-focus-visible:ring-1 has-focus-visible:ring-[var(--focus-ring)] flex cursor-pointer flex-col gap-1.5 rounded-lg p-1.5 text-[12.5px] transition-colors duration-100";
+  "text-text-muted hover:bg-hover hover:text-text has-checked:text-text-strong has-checked:bg-selected has-checked:shadow-[inset_0_0_0_1px_var(--color-line-strong)] has-focus-visible:ring-1 has-focus-visible:ring-[var(--focus-ring)] flex cursor-pointer flex-col gap-1.5 rounded-lg p-1.5 text-[12.5px] leading-5 transition-colors duration-100";
 
 /**
  * A choice among preview cards, with a _System_ badge on the card the operating system asks for.
