@@ -157,7 +157,7 @@ export function WorkspacePage({
         </div>
       )}
       {(lock === "unavailable" || lock === "unreadable") && (
-        <output className="text-text-muted mb-6 block text-[13px] leading-normal">
+        <output className="text-text-muted mb-6 block text-[13px] leading-5">
           {lock === "unavailable"
             ? `"${homeName}" isn't found, so the details kept in it can't be changed.`
             : `"${homeName}" holds workspace details this version of Vista can't read, so they can't be changed here.`}
@@ -353,10 +353,10 @@ function StorageChoice({ name, isChecked, onChoose, label, description }: Storag
         className="radio mt-px flex-none"
       />
       <span className="min-w-0">
-        <span id={labelId} className="text-text-strong block text-[13px] font-medium">
+        <span id={labelId} className="text-text-strong block text-[13px] leading-5 font-medium">
           {label}
         </span>
-        <span id={descriptionId} className="text-text-muted block text-[12.5px] leading-[1.45]">
+        <span id={descriptionId} className="text-text-muted block text-[12.5px] leading-[18px]">
           {description}
         </span>
       </span>
