@@ -1039,23 +1039,22 @@ describe("App", () => {
 
       await user.keyboard("{Control>},{/Control}");
       const dialog = await settingsDialog();
-      const contrastGroup = within(dialog).getByRole("group", { name: "Contrast" });
-      const motionGroup = within(dialog).getByRole("group", { name: "Motion" });
-      const contrast = within(contrastGroup).getByRole("radiogroup", { name: "Contrast" });
-      const motion = within(motionGroup).getByRole("radiogroup", { name: "Motion" });
-      const matchContrast = within(contrastGroup).getByRole("switch", { name: "Match system" });
-      const matchMotion = within(motionGroup).getByRole("switch", { name: "Match system" });
+      const contrast = within(dialog).getByRole("radiogroup", { name: "Contrast" });
+      const motion = within(dialog).getByRole("radiogroup", { name: "Motion" });
+      // Both are named Match system; the tooltip that describes each says what it follows.
+      const matchContrast = within(dialog).getByRole("button", { name: "Match system", description: /contrast/ });
+      const matchMotion = within(dialog).getByRole("button", { name: "Match system", description: /motion/ });
 
-      // Matching the system, the cards show what it asks for, marked as the system's.
-      expect(matchContrast).toBeChecked();
+      // While matching the system, the cards show what it asks for, marked as the system's.
+      expect(matchContrast).toHaveAttribute("aria-pressed", "true");
       expect(within(contrast).getByRole("radio", { name: "Standard" })).toBeChecked();
       expect(within(contrast).getByRole("radio", { name: "Standard" })).toHaveAccessibleDescription("System");
       expect(within(motion).getByRole("radio", { name: "All" })).toBeChecked();
 
       await user.click(within(contrast).getByRole("radio", { name: "More" }));
       await user.click(within(motion).getByRole("radio", { name: "None" }));
-      expect(matchContrast).not.toBeChecked();
-      expect(matchMotion).not.toBeChecked();
+      expect(matchContrast).toHaveAttribute("aria-pressed", "false");
+      expect(matchMotion).toHaveAttribute("aria-pressed", "false");
       expect(document.documentElement).toHaveAttribute("data-contrast", "more");
       expect(document.documentElement).toHaveAttribute("data-motion", "none");
       expect(JSON.parse(localStorage.getItem("vista.settings") ?? "{}").appearance).toEqual({
@@ -1076,7 +1075,7 @@ describe("App", () => {
 
       // Choosing the card the system already asks for pins it; turning the switch off keeps the card.
       await user.click(within(contrast).getByRole("radio", { name: "Standard" }));
-      expect(matchContrast).not.toBeChecked();
+      expect(matchContrast).toHaveAttribute("aria-pressed", "false");
       await user.click(matchMotion);
       expect(within(motion).getByRole("radio", { name: "All" })).toBeChecked();
       expect(JSON.parse(localStorage.getItem("vista.settings") ?? "{}").appearance).toEqual({

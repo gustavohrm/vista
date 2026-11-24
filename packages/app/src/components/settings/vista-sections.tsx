@@ -20,6 +20,7 @@ import {
 import type { SettingsChanges } from "../../state/settings";
 import { useAppearanceLevels } from "../../theme/appearance";
 import type { ThemeState } from "../../theme/theme-manager";
+import { Tooltip } from "../feedback/tooltip";
 import { GroupHeading, SectionHeading, SettingsGroup, SettingsRow, Switch } from "./settings-parts";
 import { formatReleaseDate, WhatsNewDialog } from "./whats-new-dialog";
 
@@ -173,7 +174,7 @@ function PreviewChoice<T extends string>({
   systemValue: T;
   onChoose: (value: T) => void;
   labelId: string;
-  descriptionId: string;
+  descriptionId?: string;
   cardClassName?: string;
 }) {
   const name = useId();
@@ -218,6 +219,44 @@ function PreviewChoice<T extends string>({
         );
       })}
     </div>
+  );
+}
+
+/** The Match system toggle: a small text button with an icon, in the shell's hover and pressed fills. */
+const MATCH_SYSTEM_CLASS =
+  "text-text-muted hover:bg-hover hover:text-text aria-pressed:bg-selected aria-pressed:text-text-strong inline-flex h-7 flex-none cursor-pointer items-center gap-1.5 rounded-md px-2 text-[12.5px] font-medium transition-colors duration-100 outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)]";
+
+/**
+ * The _System_ choice of a group of preview cards, at the right of the group's name: pressed while
+ * the operating system decides which card applies. Its tooltip says what it follows.
+ *
+ * @param props - The tooltip, which says what it follows; whether it is on; and what to do when it is pressed.
+ * @returns Toggle button inside its tooltip.
+ */
+function MatchSystemToggle({
+  hint,
+  isOn,
+  onToggle,
+}: {
+  hint: string;
+  isOn: boolean;
+  onToggle: (isOn: boolean) => void;
+}) {
+  return (
+    <Tooltip text={hint} position="bottom" className="-mr-2 flex flex-none">
+      {(bubbleId) => (
+        <button
+          type="button"
+          onClick={() => onToggle(!isOn)}
+          aria-pressed={isOn}
+          aria-describedby={bubbleId}
+          className={MATCH_SYSTEM_CLASS}
+        >
+          <i className="ic-monitor text-sm" aria-hidden="true" />
+          Match system
+        </button>
+      )}
+    </Tooltip>
   );
 }
 
@@ -304,27 +343,20 @@ export function AppearanceSection({ theme, settings, onChange }: AppearanceSecti
         </SettingsRow>
       </SettingsGroup>
 
-      <GroupHeading id={id("contrast")}>Contrast</GroupHeading>
-      <SettingsGroup labelledBy={id("contrast")}>
-        <SettingsRow
-          label="Match system"
-          htmlFor={id("contrast-system")}
-          description="Follows your operating system's contrast setting and changes with it."
-          descriptionId={id("contrast-system-description")}
-        >
-          <Switch
-            id={id("contrast-system")}
-            checked={contrast === "system"}
-            onChange={(checked) => chooseContrast(checked ? "system" : shownContrast)}
-            describedBy={id("contrast-system-description")}
+      <GroupHeading
+        id={id("contrast")}
+        action={
+          <MatchSystemToggle
+            hint="Follow your operating system's contrast setting"
+            isOn={contrast === "system"}
+            onToggle={(isOn) => chooseContrast(isOn ? "system" : shownContrast)}
           />
-        </SettingsRow>
-        <SettingsRow
-          label="Level"
-          labelId={id("contrast-level")}
-          description="More draws lines, borders, and faint text darker."
-          descriptionId={id("contrast-description")}
-        >
+        }
+      >
+        Contrast
+      </GroupHeading>
+      <SettingsGroup>
+        <div className="p-3">
           <PreviewChoice
             cards={CONTRAST_CARDS.map((card) => ({
               ...card,
@@ -334,42 +366,33 @@ export function AppearanceSection({ theme, settings, onChange }: AppearanceSecti
             systemValue={levels.systemContrast}
             onChoose={chooseContrast}
             labelId={id("contrast")}
-            descriptionId={id("contrast-description")}
           />
-        </SettingsRow>
+        </div>
       </SettingsGroup>
 
-      <GroupHeading id={id("motion")}>Motion</GroupHeading>
-      <SettingsGroup labelledBy={id("motion")}>
-        <SettingsRow
-          label="Match system"
-          htmlFor={id("motion-system")}
-          description="Follows your operating system's reduced-motion setting and changes with it."
-          descriptionId={id("motion-system-description")}
-        >
-          <Switch
-            id={id("motion-system")}
-            checked={motion === "system"}
-            onChange={(checked) => chooseMotion(checked ? "system" : shownMotion)}
-            describedBy={id("motion-system-description")}
+      <GroupHeading
+        id={id("motion")}
+        action={
+          <MatchSystemToggle
+            hint="Follow your operating system's reduced-motion setting"
+            isOn={motion === "system"}
+            onToggle={(isOn) => chooseMotion(isOn ? "system" : shownMotion)}
           />
-        </SettingsRow>
-        <SettingsRow
-          label="Level"
-          labelId={id("motion-level")}
-          description="Reduced keeps fades and drops movement. None stops every animation. Point at a card to see it."
-          descriptionId={id("motion-description")}
-        >
+        }
+      >
+        Motion
+      </GroupHeading>
+      <SettingsGroup>
+        <div className="p-3">
           <PreviewChoice
             cards={MOTION_CARDS.map((card) => ({ ...card, preview: <MotionPreview level={card.value} /> }))}
             value={shownMotion}
             systemValue={systemMotion}
             onChoose={chooseMotion}
             labelId={id("motion")}
-            descriptionId={id("motion-description")}
             cardClassName="vista-motion-card"
           />
-        </SettingsRow>
+        </div>
       </SettingsGroup>
     </>
   );
