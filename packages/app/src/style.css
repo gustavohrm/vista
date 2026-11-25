@@ -10,8 +10,10 @@
 
 /* Vista's shell. The chrome around the document recedes and the frame that holds the document comes
    forward; each boundary is drawn once, by the frame's background and its hairline. `--ui-ink` is the
-   styles package's hook for its components' border colour, so buttons, inputs, and keys take the
-   same hairline instead of the package's stronger default border. */
+   styles package's hook for its components' border colour, so buttons and keys take the same
+   hairline instead of the package's stronger default border. Fields, radios, and switches are found
+   by their border, so `--ui-control-ink`, the package's hook for those, keeps the theme's control
+   border, at the strength Contrast in `docs/specs/appearance.md` sets. */
 @theme {
   --font-default: "Inter Variable", "Segoe UI", system-ui, sans-serif;
   --font-mono: ui-monospace, "Cascadia Mono", "Cascadia Code", Consolas, "DejaVu Sans Mono", monospace;
@@ -49,6 +51,7 @@
 
 :root {
   --ui-ink: var(--color-line);
+  --ui-control-ink: var(--color-control-border);
 }
 
 /* The themes, as `docs/specs/appearance.md` defines them. Each sets every themed colour above and
