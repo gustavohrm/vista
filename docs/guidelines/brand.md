@@ -196,7 +196,7 @@ Daylight on a bright ground is invisible, which is why `daylight-deep` exists: i
 
 ### Interface themes
 
-The ratios each theme's tokens reach, as painted in the browser by `apps/web/tests/e2e/appearance.spec.ts`, which fails when one falls below what [Contrast](../specs/appearance.md#contrast) sets. Each is the lowest over the grounds the pairing appears on, the frame, the chrome, and the floating surface for text, and the frame and chrome for the rest. At Standard, text and the primary button reach 4.5:1 and the focus ring and control border 3:1; faint text, lines, and fills sit lower by design. At More, every row reaches 4.5:1 for text and 3:1 for the rest. Run the test with `VISTA_PRINT_CONTRAST=1` to print every pairing.
+The ratios each theme's tokens reach, as painted in the browser by `apps/web/tests/e2e/appearance.spec.ts`, which fails when one falls below what [Contrast](../specs/appearance.md#contrast) sets. Each is the lowest over the grounds the pairing appears on, the frame, the chrome, and the floating surface for text, and the frame and chrome for the rest. At Standard, text and the primary button reach 4.5:1 and the focus ring and control border 3:1, though a text field draws its resting border lighter than the token, as Contrast describes; faint text, lines, and fills sit lower by design. At More, every row reaches 4.5:1 for text and 3:1 for the rest. Run the test with `VISTA_PRINT_CONTRAST=1` to print every pairing.
 
 | Daylight                         | Light   | Dark    | Light, More | Dark, More |
 | -------------------------------- | ------- | ------- | ----------- | ---------- |

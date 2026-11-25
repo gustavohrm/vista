@@ -1029,6 +1029,39 @@ describe("App", () => {
       expect(within(theme).getByRole("radio", { name: "Daylight" })).toBeChecked();
     });
 
+    it("keeps the chosen scheme while the browser blocks storage", async () => {
+      // Where the browser blocks site data, merely reading `window.localStorage` throws.
+      const blocked = vi.spyOn(window, "localStorage", "get").mockImplementation(() => {
+        throw new DOMException("The operation is insecure.", "SecurityError");
+      });
+      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        const user = userEvent.setup();
+        render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+        await screen.findByRole("button", { name: "Open Folder…" });
+
+        await user.keyboard("{Control>},{/Control}");
+        const dialog = await settingsDialog();
+        const scheme = within(dialog).getByRole("radiogroup", { name: "Scheme" });
+        const theme = within(dialog).getByRole("radiogroup", { name: "Theme" });
+        await user.click(within(scheme).getByRole("radio", { name: "Light" }));
+        expect(within(scheme).getByRole("radio", { name: "Light" })).toBeChecked();
+
+        // A choice the browser could not save still counts: another theme keeps the scheme.
+        await user.click(within(theme).getByRole("radio", { name: "Ocean" }));
+        expect(document.documentElement).toHaveAttribute("data-theme", "ocean-light");
+        expect(within(scheme).getByRole("radio", { name: "Light" })).toBeChecked();
+
+        // The theme manager outlives the test, so the default goes back without a saved choice.
+        await user.click(within(theme).getByRole("radio", { name: "Daylight" }));
+        await user.click(within(scheme).getByRole("radio", { name: "System" }));
+        expect(within(scheme).getByRole("radio", { name: "System" })).toBeChecked();
+      } finally {
+        blocked.mockRestore();
+        logged.mockRestore();
+      }
+    });
+
     it("sets contrast and motion in Appearance, on <html> and in the saved settings", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
@@ -3666,7 +3699,9 @@ describe("App", () => {
 
       await user.click(screen.getByRole("button", { name: "Close data.csv" }));
 
-      expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["readme.md"]);
+      // The tab closes after an await, so React renders the close in a later task that the click
+      // may return before.
+      await waitFor(() => expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["readme.md"]));
       expect(await screen.findByRole("heading", { name: "Hello Vista" })).toBeVisible();
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
@@ -3755,7 +3790,8 @@ describe("App", () => {
       await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" }));
 
       expect(await screen.findByText("2 open files were deleted.")).toBeInTheDocument();
-      expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["readme.md"]);
+      // The toast can show before React renders the tabs closing, which happens after an await.
+      await waitFor(() => expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["readme.md"]));
     });
   });
 
