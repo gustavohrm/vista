@@ -196,6 +196,83 @@ for (const theme of THEMES) {
   }
 }
 
+/**
+ * The contrast of an element's top border against what is behind it, as painted: the backgrounds of
+ * its ancestors, each over the one before, on white.
+ */
+async function measureBorder(page: Page, selector: string): Promise<number> {
+  return page
+    .locator(selector)
+    .first()
+    .evaluate((element) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1;
+      canvas.height = 1;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context) {
+        throw new Error("No 2D canvas");
+      }
+      const grounds: string[] = [];
+      for (let node = element.parentElement; node; node = node.parentElement) {
+        grounds.unshift(getComputedStyle(node).backgroundColor);
+      }
+      const paint = (colors: readonly string[]) => {
+        context.fillStyle = "#fff";
+        context.fillRect(0, 0, 1, 1);
+        for (const color of colors) {
+          context.fillStyle = color;
+          context.fillRect(0, 0, 1, 1);
+        }
+        return Array.from(context.getImageData(0, 0, 1, 1).data.slice(0, 3));
+      };
+      const luminance = (rgb: number[]) => {
+        const [r = 0, g = 0, b = 0] = rgb.map((value) => {
+          const channel = value / 255;
+          return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+        });
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      };
+      const a = luminance(paint([...grounds, getComputedStyle(element).borderTopColor]));
+      const b = luminance(paint(grounds));
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    });
+}
+
+// What the token pairings above cannot show: the border the styles package draws on a control, which
+// it mixes from the token. A field rests lighter at Standard by the package's design, as Contrast in
+// `docs/specs/appearance.md` records; an unchecked toggle has only its border to show it.
+for (const theme of THEMES) {
+  for (const scheme of SCHEMES) {
+    for (const level of LEVELS) {
+      test(`${theme} ${scheme} draws field and toggle borders at the ${level} ratios`, async ({ page }) => {
+        await page.addInitScript(
+          ({ variant, contrast }) => {
+            localStorage.setItem("vista-theme", variant);
+            localStorage.setItem(
+              "vista.settings",
+              JSON.stringify({ version: 1, appearance: { contrast, motion: "none" } }),
+            );
+          },
+          { variant: `${theme}-${scheme}`, contrast: level },
+        );
+        await page.goto("/");
+        await expect(page.locator("html")).toHaveAttribute("data-contrast", level);
+        await page.keyboard.press("Control+Comma");
+
+        await page.getByRole("button", { name: "Editor", exact: true }).click();
+        const toggle = await measureBorder(page, ".switch:not(:checked)");
+        await page.getByRole("button", { name: "Files", exact: true }).click();
+        // Away from the field, so it shows its resting border.
+        await page.mouse.move(0, 0);
+        const field = await measureBorder(page, ".ipt");
+
+        expect(toggle, "unchecked switch").toBeGreaterThanOrEqual(3);
+        expect(field, "text field at rest").toBeGreaterThanOrEqual(level === "more" ? 3 : 2.1);
+      });
+    }
+  }
+}
+
 test("follows the operating system's contrast and motion while both are System", async ({ page }) => {
   await page.emulateMedia({ contrast: "more", reducedMotion: "reduce" });
   await page.goto("/");
