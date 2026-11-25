@@ -214,8 +214,8 @@ catalogs:
       specifier: 0.11.0
       version: 0.11.0
     '@codenhub/theme':
-      specifier: 0.4.0
-      version: 0.4.0
+      specifier: 0.4.1
+      version: 0.4.1
     '@codenhub/toaster':
       specifier: 0.4.0
       version: 0.4.0
@@ -501,7 +501,7 @@ importers:
         version: 0.11.0
       '@codenhub/theme':
         specifier: 'catalog:'
-        version: 0.4.0
+        version: 0.4.1
       '@codenhub/toaster':
         specifier: 'catalog:'
         version: 0.4.0(@codenhub/styles@0.11.0)
@@ -704,8 +704,8 @@ packages:
     engines: {node: '>=24'}
     hasBin: true
 
-  '@codenhub/theme@0.4.0':
-    resolution: {integrity: sha512-bPo3IUY2XLaSqrkc99rG3QBk2Eqky1QZGvXhqAx2V6A1egczi6ybldAj6yfKYdCid3tqQIkCu3ek9D0vcke7FQ==}
+  '@codenhub/theme@0.4.1':
+    resolution: {integrity: sha512-ixpbL80zMJL4xnZJ+R2AW6V+6nE0CU/l7p7ekJ5tBn8MsaQVSSIQUX1+QDluqGU5aXqa7SUWk113bcYwIhDn1A==}
 
   '@codenhub/toaster@0.4.0':
     resolution: {integrity: sha512-7oe1RBjriuUcK9NWHZI+hCDZmvFKBDbfOG7LukxVUGZn26J+JZMW2kpOtY7CaY0BUHjx1lhxajeWDryeRRIH6g==}
@@ -2946,7 +2946,7 @@ snapshots:
 
   '@codenhub/styles@0.11.0': {}
 
-  '@codenhub/theme@0.4.0': {}
+  '@codenhub/theme@0.4.1': {}
 
   '@codenhub/toaster@0.4.0(@codenhub/styles@0.11.0)':
     optionalDependencies:
