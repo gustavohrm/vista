@@ -49,7 +49,14 @@
   --ease-move: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-:root {
+/* Declared again on each class that shows a theme or level inside one element, because a custom
+   property resolves its `var()` where it is declared: one set only on the root would carry the root's
+   colours into a Settings preview. */
+:root,
+.theme-daylight,
+.theme-neutral,
+.theme-ocean,
+.contrast-more {
   --ui-ink: var(--color-line);
   --ui-control-ink: var(--color-control-border);
 }
