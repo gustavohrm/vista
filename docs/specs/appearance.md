@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-24
+last_updated: 2026-11-25
 scope: The appearance preferences, which are theme, scheme, contrast, and motion, how each is chosen, stored, and applied, what each theme must provide, and the package versions they need.
 ---
 
@@ -66,7 +66,11 @@ Themes ship in steps: Daylight and Neutral first, with one more, to prove the to
 
 ## Contrast
 
-At _Standard_, every variant meets WCAG 2.2 AA: text at 4.5:1 against its ground, and the boundaries that identify a control at 3:1. Dividers, and faint text that only supports other text, such as line numbers, may sit lower by design. _More_ raises those: muted and faint text to at least 4.5:1, and every line, border, and hover or selected fill to at least 3:1. It is one rule set applied over any theme's tokens, so a new theme needs no contrast work of its own beyond measuring the result. _Standard_ uses the theme as designed, even where the operating system asks for more contrast. A less-contrast level is not offered: `@codenhub/styles` does not read `prefers-contrast: less`, and the need is rare.
+At _Standard_, every variant holds text at 4.5:1 against its ground and the boundaries that identify a control at 3:1, the WCAG 2.2 AA ratios, except a text field's resting border, as described below, so _Standard_ meets AA everywhere but there. Dividers, and faint text that only supports other text, such as line numbers, may sit lower by design. _More_ raises those: muted and faint text to at least 4.5:1, and every line, border, and hover or selected fill to at least 3:1. It is one rule set applied over any theme's tokens, so a new theme needs no contrast work of its own beyond measuring the result. _Standard_ uses the theme as designed, even where the operating system asks for more contrast. A less-contrast level is not offered: `@codenhub/styles` does not read `prefers-contrast: less`, and the need is rare.
+
+A text field at rest is the one boundary held lower at _Standard_. `@codenhub/styles` draws a field's resting border lighter than its full one by design, at about 2.2:1 against the page, so hover and focus have a stronger tone to change to, as its accessibility guide describes under control boundaries. Vista keeps that: at _Standard_, a field rests at the package's border in the theme's `--color-control-border`, at 2.1:1 or more, and strengthens on hover and focus; at _More_, the package draws the full border, at 3:1 or more. A field is also identified by its label beside it and the value in it. Toggles, such as a radio or a switch, draw their full border at both levels, since that border is all that shows an unchecked one.
+
+Holding fields to 3:1 at _Standard_ too was the earlier rule, and it lost because it overrode a trade-off the styles package made on purpose, which that rule never weighed. Meeting it takes a darker border colour of Vista's own for fields, which works around the package rather than following it, and leaves hover and focus less room to show a change. Decided in #60.
 
 The operating system's high-contrast mode (`forced-colors: active`) is not this setting and always applies, whatever Contrast says.
 
