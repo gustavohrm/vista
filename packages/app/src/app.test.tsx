@@ -1029,6 +1029,39 @@ describe("App", () => {
       expect(within(theme).getByRole("radio", { name: "Daylight" })).toBeChecked();
     });
 
+    it("keeps the chosen scheme while the browser blocks storage", async () => {
+      // Where the browser blocks site data, merely reading `window.localStorage` throws.
+      const blocked = vi.spyOn(window, "localStorage", "get").mockImplementation(() => {
+        throw new DOMException("The operation is insecure.", "SecurityError");
+      });
+      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        const user = userEvent.setup();
+        render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+        await screen.findByRole("button", { name: "Open Folder…" });
+
+        await user.keyboard("{Control>},{/Control}");
+        const dialog = await settingsDialog();
+        const scheme = within(dialog).getByRole("radiogroup", { name: "Scheme" });
+        const theme = within(dialog).getByRole("radiogroup", { name: "Theme" });
+        await user.click(within(scheme).getByRole("radio", { name: "Light" }));
+        expect(within(scheme).getByRole("radio", { name: "Light" })).toBeChecked();
+
+        // A choice the browser could not save still counts: another theme keeps the scheme.
+        await user.click(within(theme).getByRole("radio", { name: "Ocean" }));
+        expect(document.documentElement).toHaveAttribute("data-theme", "ocean-light");
+        expect(within(scheme).getByRole("radio", { name: "Light" })).toBeChecked();
+
+        // The theme manager outlives the test, so the default goes back without a saved choice.
+        await user.click(within(theme).getByRole("radio", { name: "Daylight" }));
+        await user.click(within(scheme).getByRole("radio", { name: "System" }));
+        expect(within(scheme).getByRole("radio", { name: "System" })).toBeChecked();
+      } finally {
+        blocked.mockRestore();
+        logged.mockRestore();
+      }
+    });
+
     it("sets contrast and motion in Appearance, on <html> and in the saved settings", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
