@@ -3699,7 +3699,9 @@ describe("App", () => {
 
       await user.click(screen.getByRole("button", { name: "Close data.csv" }));
 
-      expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["readme.md"]);
+      // The tab closes after an await, so React renders the close in a later task that the click
+      // may return before.
+      await waitFor(() => expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["readme.md"]));
       expect(await screen.findByRole("heading", { name: "Hello Vista" })).toBeVisible();
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
@@ -3788,7 +3790,8 @@ describe("App", () => {
       await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" }));
 
       expect(await screen.findByText("2 open files were deleted.")).toBeInTheDocument();
-      expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["readme.md"]);
+      // The toast can show before React renders the tabs closing, which happens after an await.
+      await waitFor(() => expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["readme.md"]));
     });
   });
 
