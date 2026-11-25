@@ -15,7 +15,7 @@ Every document in `docs/` is listed here. Adding, moving, or deleting one update
 | Document                        | Contains                                                                            |
 | ------------------------------- | ----------------------------------------------------------------------------------- |
 | [Architecture](architecture.md) | Shared app code versus platform hosts, platform adapters, and the hosting decision. |
-| [Roadmap](roadmap.md)           | Planned, possible, and ruled-out work, each cited to the document that states it.   |
+| [Roadmap](roadmap.md)           | Current focus, planned, possible, and ruled-out work, each cited to its source.     |
 | [Changelog](changelog/index.md) | What each released version changed, newest first.                                   |
 
 ## Repository references
