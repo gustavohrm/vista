@@ -90,6 +90,7 @@ import {
 } from "./state/documents";
 import { loadFile } from "./state/load-file";
 import { useSettings } from "./state/settings";
+import { loadSettingsPage, saveSettingsPage } from "./state/settings-page";
 import { browserStorage, checkFolderOverlap, createWorkspaceStore, type WorkspaceDetails } from "./state/workspaces";
 import { useApplyAppearance } from "./theme/appearance";
 import { useTheme } from "./theme/theme-manager";
@@ -250,9 +251,11 @@ function AppShell({ adapter }: AppProps) {
   // A File menu request to name a new entry at the workspace root.
   const [newEntryRequest, setNewEntryRequest] = useState<NewEntryRequest | null>(null);
   /** The Settings section shown in the frame, in place of the document; `null` while Settings is closed. */
-  const [settingsSection, setSettingsSection] = useState<SettingsSection | null>(null);
+  // Both start where Settings was before a reload of the window, so a reload doesn't close it.
+  const [restoredSettingsPage] = useState(loadSettingsPage);
+  const [settingsSection, setSettingsSection] = useState<SettingsSection | null>(restoredSettingsPage?.section ?? null);
   // The workspace whose page Settings shows while its section is "workspaces"; Appearance shows without one.
-  const [managedId, setManagedId] = useState<string | null>(null);
+  const [managedId, setManagedId] = useState<string | null>(restoredSettingsPage?.workspaceId ?? null);
   // That workspace as read for its page, while it isn't the open one.
   const [managed, setManaged] = useState<ManagedPage | null>(null);
   // Re-renders after a change only the workspace store holds, such as removing a workspace from Recent.
@@ -2463,6 +2466,10 @@ function AppShell({ adapter }: AppProps) {
       showManaged(open.id);
     }
   }, [showManaged]);
+
+  useEffect(() => {
+    saveSettingsPage(settingsSection === null ? null : { section: settingsSection, workspaceId: managedId });
+  }, [managedId, settingsSection]);
 
   // A page for a workspace that isn't open is read as it shows, and dropped as Settings leaves the workspaces' pages.
   useEffect(() => {

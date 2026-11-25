@@ -993,6 +993,34 @@ describe("App", () => {
       expect(within(dialog).getByRole("switch", { name: "Word wrap" })).toBeInTheDocument();
     });
 
+    it("shows the same section after a reload, and stays closed after a reload once closed", async () => {
+      const user = userEvent.setup();
+      const adapter = { platform: "web" as const, workspace: createMockWorkspaceCapability() };
+      const { unmount } = render(<App adapter={adapter} />);
+      await screen.findByRole("button", { name: "Open Folder…" });
+      await user.keyboard("{Control>},{/Control}");
+      await user.click(within(await settingsDialog()).getByRole("button", { name: "Editor" }));
+      unmount();
+
+      const view = render(<App adapter={adapter} />);
+      const dialog = await settingsDialog();
+      expect(within(dialog).getByRole("button", { name: "Editor" })).toHaveAttribute("aria-current", "page");
+      await user.keyboard("{Escape}");
+      await waitFor(() => expect(screen.queryByRole("region", { name: "Settings" })).not.toBeInTheDocument());
+      view.unmount();
+
+      render(<App adapter={adapter} />);
+      await screen.findByRole("button", { name: "Open Folder…" });
+      expect(screen.queryByRole("region", { name: "Settings" })).not.toBeInTheDocument();
+    });
+
+    it("ignores a remembered section it doesn't know", async () => {
+      sessionStorage.setItem("vista.settingsPage", JSON.stringify({ section: "nope", workspaceId: null }));
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await screen.findByRole("button", { name: "Open Folder…" });
+      expect(screen.queryByRole("region", { name: "Settings" })).not.toBeInTheDocument();
+    });
+
     it("sets the theme in Appearance, and has no theme button outside it", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
@@ -2565,6 +2593,24 @@ describe("App", () => {
         expect(storedWorkspaces().find((workspace) => workspace.id === "w2")?.name).toBe("Job");
         expect(switcherButton()).toHaveAccessibleName("Research");
         expect(navigation(page).getByRole("button", { name: "Job" })).toHaveAttribute("aria-current", "page");
+      });
+
+      it("shows the same workspace's page after a reload", async () => {
+        const user = userEvent.setup();
+        const { capability } = twoWorkspaces();
+        const { unmount } = render(<App adapter={{ platform: "web", workspace: capability }} />);
+        await findExplorerPanel();
+        const page = await openSettings(user);
+        await user.click(within(page).getByRole("button", { name: "Work" }));
+        await within(page).findByRole("heading", { name: "Work" });
+        unmount();
+
+        render(<App adapter={{ platform: "web", workspace: capability }} />);
+        const again = await screen.findByRole("region", { name: "Settings" });
+        expect(await within(again).findByRole("heading", { name: "Work" })).toBeInTheDocument();
+        expect(navigation(again).getByRole("button", { name: "Work" })).toHaveAttribute("aria-current", "page");
+        // Research, the last workspace, still reopens behind Settings.
+        expect(switcherButton()).toHaveAccessibleName("Research");
       });
 
       it("opens a workspace from its page and closes Settings", async () => {

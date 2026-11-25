@@ -35,4 +35,5 @@ afterEach(() => {
   cleanup();
   // Settings and the theme persist here; each test starts from the defaults.
   localStorage.clear();
+  sessionStorage.clear();
 });
