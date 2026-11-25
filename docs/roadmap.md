@@ -12,15 +12,15 @@ Durable direction for Vista: the current focus, what is planned, what is possibl
 
 ## Current Focus
 
-Release 0.0.4, set by the owner. The order follows what each outcome depends on: text written after the languages land is translated as it is written, rather than written in English and reworked.
+Release 0.0.4, set by the owner. The order follows what each outcome depends on: text written after the languages land is translated as it is written, rather than written in English and reworked, and the failure messages wait on a dependency.
 
-1. **Failures shown in Vista's own words.** Adapters report a failure kind and the shared app shows its own message for it, so no platform text reaches the interface. The languages need it to be fully translated. Source: `docs/specs/errors.md`, "Direction".
-2. **Interface languages.** English, Brazilian Portuguese, and Spanish, chosen in Settings or detected from the system, with dates and numbers following the language, and each release's changelog entry in all three. Source: `docs/specs/languages.md`.
-3. **A polished Settings screen**, and interface polish elsewhere. Source: the owner, for 0.0.4.
-4. **Customizable keyboard shortcuts.** Source: the owner, for 0.0.4; needs a spec.
-5. **Workspace search.** Searching inside file contents, in its own view behind the left rail's **Search** button, with its scope set by a spec. Sources: `docs/specs/workspaces.md`, "Shell layout"; the owner, for 0.0.4.
-6. **More interface themes.** Midnight, Forest, Ember, and Cappuccino, beside Daylight, Neutral, and Ocean. Independent of the others. Source: `docs/specs/appearance.md`, "Themes".
-7. **One site in three parts.** `vista.coden.dev` becomes a landing page, the app moves to `vista.coden.dev/app`, and `vista.coden.dev/docs` holds articles, guides, and the full changelog. The updater and download routes, `/releases/*` and `/download/*`, stay where they are, because every installed app checks them. The app stays on the same domain, because the browser keeps remembered folders and settings per domain. Changes the hosting decision in `docs/architecture.md`; needs a spec. Source: the owner, for 0.0.4.
+1. **More interface themes.** Midnight, Forest, Ember, and Cappuccino, beside Daylight, Neutral, and Ocean. Independent of the others. Source: `docs/specs/appearance.md`, "Themes".
+2. **Customizable keyboard shortcuts.** Source: the owner, for 0.0.4; needs a spec.
+3. **One site in three parts.** `vista.coden.dev` becomes a landing page, the app moves to `vista.coden.dev/app`, and `vista.coden.dev/docs` holds articles, guides, and the full changelog. The updater and download routes, `/releases/*` and `/download/*`, stay where they are, because every installed app checks them. The app stays on the same domain, because the browser keeps remembered folders and settings per domain. Changes the hosting decision in `docs/architecture.md`; needs a spec. Source: the owner, for 0.0.4.
+4. **Workspace search.** Searching inside file contents, in its own view behind the left rail's **Search** button, with filters by folder, file type, and date, regular expressions, and replace across files. Needs a spec. Sources: `docs/specs/workspaces.md`, "Shell layout"; the owner, for 0.0.4.
+5. **Interface languages.** English, Brazilian Portuguese, and Spanish, chosen in Settings or detected from the system, with dates and numbers following the language, and each release's changelog entry in all three. Every text but failure messages is translated first. Source: `docs/specs/languages.md`.
+6. **A polished Settings screen**, and interface polish elsewhere. Source: the owner, for 0.0.4.
+7. **Failures shown in Vista's own words.** Adapters report a failure kind and the shared app shows its own message for it, so no platform text reaches the interface, through `@codenhub/error`. It completes the languages. It waits on that package letting an adapter name a failure without wording it, [codenhub/codenhub#676](https://github.com/codenhub/codenhub/issues/676), so that the web and desktop adapters report a failure the same way. Source: `docs/specs/errors.md`, "Direction".
 
 ## Planned
 
