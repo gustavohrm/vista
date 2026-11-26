@@ -55,7 +55,11 @@
 :root,
 .theme-daylight,
 .theme-neutral,
+.theme-midnight,
 .theme-ocean,
+.theme-forest,
+.theme-ember,
+.theme-cappuccino,
 .contrast-more {
   --ui-ink: var(--color-line);
   --ui-control-ink: var(--color-control-border);
@@ -156,6 +160,47 @@
   --focus-ring: color-mix(in oklab, var(--color-primary) 64%, transparent);
 }
 
+/* Midnight: deep indigo grounds and lines, with magenta as the primary colour and cyan as the
+   selection and the find matches. */
+.theme-midnight {
+  --color-chrome: light-dark(#eeeef8, #0b0a1f);
+  --color-frame: light-dark(#fcfcff, #13112b);
+  --color-line: light-dark(#e0dff0, #221f42);
+  --color-line-strong: light-dark(#c9c7e2, #302c57);
+  --color-hover: light-dark(rgb(30 20 90 / 5%), rgb(190 180 255 / 6.5%));
+  --color-selected: light-dark(rgb(30 20 90 / 8.5%), rgb(190 180 255 / 10.5%));
+  --color-text-muted: light-dark(#55527a, #a9a5d1);
+  --color-text-faint: light-dark(#6d6a93, #7a76a6);
+  --color-pop: light-dark(#ffffff, #1a1736);
+  --color-scrim: light-dark(rgb(10 6 40 / 30%), rgb(2 0 12 / 60%));
+  --color-selection: light-dark(#a5f3fc, #22d3ee);
+  --color-selection-text: light-dark(#0b0a1f, #051a20);
+  --color-highlight: light-dark(rgb(34 211 238 / 50%), rgb(34 211 238 / 38%));
+  --color-highlight-soft: light-dark(rgb(34 211 238 / 22%), rgb(34 211 238 / 15%));
+  --color-action: light-dark(#a21caf, #e879f9);
+  --color-action-hover: light-dark(#86198f, #f0abfc);
+  --color-action-text: light-dark(#ffffff, #1f0326);
+  --color-background: light-dark(#f6f6fc, #0b0a1f);
+  --color-foreground: light-dark(#ececf7, #13112b);
+  --color-surface: light-dark(#dcdbee, #221f42);
+  --color-border: light-dark(#9693b8, #3d3866);
+  --color-border-hover: light-dark(#56527d, #726da3);
+  --color-control-border: light-dark(#73709a, #7a75a8);
+  --color-text: light-dark(#0d0b24, #ecebfb);
+  --color-text-secondary: light-dark(#3f3b66, #b4b0db);
+  --color-text-strong: light-dark(#070616, #f5f4ff);
+  --color-text-hover: light-dark(#383460, #cfcbf0);
+  --color-text-contrast: light-dark(#f6f6fc, #0b0a1f);
+  --color-primary: light-dark(#a21caf, #e879f9);
+  --color-primary-hover: light-dark(#86198f, #f0abfc);
+  --color-primary-contrast: light-dark(#ffffff, #1f0326);
+  --color-primary-subtle: light-dark(#fae8ff, #3b0f45);
+  --color-primary-strong: light-dark(#701a75, #f5d0fe);
+  --color-tooltip: light-dark(#ffffff, #302c57);
+  --color-tooltip-contrast: light-dark(#0d0b24, #f5f4ff);
+  --focus-ring: var(--color-primary);
+}
+
 /* Ocean: blue-grey grounds and lines, with teal as the primary colour, the selection, and the find
    matches. */
 .theme-ocean {
@@ -195,6 +240,129 @@
   --color-tooltip: light-dark(#ffffff, #2a3c50);
   --color-tooltip-contrast: light-dark(#0a1622, #f1f6fb);
   /* At full strength: teal at the other themes' 64% falls under 3:1 on the light frame. */
+  --focus-ring: var(--color-primary);
+}
+
+/* Forest: warm earth grounds and lines, with green as the primary colour and the selection, and
+   ochre as the find matches. */
+.theme-forest {
+  --color-chrome: light-dark(#f1efe6, #0e120c);
+  --color-frame: light-dark(#fdfcf7, #161c14);
+  --color-line: light-dark(#e4e1d3, #242c20);
+  --color-line-strong: light-dark(#cdc8b4, #333d2d);
+  --color-hover: light-dark(rgb(48 40 16 / 5%), rgb(220 230 200 / 6%));
+  --color-selected: light-dark(rgb(48 40 16 / 8.5%), rgb(220 230 200 / 10%));
+  --color-text-muted: light-dark(#59574a, #a8ad99);
+  --color-text-faint: light-dark(#6f6c5c, #7b8170);
+  --color-pop: light-dark(#ffffff, #1c2319);
+  --color-scrim: light-dark(rgb(20 18 8 / 30%), rgb(0 2 0 / 60%));
+  --color-selection: light-dark(#c6e6b3, #86c06c);
+  --color-selection-text: light-dark(#10180c, #0b1408);
+  --color-highlight: light-dark(rgb(214 158 46 / 45%), rgb(214 158 46 / 35%));
+  --color-highlight-soft: light-dark(rgb(214 158 46 / 20%), rgb(214 158 46 / 14%));
+  --color-action: light-dark(#2f6b2a, #86c06c);
+  --color-action-hover: light-dark(#24541f, #a3d48c);
+  --color-action-text: light-dark(#ffffff, #0b1408);
+  --color-background: light-dark(#f8f6ee, #0e120c);
+  --color-foreground: light-dark(#eeebdf, #161c14);
+  --color-surface: light-dark(#e0dccb, #242c20);
+  --color-border: light-dark(#a29d86, #424d3b);
+  --color-border-hover: light-dark(#5e5a48, #758068);
+  --color-control-border: light-dark(#77735f, #6c7760);
+  --color-text: light-dark(#0a0c06, #ecefe4);
+  --color-text-secondary: light-dark(#45473a, #b3b8a4);
+  --color-text-strong: light-dark(#0c0e08, #f4f6ee);
+  --color-text-hover: light-dark(#3d4033, #d3d8c6);
+  --color-text-contrast: light-dark(#f8f6ee, #0e120c);
+  --color-primary: light-dark(#2f6b2a, #86c06c);
+  --color-primary-hover: light-dark(#24541f, #a3d48c);
+  --color-primary-contrast: light-dark(#ffffff, #0b1408);
+  --color-primary-subtle: light-dark(#e1f0d6, #1f3a18);
+  --color-primary-strong: light-dark(#1f4a1b, #c6e6b3);
+  --color-tooltip: light-dark(#ffffff, #333d2d);
+  --color-tooltip-contrast: light-dark(#15170f, #f4f6ee);
+  --focus-ring: var(--color-primary);
+}
+
+/* Ember: charcoal grounds and lines, with a vivid red-orange as the primary colour, the selection,
+   and the find matches. */
+.theme-ember {
+  --color-chrome: light-dark(#f3f2f1, #0c0b0b);
+  --color-frame: light-dark(#fffefd, #171615);
+  --color-line: light-dark(#e7e5e3, #272524);
+  --color-line-strong: light-dark(#d3d0cd, #353230);
+  --color-hover: light-dark(rgb(30 20 15 / 4.5%), rgb(255 240 230 / 5.5%));
+  --color-selected: light-dark(rgb(30 20 15 / 7.5%), rgb(255 240 230 / 9%));
+  --color-text-muted: light-dark(#5e5a57, #a8a29e);
+  --color-text-faint: light-dark(#75706c, #7a7470);
+  --color-pop: light-dark(#ffffff, #1e1c1b);
+  --color-scrim: light-dark(rgb(10 5 0 / 28%), rgb(0 0 0 / 58%));
+  --color-selection: light-dark(#ffc9a8, #ff6a3d);
+  --color-selection-text: light-dark(#1a0a04, #1a0702);
+  --color-highlight: light-dark(rgb(255 106 61 / 40%), rgb(255 106 61 / 32%));
+  --color-highlight-soft: light-dark(rgb(255 106 61 / 18%), rgb(255 106 61 / 13%));
+  --color-action: light-dark(#c2410c, #ff6a3d);
+  --color-action-hover: light-dark(#9a3412, #ff8a63);
+  --color-action-text: light-dark(#ffffff, #1a0702);
+  --color-background: light-dark(#f9f8f7, #0c0b0b);
+  --color-foreground: light-dark(#efeeec, #171615);
+  --color-surface: light-dark(#e1dedb, #272524);
+  --color-border: light-dark(#a39d98, #45413e);
+  --color-border-hover: light-dark(#57524e, #78726e);
+  --color-control-border: light-dark(#77716c, #807a75);
+  --color-text: light-dark(#0f0d0c, #f6f3f1);
+  --color-text-secondary: light-dark(#423e3b, #b0aaa5);
+  --color-text-strong: light-dark(#090807, #fbf9f7);
+  --color-text-hover: light-dark(#3d3936, #d6d1cd);
+  --color-text-contrast: light-dark(#f9f8f7, #0c0b0b);
+  --color-primary: light-dark(#c2410c, #ff6a3d);
+  --color-primary-hover: light-dark(#9a3412, #ff8a63);
+  --color-primary-contrast: light-dark(#ffffff, #1a0702);
+  --color-primary-subtle: light-dark(#ffedd5, #3d1608);
+  --color-primary-strong: light-dark(#7c2d12, #ffc9a8);
+  --color-tooltip: light-dark(#ffffff, #353230);
+  --color-tooltip-contrast: light-dark(#0f0d0c, #fbf9f7);
+  --focus-ring: var(--color-primary);
+}
+
+/* Cappuccino: cream and coffee grounds and lines, low in chroma, with a coffee brown as the
+   primary colour and a milky tan as the selection and the find matches. */
+.theme-cappuccino {
+  --color-chrome: light-dark(#f2ede6, #14100d);
+  --color-frame: light-dark(#fcf9f4, #1d1814);
+  --color-line: light-dark(#e5ded3, #2c251f);
+  --color-line-strong: light-dark(#d2c7b8, #3a3129);
+  --color-hover: light-dark(rgb(60 40 20 / 5%), rgb(240 220 200 / 6%));
+  --color-selected: light-dark(rgb(60 40 20 / 8.5%), rgb(240 220 200 / 10%));
+  --color-text-muted: light-dark(#615548, #b0a395);
+  --color-text-faint: light-dark(#786a5c, #85786a);
+  --color-pop: light-dark(#fffdf9, #241e19);
+  --color-scrim: light-dark(rgb(30 20 10 / 30%), rgb(5 2 0 / 60%));
+  --color-selection: light-dark(#e4cfb3, #c8a983);
+  --color-selection-text: light-dark(#1e1710, #1e1710);
+  --color-highlight: light-dark(rgb(176 128 80 / 40%), rgb(200 160 120 / 32%));
+  --color-highlight-soft: light-dark(rgb(176 128 80 / 18%), rgb(200 160 120 / 13%));
+  --color-action: light-dark(#6f4e37, #d4b08c);
+  --color-action-hover: light-dark(#5a3e2b, #e2c4a4);
+  --color-action-text: light-dark(#ffffff, #1e1710);
+  --color-background: light-dark(#f7f3ed, #14100d);
+  --color-foreground: light-dark(#ece6dc, #1d1814);
+  --color-surface: light-dark(#ddd4c6, #2c251f);
+  --color-border: light-dark(#a8998a, #4a3f35);
+  --color-border-hover: light-dark(#5f5246, #7f7164);
+  --color-control-border: light-dark(#7d6e60, #87786b);
+  --color-text: light-dark(#0f0b07, #f3ece4);
+  --color-text-secondary: light-dark(#4a3f34, #bfb2a4);
+  --color-text-strong: light-dark(#130e09, #faf5ef);
+  --color-text-hover: light-dark(#43382e, #ddd2c5);
+  --color-text-contrast: light-dark(#f7f3ed, #14100d);
+  --color-primary: light-dark(#6f4e37, #d4b08c);
+  --color-primary-hover: light-dark(#5a3e2b, #e2c4a4);
+  --color-primary-contrast: light-dark(#ffffff, #1e1710);
+  --color-primary-subtle: light-dark(#f0e4d6, #3a2c20);
+  --color-primary-strong: light-dark(#4a3324, #ecdcc8);
+  --color-tooltip: light-dark(#fffdf9, #3a3129);
+  --color-tooltip-contrast: light-dark(#1e1710, #faf5ef);
   --focus-ring: var(--color-primary);
 }
 

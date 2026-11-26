@@ -1,12 +1,12 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-25
+last_updated: 2026-11-26
 scope: The appearance preferences, which are theme, scheme, contrast, and motion, how each is chosen, stored, and applied, what each theme must provide, and the package versions they need.
 ---
 
 # Appearance
 
-This document describes how Vista's appearance is configured: its scheme, theme, contrast, and motion. It is implemented with the first step of [themes](#themes), Daylight, Neutral, and Ocean; the other themes it lists are not built yet.
+This document describes how Vista's appearance is configured: its scheme, theme, contrast, and motion. It is implemented with every theme it lists.
 
 ## The preferences
 
@@ -62,7 +62,7 @@ Cyberpunk and Tokyo were proposed as two themes and merged into Midnight, since 
 
 A theme is a value, as a `light-dark()` pair, for every colour token `packages/app/src/style.css` defines or sets, including the `@codenhub/styles` tokens it overrides, as [Architecture](../architecture.md#shared-presentation) describes. The stylesheet is the list: a theme sets every token in it, and a token added later gets a value in every theme. No component names a theme. Every variant meets the ratios [Contrast](#contrast) sets for each level, and adding a theme records its measured pairings in [the brand guidelines](../guidelines/brand.md#colours).
 
-Themes ship in steps: Daylight and Neutral first, with one more, to prove the token set, then the rest. The first step shipped with Ocean as the third theme, since blues and teals are furthest from Daylight's ink and paper and so test the token set hardest; Midnight, Forest, Ember, and Cappuccino follow.
+Themes ship in steps: Daylight and Neutral first, with one more, to prove the token set, then the rest. The first step shipped with Ocean as the third theme, since blues and teals are furthest from Daylight's ink and paper and so test the token set hardest; Midnight, Forest, Ember, and Cappuccino followed in the second, for 0.0.4.
 
 ## Contrast
 
