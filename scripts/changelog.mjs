@@ -10,7 +10,13 @@
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { findEntryProblems, parseChangelogPage, readIndexItems } from "../packages/app/src/domain/changelog.ts";
+import {
+  CHANGELOG_TRANSLATIONS,
+  findEntryProblems,
+  findTranslationProblems,
+  parseChangelogPage,
+  readIndexItems,
+} from "../packages/app/src/domain/changelog.ts";
 
 export const CHANGELOG_DIR = "docs/changelog";
 
@@ -19,10 +25,11 @@ export const CHANGELOG_DIR = "docs/changelog";
 /**
  * Reports what keeps a version's entry from being released: no index, an index item that is not a link to a
  * version page, an index link to a page that does not exist, no page, a page the index does not link or does
- * not list first, or a page that is incomplete.
+ * not list first, a page that is incomplete, or a translation that is missing or does not match the English page.
  *
  * @param {string} version - The version being released.
- * @param {ReadPage} read - Returns a page's text by its file name in `docs/changelog/`, or null when it is missing.
+ * @param {ReadPage} read - Returns a page's text by its path in `docs/changelog/`, such as `0.2.0.md` or
+ *   `pt-BR/0.2.0.md`, or null when it is missing.
  * @returns {string[]} One message per problem; empty when the entry is ready.
  */
 export function findChangelogProblems(version, read) {
@@ -54,7 +61,18 @@ export function findChangelogProblems(version, read) {
   } else if (linked[0] !== page) {
     problems.push(`${CHANGELOG_DIR}/index.md must list ${page} first, since it is the newest version.`);
   }
-  return [...problems, ...findEntryProblems(version, text)];
+  problems.push(...findEntryProblems(version, text));
+  for (const locale of CHANGELOG_TRANSLATIONS) {
+    const translation = read(`${locale}/${page}`);
+    if (translation === null) {
+      problems.push(
+        `${CHANGELOG_DIR}/${locale}/${page} is missing. Translate the entry in the change that raises the version.`,
+      );
+    } else {
+      problems.push(...findTranslationProblems(version, locale, text, translation));
+    }
+  }
+  return problems;
 }
 
 /** @type {ReadPage} */
@@ -76,6 +94,19 @@ export function readEntry(version) {
     throw new Error(`${CHANGELOG_DIR}/${version}.md is missing.`);
   }
   return parseChangelogPage(version, text);
+}
+
+/**
+ * Reads a version's translated entry from `docs/changelog/{locale}/`.
+ *
+ * @param {string} version - The version, such as `0.2.0`.
+ * @param {string} locale - The translation's language, such as `pt-BR`.
+ * @returns {import("../packages/app/src/domain/changelog.ts").ChangelogEntry | null} The entry, or null when the
+ *   version has no translation in that language.
+ */
+export function readTranslation(version, locale) {
+  const text = readPage(`${locale}/${version}.md`);
+  return text === null ? null : parseChangelogPage(version, text);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

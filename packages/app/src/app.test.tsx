@@ -9,6 +9,7 @@ import { App } from "./app";
 import { changelogEntryFor } from "./changelog";
 import { resetStartIntro } from "./components/layout/start-screen";
 import { inlineParts } from "./domain/changelog";
+import { i18n } from "./i18n";
 import {
   LEGACY_FOLDER_ID,
   type AppAdapter,
@@ -1239,6 +1240,25 @@ describe("App", () => {
       }
       await user.click(within(whatsNew).getByRole("button", { name: "Close" }));
       expect(screen.queryByRole("dialog", { name: `What's new in Vista ${APP_VERSION}` })).not.toBeInTheDocument();
+    });
+
+    it("shows the running version's entry in the interface language, from its translated page", async () => {
+      const user = userEvent.setup();
+      const english = changelogEntryFor(APP_VERSION);
+      const portuguese = changelogEntryFor(APP_VERSION, "pt-BR");
+      // The release check makes the running version's translations exist.
+      expect(portuguese?.description).toBeTruthy();
+      expect(portuguese?.description).not.toBe(english?.description);
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await screen.findByRole("button", { name: "Open Folder…" });
+      await user.keyboard("{Control>},{/Control}");
+      const settings = await settingsDialog();
+      await user.click(within(settings).getByRole("button", { name: "About" }));
+
+      await act(() => i18n.setLocale("pt-BR"));
+
+      expect(within(settings).getByText(portuguese?.description ?? "")).toBeInTheDocument();
+      expect(within(settings).queryByText(english?.description ?? "")).not.toBeInTheDocument();
     });
 
     it("offers no update check in About when the host has no updater", async () => {
@@ -5422,6 +5442,30 @@ describe("App", () => {
       );
       const offer = await openOffer(user);
       expect(within(offer).getByText(/^Folders open faster\. Install it now\?/)).toBeInTheDocument();
+    });
+
+    it("says what the new version changes in the interface language, and in English where it has no translation", async () => {
+      const install = vi.fn();
+      const updater = {
+        check: vi.fn(async () => ({
+          version: "0.3.0",
+          notes: "Folders open faster.",
+          notesByLocale: { "pt-BR": "Pastas abrem mais rápido." },
+          install,
+        })),
+      } as unknown as NonNullable<AppAdapter["updater"]>;
+      await act(() => i18n.setLocale("pt-BR"));
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability(), updater }} />);
+
+      expect(await screen.findByRole("button", { name: "Atualizar para 0.3.0" })).toHaveAttribute(
+        "title",
+        expect.stringContaining("Pastas abrem mais rápido."),
+      );
+      await act(() => i18n.setLocale("es"));
+      expect(screen.getByRole("button", { name: "Actualizar a 0.3.0" })).toHaveAttribute(
+        "title",
+        expect.stringContaining("Folders open faster."),
+      );
     });
 
     it("keeps a dismissed version's notice away at the next start, but not a newer version's", async () => {

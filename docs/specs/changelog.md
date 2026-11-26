@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-23
+last_updated: 2026-11-26
 scope: The changelog under docs/changelog/, the check that holds a release to it, and where its entries are shown.
 ---
 
@@ -15,9 +15,15 @@ docs/changelog/
   index.md   # the published versions, newest first, and nothing else
   0.2.0.md
   0.1.0.md
+  pt-BR/
+    0.2.0.md # the 0.2.0 entry, translated
+  es/
+    0.2.0.md
 ```
 
 Each released version has a page named for its exact version string, `0.2.0.md` or `1.0.0-beta.1.md`, which is the version in `package.json` and in the release tag without its `v`. A version number is not a word, so the page is not kebab-cased.
+
+Each entry is also written in each of the interface's other languages, in a folder named for the language, as [Languages → The changelog](languages.md#the-changelog) describes: what a translated page holds, and that a version from before translations shows in English. The index lists versions, not languages, so the folders have no index; a translated page is published when its English page is.
 
 ### The index decides what is published
 
@@ -77,7 +83,8 @@ These pages carry the fields above instead of the `status` and `last_updated` he
 - the page's `title` is not the version, its `date` is not a real `YYYY-MM-DD` date, or its `description` is empty or `TODO`;
 - the page has a heading other than the six above, a heading with no bullets, no bullets at all, or a bullet that starts with `TODO`, and a heading deeper than `##` counts as one other than the six;
 - the page has no `# {version}` heading, or its `##` headings are out of the order above or repeated;
-- any item of `index.md`, for any version, is not a link to a version page, since it would drop that version from every surface.
+- any item of `index.md`, for any version, is not a link to a version page, since it would drop that version from every surface;
+- a translation of the version is missing, or does not match the English page as [Languages → The changelog](languages.md#the-changelog) lists.
 
 Keeping every released version linked is otherwise a review rule: removing a correct link fails nothing, because dropping one is sometimes right, as [The index decides what is published](#the-index-decides-what-is-published) says.
 
@@ -85,10 +92,10 @@ Only the current version's page is checked. An older page that was written befor
 
 ## Where entries are shown
 
-Every entry is shown in English today. [Languages → The changelog](languages.md#the-changelog), which is approved and not yet implemented, adds a translated page per language beside each entry, shown in the interface language on the surfaces below except GitHub; this document takes those pages in when they are implemented.
+The app shows each entry in the interface language, from its translated page, and the English page whole for a version with no translation in that language. GitHub shows the English page.
 
-- **In the app.** `packages/app/src/changelog.ts` inlines `docs/changelog/` at build time, so each build carries the entries up to its own version, in the browser and on the desktop, and reads them without a network request. **About** in Settings shows the running version's release date and summary, and **What's New** opens the entry, as [the workspace spec](workspaces.md#settings) describes. In the browser, the start screen's desktop download names the version it downloads, which is the running one, since a release deploys the web app. The release deploys the web app a moment before it publishes `latest.json`, which the download links follow, so for that moment, or until a rerun if the manifest upload fails, the label names the new version beside the previous installer. Reading the version from the manifest instead would cost a request on every start for that window alone.
-- **In the update offer.** A newer version cannot be in the running build, so `scripts/release-manifest.mjs` writes the entry's `description` into the `notes` field of `latest.json`, and the desktop updater passes it to the app. The offer and the update notice show it as plain text.
+- **In the app.** `packages/app/src/changelog.ts` inlines `docs/changelog/` at build time, translated pages included, so each build carries the entries up to its own version, in the browser and on the desktop, and reads them without a network request. **About** in Settings shows the running version's release date and summary, and **What's New** opens the entry, as [the workspace spec](workspaces.md#settings) describes. In the browser, the start screen's desktop download names the version it downloads, which is the running one, since a release deploys the web app. The release deploys the web app a moment before it publishes `latest.json`, which the download links follow, so for that moment, or until a rerun if the manifest upload fails, the label names the new version beside the previous installer. Reading the version from the manifest instead would cost a request on every start for that window alone.
+- **In the update offer.** A newer version cannot be in the running build, so `scripts/release-manifest.mjs` writes the entry's `description` into the `notes` field of `latest.json`, and each translated page's `description` into a `vista_notes` object, by language, as `{ "pt-BR": "…", "es": "…" }`. The desktop updater passes `notes` to the app, and the native adapter reads `vista_notes` from the manifest as served, since the updater does not know the field. The offer and the update notice show the summary in the interface language, or `notes` when there is none in it, as plain text.
 - **On GitHub.** The release workflow's last job creates the GitHub release for the tag with the entry's body and a link to the downloads, as a prerelease for a version with a suffix. The installers are not attached: they are served from the web app's host, as [Architecture](../architecture.md#hosting-decision) records.
 
 A public `/changelog.json` route on the Worker was considered and not added: every surface above already has the entries, and the Worker's R2 copy would not do, since [retention](../ci.md#releases) keeps only the newest version folder before 1.0. A surface that needs entries the running build lacks, such as a website page, can add the route then.

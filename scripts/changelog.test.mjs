@@ -28,7 +28,14 @@ title: Changelog
 /** @type {(pages: Record<string, string | undefined>) => (name: string) => string | null} */
 const readerFor = (pages) => (name) => pages[name] ?? null;
 
-const PAGES = { "index.md": INDEX, "0.2.0.md": ENTRY, "0.1.0.md": ENTRY.replaceAll("0.2.0", "0.1.0") };
+// A translation with the English text matches the English page, which is all the check can tell.
+const PAGES = {
+  "index.md": INDEX,
+  "0.2.0.md": ENTRY,
+  "pt-BR/0.2.0.md": ENTRY,
+  "es/0.2.0.md": ENTRY,
+  "0.1.0.md": ENTRY.replaceAll("0.2.0", "0.1.0"),
+};
 
 describe("findChangelogProblems", () => {
   it("passes when the version has a complete entry the index lists first", () => {
@@ -72,6 +79,20 @@ describe("findChangelogProblems", () => {
     const pages = { ...PAGES, "0.1.0.md": undefined };
     expect(findChangelogProblems("0.2.0", readerFor(pages))).toEqual([
       expect.stringContaining("links 0.1.0.md, which does not exist"),
+    ]);
+  });
+
+  it("fails when a translation of the version is missing", () => {
+    const pages = { ...PAGES, "es/0.2.0.md": undefined };
+    expect(findChangelogProblems("0.2.0", readerFor(pages))).toEqual([
+      expect.stringContaining("docs/changelog/es/0.2.0.md is missing"),
+    ]);
+  });
+
+  it("reports a translation that does not match the English page", () => {
+    const pages = { ...PAGES, "pt-BR/0.2.0.md": ENTRY.replace("date: 2026-12-01", "date: 2026-12-02") };
+    expect(findChangelogProblems("0.2.0", readerFor(pages))).toEqual([
+      expect.stringContaining('docs/changelog/pt-BR/0.2.0.md must set "date: 2026-12-01"'),
     ]);
   });
 

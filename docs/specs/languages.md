@@ -1,12 +1,12 @@
 ---
 status: APPROVED
-last_updated: 2026-11-23
+last_updated: 2026-11-26
 scope: The interface languages, how one is chosen, stored, and applied, which text is translated and which is not, how changelog entries are translated, how dates and numbers follow the language, and how translations are written, reviewed, and tested.
 ---
 
 # Languages
 
-This document makes Vista's interface available in more than one language. It is approved and partly implemented: the language starts before the first render, is chosen in Settings → Language, and is stored as described below; the interface text is in the dictionaries with its tests; and the dates and numbers follow the language. Messages that report a failed operation, such as `Failed to open the selected folder.`, are still English literals in `packages/app`, because the [Errors direction](errors.md#direction) rewrites them; they move into the dictionaries with it. The editor's phrases and the translated changelog are not implemented yet.
+This document makes Vista's interface available in more than one language. It is approved and partly implemented: the language starts before the first render, is chosen in Settings → Language, and is stored as described below; the interface text is in the dictionaries with its tests; the dates and numbers follow the language; and each changelog entry is translated, as [The changelog](#the-changelog) describes. Messages that report a failed operation, such as `Failed to open the selected folder.`, are still English literals in `packages/app`, because the [Errors direction](errors.md#direction) rewrites them; they move into the dictionaries with it. The editor's phrases are not implemented yet.
 
 ## The languages
 
@@ -99,7 +99,7 @@ A user deciding whether to install an update reads what it changes in their own 
 - **Fallback.** A version with no translation in a language, such as a release from before this document, shows its English page whole, not a mix of the two.
 - **The update offer.** A newer version cannot be in the running build, so `latest.json` carries the translated summaries: `notes` keeps the English `description`, which the desktop updater reads as before, and a `vista_notes` object adds the others by locale, as `{ "pt-BR": "…", "es": "…" }`. The native adapter reads it from the update's raw manifest, the [updater port](../../packages/app/src/ports.ts) carries the summaries by locale, and the shared app shows the one in the interface language, or `notes` when it has none.
 
-[The changelog spec](changelog.md) owns the English pages and the check; it is updated to include translated pages in the change that implements them.
+[The changelog spec](changelog.md) owns the pages, the check, and where entries are shown; this section owns what a translation holds and what the check holds it to.
 
 ### Alternatives considered
 

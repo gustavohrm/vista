@@ -165,7 +165,7 @@ jobs:
         shell: bash
 
       # Fails when an installer or its signature is missing, before anything is uploaded. The manifest's notes
-      # are the description of the version's changelog entry.
+      # are the description of the version's changelog entry, and its vista_notes those of the translated entries.
       - name: Write the update manifest
         run: node scripts/release-manifest.mjs "$VERSION" release
 
