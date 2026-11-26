@@ -550,11 +550,10 @@ function AppShell({ adapter }: AppProps) {
         toast.show({ kind: "info", text: t("app.update.alreadyDownloading") });
         return;
       }
+      const notes = notesFor(update);
       const accepted = await toast.confirm({
         title: t("app.update.offer.title", { version: update.version }),
-        message: update.notes
-          ? t("app.update.offer.messageWithNotes", { notes: update.notes })
-          : t("app.update.offer.message"),
+        message: notes ? t("app.update.offer.messageWithNotes", { notes }) : t("app.update.offer.message"),
         confirmLabel: t("app.update.offer.install"),
         cancelLabel: t("app.update.offer.later"),
       });
@@ -651,7 +650,7 @@ function AppShell({ adapter }: AppProps) {
   const updateNotice = noticedUpdate && (
     <UpdateNotice
       version={noticedUpdate.version}
-      notes={noticedUpdate.notes}
+      notes={notesFor(noticedUpdate)}
       onInstall={() => void offerUpdate(noticedUpdate)}
       onDismiss={() => dismissUpdateNotice(noticedUpdate.version)}
     />
@@ -3159,7 +3158,7 @@ function AppShell({ adapter }: AppProps) {
                   <AboutSection
                     platform={adapter.platform}
                     version={APP_VERSION}
-                    entry={changelogEntryFor(APP_VERSION)}
+                    entry={changelogEntryFor(APP_VERSION, locale)}
                     onCheckForUpdates={adapter.updater ? () => checkForUpdates({ isRequested: true }) : undefined}
                     settings={settings}
                     onChange={updateSettings}
@@ -3646,4 +3645,14 @@ async function readCpuArchitecture(): Promise<CpuArchitecture | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * What an update changes, in the interface language when the release translated it, and in English otherwise.
+ *
+ * @param update - The update on offer.
+ * @returns Its summary, or undefined when the release gives none.
+ */
+function notesFor(update: AvailableUpdate): string | undefined {
+  return update.notesByLocale?.[i18n.locale] ?? update.notes;
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   findEntryProblems,
+  findTranslationProblems,
   inlineParts,
   isIsoDate,
   parseChangelogIndex,
@@ -139,6 +140,94 @@ describe("findEntryProblems", () => {
 
   it("reports a page with no frontmatter", () => {
     expect(findEntryProblems("0.2.0", "# 0.2.0\n")).toEqual([expect.stringContaining("no frontmatter")]);
+  });
+});
+
+describe("findTranslationProblems", () => {
+  const TRANSLATION = `---
+title: 0.2.0
+date: 2026-12-01
+description: Pastas abrem mais rápido, e arquivos CSV mantêm as aspas.
+---
+
+# 0.2.0
+
+## Changed
+
+- Pastas grandes abrem mais rápido.
+
+## Fixed
+
+- Salvar um arquivo CSV mantém células \`"quoted"\` como escritas.
+  ([#12](https://github.com/example/vista/issues/12))
+- Uma segunda correção.
+`;
+
+  it("passes a translation that matches the English page", () => {
+    expect(findTranslationProblems("0.2.0", "pt-BR", PAGE, TRANSLATION)).toEqual([]);
+  });
+
+  it("names the translated page in each problem", () => {
+    const problems = findTranslationProblems(
+      "0.2.0",
+      "pt-BR",
+      PAGE,
+      TRANSLATION.replace("title: 0.2.0", "title: 0.1.0"),
+    );
+    expect(problems).toEqual([expect.stringContaining("docs/changelog/pt-BR/0.2.0.md")]);
+  });
+
+  it("fails without frontmatter", () => {
+    expect(findTranslationProblems("0.2.0", "es", PAGE, "# 0.2.0\n")).toEqual([
+      expect.stringContaining("has no frontmatter"),
+    ]);
+  });
+
+  it("fails when the date differs from the English page", () => {
+    const problems = findTranslationProblems("0.2.0", "es", PAGE, TRANSLATION.replace("2026-12-01", "2026-12-02"));
+    expect(problems).toEqual([expect.stringContaining('"date: 2026-12-01"')]);
+  });
+
+  it.each(["", "TODO"])("fails when the description is %j", (description) => {
+    const translation = TRANSLATION.replace(/^description: .*$/m, `description: ${description}`);
+    expect(findTranslationProblems("0.2.0", "es", PAGE, translation)).toEqual([
+      expect.stringContaining('"description"'),
+    ]);
+  });
+
+  it("accepts a description that starts with the word Todo", () => {
+    const translation = TRANSLATION.replace(
+      /^description: .*$/m,
+      "description: Todo el proceso de abrir carpetas es más rápido.",
+    );
+    expect(findTranslationProblems("0.2.0", "es", PAGE, translation)).toEqual([]);
+  });
+
+  it("fails without the version heading", () => {
+    expect(findTranslationProblems("0.2.0", "es", PAGE, TRANSLATION.replace("# 0.2.0", "# Versão 0.2.0"))).toEqual([
+      expect.stringContaining('"# 0.2.0"'),
+    ]);
+  });
+
+  it("fails when the headings differ from the English page", () => {
+    const problems = findTranslationProblems("0.2.0", "es", PAGE, TRANSLATION.replace("## Fixed", "## Corrigido"));
+    expect(problems).toEqual([expect.stringContaining("## Changed, ## Fixed")]);
+  });
+
+  it("fails when a heading has a different number of bullets", () => {
+    const problems = findTranslationProblems("0.2.0", "es", PAGE, TRANSLATION.replace("- Uma segunda correção.\n", ""));
+    expect(problems).toEqual([expect.stringContaining('"## Fixed" has 1 bullets, and the English page 2')]);
+  });
+
+  it("fails when a bullet's links or code spans differ from its English bullet", () => {
+    const relinked = TRANSLATION.replace("issues/12", "issues/13");
+    expect(findTranslationProblems("0.2.0", "es", PAGE, relinked)).toEqual([
+      expect.stringContaining('bullet 1 under "## Fixed"'),
+    ]);
+    const recoded = TRANSLATION.replace('`"quoted"`', '"quoted"');
+    expect(findTranslationProblems("0.2.0", "es", PAGE, recoded)).toEqual([
+      expect.stringContaining('bullet 1 under "## Fixed"'),
+    ]);
   });
 });
 

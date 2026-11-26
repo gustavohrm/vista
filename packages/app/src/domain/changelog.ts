@@ -7,6 +7,12 @@
 export const CHANGELOG_HEADINGS = ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"] as const;
 
 /**
+ * The languages each entry is translated into besides English, which are the interface's other languages. Each
+ * has a folder of `docs/changelog/` named for it.
+ */
+export const CHANGELOG_TRANSLATIONS = ["pt-BR", "es"] as const;
+
+/**
  * One heading of an entry, such as `Fixed`, and its bullets as written, in inline Markdown. A heading deeper
  * than `##` keeps its marks, as `### Details`, so the check can tell it from an entry heading.
  */
@@ -38,6 +44,8 @@ export interface InlinePart {
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const PLACEHOLDER = /^TODO\b/i;
+// In Spanish and Portuguese, "Todo" (all) starts ordinary sentences, so a translation's marker must be in capitals.
+const TRANSLATION_PLACEHOLDER = /^TODO\b/;
 // A file name the index may link: a version, as the release tag names it, and `.md`.
 const PAGE_NAME = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?\.md$/;
 // A list item in the index, whether or not it is a link the index can read.
@@ -239,6 +247,74 @@ export function findEntryProblems(version: string, text: string): string[] {
     problems.push(`${page} still has a TODO bullet. Replace it with what changed.`);
   }
   return problems;
+}
+
+/**
+ * Holds a translated page of the version being released to its English page: the same `title` and `date`, a
+ * description of its own, the `# {version}` heading, the same headings in the same order with as many bullets
+ * under each, and in each bullet the same link targets and code spans, in the same order. The wording is left
+ * to review.
+ *
+ * @param version - The version being released.
+ * @param locale - The translation's language, which names its folder, such as `pt-BR`.
+ * @param english - The English page's text, which `findEntryProblems` checks.
+ * @param text - The translated page's text.
+ * @returns One message per problem; empty when the translation matches.
+ */
+export function findTranslationProblems(version: string, locale: string, english: string, text: string): string[] {
+  const page = `docs/changelog/${locale}/${version}.md`;
+  const parsed = parseFrontmatter(text);
+  if (!parsed) {
+    return [`${page} has no frontmatter. Copy the English page's title and date, and translate its description.`];
+  }
+  const problems: string[] = [];
+  const englishFields = parseFrontmatter(english)?.fields ?? {};
+  const { title = "", date = "", description = "" } = parsed.fields;
+  if (title !== (englishFields.title ?? "")) {
+    problems.push(`${page} must set "title: ${englishFields.title ?? ""}", as the English page does.`);
+  }
+  if (date !== (englishFields.date ?? "")) {
+    problems.push(`${page} must set "date: ${englishFields.date ?? ""}", as the English page does.`);
+  }
+  if (description === "" || TRANSLATION_PLACEHOLDER.test(description)) {
+    problems.push(`${page} must set "description" to the English description, translated.`);
+  }
+
+  const entry = parseChangelogPage(version, text);
+  if (entry.title !== version) {
+    problems.push(`${page} must have the heading "# ${version}".`);
+  }
+  const source = parseChangelogPage(version, english);
+  const headings = (sections: ChangelogSection[]) =>
+    sections.map((section) => (section.heading.startsWith("#") ? section.heading : `## ${section.heading}`)).join(", ");
+  if (headings(entry.sections) !== headings(source.sections)) {
+    problems.push(
+      `${page} must have the English page's headings, in English and in its order: ${headings(source.sections)}.`,
+    );
+    return problems;
+  }
+  source.sections.forEach((section, sectionIndex) => {
+    const items = entry.sections[sectionIndex]?.items ?? [];
+    if (items.length !== section.items.length) {
+      problems.push(
+        `${page}: "## ${section.heading}" has ${items.length} bullets, and the English page ${section.items.length}.`,
+      );
+      return;
+    }
+    section.items.forEach((item, itemIndex) => {
+      if (markupOf(items[itemIndex] ?? "") !== markupOf(item)) {
+        problems.push(
+          `${page}: bullet ${itemIndex + 1} under "## ${section.heading}" must keep the English bullet's links and code spans, in order.`,
+        );
+      }
+    });
+  });
+  return problems;
+}
+
+/** A bullet's link targets and code spans, in order, which a translation keeps as written. */
+function markupOf(markdown: string): string {
+  return JSON.stringify([...markdown.matchAll(/`[^`]+`|\]\(([^)\s]*)\)/g)].map((match) => match[1] ?? match[0]));
 }
 
 /**

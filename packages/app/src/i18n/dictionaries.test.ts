@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { i18n, LOCALES } from ".";
+import { CHANGELOG_TRANSLATIONS } from "../domain/changelog";
 
 // Plural forms other than `other` differ by language, so a dictionary has only the ones its language uses.
 function isLanguageSpecificForm(key: string, dictionary: Readonly<Record<string, string>>): boolean {
@@ -73,5 +74,12 @@ describe("dictionaries", () => {
         });
       }
     }
+  });
+});
+
+describe("changelog translations", () => {
+  it("translate each entry into every interface language besides English", () => {
+    // The changelog check runs without the app's dependencies, so it keeps its own list, held to this one here.
+    expect([...CHANGELOG_TRANSLATIONS].sort()).toEqual(LOCALES.filter((locale) => locale !== "en").sort());
   });
 });

@@ -282,6 +282,11 @@ export interface AvailableUpdate {
    */
   notes?: string;
   /**
+   * `notes` in other languages, by locale, such as `{ "pt-BR": "…" }`, from the version's translated changelog
+   * entries. The app shows the one in the interface language, and `notes` for a language with none.
+   */
+  notesByLocale?: Readonly<Record<string, string>>;
+  /**
    * Downloads, verifies, and installs the update, then restarts the app. It may not return: on
    * Windows the installer ends the running app itself.
    *

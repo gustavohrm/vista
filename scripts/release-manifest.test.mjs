@@ -46,6 +46,23 @@ describe("buildManifest", () => {
     expect(manifest.notes).toBe("Folders open faster.");
   });
 
+  it("carries each translated description under vista_notes, leaving out empty ones", () => {
+    const manifest = buildManifest({
+      version: "0.2.0",
+      notes: "Folders open faster.",
+      localizedNotes: { "pt-BR": " Pastas abrem mais rápido.\n", es: " " },
+      pubDate: "x",
+      ...readerFor(FILES),
+    });
+    expect(manifest.notes).toBe("Folders open faster.");
+    expect(manifest.vista_notes).toEqual({ "pt-BR": "Pastas abrem mais rápido." });
+  });
+
+  it("writes no vista_notes without a translated description", () => {
+    const manifest = buildManifest({ version: "0.2.0", localizedNotes: { es: "" }, pubDate: "x", ...readerFor(FILES) });
+    expect(manifest).not.toHaveProperty("vista_notes");
+  });
+
   it("fails when an installer is missing", () => {
     const rest = without(FILES, "Vista_0.2.0_amd64.AppImage");
 
