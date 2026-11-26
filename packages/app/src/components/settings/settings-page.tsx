@@ -1,21 +1,29 @@
 import { motion } from "motion/react";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
+import { t } from "../../i18n";
 import { useReducedMotion } from "../../theme/appearance";
 import { Tooltip } from "../feedback/tooltip";
 import type { ManagedWorkspace } from "./workspace-manager";
 import { WorkspaceNav } from "./workspace-nav";
 
 /** A section of Settings: a workspace's page, or one of Vista's own. */
-export type SettingsSection = "workspaces" | "appearance" | "editor" | "files" | "shortcuts" | "about";
+export type SettingsSection = "workspaces" | "appearance" | "language" | "editor" | "files" | "shortcuts" | "about";
 
-const VISTA_SECTIONS: readonly { id: Exclude<SettingsSection, "workspaces">; label: string; icon: ReactNode }[] = [
-  { id: "appearance", label: "Appearance", icon: <i className="ic-sun" aria-hidden="true" /> },
-  { id: "editor", label: "Editor", icon: <i className="ic-type" aria-hidden="true" /> },
-  { id: "files", label: "Files", icon: <i className="ic-folder" aria-hidden="true" /> },
-  { id: "shortcuts", label: "Keyboard Shortcuts", icon: <i className="ic-keyboard" aria-hidden="true" /> },
-  { id: "about", label: "About", icon: <i className="ic-info" aria-hidden="true" /> },
-];
+// A label is a function, so it is read in the interface language at each render.
+const VISTA_SECTIONS: readonly { id: Exclude<SettingsSection, "workspaces">; label: () => string; icon: ReactNode }[] =
+  [
+    { id: "appearance", label: () => "Appearance", icon: <i className="ic-sun" aria-hidden="true" /> },
+    {
+      id: "language",
+      label: () => t("settings.sections.language"),
+      icon: <i className="ic-languages" aria-hidden="true" />,
+    },
+    { id: "editor", label: () => "Editor", icon: <i className="ic-type" aria-hidden="true" /> },
+    { id: "files", label: () => "Files", icon: <i className="ic-folder" aria-hidden="true" /> },
+    { id: "shortcuts", label: () => "Keyboard Shortcuts", icon: <i className="ic-keyboard" aria-hidden="true" /> },
+    { id: "about", label: () => "About", icon: <i className="ic-info" aria-hidden="true" /> },
+  ];
 
 const EASE_ENTER = [0.2, 0, 0, 1] as const;
 
@@ -172,7 +180,7 @@ export function SettingsPage({
               {VISTA_SECTIONS.map(({ id, label, icon }) => (
                 <NavItem key={id} isCurrent={section === id} onSelect={() => onSectionChange(id)}>
                   <span className="text-text-faint flex text-[15px]">{icon}</span>
-                  {label}
+                  {label()}
                 </NavItem>
               ))}
             </>

@@ -104,6 +104,7 @@ describe("SettingsPage", () => {
       "Notes",
       "Research",
       "Appearance",
+      "Language",
       "Editor",
       "Files",
       "Keyboard Shortcuts",

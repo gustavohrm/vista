@@ -982,6 +982,7 @@ describe("App", () => {
         "Search Workspaces",
         "New Workspace…",
         "Appearance",
+        "Language",
         "Editor",
         "Files",
         "Keyboard Shortcuts",

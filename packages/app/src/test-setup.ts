@@ -1,7 +1,9 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { MotionGlobalConfig } from "motion/react";
-import { afterEach } from "vitest";
+import { afterEach, beforeEach } from "vitest";
+
+import { setMissingKeyHandler, startLanguage, stopLanguage } from "./i18n";
 
 // Animations finish at once, so a part of the shell that leaves is gone when the test looks, as it
 // is for a person once the animation has played.
@@ -31,8 +33,20 @@ if (typeof Range !== "undefined" && typeof Range.prototype.getClientRects !== "f
   };
 }
 
+// A key no dictionary has fails the test that asks for it, rather than showing the key.
+setMissingKeyHandler((key, locale) => {
+  throw new Error(`Missing translation "${key}" in ${locale}`);
+});
+
+// Each test starts in English, as jsdom reports `en-US` and storage starts empty, so tests that find an
+// element by its English text keep working.
+beforeEach(async () => {
+  await startLanguage();
+});
+
 afterEach(() => {
   cleanup();
+  stopLanguage();
   // Settings and the theme persist here; each test starts from the defaults.
   localStorage.clear();
   sessionStorage.clear();

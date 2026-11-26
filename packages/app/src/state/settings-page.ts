@@ -8,7 +8,15 @@ export interface SettingsPage {
 }
 
 const STORAGE_KEY = "vista.settingsPage";
-const SECTIONS: readonly SettingsSection[] = ["workspaces", "appearance", "editor", "files", "shortcuts", "about"];
+const SECTIONS: readonly SettingsSection[] = [
+  "workspaces",
+  "appearance",
+  "language",
+  "editor",
+  "files",
+  "shortcuts",
+  "about",
+];
 
 /**
  * Reads the Settings page this window last showed, or `null` when Settings was closed. It is kept in
