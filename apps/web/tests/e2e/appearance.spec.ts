@@ -4,7 +4,7 @@ import { expect, test, type Page } from "./test";
 // measured on the colours the browser paints. The pairings and their results are recorded in
 // `docs/guidelines/brand.md`; run with `VISTA_PRINT_CONTRAST=1` to print them.
 
-const THEMES = ["daylight", "neutral", "ocean"] as const;
+const THEMES = ["daylight", "neutral", "midnight", "ocean", "forest", "ember", "cappuccino"] as const;
 const SCHEMES = ["light", "dark"] as const;
 const LEVELS = ["standard", "more"] as const;
 

@@ -98,7 +98,11 @@ function SegmentedChoice<T extends string>({
 const THEME_CLASS: Record<ThemeId, string> = {
   daylight: "theme-daylight",
   neutral: "theme-neutral",
+  midnight: "theme-midnight",
   ocean: "theme-ocean",
+  forest: "theme-forest",
+  ember: "theme-ember",
+  cappuccino: "theme-cappuccino",
 };
 
 /**

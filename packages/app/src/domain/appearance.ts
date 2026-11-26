@@ -13,7 +13,11 @@ export type SchemePreference = "system" | "light" | "dark";
 export const THEMES = [
   { id: "daylight", label: "Daylight" },
   { id: "neutral", label: "Neutral" },
+  { id: "midnight", label: "Midnight" },
   { id: "ocean", label: "Ocean" },
+  { id: "forest", label: "Forest" },
+  { id: "ember", label: "Ember" },
+  { id: "cappuccino", label: "Cappuccino" },
 ] as const;
 
 /** A theme's id, as it appears in its variants' names and in its `theme-<id>` class. */

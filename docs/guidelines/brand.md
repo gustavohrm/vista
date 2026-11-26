@@ -228,6 +228,21 @@ The ratios each theme's tokens reach, as painted in the browser by `apps/web/tes
 | Selected text                    | 13.36:1 | 7.49:1  | 13.36:1     | 7.49:1     |
 | Text on a find match             | 11.71:1 | 6.41:1  | 11.71:1     | 6.41:1     |
 
+| Midnight                         | Light   | Dark    | Light, More | Dark, More |
+| -------------------------------- | ------- | ------- | ----------- | ---------- |
+| Text                             | 16.71:1 | 14.63:1 | 16.71:1     | 14.63:1    |
+| Muted text                       | 6.34:1  | 7.37:1  | 9.87:1      | 8.56:1     |
+| Secondary text                   | 8.98:1  | 8.34:1  | 8.98:1      | 8.34:1     |
+| Faint text                       | 4.41:1  | 4.07:1  | 8.08:1      | 7.31:1     |
+| Text on a hover or selected fill | 14.68:1 | 13.96:1 | 5.05:1      | 5.08:1     |
+| Focus ring                       | 5.49:1  | 7.47:1  | 5.49:1      | 7.47:1     |
+| Control border                   | 4.54:1  | 4.32:1  | 5.92:1      | 5.54:1     |
+| Lines                            | 1.14:1  | 1.17:1  | 3.99:1      | 4.35:1     |
+| Hover and selected fills         | 1.11:1  | 1.10:1  | 3.10:1      | 3.03:1     |
+| Primary button text              | 6.32:1  | 7.76:1  | 6.32:1      | 7.76:1     |
+| Selected text                    | 15.62:1 | 9.89:1  | 15.62:1     | 9.89:1     |
+| Text on a find match             | 13.79:1 | 6.47:1  | 13.79:1     | 6.47:1     |
+
 | Ocean                            | Light   | Dark    | Light, More | Dark, More |
 | -------------------------------- | ------- | ------- | ----------- | ---------- |
 | Text                             | 16.58:1 | 13.83:1 | 16.58:1     | 13.83:1    |
@@ -242,6 +257,51 @@ The ratios each theme's tokens reach, as painted in the browser by `apps/web/tes
 | Primary button text              | 5.47:1  | 9.18:1  | 5.47:1      | 9.18:1     |
 | Selected text                    | 13.79:1 | 9.18:1  | 13.79:1     | 9.18:1     |
 | Text on a find match             | 12.95:1 | 5.90:1  | 12.95:1     | 5.90:1     |
+
+| Forest                           | Light   | Dark    | Light, More | Dark, More |
+| -------------------------------- | ------- | ------- | ----------- | ---------- |
+| Text                             | 17.07:1 | 13.83:1 | 17.07:1     | 13.83:1    |
+| Muted text                       | 6.31:1  | 6.98:1  | 10.44:1     | 8.25:1     |
+| Secondary text                   | 8.23:1  | 7.91:1  | 8.23:1      | 7.91:1     |
+| Faint text                       | 4.59:1  | 4.00:1  | 8.44:1      | 7.05:1     |
+| Text on a hover or selected fill | 14.95:1 | 12.48:1 | 5.11:1      | 4.79:1     |
+| Focus ring                       | 5.60:1  | 8.07:1  | 5.60:1      | 8.07:1     |
+| Control border                   | 4.64:1  | 3.67:1  | 6.19:1      | 5.52:1     |
+| Lines                            | 1.14:1  | 1.20:1  | 4.16:1      | 4.35:1     |
+| Hover and selected fills         | 1.10:1  | 1.12:1  | 3.14:1      | 3.08:1     |
+| Primary button text              | 6.45:1  | 8.74:1  | 6.45:1      | 8.74:1     |
+| Selected text                    | 13.27:1 | 8.74:1  | 13.27:1     | 8.74:1     |
+| Text on a find match             | 13.27:1 | 7.53:1  | 13.27:1     | 7.53:1     |
+
+| Ember                            | Light   | Dark    | Light, More | Dark, More |
+| -------------------------------- | ------- | ------- | ----------- | ---------- |
+| Text                             | 17.34:1 | 15.37:1 | 17.34:1     | 15.37:1    |
+| Muted text                       | 6.11:1  | 6.73:1  | 10.27:1     | 8.99:1     |
+| Secondary text                   | 9.47:1  | 7.39:1  | 9.47:1      | 7.39:1     |
+| Faint text                       | 4.38:1  | 3.69:1  | 8.39:1      | 7.68:1     |
+| Text on a hover or selected fill | 15.32:1 | 13.65:1 | 5.17:1      | 5.03:1     |
+| Focus ring                       | 4.63:1  | 6.35:1  | 4.63:1      | 6.35:1     |
+| Control border                   | 4.78:1  | 4.27:1  | 6.11:1      | 5.83:1     |
+| Lines                            | 1.12:1  | 1.18:1  | 4.10:1      | 4.54:1     |
+| Hover and selected fills         | 1.09:1  | 1.10:1  | 3.12:1      | 3.14:1     |
+| Primary button text              | 5.18:1  | 6.86:1  | 5.18:1      | 6.86:1     |
+| Selected text                    | 13.01:1 | 6.86:1  | 13.01:1     | 6.86:1     |
+| Text on a find match             | 12.55:1 | 9.73:1  | 12.55:1     | 9.73:1     |
+
+| Cappuccino                       | Light   | Dark    | Light, More | Dark, More |
+| -------------------------------- | ------- | ------- | ----------- | ---------- |
+| Text                             | 16.83:1 | 14.06:1 | 16.83:1     | 14.06:1    |
+| Muted text                       | 6.22:1  | 6.68:1  | 10.29:1     | 8.38:1     |
+| Secondary text                   | 8.79:1  | 7.94:1  | 8.79:1      | 7.94:1     |
+| Faint text                       | 4.49:1  | 3.84:1  | 8.42:1      | 7.18:1     |
+| Text on a hover or selected fill | 14.82:1 | 12.85:1 | 5.04:1      | 4.84:1     |
+| Focus ring                       | 6.39:1  | 8.71:1  | 6.39:1      | 8.71:1     |
+| Control border                   | 4.68:1  | 4.13:1  | 6.12:1      | 5.50:1     |
+| Lines                            | 1.15:1  | 1.17:1  | 4.16:1      | 4.34:1     |
+| Hover and selected fills         | 1.10:1  | 1.12:1  | 3.14:1      | 3.09:1     |
+| Primary button text              | 7.44:1  | 8.76:1  | 7.44:1      | 8.76:1     |
+| Selected text                    | 11.71:1 | 7.98:1  | 11.71:1     | 7.98:1     |
+| Text on a find match             | 12.12:1 | 8.08:1  | 12.12:1     | 8.08:1     |
 
 ## Typefaces
 
