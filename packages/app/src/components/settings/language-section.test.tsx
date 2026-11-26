@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -32,7 +32,8 @@ describe("LanguageSection", () => {
 
     const list = await screen.findByRole("combobox", { name: "Idioma" });
     expect(list).toHaveValue("es");
-    expect(screen.getByRole("option", { name: "Sistema (Español)" })).toBeInTheDocument();
+    // In Spanish, System still names the system's language.
+    expect(screen.getByRole("option", { name: "Sistema (English)" })).toBeInTheDocument();
     expect(localStorage.getItem(LOCALE_STORAGE_KEY)).toBe(JSON.stringify({ locale: "es" }));
   });
 
@@ -54,11 +55,28 @@ describe("LanguageSection", () => {
     const user = userEvent.setup();
     render(<LanguageSection />);
 
-    await user.selectOptions(screen.getByRole("combobox", { name: "Language" }), "System (English)");
+    // System names the language it gives, not the one chosen.
+    await user.selectOptions(screen.getByRole("combobox", { name: "Language" }), "System (Português (Brasil))");
 
     const list = await screen.findByRole("combobox", { name: "Idioma" });
     expect(list).toHaveValue("system");
     expect(i18n.locale).toBe("pt-BR");
     expect(localStorage.getItem(LOCALE_STORAGE_KEY)).toBeNull();
+  });
+
+  it("renames System when the system's languages change while a language is chosen", async () => {
+    const languages = vi.spyOn(navigator, "languages", "get").mockReturnValue(["en-US"]);
+    const user = userEvent.setup();
+    render(<LanguageSection />);
+    await user.selectOptions(screen.getByRole("combobox", { name: "Language" }), "English");
+    await waitFor(() => expect(localStorage.getItem(LOCALE_STORAGE_KEY)).not.toBeNull());
+
+    languages.mockReturnValue(["es-ES"]);
+    act(() => {
+      window.dispatchEvent(new Event("languagechange"));
+    });
+
+    expect(screen.getByRole("option", { name: "System (Español)" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Language" })).toHaveValue("en");
   });
 });

@@ -104,18 +104,21 @@ export function useIsLanguageReady(): boolean {
   return useSyncExternalStore(i18n.subscribe, isReady, isReady);
 }
 
-/** What the Language row shows: _System_ or a chosen language, and the language in use. */
+/** What the Language row shows: _System_ or a chosen language, and the language _System_ gives. */
 export interface LanguageChoice {
   choice: "system" | Locale;
-  locale: Locale;
+  /** The language the system's languages give now, which choosing _System_ switches to. */
+  systemLocale: Locale;
 }
 
-let shownChoice: LanguageChoice = { choice: "system", locale: "en" };
+let shownChoice: LanguageChoice = { choice: "system", systemLocale: "en" };
 
 function readChoice(): LanguageChoice {
   const choice = binding === null || binding.isUsingSystemLocale ? "system" : i18n.locale;
-  if (shownChoice.choice !== choice || shownChoice.locale !== i18n.locale) {
-    shownChoice = { choice, locale: i18n.locale };
+  // As the binding detects it: the system's languages, most preferred first, then English.
+  const systemLocale = i18n.matchLocale(navigator.languages) ?? i18n.defaultLocale;
+  if (shownChoice.choice !== choice || shownChoice.systemLocale !== systemLocale) {
+    shownChoice = { choice, systemLocale };
   }
   return shownChoice;
 }
@@ -123,13 +126,20 @@ function readChoice(): LanguageChoice {
 function subscribeToChoice(listener: () => void): () => void {
   // The binding also reports a pick of the language already shown, and a change to following the system,
   // neither of which changes the language the manager reports.
-  return binding ? binding.subscribe(listener) : i18n.subscribe(listener);
+  const unsubscribe = binding ? binding.subscribe(listener) : i18n.subscribe(listener);
+  // While a language is chosen, the binding ignores a change to the system's languages, which still
+  // changes the language _System_ names.
+  window.addEventListener("languagechange", listener);
+  return () => {
+    unsubscribe();
+    window.removeEventListener("languagechange", listener);
+  };
 }
 
 /**
  * The Language row's selection, updated as the user chooses or the system's languages change.
  *
- * @returns The selected entry and the language in use.
+ * @returns The selected entry and the language _System_ gives.
  */
 export function useLanguageChoice(): LanguageChoice {
   return useSyncExternalStore(subscribeToChoice, readChoice, readChoice);

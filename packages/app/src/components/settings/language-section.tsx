@@ -12,7 +12,7 @@ import { SectionHeading, SettingsGroup, SettingsRow } from "./settings-parts";
 export function LanguageSection() {
   const selectId = useId();
   const descriptionId = useId();
-  const { choice, locale } = useLanguageChoice();
+  const { choice, systemLocale } = useLanguageChoice();
   // The user's pick, shown while its language loads, so the list doesn't jump back to the old one.
   const [pending, setPending] = useState<"system" | Locale>();
 
@@ -46,7 +46,7 @@ export function LanguageSection() {
             onChange={(event) => void choose(event.target.value as "system" | Locale)}
             className="select text-[13px]"
           >
-            <option value="system">{t("settings.language.system", { language: LOCALE_NAMES[locale] })}</option>
+            <option value="system">{t("settings.language.system", { language: LOCALE_NAMES[systemLocale] })}</option>
             {LOCALES.map((option) => (
               <option key={option} value={option} lang={option}>
                 {LOCALE_NAMES[option]}
