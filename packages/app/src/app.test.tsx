@@ -228,6 +228,17 @@ async function runFromPalette(user: UserEvent, title: string) {
   await user.click(screen.getByRole("option", { name: pattern }));
 }
 
+/** The row of a command in Settings → Keyboard Shortcuts, found by the command's name. */
+function shortcutRow(container: HTMLElement, name: string): HTMLElement {
+  const row = within(container)
+    .getAllByRole("listitem")
+    .find((item) => item.querySelector(":scope > div > div > div")?.textContent === name);
+  if (!row) {
+    throw new Error(`No shortcut row for ${name}`);
+  }
+  return row;
+}
+
 function getTab(name: string): HTMLElement {
   return screen.getByRole("tab", { name: new RegExp(`^${name.replaceAll(".", "\\.")}`) });
 }
@@ -1017,7 +1028,7 @@ describe("App", () => {
       // The commands are built once and kept, so they show the new language only if a language change rebuilds them.
       await user.click(within(dialog).getByRole("button", { name: "Atajos de teclado" }));
       expect(within(dialog).getByRole("heading", { name: "Archivo" })).toBeInTheDocument();
-      expect(within(dialog).getByRole("cell", { name: "Guardar" })).toBeInTheDocument();
+      expect(shortcutRow(dialog, "Guardar")).toBeInTheDocument();
     });
 
     it("shows the same section after a reload, and stays closed after a reload once closed", async () => {
@@ -4671,6 +4682,204 @@ describe("App", () => {
     });
   });
 
+  describe("custom shortcuts", () => {
+    function storeSettings(settings: Record<string, unknown>) {
+      localStorage.setItem("vista.settings", JSON.stringify({ version: 1, ...settings }));
+    }
+
+    function storedShortcuts(): unknown {
+      return JSON.parse(localStorage.getItem("vista.settings") ?? "{}").shortcuts;
+    }
+
+    async function openShortcuts(user: UserEvent): Promise<HTMLElement> {
+      await runFromPalette(user, "Settings: Keyboard Shortcuts");
+      return screen.findByRole("region", { name: "Settings" });
+    }
+
+    it("adds a key that runs the command beside its other keys, and saves it", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      const page = await openShortcuts(user);
+
+      await user.click(within(page).getByRole("button", { name: "Add Shortcut to Show All Commands" }));
+      expect(within(page).getByRole("textbox", { name: "Press a shortcut for Show All Commands" })).toHaveFocus();
+      await user.keyboard("{Control>}j{/Control}");
+
+      const row = shortcutRow(page, "Show All Commands");
+      expect(row).toHaveTextContent("Ctrl + Shift + P");
+      expect(row).toHaveTextContent("Ctrl + J");
+      expect(row).toHaveTextContent("Default: Ctrl + Shift + P");
+      expect(storedShortcuts()).toEqual({ "palette.commands": ["Mod+Shift+P", "Mod+J"] });
+
+      await user.keyboard("{Control>}j{/Control}");
+      expect(screen.getByRole("combobox", { name: "Run a command" })).toBeInTheDocument();
+    });
+
+    it("cancels recording with Escape and keeps Settings open", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      const page = await openShortcuts(user);
+
+      await user.click(within(page).getByRole("button", { name: "Add Shortcut to Go to Line" }));
+      await user.keyboard("{Escape}");
+
+      expect(within(page).queryByRole("textbox", { name: /Press a shortcut/ })).not.toBeInTheDocument();
+      expect(within(page).getByRole("button", { name: "Add Shortcut to Go to Line" })).toHaveFocus();
+      expect(screen.getByRole("region", { name: "Settings" })).toBeInTheDocument();
+      expect(storedShortcuts()).toBeUndefined();
+    });
+
+    it("refuses a key the command already has, and one that would stop typing", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      const page = await openShortcuts(user);
+
+      await user.click(within(page).getByRole("button", { name: "Add Shortcut to Go to Line" }));
+      await user.keyboard("{Control>}g{/Control}");
+      expect(within(page).getByRole("alert")).toHaveTextContent("Go to Line already has Ctrl + G.");
+      await user.keyboard("{Control>}z{/Control}");
+      expect(within(page).getByRole("alert")).toHaveTextContent("Ctrl + Z is Undo in the editor.");
+
+      expect(within(page).getByRole("textbox", { name: "Press a shortcut for Go to Line" })).toHaveFocus();
+      expect(storedShortcuts()).toBeUndefined();
+    });
+
+    it("says which keys the browser keeps while recording in the browser", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      const page = await openShortcuts(user);
+
+      await user.click(within(page).getByRole("button", { name: "Add Shortcut to Next Tab" }));
+
+      expect(
+        within(page).getByText("The browser keeps Ctrl + N, Ctrl + T, Ctrl + W, and Ctrl + Tab for itself."),
+      ).toBeInTheDocument();
+    });
+
+    it("asks before taking a key from another command, which keeps its other keys", async () => {
+      const user = userEvent.setup();
+      storeSettings({ shortcuts: { "goto.line": ["Mod+G", "Mod+L"] } });
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      const page = await openShortcuts(user);
+
+      await user.click(within(page).getByRole("button", { name: "Add Shortcut to Next Tab" }));
+      await user.keyboard("{Control>}l{/Control}");
+      expect(within(page).getByRole("alert")).toHaveTextContent("Ctrl + L is used by Go to Line.");
+      expect(screen.queryByRole("combobox", { name: "Go to file, or :line:column" })).not.toBeInTheDocument();
+
+      await user.click(within(page).getByRole("button", { name: "Replace" }));
+
+      expect(shortcutRow(page, "Next Tab")).toHaveTextContent("Ctrl + L");
+      expect(shortcutRow(page, "Go to Line")).toHaveTextContent("Ctrl + G");
+      expect(shortcutRow(page, "Go to Line")).not.toHaveTextContent("Ctrl + L");
+      expect(storedShortcuts()).toEqual({ "tabs.next": ["Mod+L"] });
+    });
+
+    it("does not run the command whose key is pressed while recording", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      const page = await openShortcuts(user);
+
+      await user.click(within(page).getByRole("button", { name: "Add Shortcut to Next Tab" }));
+      await user.keyboard("{Control>}{Shift>}p{/Shift}{/Control}");
+
+      expect(within(page).getByRole("alert")).toHaveTextContent("Ctrl + Shift + P is used by Show All Commands.");
+      expect(screen.queryByRole("combobox", { name: "Run a command" })).not.toBeInTheDocument();
+    });
+
+    it("removes a key, and resets a command after asking for a default key another command took", async () => {
+      const user = userEvent.setup();
+      storeSettings({ shortcuts: { "tabs.next": ["Mod+P"] } });
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      const page = await openShortcuts(user);
+      expect(shortcutRow(page, "Go to File")).toHaveTextContent("None");
+
+      await user.click(within(page).getByRole("button", { name: "Reset Go to File to Default" }));
+      expect(within(page).getByRole("alert")).toHaveTextContent("Ctrl + P is used by Next Tab.");
+      await user.click(within(page).getByRole("button", { name: "Replace" }));
+
+      expect(shortcutRow(page, "Go to File")).toHaveTextContent("Ctrl + P");
+      expect(shortcutRow(page, "Next Tab")).toHaveTextContent("None");
+      // Next Tab has no key by default, so its empty list is not stored.
+      expect(storedShortcuts()).toEqual({});
+
+      await user.click(within(shortcutRow(page, "Go to File")).getByRole("button", { name: "Remove Ctrl + P" }));
+      expect(storedShortcuts()).toEqual({ "goto.file": [] });
+      await waitFor(() =>
+        expect(within(page).getByRole("button", { name: "Add Shortcut to Go to File" })).toHaveFocus(),
+      );
+      await user.keyboard("{Escape}");
+      expect(screen.queryByRole("region", { name: "Settings" })).not.toBeInTheDocument();
+    });
+
+    it("resets every shortcut after confirming", async () => {
+      const user = userEvent.setup();
+      storeSettings({ shortcuts: { "tabs.next": ["Mod+P"], "goto.line": [] } });
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      const page = await openShortcuts(user);
+
+      await user.click(within(page).getByRole("button", { name: "Reset All Shortcuts" }));
+      await user.click(await screen.findByRole("button", { name: "Reset" }));
+
+      expect(shortcutRow(page, "Go to File")).toHaveTextContent("Ctrl + P");
+      expect(shortcutRow(page, "Go to Line")).toHaveTextContent("Ctrl + G");
+      expect(storedShortcuts()).toEqual({});
+    });
+
+    it("filters the list by command name or key", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      const page = await openShortcuts(user);
+
+      await user.type(within(page).getByRole("searchbox", { name: "Search commands or keys" }), "ctrl + g");
+
+      expect(shortcutRow(page, "Go to Line")).toBeInTheDocument();
+      expect(within(page).getAllByRole("listitem")).toHaveLength(1);
+    });
+
+    it("shows a command's first key in hints and the palette, and the next once it is removed", async () => {
+      const user = userEvent.setup();
+      storeSettings({ shortcuts: { "goto.file": ["Mod+Shift+O", "Mod+P"] } });
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await openFolderFromWelcome(user);
+      const main = screen.getByRole("main");
+      expect(within(main).getByText("Ctrl + Shift + O")).toBeInTheDocument();
+
+      await user.keyboard("{Control>}{Shift>}p{/Shift}{/Control}");
+      expect(screen.getByRole("option", { name: /^Go: Go to File/ })).toHaveTextContent("Ctrl + Shift + O");
+      await user.keyboard("{Escape}");
+
+      const page = await openShortcuts(user);
+      await user.click(
+        within(shortcutRow(page, "Go to File")).getByRole("button", { name: "Remove Ctrl + Shift + O" }),
+      );
+      expect(shortcutRow(page, "Go to File")).toHaveTextContent("Ctrl + P");
+
+      await user.keyboard("{Control>}{Shift>}p{/Shift}{/Control}");
+      expect(screen.getByRole("option", { name: /^Go: Go to File/ })).toHaveTextContent("Ctrl + P");
+    });
+
+    it.each([false, true])("runs a command with any of its keys in the raw editor, with vim %s", async (vim) => {
+      const user = userEvent.setup();
+      storeSettings({ editor: { vim }, shortcuts: { "goto.line": ["Mod+G", "Mod+L"] } });
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      const editor = await openRawReadme(user);
+
+      await user.click(editor);
+      await user.keyboard("{Control>}g{/Control}");
+      expect(screen.getByRole("combobox", { name: "Go to file, or :line:column" })).toHaveValue(":");
+      await user.keyboard("{Escape}");
+
+      // Ctrl+L selects the line in CodeMirror; the command wins.
+      await user.click(editor);
+      await user.keyboard("{Control>}l{/Control}");
+      expect(screen.getByRole("combobox", { name: "Go to file, or :line:column" })).toHaveValue(":");
+    });
+  });
+
   describe("commands", () => {
     it("has no menu bar", async () => {
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
@@ -4750,7 +4959,7 @@ describe("App", () => {
       expect(editor).toHaveFocus();
     });
 
-    it("lists every command with a key in the Keyboard Shortcuts section", async () => {
+    it("lists every command, with its keys, in the Keyboard Shortcuts section", async () => {
       const user = userEvent.setup();
       render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
 
@@ -4758,11 +4967,12 @@ describe("App", () => {
       await runFromPalette(user, "Settings: Keyboard Shortcuts");
 
       const dialog = await screen.findByRole("region", { name: "Settings" });
-      expect(within(dialog).getByRole("row", { name: "Save Ctrl + S" })).toBeInTheDocument();
-      expect(within(dialog).getByRole("row", { name: "Word Wrap Alt + Z" })).toBeInTheDocument();
-      expect(within(dialog).getByRole("row", { name: "Undo Ctrl + Z" })).toBeInTheDocument();
-      const tabsSection = within(dialog).getByRole("table", { name: "Tabs" });
-      expect(within(tabsSection).getByRole("row", { name: "Close Tab Alt + W" })).toBeInTheDocument();
+      expect(shortcutRow(dialog, "Save")).toHaveTextContent("Ctrl + S");
+      expect(shortcutRow(dialog, "Word Wrap")).toHaveTextContent("Alt + Z");
+      expect(shortcutRow(dialog, "Undo")).toHaveTextContent("Ctrl + Z");
+      expect(shortcutRow(dialog, "Save All")).toHaveTextContent("None");
+      const tabsSection = within(dialog).getByRole("list", { name: "Tabs" });
+      expect(shortcutRow(tabsSection, "Close Tab")).toHaveTextContent("Alt + W");
     });
 
     it("closes the other tabs from a tab's menu", async () => {

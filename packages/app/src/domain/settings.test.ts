@@ -19,6 +19,19 @@ describe("parseSettings", () => {
     });
   });
 
+  it("reads stored shortcut lists, keeping each list and its string keys", () => {
+    const stored = JSON.stringify({
+      version: 1,
+      shortcuts: { "goto.line": ["Mod+G", 3, "", "Mod+L"], "tabs.close": [], save: "Mod+S", find: null },
+    });
+
+    expect(parseSettings(stored).shortcuts).toEqual({ "goto.line": ["Mod+G", "Mod+L"], "tabs.close": [] });
+  });
+
+  it("reads no shortcut changes when the field is not an object", () => {
+    expect(parseSettings(JSON.stringify({ version: 1, shortcuts: ["Mod+G"] })).shortcuts).toEqual({});
+  });
+
   it("reads the stored file size limit", () => {
     const stored = JSON.stringify({ version: 1, files: { maxOpenSizeMb: 50 } });
 

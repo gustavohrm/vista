@@ -33,7 +33,7 @@ interface StartScreenProps {
   onOpenFolder: () => void;
   onOpenSettings: () => void;
   /** Shortcut that opens Settings, in the `Mod+,` notation. */
-  settingsShortcut: string;
+  settingsShortcut?: string;
   onOpenRecent: (workspaceId: string) => void;
   /** Takes a workspace out of Recent without forgetting it. */
   onRemoveRecent: (workspaceId: string) => void;
@@ -126,9 +126,11 @@ export function StartScreen({
               <button type="button" onClick={onOpenSettings} className={ROW_CLASS}>
                 <i className="ic-settings text-text-muted flex-none text-base" aria-hidden="true" />
                 <span className="text-text-strong flex-1">{t("common.settings")}</span>
-                <kbd aria-hidden="true" className="shortcut-key flex-none">
-                  {formatShortcut(settingsShortcut)}
-                </kbd>
+                {settingsShortcut && (
+                  <kbd aria-hidden="true" className="shortcut-key flex-none">
+                    {formatShortcut(settingsShortcut)}
+                  </kbd>
+                )}
               </button>
             </li>
             {desktopDownload && (

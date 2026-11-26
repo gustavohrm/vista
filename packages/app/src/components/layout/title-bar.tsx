@@ -16,8 +16,8 @@ interface TitleBarProps {
   onToggleSidebar: () => void;
   /** Opens the picker on files. */
   onGoToFile: () => void;
-  /** Shortcut that opens the picker on files, shown in the field. */
-  goToFileShortcut: string;
+  /** Shortcut that opens the picker on files, shown in the field; none when the user removed it. */
+  goToFileShortcut?: string;
   /** The workspace switcher. */
   switcher?: ReactNode;
   /** The panel toggles at the right end, from `md` up. */
@@ -107,9 +107,11 @@ export function TitleBar({
         >
           <i className="ic-file-search text-text-faint text-sm" aria-hidden="true" />
           <span className="hidden flex-1 text-left md:inline">{t("titleBar.goToFile")}</span>
-          <kbd aria-hidden="true" className="shortcut-key hidden md:inline-flex">
-            {formatShortcut(goToFileShortcut)}
-          </kbd>
+          {goToFileShortcut && (
+            <kbd aria-hidden="true" className="shortcut-key hidden md:inline-flex">
+              {formatShortcut(goToFileShortcut)}
+            </kbd>
+          )}
         </button>
       )}
 

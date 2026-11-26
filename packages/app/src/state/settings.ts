@@ -16,6 +16,8 @@ export interface SettingsChanges {
   editor?: Partial<EditorSettings>;
   files?: Partial<FileSettings>;
   updates?: Partial<UpdateSettings>;
+  /** Replaces every shortcut choice. */
+  shortcuts?: Settings["shortcuts"];
 }
 
 /**
@@ -35,6 +37,7 @@ export function useSettings(): [Settings, (changes: SettingsChanges) => void] {
         editor: { ...previous.editor, ...changes.editor },
         files: { ...previous.files, ...changes.files },
         updates: { ...previous.updates, ...changes.updates },
+        shortcuts: changes.shortcuts ?? previous.shortcuts,
       };
       try {
         localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(next));

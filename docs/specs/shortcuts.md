@@ -1,16 +1,16 @@
 ---
-status: APPROVED
+status: IMPLEMENTED
 last_updated: 2026-11-26
 scope: Customizable keyboard shortcuts, which commands can be given keys, how a key is added, removed, and reset in Settings, which keys are refused, how a key already in use is handled, and how the choices are stored and shown.
 ---
 
 # Keyboard shortcuts
 
-This document makes Vista's keyboard shortcuts customizable, with any number of keys for each command. It is approved and not implemented: [Current behavior](#current-behavior) describes the code as it is, and the sections after it describe what is to be built.
+This document makes Vista's keyboard shortcuts customizable, with any number of keys for each command. It is implemented. [Before this change](#before-this-change) describes the fixed shortcuts it replaced, and the sections after it describe how they work now.
 
-## Current behavior
+## Before this change
 
-Every shortcut is fixed in code. [Commands and shortcuts](../architecture.md#commands-and-shortcuts) describes the mechanism: each action is a `Command` built in `AppShell` (`packages/app/src/app.tsx`), and a command has either a `shortcut`, which one window `keydown` listener (`useCommandShortcuts`) binds, or a `shortcutHint`, a key an editor handles itself, which menus show but the app does not bind.
+Every shortcut was fixed in code, and the rest of this section is written as it was then. [Commands and shortcuts](../architecture.md#commands-and-shortcuts) describes the mechanism: each action is a `Command` built in `AppShell` (`packages/app/src/app.tsx`), and a command has either a `shortcut`, which one window `keydown` listener (`useCommandShortcuts`) binds, or a `shortcutHint`, a key an editor handles itself, which menus show but the app does not bind.
 
 - **Bound keys.** Save (`Mod+S`), Close Tab (`Mod+W` on the desktop, `Alt+W` in the browser, which keeps `Ctrl+W` for itself), Find (`Mod+F`), Replace (`Mod+H`), Go to File (`Mod+P`), Show All Commands (`Mod+Shift+P`), Go to Line (`Mod+G`), Word Wrap (`Alt+Z`), and Settings (`Mod+,`).
 - **Editor keys.** Undo, Redo, Cut, Copy, Paste, Select All, and the Selection commands carry a `shortcutHint`. The raw editor's CodeMirror keymap, and vim when it is on, handle them, and the browser handles them in every other text field. The rendered Markdown editor has keymaps of its own.
@@ -47,7 +47,7 @@ Each row shows the command's name and its keys in order, each as a key cap, or `
 - **A refused key.** A key [Keys that are refused](#keys-that-are-refused) names keeps the cell recording and shows why below it, as in `Ctrl + Z is Undo in the editor.` A key the command already has is refused with `Go to Line already has Ctrl + L.`
 - **A key already in use.** A key another command has shows `Ctrl + G is used by Go to Line.` below the cell, with **Replace** and **Cancel**. Replace adds the key to this command and removes it from Go to Line, which keeps its other keys; its row shows the change. Cancel keeps recording. Moving the key at once, with an **Undo** in a toast, was rejected, since a command the user wasn't looking at would lose a key; refusing the key until the user removes it elsewhere was rejected as tedious.
 - **Removing a key.** Each key cap has a **Remove** button with the close icon, named `Remove Ctrl + G` for screen readers, shown as the pointer rests on the row or the keyboard reaches the cap.
-- **Resetting.** The row's menu, beside Add Shortcut, has **Reset to Default** on a changed row. When a default key has since gone to another command, resetting asks as adding does, `Ctrl + G is used by Go to File.`, with **Replace** and **Cancel**: Replace restores the whole default and removes the key from Go to File, and Cancel changes nothing. Resetting without asking would either leave the command short of its default or take a key from another command the user wasn't looking at. The section's header has **Reset All Shortcuts**, which asks `Reset all shortcuts to their defaults?` through the app's confirmation, since it can undo many choices at once; it needs no other question, because the defaults never share a key.
+- **Resetting.** A changed row has a **Reset to Default** button, with the rotate icon, beside Add Shortcut. A row menu holding the one item was dropped as an extra step. When a default key has since gone to another command, resetting asks as adding does, `Ctrl + G is used by Go to File.`, with **Replace** and **Cancel**: Replace restores the whole default and removes the key from Go to File, and Cancel changes nothing. Resetting without asking would either leave the command short of its default or take a key from another command the user wasn't looking at. The section's header has **Reset All Shortcuts**, which asks `Reset all shortcuts to their defaults?` through the app's confirmation, since it can undo many choices at once; it needs no other question, because the defaults never share a key.
 
 While a key is being recorded, the window listener runs no command, so pressing `Ctrl + S` to record it does not save.
 
@@ -62,7 +62,7 @@ A key is refused when it cannot work, or when binding it would break typing:
 
 Other keys CodeMirror or vim handle, such as vim's `Ctrl+R` for Redo, are allowed without a warning, and the command wins as it does today: the user chose the key. Warning about them was rejected, since it needs a list of every CodeMirror and vim key, which would go stale with each upgrade of either, and the editor keys that matter most are already refused.
 
-A key is recorded from the physical key for letters and digits (`event.code`, as `KeyG` becomes `G`) and from `event.key` for the rest, so a shortcut recorded with Alt or Shift held matches the way [matching](#current-behavior) already does.
+A key is recorded from the physical key for letters and digits (`event.code`, as `KeyG` becomes `G`) and from `event.key` for the rest, so a shortcut recorded with Alt or Shift held matches the way [matching](#before-this-change) already did.
 
 ## Storage
 

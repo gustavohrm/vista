@@ -7,7 +7,14 @@ import { flushSync } from "react-dom";
 
 import { version as APP_VERSION } from "../package.json";
 import { changelogEntryFor } from "./changelog";
-import { categoryLabel, runCommand, sortByCategory, useCommandShortcuts, type Command } from "./commands";
+import {
+  categoryLabel,
+  resolveShortcuts,
+  runCommand,
+  sortByCategory,
+  useCommandShortcuts,
+  type Command,
+} from "./commands";
 import { findCodeMirrorView, runEditingAction, type EditingAction } from "./commands/editing";
 import { DocumentActions } from "./components/editor/document-actions";
 import { EditorPane, type FindRequest } from "./components/editor/editor-pane";
@@ -35,13 +42,8 @@ import {
 } from "./components/navigation/go-to-dialog";
 import { LanguageSection } from "./components/settings/language-section";
 import { SettingsPage, type SettingsSection } from "./components/settings/settings-page";
-import {
-  AboutSection,
-  AppearanceSection,
-  EditorSection,
-  FilesSection,
-  ShortcutsSection,
-} from "./components/settings/vista-sections";
+import { ShortcutsSection } from "./components/settings/shortcuts-section";
+import { AboutSection, AppearanceSection, EditorSection, FilesSection } from "./components/settings/vista-sections";
 import { WorkspacePage, type ManagedWorkspace, type WorkspaceLock } from "./components/settings/workspace-manager";
 import { WorkspaceSwitcher, type FolderStatus, type RecentWorkspace } from "./components/workspace/workspace-switcher";
 import { type CpuArchitecture, type DesktopDownload, desktopDownloadFor } from "./domain/desktop-download";
@@ -146,15 +148,21 @@ type StoredRead =
   /** A newer action took over while it read, so it changed nothing. */
   | { kind: "stale" };
 
-const GO_TO_FILE_SHORTCUT = "Mod+P";
-const COMMANDS_SHORTCUT = "Mod+Shift+P";
-const SETTINGS_SHORTCUT = "Mod+,";
-/** The key hints on the empty frame of an open workspace, in the interface language. */
-function startHints(): readonly StartHint[] {
-  return [
-    { label: t("app.startHints.goToFile"), shortcut: GO_TO_FILE_SHORTCUT },
-    { label: t("app.startHints.allCommands"), shortcut: COMMANDS_SHORTCUT },
+/**
+ * The key hints on the empty frame of an open workspace, in the interface language, each with its
+ * command's first key. A command the user left with no key has no hint.
+ */
+function startHints(commands: readonly Command[]): readonly StartHint[] {
+  const hints = [
+    { label: t("app.startHints.goToFile"), shortcut: commandShortcut(commands, "goto.file") },
+    { label: t("app.startHints.allCommands"), shortcut: commandShortcut(commands, "palette.commands") },
   ];
+  return hints.flatMap((hint) => (hint.shortcut ? [{ label: hint.label, shortcut: hint.shortcut }] : []));
+}
+
+/** The first key of a command, by id, or undefined when it has none. */
+function commandShortcut(commands: readonly Command[], id: string): string | undefined {
+  return commands.find((command) => command.id === id)?.shortcuts?.[0];
 }
 
 const EDITOR_MENU = ["edit.cut", "edit.copy", "edit.paste", "selection.all", MENU_SEPARATOR, "find.find"];
@@ -2514,7 +2522,7 @@ function AppShell({ adapter }: AppProps) {
   const editorSettings = settings.editor;
 
   const hasReadyFolder = workspace?.folders.some((entry) => entry.status === "ready") ?? false;
-  const commands = useMemo<Command[]>(
+  const defaultCommands = useMemo<Command[]>(
     () => [
       {
         id: "file.openFolder",
@@ -2571,7 +2579,7 @@ function AppShell({ adapter }: AppProps) {
         id: "file.save",
         category: "File",
         label: t("commands.file.save"),
-        shortcut: "Mod+S",
+        shortcuts: ["Mod+S"],
         // A second prompt over a pending one would leave the first flow waiting forever.
         isEnabled: !isPromptingForUnsavedChanges && (activeDocument?.isDirty ?? false),
         run: saveActiveDocument,
@@ -2628,7 +2636,7 @@ function AppShell({ adapter }: AppProps) {
         id: "file.settings",
         category: "Settings",
         label: t("commands.file.settings"),
-        shortcut: SETTINGS_SHORTCUT,
+        shortcuts: ["Mod+,"],
         isEnabled: !isPromptingForUnsavedChanges,
         run: openSettings,
       },
@@ -2637,7 +2645,7 @@ function AppShell({ adapter }: AppProps) {
         category: "Tabs",
         label: t("commands.tabs.close"),
         // Browsers reserve Ctrl+W for closing their own tab, so the web host uses Alt+W.
-        shortcut: adapter.platform === "native" ? "Mod+W" : "Alt+W",
+        shortcuts: [adapter.platform === "native" ? "Mod+W" : "Alt+W"],
         isEnabled: !isPromptingForUnsavedChanges && documentInView !== null,
         run: closeActiveDocument,
       },
@@ -2688,7 +2696,7 @@ function AppShell({ adapter }: AppProps) {
         id: "find.find",
         category: "Edit",
         label: t("commands.find.find"),
-        shortcut: "Mod+F",
+        shortcuts: ["Mod+F"],
         isEnabled: !isPromptingForUnsavedChanges && documentInView !== null,
         run: () => openFind("find"),
       },
@@ -2696,7 +2704,7 @@ function AppShell({ adapter }: AppProps) {
         id: "find.replace",
         category: "Edit",
         label: t("commands.find.replace"),
-        shortcut: "Mod+H",
+        shortcuts: ["Mod+H"],
         isEnabled: !isPromptingForUnsavedChanges && documentInView !== null,
         run: () => openFind("replace"),
       },
@@ -2752,7 +2760,7 @@ function AppShell({ adapter }: AppProps) {
         id: "palette.commands",
         category: "View",
         label: t("commands.palette.commands"),
-        shortcut: COMMANDS_SHORTCUT,
+        shortcuts: ["Mod+Shift+P"],
         isEnabled: !isPromptingForUnsavedChanges,
         run: () => setGoToQuery(COMMAND_QUERY_PREFIX),
       },
@@ -2784,7 +2792,7 @@ function AppShell({ adapter }: AppProps) {
         id: "view.wordWrap",
         category: "View",
         label: t("commands.view.wordWrap"),
-        shortcut: "Alt+Z",
+        shortcuts: ["Alt+Z"],
         isChecked: editorSettings.wordWrap,
         run: () => updateSettings({ editor: { wordWrap: !editorSettings.wordWrap } }),
       },
@@ -2813,7 +2821,7 @@ function AppShell({ adapter }: AppProps) {
         id: "goto.file",
         category: "Go",
         label: t("commands.goto.file"),
-        shortcut: GO_TO_FILE_SHORTCUT,
+        shortcuts: ["Mod+P"],
         isEnabled: !isPromptingForUnsavedChanges && workspace !== null,
         run: () => setGoToQuery(""),
       },
@@ -2821,7 +2829,7 @@ function AppShell({ adapter }: AppProps) {
         id: "goto.line",
         category: "Go",
         label: t("commands.goto.line"),
-        shortcut: "Mod+G",
+        shortcuts: ["Mod+G"],
         isEnabled: !isPromptingForUnsavedChanges && documentInView !== null,
         run: () => setGoToQuery(":"),
       },
@@ -2908,6 +2916,10 @@ function AppShell({ adapter }: AppProps) {
       workspace,
     ],
   );
+  const commands = useMemo(
+    () => resolveShortcuts(defaultCommands, settings.shortcuts, adapter.platform),
+    [adapter.platform, defaultCommands, settings.shortcuts],
+  );
   const editorMenuItems = useMemo(
     () => commandMenuEntries(isRawShown ? RAW_EDITOR_MENU : EDITOR_MENU, commands),
     [commands, isRawShown],
@@ -2939,10 +2951,7 @@ function AppShell({ adapter }: AppProps) {
     () => describeExplorerFolders(workspace?.folders ?? [], adapter.platform === "native"),
     [adapter.platform, workspace],
   );
-  const reservedShortcuts = useMemo(
-    () => commands.flatMap((command) => (command.shortcut ? [command.shortcut] : [])),
-    [commands],
-  );
+  const reservedShortcuts = useMemo(() => commands.flatMap((command) => command.shortcuts ?? []), [commands]);
   const handleCursorChange = useCallback((key: string, position: CursorInfo) => {
     setCursor((previous) =>
       previous?.key === key &&
@@ -3009,7 +3018,7 @@ function AppShell({ adapter }: AppProps) {
                 isDisabled={isLoading}
               />
             }
-            goToFileShortcut={GO_TO_FILE_SHORTCUT}
+            goToFileShortcut={commandShortcut(commands, "goto.file")}
             notice={updateNotice}
             panels={[
               {
@@ -3149,11 +3158,20 @@ function AppShell({ adapter }: AppProps) {
                 ) : shownSettingsSection === "language" ? (
                   <LanguageSection />
                 ) : shownSettingsSection === "editor" ? (
-                  <EditorSection settings={settings} onChange={updateSettings} />
+                  <EditorSection
+                    settings={settings}
+                    onChange={updateSettings}
+                    wordWrapShortcut={commandShortcut(commands, "view.wordWrap")}
+                  />
                 ) : shownSettingsSection === "files" ? (
                   <FilesSection settings={settings} onChange={updateSettings} />
                 ) : shownSettingsSection === "shortcuts" ? (
-                  <ShortcutsSection commands={commands} />
+                  <ShortcutsSection
+                    commands={commands}
+                    platform={adapter.platform}
+                    stored={settings.shortcuts}
+                    onChange={(shortcuts) => updateSettings({ shortcuts })}
+                  />
                 ) : shownSettingsSection === "about" ? (
                   <AboutSection
                     platform={adapter.platform}
@@ -3191,6 +3209,7 @@ function AppShell({ adapter }: AppProps) {
                       onViewModeChange={handleViewModeChange}
                       isFindOpen={find !== null}
                       onFind={() => openFind("find")}
+                      findShortcut={commandShortcut(commands, "find.find")}
                       editorSettings={settings.editor}
                       onEditorSettingsChange={(editor) => updateSettings({ editor })}
                       onOpenEditorSettings={() => setSettingsSection("editor")}
@@ -3223,10 +3242,10 @@ function AppShell({ adapter }: AppProps) {
                       recents={recents}
                       onOpenFolder={() => void handleOpenFolder()}
                       onOpenSettings={openSettings}
-                      settingsShortcut={SETTINGS_SHORTCUT}
+                      settingsShortcut={commandShortcut(commands, "file.settings")}
                       onOpenRecent={(workspaceId) => void handleOpenWorkspace(workspaceId)}
                       onRemoveRecent={handleRemoveFromRecent}
-                      hints={startHints()}
+                      hints={startHints(commands)}
                       desktopDownload={desktopDownload}
                     />
                   )
