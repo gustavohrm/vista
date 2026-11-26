@@ -221,6 +221,29 @@ describe("RawEditor", () => {
     expect(props.onChange).toHaveBeenLastCalledWith(expect.stringContaining("x"));
   });
 
+  it("announces CodeMirror's phrases in a new language, keeping the selection and undo history", async () => {
+    const user = userEvent.setup();
+    const { props } = renderEditor();
+    await user.click(getEditor());
+    await user.keyboard("{Control>}{End}{/Control}!");
+    act(() => getView().dispatch({ selection: { anchor: 0, head: 5 } }));
+
+    await act(() => i18n.setLocale("es"));
+    const view = EditorView.findFromDOM(
+      screen.getByRole("textbox", { name: "Contenido en texto sin formato de a.txt" }),
+    );
+    if (!view) {
+      throw new Error("The raw editor has no CodeMirror view.");
+    }
+    expect(view.state.phrase("Selection deleted")).toBe("Selección eliminada");
+    expect(view.state.phrase("replaced $ matches", 3)).toBe("coincidencias reemplazadas: 3");
+    expect(view.state.phrase("replaced match on line $", 2)).toBe("coincidencia reemplazada en la línea 2");
+    expect(view.state.selection.main).toMatchObject({ anchor: 0, head: 5 });
+
+    await user.keyboard("{Control>}z{/Control}");
+    expect(props.onChange).toHaveBeenLastCalledWith("first line\nsecond line");
+  });
+
   it("moves to a requested position, clamped to the document", () => {
     const onJumpApplied = vi.fn();
     const { rerenderWith } = renderEditor({ onJumpApplied });

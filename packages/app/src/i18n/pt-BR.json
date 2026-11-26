@@ -473,7 +473,14 @@
     "richText": "Texto formatado",
     "table": "Tabela",
     "raw": "Bruto",
-    "rawContent": "Conteúdo em texto bruto de {name}"
+    "rawContent": "Conteúdo em texto bruto de {name}",
+    "phrases": {
+      "currentMatch": "resultado atual",
+      "onLine": "na linha",
+      "replacedMatchOnLine": "resultado substituído na linha {line}",
+      "replacedMatches": "resultados substituídos: {count}",
+      "selectionDeleted": "Seleção excluída"
+    }
   },
   "markdown": {
     "editor": "Editor de Markdown",

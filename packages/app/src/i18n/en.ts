@@ -492,6 +492,14 @@ const en = {
     table: "Table",
     raw: "Raw",
     rawContent: "Raw text content of {name}",
+    // CodeMirror's phrases that the raw editor announces to screen readers, in CodeMirror's own wording.
+    phrases: {
+      currentMatch: "current match",
+      onLine: "on line",
+      replacedMatchOnLine: "replaced match on line {line}",
+      replacedMatches: "replaced {count} matches",
+      selectionDeleted: "Selection deleted",
+    },
   },
   markdown: {
     editor: "Markdown Editor",

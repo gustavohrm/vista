@@ -126,6 +126,28 @@ const editorTheme = EditorView.theme({
   ".cm-searchMatch.cm-searchMatch-selected": { backgroundColor: "var(--color-highlight)" },
 });
 
+/**
+ * CodeMirror's phrases that the raw editor shows, all of them announcements to screen readers, keyed by
+ * CodeMirror's English text; CodeMirror puts its value where a phrase has `$`. The search panel's and
+ * go-to prompt's phrases are left out, since the app's find bar and go-to dialog replace them.
+ *
+ * Each phrase is read in the interface language when CodeMirror asks for it, so the map itself never
+ * changes: a different phrases map makes CodeMirror rebuild the view, which drops vim back to normal mode.
+ */
+const editorPhrases: Readonly<Record<string, string>> = Object.defineProperties(
+  {},
+  {
+    "current match": { enumerable: true, get: () => t("editor.phrases.currentMatch") },
+    "on line": { enumerable: true, get: () => t("editor.phrases.onLine") },
+    "replaced match on line $": {
+      enumerable: true,
+      get: () => t("editor.phrases.replacedMatchOnLine", { line: "$" }),
+    },
+    "replaced $ matches": { enumerable: true, get: () => t("editor.phrases.replacedMatches", { count: "$" }) },
+    "Selection deleted": { enumerable: true, get: () => t("editor.phrases.selectionDeleted") },
+  },
+);
+
 const selectedTextMark = Decoration.mark({ class: "cm-selectedText" });
 
 /**
@@ -280,6 +302,7 @@ function createEditorState(content: string): EditorState {
       compartments.wordWrap.of([]),
       compartments.minimap.of([]),
       compartments.readOnly.of([]),
+      EditorState.phrases.of(editorPhrases),
       history(),
       drawSelection(),
       selectedText,
