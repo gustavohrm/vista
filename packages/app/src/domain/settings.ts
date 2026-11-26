@@ -32,6 +32,12 @@ export interface Settings {
   editor: EditorSettings;
   files: FileSettings;
   updates: UpdateSettings;
+  /**
+   * The user's keyboard shortcut choices: the whole list of keys of each command whose list differs
+   * from its default, by command id. Read as stored; which commands and keys apply is settled when
+   * the commands are built.
+   */
+  shortcuts: Readonly<Record<string, readonly string[]>>;
 }
 
 export const SETTINGS_STORAGE_KEY = "vista.settings";
@@ -62,6 +68,7 @@ export const DEFAULT_SETTINGS: Settings = {
   editor: DEFAULT_EDITOR_SETTINGS,
   files: DEFAULT_FILE_SETTINGS,
   updates: DEFAULT_UPDATE_SETTINGS,
+  shortcuts: {},
 };
 
 export const BYTES_PER_MB = 1024 * 1024;
@@ -99,6 +106,7 @@ export function parseSettings(stored: string | null): Settings {
     editor: parseEditorSettings(value.editor),
     files: parseFileSettings(value.files),
     updates: parseUpdateSettings(value.updates),
+    shortcuts: parseShortcutSettings(value.shortcuts),
   };
 }
 
@@ -135,6 +143,18 @@ function parseUpdateSettings(value: unknown): UpdateSettings {
         ? dismissedVersion
         : DEFAULT_UPDATE_SETTINGS.dismissedVersion,
   };
+}
+
+/** Keeps each entry that is a list, and in it each key that is a non-empty string. */
+function parseShortcutSettings(value: unknown): Record<string, string[]> {
+  if (!isRecord(value)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([id, keys]) =>
+      Array.isArray(keys) ? [[id, keys.filter((key): key is string => typeof key === "string" && key !== "")]] : [],
+    ),
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

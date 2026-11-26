@@ -57,7 +57,8 @@
       },
       "wordWrap": {
         "label": "Quebra de linha",
-        "description": "Quebra as linhas longas na borda da janela em vez de rolar para o lado. {shortcut} ativa e desativa."
+        "description": "Quebra as linhas longas na borda da janela em vez de rolar para o lado. {shortcut} ativa e desativa.",
+        "descriptionWithoutShortcut": "Quebra as linhas longas na borda da janela em vez de rolar para o lado."
       },
       "minimap": {
         "label": "Minimapa",
@@ -83,7 +84,34 @@
     },
     "shortcuts": {
       "title": "Atalhos de teclado",
-      "lead": "As teclas dos comandos do Vista, as mesmas em todos os espaços de trabalho."
+      "lead": "As teclas dos comandos do Vista, as mesmas em todos os espaços de trabalho.",
+      "search": "Pesquisar comandos ou teclas",
+      "noResults": "Nenhum comando ou tecla corresponde a “{query}”.",
+      "none": "Nenhum",
+      "changed": "Alterado",
+      "default": "Padrão: {key}",
+      "defaultNone": "Padrão: nenhum",
+      "editorKey": "O editor cuida desta tecla.",
+      "add": "Adicionar atalho",
+      "addFor": "Adicionar atalho a {command}",
+      "press": "Pressione um atalho…",
+      "recordFor": "Pressione um atalho para {command}",
+      "remove": "Remover {key}",
+      "resetOne": "Restaurar padrão",
+      "resetFor": "Restaurar o padrão de {command}",
+      "resetAll": "Restaurar todos os atalhos",
+      "resetAllConfirm": "Restaurar todos os atalhos para o padrão?",
+      "reset": "Restaurar",
+      "inUse": "{key} é usado por {command}.",
+      "replace": "Substituir",
+      "browserKeeps": "O navegador reserva {keys} para si.",
+      "refused": {
+        "already": "{command} já tem {key}.",
+        "noModifier": "{key} precisa de Ctrl ou Alt, senão impediria que um caractere fosse digitado.",
+        "altGraph": "{key} é AltGr em muitos teclados, que digita caracteres.",
+        "host": "O navegador reserva {key} para si.",
+        "editor": "{key} é {command} no editor."
+      }
     },
     "about": {
       "title": "Sobre",

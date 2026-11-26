@@ -57,7 +57,8 @@
       },
       "wordWrap": {
         "label": "Ajuste de línea",
-        "description": "Divide las líneas largas en el borde de la ventana en lugar de desplazarse hacia el lado. {shortcut} lo activa y desactiva."
+        "description": "Divide las líneas largas en el borde de la ventana en lugar de desplazarse hacia el lado. {shortcut} lo activa y desactiva.",
+        "descriptionWithoutShortcut": "Divide las líneas largas en el borde de la ventana en lugar de desplazarse hacia el lado."
       },
       "minimap": {
         "label": "Minimapa",
@@ -83,7 +84,34 @@
     },
     "shortcuts": {
       "title": "Atajos de teclado",
-      "lead": "Las teclas de los comandos de Vista, las mismas en todos los espacios de trabajo."
+      "lead": "Las teclas de los comandos de Vista, las mismas en todos los espacios de trabajo.",
+      "search": "Buscar comandos o teclas",
+      "noResults": "Ningún comando ni tecla coincide con “{query}”.",
+      "none": "Ninguno",
+      "changed": "Cambiado",
+      "default": "Predeterminado: {key}",
+      "defaultNone": "Predeterminado: ninguno",
+      "editorKey": "El editor se encarga de esta tecla.",
+      "add": "Añadir atajo",
+      "addFor": "Añadir atajo a {command}",
+      "press": "Pulsa un atajo…",
+      "recordFor": "Pulsa un atajo para {command}",
+      "remove": "Quitar {key}",
+      "resetOne": "Restablecer predeterminado",
+      "resetFor": "Restablecer {command} al predeterminado",
+      "resetAll": "Restablecer todos los atajos",
+      "resetAllConfirm": "¿Restablecer todos los atajos a sus valores predeterminados?",
+      "reset": "Restablecer",
+      "inUse": "{key} lo usa {command}.",
+      "replace": "Reemplazar",
+      "browserKeeps": "El navegador reserva {keys} para sí mismo.",
+      "refused": {
+        "already": "{command} ya tiene {key}.",
+        "noModifier": "{key} necesita Ctrl o Alt, o impediría escribir un carácter.",
+        "altGraph": "{key} es AltGr en muchos teclados, que escribe caracteres.",
+        "host": "El navegador reserva {key} para sí mismo.",
+        "editor": "{key} es {command} en el editor."
+      }
     },
     "about": {
       "title": "Acerca de",

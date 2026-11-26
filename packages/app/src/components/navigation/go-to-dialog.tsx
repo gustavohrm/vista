@@ -9,7 +9,7 @@ import {
   type MouseEvent,
 } from "react";
 
-import { formatShortcut, type Command } from "../../commands";
+import { formatShortcut, shownShortcut, type Command } from "../../commands";
 import { parseGoToQuery, rankFiles, type FileMatch } from "../../domain/goto";
 import { t } from "../../i18n";
 import { FileIcon } from "../layout/file-icon";
@@ -224,7 +224,7 @@ export function GoToDialog({
               ? commandMatches.map((match, index) => {
                   const { command, title } = match.entry;
                   const isDisabled = command.isEnabled === false;
-                  const shortcut = command.shortcut ?? command.shortcutHint;
+                  const shortcut = shownShortcut(command);
                   return (
                     // oxlint-disable-next-line jsx-a11y/click-events-have-key-events -- the combobox field handles the keyboard: arrows pick an option and Enter runs it
                     <div

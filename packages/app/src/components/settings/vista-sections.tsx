@@ -1,6 +1,6 @@
 import { useId, useState, type ReactNode } from "react";
 
-import { categoryLabel, COMMAND_CATEGORIES, formatShortcut, type Command } from "../../commands";
+import { formatShortcut } from "../../commands";
 import {
   THEMES,
   type ContrastLevel,
@@ -454,7 +454,7 @@ export function AppearanceSection({ theme, settings, onChange }: AppearanceSecti
  *
  * @returns Each switch's setting, label, and description.
  */
-export function editorOptions(): readonly {
+export function editorOptions(wordWrapShortcut?: string): readonly {
   name: keyof EditorSettings;
   label: string;
   description: string;
@@ -468,9 +468,9 @@ export function editorOptions(): readonly {
     {
       name: "wordWrap",
       label: t("settings.editor.wordWrap.label"),
-      description: t("settings.editor.wordWrap.description", {
-        shortcut: formatShortcut("Alt+Z"),
-      }),
+      description: wordWrapShortcut
+        ? t("settings.editor.wordWrap.description", { shortcut: formatShortcut(wordWrapShortcut) })
+        : t("settings.editor.wordWrap.descriptionWithoutShortcut"),
     },
     {
       name: "minimap",
@@ -496,13 +496,17 @@ interface SettingsSectionProps {
  * @param props - The settings and the way to change them.
  * @returns Section content.
  */
-export function EditorSection({ settings, onChange }: SettingsSectionProps) {
+export function EditorSection({
+  settings,
+  onChange,
+  wordWrapShortcut,
+}: SettingsSectionProps & { wordWrapShortcut?: string }) {
   const idPrefix = useId();
   return (
     <>
       <SectionHeading title={t("settings.editor.title")} lead={t("settings.editor.lead")} />
       <SettingsGroup>
-        {editorOptions().map(({ name, label, description }) => (
+        {editorOptions(wordWrapShortcut).map(({ name, label, description }) => (
           <SettingsRow
             key={name}
             label={label}
@@ -578,65 +582,6 @@ export function FilesSection({ settings, onChange }: SettingsSectionProps) {
           />
         </SettingsRow>
       </SettingsGroup>
-    </>
-  );
-}
-
-/**
- * Every command that has a key, including keys the editors handle themselves, under its category.
- *
- * @param props - Every command.
- * @returns Section content.
- */
-export function ShortcutsSection({ commands }: { commands: readonly Command[] }) {
-  const idPrefix = useId();
-  const withKeys = commands.flatMap((command) => {
-    const shortcut = command.shortcut ?? command.shortcutHint;
-    return shortcut
-      ? [
-          {
-            id: command.id,
-            label: command.label,
-            category: command.category,
-            shortcut,
-          },
-        ]
-      : [];
-  });
-  const categories = COMMAND_CATEGORIES.map((category) => ({
-    id: category,
-    rows: withKeys.filter((row) => row.category === category),
-  })).filter((category) => category.rows.length > 0);
-
-  return (
-    <>
-      <SectionHeading title={t("settings.shortcuts.title")} lead={t("settings.shortcuts.lead")} />
-      {categories.map((category, index) => (
-        <div key={category.id}>
-          <GroupHeading id={`${idPrefix}-${index}`} isFirst={index === 0}>
-            {categoryLabel(category.id)}
-          </GroupHeading>
-          <div className="border-line rounded-[10px] border">
-            <table
-              aria-labelledby={`${idPrefix}-${index}`}
-              className="w-full border-separate border-spacing-0 text-[13px]"
-            >
-              <tbody>
-                {category.rows.map((row, rowIndex) => (
-                  <tr key={row.id}>
-                    <td className={`text-text py-2 pr-4 pl-4 ${rowIndex > 0 ? "border-line border-t" : ""}`}>
-                      {row.label}
-                    </td>
-                    <td className={`py-2 pr-4 text-right ${rowIndex > 0 ? "border-line border-t" : ""}`}>
-                      <kbd className="shortcut-key">{formatShortcut(row.shortcut)}</kbd>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ))}
     </>
   );
 }

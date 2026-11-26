@@ -1,4 +1,4 @@
-import { runCommand, type Command } from "../../commands";
+import { runCommand, shownShortcut, type Command } from "../../commands";
 import { MENU_SEPARATOR, type MenuEntry } from "./menu";
 
 /**
@@ -19,7 +19,7 @@ export function commandMenuEntries(ids: readonly string[], commands: readonly Co
     return [
       {
         label: command.label,
-        shortcut: command.shortcut ?? command.shortcutHint,
+        shortcut: shownShortcut(command),
         disabled: command.isEnabled === false,
         checked: command.isChecked,
         onSelect: () => void runCommand(command),

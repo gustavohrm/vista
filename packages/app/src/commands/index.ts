@@ -4,6 +4,14 @@ import { t } from "../i18n";
 import { matchesShortcut } from "./shortcuts";
 
 export { formatShortcut } from "./shortcuts";
+export {
+  changeShortcuts,
+  isRebindable,
+  resolveShortcuts,
+  sameKeys,
+  shortcutOwner,
+  type StoredShortcuts,
+} from "./keymap";
 
 /**
  * The groups commands are listed under, in the order the palette and the Keyboard Shortcuts list
@@ -40,7 +48,10 @@ export interface Command {
   id: string;
   label: string;
   category: CommandCategory;
-  shortcut?: string;
+  /** The keys that run the command, any of them; the first is the one shown where only one fits. */
+  shortcuts?: readonly string[];
+  /** The keys the command has until the user changes them, set by `resolveShortcuts`. */
+  defaultShortcuts?: readonly string[];
   /**
    * A key the focused editor handles itself, shown in menus but not bound by the app, such as
    * Ctrl+Z in the raw editor. Binding it here would take the key from every other text field.
@@ -53,7 +64,18 @@ export interface Command {
   run: () => void | Promise<void>;
 }
 
-/** Runs the command whose shortcut matches each keydown on the window. */
+/**
+ * The key shown for a command where only one fits, such as a tooltip or a menu row: its first key,
+ * or the key an editor handles for it.
+ *
+ * @param command - The command.
+ * @returns The key, or undefined when it has none.
+ */
+export function shownShortcut(command: Pick<Command, "shortcuts" | "shortcutHint">): string | undefined {
+  return command.shortcuts?.[0] ?? command.shortcutHint;
+}
+
+/** Runs the command one of whose keys matches each keydown on the window. */
 export function useCommandShortcuts(commands: readonly Command[]): void {
   // A ref keeps one listener for the app's lifetime while always reading the latest commands.
   const commandsRef = useRef(commands);
@@ -61,7 +83,9 @@ export function useCommandShortcuts(commands: readonly Command[]): void {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      const command = commandsRef.current.find((cmd) => cmd.shortcut && matchesShortcut(event, cmd.shortcut));
+      const command = commandsRef.current.find((cmd) =>
+        cmd.shortcuts?.some((shortcut) => matchesShortcut(event, shortcut)),
+      );
       if (!command) {
         return;
       }

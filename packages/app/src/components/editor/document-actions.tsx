@@ -17,6 +17,8 @@ interface DocumentActionsProps {
   /** Whether the find bar is open, which presses the Find button. */
   isFindOpen: boolean;
   onFind: () => void;
+  /** Find's first key, shown in its tooltip; none when the user removed it. */
+  findShortcut?: string;
   editorSettings: EditorSettings;
   onEditorSettingsChange: (changes: Partial<EditorSettings>) => void;
   /** Opens the Editor section of Settings, from the editor settings menu. */
@@ -41,6 +43,7 @@ export function DocumentActions({
   onViewModeChange,
   isFindOpen,
   onFind,
+  findShortcut,
   editorSettings,
   onEditorSettingsChange,
   onOpenEditorSettings,
@@ -58,7 +61,7 @@ export function DocumentActions({
       {canToggleView && viewer.enriched !== undefined && (
         <ViewModeToggle viewMode={doc.viewMode} enriched={viewer.enriched} onViewModeChange={onViewModeChange} />
       )}
-      <Tooltip text={t("editor.find")} shortcut="Mod+F" position="bottom">
+      <Tooltip text={t("editor.find")} shortcut={findShortcut} position="bottom">
         {(bubbleId) => (
           <button
             type="button"
