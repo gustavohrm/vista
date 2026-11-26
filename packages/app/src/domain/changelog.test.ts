@@ -195,6 +195,14 @@ description: Pastas abrem mais rápido, e arquivos CSV mantêm as aspas.
     ]);
   });
 
+  it("accepts a description that starts with the word Todo", () => {
+    const translation = TRANSLATION.replace(
+      /^description: .*$/m,
+      "description: Todo el proceso de abrir carpetas es más rápido.",
+    );
+    expect(findTranslationProblems("0.2.0", "es", PAGE, translation)).toEqual([]);
+  });
+
   it("fails without the version heading", () => {
     expect(findTranslationProblems("0.2.0", "es", PAGE, TRANSLATION.replace("# 0.2.0", "# Versão 0.2.0"))).toEqual([
       expect.stringContaining('"# 0.2.0"'),

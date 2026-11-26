@@ -274,7 +274,7 @@ export function findTranslationProblems(version: string, locale: string, english
   if (date !== (englishFields.date ?? "")) {
     problems.push(`${page} must set "date: ${englishFields.date ?? ""}", as the English page does.`);
   }
-  if (description === "" || PLACEHOLDER.test(description)) {
+  if (description === "" || TRANSLATION_PLACEHOLDER.test(description)) {
     problems.push(`${page} must set "description" to the English description, translated.`);
   }
 
