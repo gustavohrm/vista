@@ -15,7 +15,7 @@ Durable direction for Vista: the current focus, what is planned, what is possibl
 Release 0.0.4, set by the owner. The order follows what each outcome depends on: text written after the languages land is translated as it is written, rather than written in English and reworked, and the failure messages wait on their spec's approval.
 
 1. **Interface languages.** English, Brazilian Portuguese, and Spanish, chosen in Settings or detected from the system, with dates and numbers following the language, and each release's changelog entry in all three. Every text but failure messages is translated first. Source: `docs/specs/languages.md`.
-2. **Customizable keyboard shortcuts.** Source: the owner, for 0.0.4; needs a spec.
+2. **Customizable keyboard shortcuts.** Every command but the editor's own can be given a key, removed from it, or reset in Settings → Keyboard Shortcuts. Waits on the owner's approval of its draft spec and its open questions. Sources: the owner, for 0.0.4; `docs/specs/shortcuts.md`.
 3. **One site in three parts.** `vista.coden.dev` becomes a landing page, the app moves to `vista.coden.dev/app`, and `vista.coden.dev/docs` holds articles, guides, and the full changelog. The release routes, `/releases/*`, stay where they are, because every installed app checks them for updates, and so do the download links, `/download/*`, because the app and links already shared point at them. The app stays on the same domain, because the browser keeps remembered folders and settings per domain. Changes the hosting decision in `docs/architecture.md`; needs a spec. Source: the owner, for 0.0.4.
 4. **Workspace search.** Searching inside file contents, in its own view behind the left rail's **Search** button, with filters by folder, file type, and date, regular expressions, and replace across files. Needs a spec. Sources: `docs/specs/workspaces.md`, "Shell layout"; the owner, for 0.0.4.
 5. **A polished Settings screen**, and interface polish elsewhere. Source: the owner, for 0.0.4.
@@ -47,5 +47,6 @@ Release 0.0.4, set by the owner. The order follows what each outcome depends on:
 - `docs/architecture.md`: platform scope and the hosting decision.
 - `docs/specs/workspaces.md`: what is built, its known limitations, and the formats still to come.
 - `docs/specs/languages.md` and `docs/specs/errors.md`: the languages and the failure messages they depend on.
+- `docs/specs/shortcuts.md`: customizable keyboard shortcuts.
 - `apps/native/README.md`: mobile limits and distribution.
 - `apps/web/README.md`: browser targets.

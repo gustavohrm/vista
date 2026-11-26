@@ -39,12 +39,13 @@ Every document in `docs/` is listed here. Adding, moving, or deleting one update
 
 ## Specifications
 
-| Document                            | Contains                                                                                                                                                        |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Workspaces](specs/workspaces.md)   | Workspaces of one or more folders, the shell layout, view modes, platform capabilities, and file management.                                                    |
-| [Tests](specs/tests.md)             | Test categories, where each lives, coverage, and what no automated test reaches.                                                                                |
-| [Stack tests](specs/stack-tests.md) | The runners, file names, configuration, scripts, and commands for Vitest, Playwright, and cargo.                                                                |
-| [Errors](specs/errors.md)           | How failures are classified, shown, and logged today, and a draft direction for user-facing failure kinds.                                                      |
-| [Appearance](specs/appearance.md)   | The theme, scheme, contrast, and motion preferences, how each is chosen, stored, and applied, and what each theme provides.                                     |
-| [Languages](specs/languages.md)     | The interface languages, how one is chosen, stored, and applied, what is and is not translated, including changelog entries, and how translations are reviewed. |
-| [Changelog](specs/changelog.md)     | The changelog pages, the check that holds a release to them, and where the app and GitHub show them.                                                            |
+| Document                                 | Contains                                                                                                                                                        |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Workspaces](specs/workspaces.md)        | Workspaces of one or more folders, the shell layout, view modes, platform capabilities, and file management.                                                    |
+| [Tests](specs/tests.md)                  | Test categories, where each lives, coverage, and what no automated test reaches.                                                                                |
+| [Stack tests](specs/stack-tests.md)      | The runners, file names, configuration, scripts, and commands for Vitest, Playwright, and cargo.                                                                |
+| [Errors](specs/errors.md)                | How failures are classified, shown, and logged today, and a draft direction for user-facing failure kinds.                                                      |
+| [Appearance](specs/appearance.md)        | The theme, scheme, contrast, and motion preferences, how each is chosen, stored, and applied, and what each theme provides.                                     |
+| [Languages](specs/languages.md)          | The interface languages, how one is chosen, stored, and applied, what is and is not translated, including changelog entries, and how translations are reviewed. |
+| [Changelog](specs/changelog.md)          | The changelog pages, the check that holds a release to them, and where the app and GitHub show them.                                                            |
+| [Keyboard shortcuts](specs/shortcuts.md) | A draft for customizable shortcuts: which commands take a key, how one is recorded and refused, and how choices are stored.                                     |
