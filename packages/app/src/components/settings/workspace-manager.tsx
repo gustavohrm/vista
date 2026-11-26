@@ -11,33 +11,35 @@ import {
   type WorkspaceIcon,
   type WorkspaceStorage,
 } from "../../domain/workspaces";
+import { t } from "../../i18n";
 import type { WorkspaceDetails } from "../../state/workspaces";
 import { Tooltip } from "../feedback/tooltip";
 import { WorkspaceGlyph } from "../workspace/workspace-glyph";
 import type { RecentWorkspace } from "../workspace/workspace-switcher";
 import { GroupHeading, SectionHeading, SettingsGroup, SettingsRow } from "./settings-parts";
 
-const ICON_LABELS: Record<WorkspaceIcon, string> = {
-  folder: "Folder",
-  "book-open": "Book",
-  "notebook-pen": "Notebook",
-  briefcase: "Briefcase",
-  code: "Code",
-  house: "House",
-  star: "Star",
-  heart: "Heart",
-  "flask-conical": "Flask",
-  "graduation-cap": "Graduation cap",
-  "pen-line": "Pen",
-  globe: "Globe",
+// Names are functions, so they are read in the interface language at each render.
+const ICON_LABELS: Record<WorkspaceIcon, () => string> = {
+  folder: () => t("settings.workspace.icons.folder"),
+  "book-open": () => t("settings.workspace.icons.book"),
+  "notebook-pen": () => t("settings.workspace.icons.notebook"),
+  briefcase: () => t("settings.workspace.icons.briefcase"),
+  code: () => t("settings.workspace.icons.code"),
+  house: () => t("settings.workspace.icons.house"),
+  star: () => t("settings.workspace.icons.star"),
+  heart: () => t("settings.workspace.icons.heart"),
+  "flask-conical": () => t("settings.workspace.icons.flask"),
+  "graduation-cap": () => t("settings.workspace.icons.graduationCap"),
+  "pen-line": () => t("settings.workspace.icons.pen"),
+  globe: () => t("settings.workspace.icons.globe"),
 };
 
-const COLOR_LABELS: Record<PaletteColor, string> = {
-  neutral: "Neutral",
-  indigo: "Indigo",
-  emerald: "Emerald",
-  amber: "Amber",
-  rose: "Rose",
+const COLOR_LABELS: Record<PaletteColor, () => string> = {
+  neutral: () => t("settings.workspace.colours.neutral"),
+  indigo: () => t("settings.workspace.colours.indigo"),
+  emerald: () => t("settings.workspace.colours.emerald"),
+  amber: () => t("settings.workspace.colours.amber"),
+  rose: () => t("settings.workspace.colours.rose"),
 };
 
 /** Each swatch's fill: the hue's middle step, which reads on both themes. */
@@ -51,8 +53,8 @@ const SWATCH_COLORS: Record<PaletteColor, string> = {
 
 const FOLDER_STATUS_TEXT = {
   ready: undefined,
-  "needs-permission": "Needs access",
-  unavailable: "Not found",
+  "needs-permission": () => t("settings.workspace.folderStatus.needsAccess"),
+  unavailable: () => t("settings.workspace.folderStatus.notFound"),
 } as const;
 
 const ICON_CHOICE_CLASS =
@@ -136,21 +138,23 @@ export function WorkspacePage({
         action={
           !isOpen && (
             <button type="button" onClick={onOpen} className="btn sm flex-none">
-              Open
+              {t("common.open")}
             </button>
           )
         }
-        lead="These apply to this workspace only. Vista's own settings apply to every workspace."
+        lead={t("settings.workspace.lead")}
       />
       {lock === "needs-permission" && (
         <div className="mb-6">
           <SettingsGroup>
             <SettingsRow
-              label={`"${homeName}" needs access`}
-              description="The details are kept in this folder, so Vista reads them from there."
+              label={t("settings.workspace.needsAccess.label", {
+                name: homeName,
+              })}
+              description={t("settings.workspace.needsAccess.description")}
             >
               <button type="button" onClick={onAllowAccess} className="btn sm flex-none">
-                Allow access
+                {t("settings.workspace.needsAccess.allow")}
               </button>
             </SettingsRow>
           </SettingsGroup>
@@ -159,22 +163,25 @@ export function WorkspacePage({
       {(lock === "unavailable" || lock === "unreadable") && (
         <output className="text-text-muted mb-6 block text-[13px] leading-5">
           {lock === "unavailable"
-            ? `"${homeName}" isn't found, so the details kept in it can't be changed.`
-            : `"${homeName}" holds workspace details this version of Vista can't read, so they can't be changed here.`}
+            ? t("settings.workspace.unavailable", { name: homeName })
+            : t("settings.workspace.unreadable", { name: homeName })}
         </output>
       )}
       <fieldset disabled={isLocked} className="min-w-0 disabled:opacity-60">
         <SettingsGroup>
           <SettingsRow
-            label="Name"
+            label={t("settings.workspace.name.label")}
             htmlFor={nameId}
             descriptionId={nameHintId}
             description={
               nameCheck.ok ? (
-                "Shown in the workspace switcher and the recent list."
+                t("settings.workspace.name.description")
               ) : (
                 <span role="alert" className="text-destructive">
-                  {nameCheck.message} The name stays &ldquo;{workspace.name}&rdquo;.
+                  {t("settings.workspace.name.invalid", {
+                    message: nameCheck.message,
+                    name: workspace.name,
+                  })}
                 </span>
               )
             }
@@ -195,14 +202,14 @@ export function WorkspacePage({
               className="ipt w-64 max-w-full text-[13px]"
             />
           </SettingsRow>
-          <SettingsRow label="Icon" labelId={`${idPrefix}-icon`}>
+          <SettingsRow label={t("settings.workspace.icon")} labelId={`${idPrefix}-icon`}>
             <div role="radiogroup" aria-labelledby={`${idPrefix}-icon`} className="grid grid-cols-6 gap-1">
               {WORKSPACE_ICONS.map((icon) => (
-                <label key={icon} title={ICON_LABELS[icon]} className={ICON_CHOICE_CLASS}>
+                <label key={icon} title={ICON_LABELS[icon]()} className={ICON_CHOICE_CLASS}>
                   <input
                     type="radio"
                     name={`${idPrefix}-icon`}
-                    aria-label={ICON_LABELS[icon]}
+                    aria-label={ICON_LABELS[icon]()}
                     checked={workspace.icon === icon}
                     onChange={() => onChange({ icon })}
                     className="sr-only"
@@ -212,19 +219,19 @@ export function WorkspacePage({
               ))}
             </div>
           </SettingsRow>
-          <SettingsRow label="Colour" labelId={`${idPrefix}-color`}>
+          <SettingsRow label={t("settings.workspace.colour")} labelId={`${idPrefix}-color`}>
             <div role="radiogroup" aria-labelledby={`${idPrefix}-color`} className="flex gap-2">
               {WORKSPACE_COLORS.map((color) => (
                 <label
                   key={color}
-                  title={COLOR_LABELS[color]}
+                  title={COLOR_LABELS[color]()}
                   className={SWATCH_CLASS}
                   style={{ backgroundColor: SWATCH_COLORS[color] }}
                 >
                   <input
                     type="radio"
                     name={`${idPrefix}-color`}
-                    aria-label={COLOR_LABELS[color]}
+                    aria-label={COLOR_LABELS[color]()}
                     checked={workspace.color === color}
                     onChange={() => onChange({ color })}
                     className="sr-only"
@@ -239,12 +246,12 @@ export function WorkspacePage({
         <GroupHeading
           id={`${idPrefix}-folders`}
           action={
-            <Tooltip text="Add Folder to Workspace" position="bottom" className="-mr-1.5 flex flex-none">
+            <Tooltip text={t("settings.workspace.addFolder")} position="bottom" className="-mr-1.5 flex flex-none">
               {(bubbleId) => (
                 <button
                   type="button"
                   onClick={onAddFolder}
-                  aria-label="Add Folder to Workspace"
+                  aria-label={t("settings.workspace.addFolder")}
                   aria-describedby={bubbleId}
                   className="icon-button size-7 text-base"
                 >
@@ -254,7 +261,7 @@ export function WorkspacePage({
             </Tooltip>
           }
         >
-          Folders
+          {t("settings.workspace.folders")}
         </GroupHeading>
         <SettingsGroup labelledBy={`${idPrefix}-folders`}>
           <ul>
@@ -266,13 +273,15 @@ export function WorkspacePage({
                 <i className="ic-folder text-text-faint flex-none" aria-hidden="true" />
                 <span className="text-text-strong min-w-0 flex-1 truncate">{folder.name}</span>
                 {FOLDER_STATUS_TEXT[folder.status] && (
-                  <span className="text-text-muted flex-none text-xs">{FOLDER_STATUS_TEXT[folder.status]}</span>
+                  <span className="text-text-muted flex-none text-xs">{FOLDER_STATUS_TEXT[folder.status]?.()}</span>
                 )}
                 {folders.length > 1 && (
                   <button
                     type="button"
-                    aria-label={`Remove "${folder.name}" from the workspace`}
-                    title="Remove from the workspace"
+                    aria-label={t("settings.workspace.removeFolder", {
+                      name: folder.name,
+                    })}
+                    title={t("settings.workspace.removeFolderTitle")}
                     onClick={() => onRemoveFolder(folder.id)}
                     className="icon-button -mr-1.5 size-7 text-base"
                   >
@@ -287,7 +296,7 @@ export function WorkspacePage({
 
       {canChooseStorage && (
         <>
-          <GroupHeading id={`${idPrefix}-storage`}>Where its details are kept</GroupHeading>
+          <GroupHeading id={`${idPrefix}-storage`}>{t("settings.workspace.storage.heading")}</GroupHeading>
           <SettingsGroup>
             <div
               role="radiogroup"
@@ -298,15 +307,17 @@ export function WorkspacePage({
                 name={`${idPrefix}-storage`}
                 isChecked={storage === "device"}
                 onChoose={() => onChangeStorage("device")}
-                label="On this device"
-                description="Nothing is written into your folders."
+                label={t("settings.workspace.storage.device.label")}
+                description={t("settings.workspace.storage.device.description")}
               />
               <StorageChoice
                 name={`${idPrefix}-storage`}
                 isChecked={storage === "folder"}
                 onChoose={() => onChangeStorage("folder")}
-                label={`In ${homeName}/.vista`}
-                description="The name, icon, colour, and folder list travel with the folder, through sync or git. Your open tabs stay on this device."
+                label={t("settings.workspace.storage.folder.label", {
+                  name: homeName,
+                })}
+                description={t("settings.workspace.storage.folder.description")}
               />
             </div>
           </SettingsGroup>
@@ -317,11 +328,11 @@ export function WorkspacePage({
       <div className="mt-8">
         <SettingsGroup>
           <SettingsRow
-            label="Delete workspace"
-            description="Vista forgets this workspace and its tabs. Your folders and files aren't changed."
+            label={t("settings.workspace.delete.label")}
+            description={t("settings.workspace.delete.description")}
           >
             <button type="button" onClick={onDelete} className="btn sm destructive flex-none">
-              Delete Workspace…
+              {t("settings.workspace.delete.button")}
             </button>
           </SettingsRow>
         </SettingsGroup>
@@ -414,14 +425,14 @@ function CustomColorSwatch({ color, onChange }: { color: WorkspaceColor; onChang
   const shown = preview ?? (isCustom ? color : null);
   return (
     <label
-      title="Custom colour"
+      title={t("settings.workspace.customColour")}
       className={`${SWATCH_CLASS} ${isCustom ? "outline-text-strong outline-2" : ""}`}
       style={{ background: shown ?? CUSTOM_SWATCH_IDLE }}
     >
       <input
         ref={inputRef}
         type="color"
-        aria-label="Custom colour"
+        aria-label={t("settings.workspace.customColour")}
         defaultValue={startColor}
         onChange={(event) => setPreview(event.target.value)}
         className="sr-only"

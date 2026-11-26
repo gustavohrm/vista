@@ -1,8 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MAX_TABLE_CELLS } from "../../domain/csv";
 import type { DocumentLocation } from "../../domain/document-location";
+import { i18n } from "../../i18n";
 import type { OpenDocument } from "../../state/documents";
 import { StatusBar } from "./status-bar";
 
@@ -50,7 +51,10 @@ describe("StatusBar path", () => {
 
   it("hides only as many segments as it takes to fit", () => {
     stubLayout();
-    const location: DocumentLocation = { segments: ["", "home", "me", "notes", "docs", "deep.md"], separator: "/" };
+    const location: DocumentLocation = {
+      segments: ["", "home", "me", "notes", "docs", "deep.md"],
+      separator: "/",
+    };
 
     render(<StatusBar activeFile={file} location={location} />);
 
@@ -76,11 +80,47 @@ describe("StatusBar notes", () => {
   it("says nothing for a CSV the table can show", () => {
     render(
       <StatusBar
-        activeFile={{ ...file, name: "data.csv", extension: "csv", content: "a,b\n1,2\n" }}
+        activeFile={{
+          ...file,
+          name: "data.csv",
+          extension: "csv",
+          content: "a,b\n1,2\n",
+        }}
         location={location}
       />,
     );
 
     expect(screen.queryByText("Raw only")).not.toBeInTheDocument();
+  });
+});
+
+describe("StatusBar facts", () => {
+  it("writes the document's facts and position in the interface language", async () => {
+    const content = `${"palavra ".repeat(1200)}\n`.repeat(2);
+    const { rerender } = render(
+      <StatusBar activeFile={{ ...file, content }} cursor={{ line: 1234, column: 5, selectionLength: 1 }} />,
+    );
+    const bar = screen.getByRole("contentinfo", { name: "Status Bar" });
+    expect(bar).toHaveTextContent("Ln 1,234, Col 5 (1 selected)");
+    expect(bar).toHaveTextContent("3 lines");
+    expect(bar).toHaveTextContent("18.8 KB");
+    expect(bar).toHaveTextContent("2,400 words");
+
+    await act(() => i18n.setLocale("pt-BR"));
+    // The root re-renders on a language change; the same props stand in for it here.
+    rerender(<StatusBar activeFile={{ ...file, content }} cursor={{ line: 1234, column: 5, selectionLength: 1 }} />);
+    const translated = screen.getByRole("contentinfo", {
+      name: "Barra de status",
+    });
+    expect(translated).toHaveTextContent("Ln 1.234, Col 5 (1 selecionado)");
+    expect(translated).toHaveTextContent("3 linhas");
+    expect(translated).toHaveTextContent("18,8 KB");
+    expect(translated).toHaveTextContent("2.400 palavras");
+  });
+
+  it("writes an empty document's word count in the plural in Portuguese, whose singular also covers zero", async () => {
+    await act(() => i18n.setLocale("pt-BR"));
+    render(<StatusBar activeFile={{ ...file, content: "" }} cursor={{ line: 1, column: 1, selectionLength: 0 }} />);
+    expect(screen.getByRole("contentinfo", { name: "Barra de status" })).toHaveTextContent("0 palavras");
   });
 });

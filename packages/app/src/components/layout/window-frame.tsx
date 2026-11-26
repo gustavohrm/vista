@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type PointerEvent } from "react";
 
+import { t } from "../../i18n";
 import type { WindowControls } from "../../ports";
 import { Tooltip } from "../feedback/tooltip";
 
@@ -58,7 +59,7 @@ const BUTTON_CLASS =
 export function WindowButtons({ controls }: { controls: WindowControls }) {
   const [isMaximized, setIsMaximized] = useState(false);
   useEffect(() => controls.watchMaximized(setIsMaximized), [controls]);
-  const maximizeLabel = isMaximized ? "Restore" : "Maximize";
+  const maximizeLabel = isMaximized ? t("windowFrame.restore") : t("windowFrame.maximize");
   const showSnapLayouts = controls.showSnapLayouts?.bind(controls);
   const snapTimer = useRef<number | null>(null);
   const cancelSnapLayouts = useCallback(() => {
@@ -106,11 +107,11 @@ export function WindowButtons({ controls }: { controls: WindowControls }) {
 
   return (
     <div className="flex flex-none items-center gap-0.5 pr-2 pl-1">
-      <Tooltip text="Minimize" position="bottom" className="flex">
+      <Tooltip text={t("windowFrame.minimize")} position="bottom" className="flex">
         {(bubbleId) => (
           <button
             type="button"
-            aria-label="Minimize"
+            aria-label={t("windowFrame.minimize")}
             aria-describedby={bubbleId}
             onClick={() => void run("minimize", () => controls.minimize())}
             className={`${BUTTON_CLASS} hover:bg-hover hover:text-text`}
@@ -127,11 +128,11 @@ export function WindowButtons({ controls }: { controls: WindowControls }) {
       <Tooltip text={maximizeLabel} position="bottom" className="flex">
         {(bubbleId) => maximizeButton(bubbleId)}
       </Tooltip>
-      <Tooltip text="Close" position="bottom" className="flex">
+      <Tooltip text={t("common.close")} position="bottom" className="flex">
         {(bubbleId) => (
           <button
             type="button"
-            aria-label="Close"
+            aria-label={t("common.close")}
             aria-describedby={bubbleId}
             onClick={() => void run("close", () => controls.close())}
             className={`${BUTTON_CLASS} hover:bg-window-close hover:text-white`}

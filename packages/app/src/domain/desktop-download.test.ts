@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { desktopDownloadFor } from "./desktop-download";
+import { desktopDownloadFor, desktopDownloadLabel } from "./desktop-download";
 
 describe("desktopDownloadFor", () => {
   it("offers the Windows installer on Windows", () => {
     expect(
       desktopDownloadFor("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/142.0.0.0 Safari/537.36"),
-    ).toEqual({ label: "Download for Windows", href: "/download/windows" });
+    ).toEqual({ system: "windows", href: "/download/windows" });
   });
 
   // Both name `Linux x86_64` on ARM too, so with no reported processor the offer names the build's.
@@ -14,14 +14,22 @@ describe("desktopDownloadFor", () => {
     ["Firefox", "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"],
     ["Chromium", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/142.0.0.0 Safari/537.36"],
   ])("offers the AppImage, naming its x86_64 build, to %s on Linux that reports no processor", (_name, userAgent) => {
-    expect(desktopDownloadFor(userAgent)).toEqual({ label: "Download for Linux (x86_64)", href: "/download/linux" });
+    expect(desktopDownloadFor(userAgent)).toEqual({
+      system: "linuxX86_64",
+      href: "/download/linux",
+    });
   });
 
   const REDUCED_LINUX_CHROME = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/142.0.0.0 Safari/537.36";
 
   it("offers the AppImage when the browser reports an x86_64 processor", () => {
-    expect(desktopDownloadFor(REDUCED_LINUX_CHROME, { architecture: "x86", bitness: "64" })).toEqual({
-      label: "Download for Linux",
+    expect(
+      desktopDownloadFor(REDUCED_LINUX_CHROME, {
+        architecture: "x86",
+        bitness: "64",
+      }),
+    ).toEqual({
+      system: "linux",
       href: "/download/linux",
     });
   });
@@ -41,5 +49,17 @@ describe("desktopDownloadFor", () => {
     ["ARM Linux", "Mozilla/5.0 (X11; Linux aarch64; rv:140.0) Gecko/20100101 Firefox/140.0"],
   ])("offers nothing on %s, which has no desktop build", (_name, userAgent) => {
     expect(desktopDownloadFor(userAgent)).toBeNull();
+  });
+});
+
+describe("desktopDownloadLabel", () => {
+  it.each([
+    ["windows", "Download for Windows", "Download Vista for Windows"],
+    ["linux", "Download for Linux", "Download Vista for Linux"],
+    ["linuxX86_64", "Download for Linux (x86_64)", "Download Vista for Linux (x86_64)"],
+  ] as const)("names the %s download, with and without Vista's name", (system, label, named) => {
+    const download = { system, href: "/download/linux" };
+    expect(desktopDownloadLabel(download)).toBe(label);
+    expect(desktopDownloadLabel(download, true)).toBe(named);
   });
 });

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 
+import { t } from "../i18n";
 import { matchesShortcut } from "./shortcuts";
 
 export { formatShortcut } from "./shortcuts";
@@ -11,6 +12,28 @@ export { formatShortcut } from "./shortcuts";
 export const COMMAND_CATEGORIES = ["Workspace", "File", "Tabs", "Edit", "Selection", "View", "Go", "Settings"] as const;
 
 export type CommandCategory = (typeof COMMAND_CATEGORIES)[number];
+
+const CATEGORY_KEYS = {
+  Workspace: "shortcuts.categories.workspace",
+  File: "shortcuts.categories.file",
+  Tabs: "shortcuts.categories.tabs",
+  Edit: "shortcuts.categories.edit",
+  Selection: "shortcuts.categories.selection",
+  View: "shortcuts.categories.view",
+  Go: "shortcuts.categories.go",
+  Settings: "shortcuts.categories.settings",
+} as const satisfies Record<CommandCategory, string>;
+
+/**
+ * Names a category in the interface language. The category itself stays an English id, which groups
+ * and orders commands.
+ *
+ * @param category - The category to name.
+ * @returns Its name, such as `View` or `Exibir`.
+ */
+export function categoryLabel(category: CommandCategory): string {
+  return t(CATEGORY_KEYS[category]);
+}
 
 /** An action the user can trigger from a shortcut or from the menus. */
 export interface Command {

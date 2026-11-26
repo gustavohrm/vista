@@ -1,3 +1,5 @@
+import { t } from "../i18n";
+
 const RESERVED_CHARACTERS = /["*/:<>?\\|]/;
 // oxlint-disable-next-line no-control-regex -- intentionally matching ASCII control characters, which are invalid in file names on every supported platform
 const CONTROL_CHARACTERS = /[\x00-\x1f]/;
@@ -11,27 +13,29 @@ const CONTROL_CHARACTERS = /[\x00-\x1f]/;
  * @param name - Candidate entry name (not a path; must not contain a path separator).
  * @param siblingNames - Names already present in the same parent directory, excluding the
  *   entry being renamed (if any). Compared case-insensitively.
- * @returns A human-readable error message if the name is invalid, or null if it is valid.
+ * @returns A human-readable error message, in the interface language, if the name is invalid, or null if it is valid.
  */
 export function validateEntryName(name: string, siblingNames: readonly string[]): string | null {
   if (name.length === 0) {
-    return "Name cannot be empty.";
+    return t("pathValidation.empty");
   }
   if (name.trim() !== name) {
-    return "Name cannot start or end with a space.";
+    return t("pathValidation.surroundingSpace");
   }
   if (name === "." || name === "..") {
-    return "This name is reserved.";
+    return t("pathValidation.reserved");
   }
   if (name.endsWith(".")) {
-    return "Name cannot end with a period.";
+    return t("pathValidation.trailingPeriod");
   }
   if (RESERVED_CHARACTERS.test(name) || CONTROL_CHARACTERS.test(name)) {
-    return `Name cannot contain any of: ${'" * / : < > ? \\ |'}`;
+    return t("pathValidation.reservedCharacters", {
+      characters: '" * / : < > ? \\ |',
+    });
   }
   const lowerName = name.toLowerCase();
   if (siblingNames.some((sibling) => sibling.toLowerCase() === lowerName)) {
-    return `"${name}" already exists here.`;
+    return t("pathValidation.exists", { name });
   }
   return null;
 }

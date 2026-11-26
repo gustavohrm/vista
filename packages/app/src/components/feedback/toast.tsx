@@ -2,6 +2,8 @@ import { createToaster, type Toaster, type ToasterConfig } from "@codenhub/toast
 import { createDialogs, type Dialogs } from "@codenhub/toaster/dialog";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
 
+import { t, useLocale } from "../../i18n";
+
 /** Severity of a toast message, controlling its intent styling and accessible role. */
 export type ToastKind = "error" | "info" | "success";
 
@@ -31,7 +33,7 @@ interface ConfirmInput {
   message: string;
   /** Label of the affirmative button. */
   confirmLabel: string;
-  /** Label of the negative button. Defaults to the toaster's own "Cancel" label when omitted. */
+  /** Label of the negative button. Defaults to Cancel, in the interface language, when omitted. */
   cancelLabel?: string;
   /** Whether the affirmative action is destructive and should be styled as an error. */
   destructive?: boolean;
@@ -59,8 +61,12 @@ const TOASTER_CONFIG: ToasterConfig = {
   duration: 5000,
   // Lifts toasts clear of the 24px status bar along the bottom edge of the shell.
   margin: { y: "2.25rem" },
-  labels: { dismiss: "Dismiss message" },
 };
+
+/** The toaster's own controls' names, in the interface language. */
+function toasterLabels() {
+  return { dismiss: t("feedback.dismissMessage"), notifications: t("feedback.notifications") };
+}
 
 const ToastContext = createContext<ToastApi | null>(null);
 
@@ -79,10 +85,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   // this provider's effects, so they must be able to show messages immediately.
   const getToaster = useCallback((): Toaster => {
     if (!toasterRef.current) {
-      toasterRef.current = createToaster(TOASTER_CONFIG);
+      toasterRef.current = createToaster({ ...TOASTER_CONFIG, labels: toasterLabels() });
     }
     return toasterRef.current;
   }, []);
+
+  // The toaster is created once, so a language change renames its controls for the toasts that follow.
+  const locale = useLocale();
+  useEffect(() => {
+    toasterRef.current?.configure({ labels: toasterLabels() });
+  }, [locale]);
 
   const getDialogs = useCallback((): Dialogs => {
     if (!dialogsRef.current) {
@@ -116,7 +128,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         const handle = getDialogs().confirm(message, {
           title,
           confirmLabel,
-          cancelLabel,
+          cancelLabel: cancelLabel ?? t("common.cancel"),
           type: destructive ? "error" : "primary",
         });
         const confirmed = await handle;

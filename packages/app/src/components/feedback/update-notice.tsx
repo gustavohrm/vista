@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { Tooltip } from "./tooltip";
 
 interface UpdateNoticeProps {
@@ -20,17 +21,21 @@ interface UpdateNoticeProps {
  * @returns Notice element.
  */
 export function UpdateNotice({ version, notes, onInstall, onDismiss }: UpdateNoticeProps) {
-  const dismissLabel = `Dismiss Vista ${version}`;
+  const dismissLabel = t("feedback.update.dismiss", { version });
   return (
     <div className="border-line text-text-muted flex h-[30px] flex-none items-center rounded-md border text-xs">
       <button
         type="button"
         onClick={onInstall}
-        title={`Vista ${version} is available.${notes ? ` ${notes}` : ""} Choose to install it.`}
+        title={
+          notes
+            ? t("feedback.update.availableWithNotes", { version, notes })
+            : t("feedback.update.available", { version })
+        }
         className="hover:text-text flex h-full items-center gap-1.5 rounded-l-md pr-1 pl-2 transition-colors duration-100 outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)]"
       >
         <i className="ic-circle-arrow-down text-sm" aria-hidden="true" />
-        <span>Update to {version}</span>
+        <span>{t("feedback.update.updateTo", { version })}</span>
       </button>
       <Tooltip text={dismissLabel} position="bottom" className="flex flex-none">
         {(bubbleId) => (

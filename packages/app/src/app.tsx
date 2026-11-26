@@ -7,7 +7,7 @@ import { flushSync } from "react-dom";
 
 import { version as APP_VERSION } from "../package.json";
 import { changelogEntryFor } from "./changelog";
-import { runCommand, sortByCategory, useCommandShortcuts, type Command } from "./commands";
+import { categoryLabel, runCommand, sortByCategory, useCommandShortcuts, type Command } from "./commands";
 import { findCodeMirrorView, runEditingAction, type EditingAction } from "./commands/editing";
 import { DocumentActions } from "./components/editor/document-actions";
 import { EditorPane, type FindRequest } from "./components/editor/editor-pane";
@@ -66,7 +66,7 @@ import {
   type WorkspaceRecord,
   type WorkspaceStorage,
 } from "./domain/workspaces";
-import { startLanguage, useIsLanguageReady, useLocale } from "./i18n";
+import { i18n, startLanguage, t, useIsLanguageReady, useLocale } from "./i18n";
 import {
   LEGACY_FOLDER_ID,
   WorkspaceError,
@@ -149,11 +149,13 @@ type StoredRead =
 const GO_TO_FILE_SHORTCUT = "Mod+P";
 const COMMANDS_SHORTCUT = "Mod+Shift+P";
 const SETTINGS_SHORTCUT = "Mod+,";
-/** The key hints on the empty frame of an open workspace. */
-const START_HINTS: readonly StartHint[] = [
-  { label: "Go to file", shortcut: GO_TO_FILE_SHORTCUT },
-  { label: "All commands", shortcut: COMMANDS_SHORTCUT },
-];
+/** The key hints on the empty frame of an open workspace, in the interface language. */
+function startHints(): readonly StartHint[] {
+  return [
+    { label: t("app.startHints.goToFile"), shortcut: GO_TO_FILE_SHORTCUT },
+    { label: t("app.startHints.allCommands"), shortcut: COMMANDS_SHORTCUT },
+  ];
+}
 
 const EDITOR_MENU = ["edit.cut", "edit.copy", "edit.paste", "selection.all", MENU_SEPARATOR, "find.find"];
 const RAW_EDITOR_MENU = [...EDITOR_MENU, "find.replace", "goto.line"];
@@ -197,6 +199,8 @@ export function App({ adapter }: AppProps) {
  * @returns Shared application UI configured for the supplied platform.
  */
 function AppShell({ adapter }: AppProps) {
+  // The commands and other memoized text are built again when the language changes.
+  const locale = useLocale();
   const theme = useTheme();
   const toast = useToast();
   const [workspace, setWorkspace] = useState<OpenWorkspace | null>(null);
@@ -401,10 +405,9 @@ function AppShell({ adapter }: AppProps) {
             throw err;
           }
           const overwrite = await toast.confirm({
-            title: `"${doc.name}" changed on disk`,
-            message:
-              "Another program changed or deleted this file after Vista read it. Overwrite it with your version?",
-            confirmLabel: "Overwrite",
+            title: t("app.files.changedOnDisk.title", { name: doc.name }),
+            message: t("app.files.changedOnDisk.message"),
+            confirmLabel: t("common.overwrite"),
             destructive: true,
           });
           if (!overwrite) {
@@ -544,14 +547,16 @@ function AppShell({ adapter }: AppProps) {
   const offerUpdate = useCallback(
     async (update: AvailableUpdate, isCancelled: () => boolean = () => false) => {
       if (isInstallingRef.current) {
-        toast.show({ kind: "info", text: "Vista is already downloading an update. It restarts when it's installed." });
+        toast.show({ kind: "info", text: t("app.update.alreadyDownloading") });
         return;
       }
       const accepted = await toast.confirm({
-        title: `Vista ${update.version} is available`,
-        message: `${update.notes ? `${update.notes} ` : ""}Install it now? Vista restarts to finish, and asks about unsaved changes first.`,
-        confirmLabel: "Install and Restart",
-        cancelLabel: "Later",
+        title: t("app.update.offer.title", { version: update.version }),
+        message: update.notes
+          ? t("app.update.offer.messageWithNotes", { notes: update.notes })
+          : t("app.update.offer.message"),
+        confirmLabel: t("app.update.offer.install"),
+        cancelLabel: t("app.update.offer.later"),
       });
       // A prompt already open belongs to another flow; replacing it would leave that flow waiting forever.
       if (!accepted || isCancelled() || isPromptingRef.current || (await confirmUnsavedChangesRef.current()) === null) {
@@ -563,7 +568,7 @@ function AppShell({ adapter }: AppProps) {
       }
       isInstallingRef.current = true;
       setNoticedUpdate(null);
-      toast.show({ kind: "info", text: `Downloading Vista ${update.version}. Vista restarts when it's installed.` });
+      toast.show({ kind: "info", text: t("app.update.downloading", { version: update.version }) });
       try {
         await update.install();
       } catch (err) {
@@ -620,7 +625,7 @@ function AppShell({ adapter }: AppProps) {
       }
       if (!update) {
         if (isRequested) {
-          toast.show({ kind: "info", text: "Vista is up to date." });
+          toast.show({ kind: "info", text: t("app.update.upToDate") });
         }
         return;
       }
@@ -771,7 +776,7 @@ function AppShell({ adapter }: AppProps) {
       if (opened.folders.some((entry) => entry.folder?.accessMode === "fallback")) {
         toast.show({
           kind: "info",
-          text: "This browser can't write files directly, so saving will download a copy instead.",
+          text: t("app.workspace.fallbackSaving"),
         });
       }
       return true;
@@ -798,7 +803,7 @@ function AppShell({ adapter }: AppProps) {
           return { id, name: result.name, folder: null, status: result.status, tree: [] };
         case "none":
           // The host lost what it remembered, so it has no name to show either.
-          return { id, name: UNKNOWN_FOLDER_NAME, folder: null, status: "unavailable", tree: [] };
+          return { id, name: unknownFolderName(), folder: null, status: "unavailable", tree: [] };
       }
     },
     [adapter.workspace, toast],
@@ -891,7 +896,7 @@ function AppShell({ adapter }: AppProps) {
           target = workspaceStore.storeOnDevice(record.id) ?? record;
           toast.show({
             kind: "info",
-            text: `"${home.name}/${WORKSPACE_FILE_PATH}" is gone, so the workspace's details are kept on this device now.`,
+            text: t("app.workspace.storage.fileGone", { path: `${home.name}/${WORKSPACE_FILE_PATH}` }),
           });
         } else {
           slots = [{ kind: "folder", id: homeId, result: homeResult }];
@@ -1059,7 +1064,7 @@ function AppShell({ adapter }: AppProps) {
 
   const handleOpenFolder = useCallback(async () => {
     if (!adapter.workspace.isSupported) {
-      toast.show({ kind: "error", text: "Local folder access is not supported in this browser or environment." });
+      toast.show({ kind: "error", text: t("app.workspace.folderAccessUnsupported") });
       return;
     }
     const approvedEdits = await confirmUnsavedChangesInAllDocuments();
@@ -1230,7 +1235,7 @@ function AppShell({ adapter }: AppProps) {
    */
   const handleNewWorkspace = useCallback(async () => {
     if (!adapter.workspace.isSupported) {
-      toast.show({ kind: "error", text: "Local folder access is not supported in this browser or environment." });
+      toast.show({ kind: "error", text: t("app.workspace.folderAccessUnsupported") });
       return;
     }
     try {
@@ -1262,9 +1267,9 @@ function AppShell({ adapter }: AppProps) {
         return;
       }
       const confirmed = await toast.confirm({
-        title: `Delete "${record.name}"?`,
-        message: "Vista forgets this workspace and its tabs. Your folders and files aren't changed.",
-        confirmLabel: "Delete",
+        title: t("app.workspace.delete.title", { name: record.name }),
+        message: t("app.workspace.delete.message"),
+        confirmLabel: t("common.delete"),
         destructive: true,
       });
       if (!confirmed) {
@@ -1552,7 +1557,7 @@ function AppShell({ adapter }: AppProps) {
           if (collision) {
             toast.show({
               kind: "info",
-              text: `Two folders named "${collision.name}" would both be recorded as "${collision.location}", so the details stay on this device.`,
+              text: t("app.workspace.storage.sharedLocation", { name: collision.name, location: collision.location }),
             });
             return;
           }
@@ -1561,17 +1566,17 @@ function AppShell({ adapter }: AppProps) {
           if (existing.status === "unreadable") {
             toast.show({
               kind: "info",
-              text: `"${home.name}" holds workspace details this version of Vista can't read, so these stay on this device.`,
+              text: t("app.workspace.storage.unreadable", { name: home.name }),
             });
             return;
           }
           if (existing.status === "ok") {
             const other = existing.details.name;
             const isReplacing = await toast.confirm({
-              title: `"${home.name}" already holds the details of "${other}"`,
-              message: `Replacing them changes that workspace on every device that opens this folder. On this device, "${other}" keeps its details here.`,
-              confirmLabel: "Replace",
-              cancelLabel: "Keep on This Device",
+              title: t("app.workspace.storage.replace.title", { name: home.name, other }),
+              message: t("app.workspace.storage.replace.message", { other }),
+              confirmLabel: t("app.workspace.storage.replace.confirm"),
+              cancelLabel: t("app.workspace.storage.replace.keep"),
               destructive: true,
             });
             if (!isReplacing || targetWorkspace(current.id) === null) {
@@ -1623,9 +1628,9 @@ function AppShell({ adapter }: AppProps) {
         return;
       }
       const confirmed = await toast.confirm({
-        title: "Store the details on this device?",
-        message: `Vista deletes "${home.name}/${WORKSPACE_FILE_PATH}", so opening the folder elsewhere no longer opens this workspace.`,
-        confirmLabel: "Delete File",
+        title: t("app.workspace.storage.toDevice.title"),
+        message: t("app.workspace.storage.toDevice.message", { path: `${home.name}/${WORKSPACE_FILE_PATH}` }),
+        confirmLabel: t("app.workspace.storage.toDevice.confirm"),
         destructive: true,
       });
       if (!confirmed) {
@@ -1687,9 +1692,9 @@ function AppShell({ adapter }: AppProps) {
             : undefined;
         let refusal: string | null;
         if (current.folders.some((entry) => entry.id === picked.id)) {
-          refusal = `"${picked.name}" is already part of this workspace.`;
+          refusal = t("app.workspace.alreadyPart", { name: picked.name });
         } else if (location !== undefined && home && current.folders.some((entry) => entry.location === location)) {
-          refusal = `"${picked.name}" would be recorded as "${location}", like another folder of this workspace, so it can't be added while the details are stored in "${home.name}".`;
+          refusal = t("app.workspace.storage.sharedLocationRefusal", { name: picked.name, location, home: home.name });
         } else {
           refusal =
             describeUnrememberedFolder(current, picked) ??
@@ -1734,14 +1739,14 @@ function AppShell({ adapter }: AppProps) {
       if (current.storage === "folder" && current.folders[0]?.id === folderId) {
         toast.show({
           kind: "info",
-          text: "The workspace's details are stored in this folder. Store them on this device first.",
+          text: t("app.workspace.removeFolder.homeRefusal"),
         });
         return;
       }
       const confirmed = await toast.confirm({
-        title: `Remove "${entry.name}" from the workspace?`,
-        message: "Your folders and files aren't changed.",
-        confirmLabel: "Remove",
+        title: t("app.workspace.removeFolder.title", { name: entry.name }),
+        message: t("app.workspace.removeFolder.message"),
+        confirmLabel: t("common.remove"),
         destructive: true,
       });
       // Only the open workspace's tabs show the folder's files; another workspace may share the folder.
@@ -1806,9 +1811,9 @@ function AppShell({ adapter }: AppProps) {
         const reachable = current.folders.flatMap((candidate) => (candidate.folder ? [candidate.folder] : []));
         let refusal: string | null = null;
         if (picked.name !== entry.name) {
-          refusal = `Pick the folder named "${entry.name}".`;
+          refusal = t("app.workspace.locate.wrongName", { name: entry.name });
         } else if (current.folders.some((candidate) => candidate.id === picked.id)) {
-          refusal = `"${picked.name}" is already part of this workspace.`;
+          refusal = t("app.workspace.alreadyPart", { name: picked.name });
         } else {
           refusal = await checkFolderOverlap(adapter.workspace, reachable, picked);
         }
@@ -1954,11 +1959,15 @@ function AppShell({ adapter }: AppProps) {
           case "too-large":
             toast.show({
               kind: "error",
-              text: `"${name}" is ${formatMegabytes(result.size)} MB, over the ${settings.files.maxOpenSizeMb} MB limit. You can raise the limit in Settings.`,
+              text: t("app.files.tooLarge", {
+                name,
+                size: formatMegabytes(result.size),
+                limit: settings.files.maxOpenSizeMb,
+              }),
             });
             return false;
           case "binary":
-            toast.show({ kind: "error", text: `Vista can't open "${name}" because it isn't a text file.` });
+            toast.show({ kind: "error", text: t("app.files.notText", { name }) });
             return false;
           case "loaded":
             break;
@@ -1967,7 +1976,7 @@ function AppShell({ adapter }: AppProps) {
         if (result.file.isReadOnly) {
           toast.show({
             kind: "info",
-            text: `"${name}" isn't UTF-8 text, so it opened read-only to keep its characters intact.`,
+            text: t("app.files.notUtf8", { name }),
           });
         }
         return true;
@@ -2241,14 +2250,12 @@ function AppShell({ adapter }: AppProps) {
       const dirtyDocuments = findAffectedDocuments(documentsRef.current, { folderId, path }).filter(
         (doc) => doc.isDirty,
       );
-      const deletionMessage = isDirectory
-        ? "This folder and everything in it will be permanently deleted."
-        : "This file will be permanently deleted.";
+      const deletionMessage = isDirectory ? t("app.files.delete.folderMessage") : t("app.files.delete.fileMessage");
       try {
         const confirmed = await toast.confirm({
-          title: `Delete "${name}"?`,
+          title: t("app.files.delete.title", { name }),
           message: [deletionMessage, describeLostEdits(dirtyDocuments)].filter(Boolean).join(" "),
-          confirmLabel: "Delete",
+          confirmLabel: t("common.delete"),
           destructive: true,
         });
         if (!confirmed) {
@@ -2403,7 +2410,7 @@ function AppShell({ adapter }: AppProps) {
     async (action: EditingAction) => {
       if (!(await runEditingAction(action))) {
         // Reading the clipboard needs a permission the keyboard shortcut does not.
-        toast.show({ kind: "info", text: "Press Ctrl + V to paste." });
+        toast.show({ kind: "info", text: t("app.pasteHint") });
       }
     },
     [toast],
@@ -2513,7 +2520,7 @@ function AppShell({ adapter }: AppProps) {
       {
         id: "file.openFolder",
         category: "Workspace",
-        label: "Open Folder…",
+        label: t("commands.file.openFolder"),
         // While a workspace is loading, a folder opened meanwhile could be replaced when that finishes,
         // and a cancelled pick would end the loading early, letting the switcher choose one too.
         isEnabled: !isPromptingForUnsavedChanges && !isLoading,
@@ -2522,49 +2529,49 @@ function AppShell({ adapter }: AppProps) {
       {
         id: "workspace.new",
         category: "Workspace",
-        label: "New Workspace…",
+        label: t("commands.workspace.new"),
         isEnabled: !isPromptingForUnsavedChanges,
         run: handleNewWorkspace,
       },
       {
         id: "file.addFolder",
         category: "Workspace",
-        label: "Add Folder to Workspace…",
+        label: t("commands.file.addFolder"),
         isEnabled: !isPromptingForUnsavedChanges && workspace !== null,
         run: () => handleAddFolder(),
       },
       {
         id: "workspace.settings",
         category: "Workspace",
-        label: "Workspace Settings…",
+        label: t("commands.workspace.settings"),
         isEnabled: !isPromptingForUnsavedChanges && workspace !== null,
         run: openWorkspaceSettings,
       },
       {
         id: "workspace.close",
         category: "Workspace",
-        label: "Close Workspace",
+        label: t("commands.workspace.close"),
         isEnabled: !isPromptingForUnsavedChanges && workspace !== null,
         run: handleCloseWorkspace,
       },
       {
         id: "file.newFile",
         category: "File",
-        label: "New File",
+        label: t("commands.file.newFile"),
         isEnabled: !isPromptingForUnsavedChanges && hasReadyFolder,
         run: () => requestNewEntry("file"),
       },
       {
         id: "file.newFolder",
         category: "File",
-        label: "New Folder",
+        label: t("commands.file.newFolder"),
         isEnabled: !isPromptingForUnsavedChanges && hasReadyFolder,
         run: () => requestNewEntry("directory"),
       },
       {
         id: "file.save",
         category: "File",
-        label: "Save",
+        label: t("commands.file.save"),
         shortcut: "Mod+S",
         // A second prompt over a pending one would leave the first flow waiting forever.
         isEnabled: !isPromptingForUnsavedChanges && (activeDocument?.isDirty ?? false),
@@ -2573,7 +2580,7 @@ function AppShell({ adapter }: AppProps) {
       {
         id: "file.saveAll",
         category: "File",
-        label: "Save All",
+        label: t("commands.file.saveAll"),
         isEnabled: !isPromptingForUnsavedChanges && hasDirtyDocuments,
         run: saveAllDocuments,
       },
@@ -2582,7 +2589,7 @@ function AppShell({ adapter }: AppProps) {
             {
               id: "file.copyPath",
               category: "File",
-              label: "Copy Path",
+              label: t("commands.file.copyPath"),
               isEnabled: documentInView !== null,
               run: () => {
                 if (activeDocument) {
@@ -2595,7 +2602,7 @@ function AppShell({ adapter }: AppProps) {
       {
         id: "file.copyRelativePath",
         category: "File",
-        label: "Copy Relative Path",
+        label: t("commands.file.copyRelativePath"),
         isEnabled: documentInView !== null,
         run: () => {
           if (activeDocument) {
@@ -2608,7 +2615,7 @@ function AppShell({ adapter }: AppProps) {
             {
               id: "file.reveal",
               category: "File",
-              label: "Reveal in File Explorer",
+              label: t("commands.file.reveal"),
               isEnabled: documentInView !== null,
               run: () => {
                 if (activeDocument) {
@@ -2621,7 +2628,7 @@ function AppShell({ adapter }: AppProps) {
       {
         id: "file.settings",
         category: "Settings",
-        label: "Settings…",
+        label: t("commands.file.settings"),
         shortcut: SETTINGS_SHORTCUT,
         isEnabled: !isPromptingForUnsavedChanges,
         run: openSettings,
@@ -2629,7 +2636,7 @@ function AppShell({ adapter }: AppProps) {
       {
         id: "tabs.close",
         category: "Tabs",
-        label: "Close Tab",
+        label: t("commands.tabs.close"),
         // Browsers reserve Ctrl+W for closing their own tab, so the web host uses Alt+W.
         shortcut: adapter.platform === "native" ? "Mod+W" : "Alt+W",
         isEnabled: !isPromptingForUnsavedChanges && documentInView !== null,
@@ -2638,20 +2645,50 @@ function AppShell({ adapter }: AppProps) {
       {
         id: "tabs.closeAll",
         category: "Tabs",
-        label: "Close All Tabs",
+        label: t("commands.tabs.closeAll"),
         isEnabled: !isPromptingForUnsavedChanges && documentInView !== null,
         run: closeAllDocuments,
       },
       // The editors handle these keys themselves, so the menus only show them.
-      { id: "edit.undo", category: "Edit", label: "Undo", shortcutHint: "Mod+Z", run: () => runEditing("undo") },
-      { id: "edit.redo", category: "Edit", label: "Redo", shortcutHint: "Mod+Y", run: () => runEditing("redo") },
-      { id: "edit.cut", category: "Edit", label: "Cut", shortcutHint: "Mod+X", run: () => runEditing("cut") },
-      { id: "edit.copy", category: "Edit", label: "Copy", shortcutHint: "Mod+C", run: () => runEditing("copy") },
-      { id: "edit.paste", category: "Edit", label: "Paste", shortcutHint: "Mod+V", run: () => runEditing("paste") },
+      {
+        id: "edit.undo",
+        category: "Edit",
+        label: t("commands.edit.undo"),
+        shortcutHint: "Mod+Z",
+        run: () => runEditing("undo"),
+      },
+      {
+        id: "edit.redo",
+        category: "Edit",
+        label: t("commands.edit.redo"),
+        shortcutHint: "Mod+Y",
+        run: () => runEditing("redo"),
+      },
+      {
+        id: "edit.cut",
+        category: "Edit",
+        label: t("commands.edit.cut"),
+        shortcutHint: "Mod+X",
+        run: () => runEditing("cut"),
+      },
+      {
+        id: "edit.copy",
+        category: "Edit",
+        label: t("commands.edit.copy"),
+        shortcutHint: "Mod+C",
+        run: () => runEditing("copy"),
+      },
+      {
+        id: "edit.paste",
+        category: "Edit",
+        label: t("commands.edit.paste"),
+        shortcutHint: "Mod+V",
+        run: () => runEditing("paste"),
+      },
       {
         id: "find.find",
         category: "Edit",
-        label: "Find",
+        label: t("commands.find.find"),
         shortcut: "Mod+F",
         isEnabled: !isPromptingForUnsavedChanges && documentInView !== null,
         run: () => openFind("find"),
@@ -2659,7 +2696,7 @@ function AppShell({ adapter }: AppProps) {
       {
         id: "find.replace",
         category: "Edit",
-        label: "Replace",
+        label: t("commands.find.replace"),
         shortcut: "Mod+H",
         isEnabled: !isPromptingForUnsavedChanges && documentInView !== null,
         run: () => openFind("replace"),
@@ -2667,7 +2704,7 @@ function AppShell({ adapter }: AppProps) {
       {
         id: "selection.all",
         category: "Selection",
-        label: "Select All",
+        label: t("commands.selection.all"),
         shortcutHint: "Mod+A",
         run: () => runEditing("selectAll"),
       },
@@ -2675,7 +2712,7 @@ function AppShell({ adapter }: AppProps) {
       {
         id: "selection.line",
         category: "Selection",
-        label: "Select Line",
+        label: t("commands.selection.line"),
         shortcutHint: "Alt+L",
         isEnabled: isRawShown,
         run: () => runSelection(selectLine),
@@ -2683,7 +2720,7 @@ function AppShell({ adapter }: AppProps) {
       {
         id: "selection.nextOccurrence",
         category: "Selection",
-        label: "Add Next Occurrence",
+        label: t("commands.selection.nextOccurrence"),
         shortcutHint: "Mod+D",
         isEnabled: isRawShown,
         run: () => runSelection(selectNextOccurrence),
@@ -2691,7 +2728,7 @@ function AppShell({ adapter }: AppProps) {
       {
         id: "selection.allOccurrences",
         category: "Selection",
-        label: "Select All Occurrences",
+        label: t("commands.selection.allOccurrences"),
         shortcutHint: "Mod+Shift+L",
         isEnabled: isRawShown,
         run: () => runSelection(selectSelectionMatches),
@@ -2699,7 +2736,7 @@ function AppShell({ adapter }: AppProps) {
       {
         id: "selection.cursorAbove",
         category: "Selection",
-        label: "Add Cursor Above",
+        label: t("commands.selection.cursorAbove"),
         shortcutHint: "Mod+Alt+Up",
         isEnabled: isRawShown,
         run: () => runSelection(addCursorAbove),
@@ -2707,7 +2744,7 @@ function AppShell({ adapter }: AppProps) {
       {
         id: "selection.cursorBelow",
         category: "Selection",
-        label: "Add Cursor Below",
+        label: t("commands.selection.cursorBelow"),
         shortcutHint: "Mod+Alt+Down",
         isEnabled: isRawShown,
         run: () => runSelection(addCursorBelow),
@@ -2715,7 +2752,7 @@ function AppShell({ adapter }: AppProps) {
       {
         id: "palette.commands",
         category: "View",
-        label: "Show All Commands",
+        label: t("commands.palette.commands"),
         shortcut: COMMANDS_SHORTCUT,
         isEnabled: !isPromptingForUnsavedChanges,
         run: () => setGoToQuery(COMMAND_QUERY_PREFIX),
@@ -2723,7 +2760,7 @@ function AppShell({ adapter }: AppProps) {
       {
         id: "view.explorer",
         category: "View",
-        label: "Explorer",
+        label: t("commands.view.explorer"),
         isChecked: isExplorerShown,
         isEnabled: canToggleExplorer,
         run: () => setIsSidebarOpen((previous) => !previous),
@@ -2731,7 +2768,7 @@ function AppShell({ adapter }: AppProps) {
       {
         id: "view.statusBar",
         category: "View",
-        label: "Status Bar",
+        label: t("commands.view.statusBar"),
         isChecked: isStatusBarShown,
         isEnabled: statusDocument !== null,
         run: () => setIsStatusBarOpen((previous) => !previous),
@@ -2739,7 +2776,7 @@ function AppShell({ adapter }: AppProps) {
       {
         id: "view.rawText",
         category: "View",
-        label: "Raw Text",
+        label: t("commands.view.rawText"),
         isChecked: isRawShown,
         isEnabled: canToggleView,
         run: () => handleViewModeChange(isRawShown ? "enriched" : "raw"),
@@ -2747,7 +2784,7 @@ function AppShell({ adapter }: AppProps) {
       {
         id: "view.wordWrap",
         category: "View",
-        label: "Word Wrap",
+        label: t("commands.view.wordWrap"),
         shortcut: "Alt+Z",
         isChecked: editorSettings.wordWrap,
         run: () => updateSettings({ editor: { wordWrap: !editorSettings.wordWrap } }),
@@ -2755,28 +2792,28 @@ function AppShell({ adapter }: AppProps) {
       {
         id: "view.lineNumbers",
         category: "View",
-        label: "Line Numbers",
+        label: t("commands.view.lineNumbers"),
         isChecked: editorSettings.lineNumbers,
         run: () => updateSettings({ editor: { lineNumbers: !editorSettings.lineNumbers } }),
       },
       {
         id: "view.minimap",
         category: "View",
-        label: "Minimap",
+        label: t("commands.view.minimap"),
         isChecked: editorSettings.minimap,
         run: () => updateSettings({ editor: { minimap: !editorSettings.minimap } }),
       },
       {
         id: "view.vim",
         category: "View",
-        label: "Vim Mode",
+        label: t("commands.view.vim"),
         isChecked: editorSettings.vim,
         run: () => updateSettings({ editor: { vim: !editorSettings.vim } }),
       },
       {
         id: "goto.file",
         category: "Go",
-        label: "Go to File",
+        label: t("commands.goto.file"),
         shortcut: GO_TO_FILE_SHORTCUT,
         isEnabled: !isPromptingForUnsavedChanges && workspace !== null,
         run: () => setGoToQuery(""),
@@ -2784,7 +2821,7 @@ function AppShell({ adapter }: AppProps) {
       {
         id: "goto.line",
         category: "Go",
-        label: "Go to Line",
+        label: t("commands.goto.line"),
         shortcut: "Mod+G",
         isEnabled: !isPromptingForUnsavedChanges && documentInView !== null,
         run: () => setGoToQuery(":"),
@@ -2792,40 +2829,47 @@ function AppShell({ adapter }: AppProps) {
       {
         id: "tabs.next",
         category: "Tabs",
-        label: "Next Tab",
+        label: t("commands.tabs.next"),
         isEnabled: !isPromptingForUnsavedChanges && documentsState.documents.length > 1,
         run: () => activateNeighborTab(1),
       },
       {
         id: "tabs.previous",
         category: "Tabs",
-        label: "Previous Tab",
+        label: t("commands.tabs.previous"),
         isEnabled: !isPromptingForUnsavedChanges && documentsState.documents.length > 1,
         run: () => activateNeighborTab(-1),
       },
       {
         id: "tabs.moveLeft",
         category: "Tabs",
-        label: "Move Tab Left",
+        label: t("commands.tabs.moveLeft"),
         isEnabled: !isPromptingForUnsavedChanges && documentsState.documents.length > 1,
         run: () => moveActiveTab(-1),
       },
       {
         id: "tabs.moveRight",
         category: "Tabs",
-        label: "Move Tab Right",
+        label: t("commands.tabs.moveRight"),
         isEnabled: !isPromptingForUnsavedChanges && documentsState.documents.length > 1,
         run: () => moveActiveTab(1),
       },
       {
         id: "help.shortcuts",
         category: "Settings",
-        label: "Keyboard Shortcuts",
+        label: t("commands.help.shortcuts"),
         run: () => setSettingsSection("shortcuts"),
       },
-      { id: "help.about", category: "Settings", label: "About Vista", run: () => setSettingsSection("about") },
+      {
+        id: "help.about",
+        category: "Settings",
+        label: t("commands.help.about"),
+        run: () => setSettingsSection("about"),
+      },
     ],
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- every label's t() reads the language, which the rule can't see
     [
+      locale,
       activateNeighborTab,
       moveActiveTab,
       activeDocument,
@@ -2875,7 +2919,10 @@ function AppShell({ adapter }: AppProps) {
     () =>
       sortByCategory(commands)
         .filter((command) => command.id !== "palette.commands")
-        .map((command) => ({ command, title: `${command.category}: ${command.label}` })),
+        .map((command) => ({
+          command,
+          title: t("commands.paletteTitle", { category: categoryLabel(command.category), label: command.label }),
+        })),
     [commands],
   );
   const handleRunPaletteCommand = useCallback((command: Command) => {
@@ -2967,7 +3014,7 @@ function AppShell({ adapter }: AppProps) {
             notice={updateNotice}
             panels={[
               {
-                label: "Toggle Explorer",
+                label: t("app.panels.toggleExplorer"),
                 icon: isExplorerShown ? (
                   <i className="ic-panel-left" aria-hidden="true" />
                 ) : (
@@ -2978,7 +3025,7 @@ function AppShell({ adapter }: AppProps) {
                 onToggle: () => setIsSidebarOpen((previous) => !previous),
               },
               {
-                label: "Toggle Status Bar",
+                label: t("app.panels.toggleStatusBar"),
                 icon: isStatusBarShown ? (
                   <i className="ic-panel-bottom" aria-hidden="true" />
                 ) : (
@@ -3180,7 +3227,7 @@ function AppShell({ adapter }: AppProps) {
                       settingsShortcut={SETTINGS_SHORTCUT}
                       onOpenRecent={(workspaceId) => void handleOpenWorkspace(workspaceId)}
                       onRemoveRecent={handleRemoveFromRecent}
-                      hints={START_HINTS}
+                      hints={startHints()}
                       desktopDownload={desktopDownload}
                     />
                   )
@@ -3194,7 +3241,9 @@ function AppShell({ adapter }: AppProps) {
                 <StatusBar
                   activeFile={statusDocument}
                   location={activeLocation}
-                  copyPathLabel={adapter.platform === "native" ? "Copy Path" : "Copy Relative Path"}
+                  copyPathLabel={
+                    adapter.platform === "native" ? t("commands.file.copyPath") : t("commands.file.copyRelativePath")
+                  }
                   onCopyPath={() => (copyFullPath ? copyFullPath(statusDocument) : copyText(statusDocument.path))}
                   onReveal={revealEntry ? () => void revealEntry(statusDocument) : undefined}
                   cursor={activeCursor}
@@ -3230,7 +3279,10 @@ type ApprovedEdits = ReadonlyMap<string, string>;
 
 const NO_APPROVED_EDITS: ApprovedEdits = new Map();
 
-const UNKNOWN_FOLDER_NAME = "Unknown folder";
+/** The name shown for a remembered folder Vista can't find, in the language at the time it is shown. */
+function unknownFolderName(): string {
+  return t("app.workspace.unknownFolder");
+}
 
 /**
  * One file is named; several are listed by path, since names repeat across directories, and by
@@ -3279,27 +3331,30 @@ function describeLostEdits(dirtyDocuments: readonly OpenDocument[]): string {
     return "";
   }
   return dirtyDocuments.length === 1
-    ? `Unsaved changes in "${first.name}" will be lost.`
-    : `Unsaved changes in ${dirtyDocuments.length} open files will be lost.`;
+    ? t("app.unsaved.lostOne", { name: first.name })
+    : t("app.unsaved.lostMany", { count: dirtyDocuments.length });
 }
 
 function describeDeletedDocuments(documents: readonly OpenDocument[]): string {
   const [first] = documents;
   return documents.length === 1 && first
-    ? `"${first.name}" was deleted.`
-    : `${documents.length} open files were deleted.`;
+    ? t("app.files.deletedOne", { name: first.name })
+    : t("app.files.deletedMany", { count: documents.length });
 }
 
 function describeExternalChanges(documents: readonly OpenDocument[]): string {
   const [first] = documents;
   return documents.length === 1 && first
-    ? `"${first.name}" changed on disk. Saving it will ask before overwriting the other version.`
-    : `${documents.length} open files changed on disk. Saving them will ask before overwriting the other versions.`;
+    ? t("app.files.changedOne", { name: first.name })
+    : t("app.files.changedMany", { count: documents.length });
 }
 
 // One decimal, rounded up, so a file just over the limit never reads as equal to it.
 function formatMegabytes(bytes: number): string {
-  return (Math.ceil((bytes / BYTES_PER_MB) * 10) / 10).toFixed(1);
+  return i18n.formatNumber(Math.ceil((bytes / BYTES_PER_MB) * 10) / 10, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
 }
 
 /** Joins a workspace-relative path onto a native root path, with the separator the root uses. */
@@ -3385,9 +3440,9 @@ function findRestoredActiveIndex(
 function describeGoneSessionFiles(gone: readonly RestoredTab[]): string {
   const [only] = gone;
   if (gone.length === 1 && only) {
-    return `"${only.path.split("/").pop() ?? only.path}" from your last session no longer exists.`;
+    return t("app.session.goneFile", { name: only.path.split("/").pop() ?? only.path });
   }
-  return `${gone.length} files from your last session no longer exist.`;
+  return t("app.session.goneFiles", { count: gone.length });
 }
 
 function summarizeFolders(folders: readonly OpenFolder[]): RecentWorkspace["folders"] {
@@ -3403,7 +3458,7 @@ function summarizeRestored(results: readonly (readonly [string, RestoreFolderRes
       case "unavailable":
         return { id, name: result.name, status: result.status };
       case "none":
-        return { id, name: UNKNOWN_FOLDER_NAME, status: "unavailable" };
+        return { id, name: unknownFolderName(), status: "unavailable" };
     }
   });
 }
@@ -3441,7 +3496,7 @@ function toPageFolder(id: string, result: RestoreFolderResult): OpenFolder {
     case "unavailable":
       return { id, name: result.name, folder: null, status: result.status, tree: [] };
     case "none":
-      return { id, name: UNKNOWN_FOLDER_NAME, folder: null, status: "unavailable", tree: [] };
+      return { id, name: unknownFolderName(), folder: null, status: "unavailable", tree: [] };
   }
 }
 
@@ -3561,11 +3616,11 @@ function describeUnrememberedFolder(workspace: OpenWorkspace, picked: WorkspaceF
   if (picked.accessMode !== "fallback" || workspace.folders.some((entry) => entry.folder?.accessMode === "fallback")) {
     return null;
   }
-  return `This browser can open "${picked.name}" only until Vista closes, so it can't join a workspace Vista remembers.`;
+  return t("app.workspace.unrememberedFolder", { name: picked.name });
 }
 
 function describeUnreadableFile(folderName: string): string {
-  return `"${folderName}" has workspace details this version of Vista can't read, so it opened as a plain folder.`;
+  return t("app.workspace.unreadableFile", { name: folderName });
 }
 
 /** The part of User-Agent Client Hints that reads the processor; only Chromium has it, and TypeScript's DOM types do not. */

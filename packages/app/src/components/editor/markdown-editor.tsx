@@ -5,6 +5,8 @@ import { commonmark } from "@milkdown/preset-commonmark";
 import { gfm } from "@milkdown/preset-gfm";
 import { useEffect, useRef } from "react";
 
+import { t, useLocale } from "../../i18n";
+
 interface MarkdownEditorProps {
   /** Markdown content used to seed the editor when it mounts. */
   content: string;
@@ -96,7 +98,7 @@ function createTaskItemView(initialNode: ProseNode, view: ProseEditorView, getPo
     writeListItemAttributes(dom, current);
     dom.dataset.checked = String(current.attrs.checked);
     checkbox.checked = current.attrs.checked === true;
-    checkbox.setAttribute("aria-label", checkbox.checked ? "Mark task as not done" : "Mark task as done");
+    labelTaskCheckbox(checkbox);
   };
   render(node);
 
@@ -190,15 +192,16 @@ function createImageView(initialNode: ProseNode, loader: ImageLoader): ProseNode
   const showPlaceholder = (current: ProseNode) => {
     const placeholder = document.createElement("span");
     const label = document.createElement("span");
-    const name = current.attrs.alt || current.attrs.src || "image";
     placeholder.className = "markdown-image-placeholder";
     placeholder.setAttribute("role", "img");
-    placeholder.setAttribute("aria-label", `Image not shown: ${name}`);
+    const name = current.attrs.alt || current.attrs.src || "";
+    placeholder.dataset.imageName = name;
+    labelImagePlaceholder(placeholder);
     placeholder.title = current.attrs.src;
     // Written as markup, a fixed literal with nothing from the document in it, so the icon build
     // finds the tag and inlines its SVG; an element made with createElement is never rewritten.
     placeholder.innerHTML = '<i class="ic-image-off" aria-hidden="true"></i>';
-    label.textContent = name;
+    label.textContent = name || t("markdown.image");
     label.setAttribute("aria-hidden", "true");
     placeholder.append(label);
     dom.replaceChildren(placeholder);
@@ -281,7 +284,8 @@ export function MarkdownEditor({ content, onChange, onReady, loadImage }: Markdo
       .config((ctx) => {
         ctx.set(rootCtx, root);
         ctx.set(defaultValueCtx, initialContentRef.current);
-        ctx.set(editorViewOptionsCtx, { attributes: { "aria-label": "Markdown Editor" } });
+        // A function, so each update names the editor in the interface language in use.
+        ctx.set(editorViewOptionsCtx, { attributes: () => ({ "aria-label": t("markdown.editor") }) });
         // Appended, not passed as `nodeViews` in editorViewOptionsCtx: core spreads that option
         // over its own node views, so it would replace them.
         const listItemView: NodeViewEntry = ["list_item", createListItemView];
@@ -325,5 +329,32 @@ export function MarkdownEditor({ content, onChange, onReady, loadImage }: Markdo
     // parent remounts this component (via `key`) when a different document should be shown.
   }, []);
 
+  // The editor writes these names into its DOM itself, so a language change rewrites them there.
+  const locale = useLocale();
+  const shownLocaleRef = useRef(locale);
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || shownLocaleRef.current === locale) {
+      return;
+    }
+    shownLocaleRef.current = locale;
+    root.querySelector(".ProseMirror")?.setAttribute("aria-label", t("markdown.editor"));
+    for (const checkbox of root.querySelectorAll<HTMLInputElement>(".task-list-item-control > input")) {
+      labelTaskCheckbox(checkbox);
+    }
+    for (const placeholder of root.querySelectorAll<HTMLElement>(".markdown-image-placeholder")) {
+      labelImagePlaceholder(placeholder);
+    }
+  }, [locale]);
+
   return <div ref={rootRef} className="markdown-editor h-full w-full overflow-y-auto px-8 pt-14 pb-8" />;
+}
+
+function labelTaskCheckbox(checkbox: HTMLInputElement): void {
+  checkbox.setAttribute("aria-label", checkbox.checked ? t("markdown.markNotDone") : t("markdown.markDone"));
+}
+
+function labelImagePlaceholder(placeholder: HTMLElement): void {
+  const name = placeholder.dataset.imageName || t("markdown.image");
+  placeholder.setAttribute("aria-label", t("markdown.imageNotShown", { name }));
 }

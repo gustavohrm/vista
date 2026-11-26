@@ -1,7 +1,12 @@
 {
   "settings": {
     "sections": {
-      "language": "Idioma"
+      "language": "Idioma",
+      "appearance": "Aparência",
+      "editor": "Editor",
+      "files": "Arquivos",
+      "shortcuts": "Atalhos de teclado",
+      "about": "Sobre"
     },
     "language": {
       "title": "Idioma",
@@ -9,6 +14,597 @@
       "label": "Idioma",
       "description": "A opção Sistema segue os idiomas do seu sistema operacional e muda junto com eles.",
       "system": "Sistema ({language})"
+    },
+    "title": "Configurações",
+    "close": "Fechar configurações",
+    "sectionsLabel": "Seções das configurações",
+    "workspacesBreadcrumb": "Espaços de trabalho",
+    "appearance": {
+      "title": "Aparência",
+      "lead": "Como o Vista se parece, em todos os espaços de trabalho.",
+      "colour": "Cor",
+      "scheme": {
+        "label": "Esquema",
+        "description": "Claro ou escuro. A opção Sistema segue o seu sistema operacional e muda junto com ele.",
+        "light": "Claro",
+        "dark": "Escuro"
+      },
+      "theme": {
+        "label": "Tema",
+        "description": "As cores da interface. Cada tema tem uma versão clara e uma escura."
+      },
+      "contrast": {
+        "title": "Contraste",
+        "hint": "Seguir a configuração de contraste do seu sistema operacional",
+        "standard": "Padrão",
+        "more": "Mais"
+      },
+      "motion": {
+        "title": "Movimento",
+        "hint": "Seguir a configuração de movimento reduzido do seu sistema operacional",
+        "all": "Todo",
+        "reduced": "Reduzido",
+        "none": "Nenhum"
+      },
+      "matchSystem": "Seguir o sistema"
+    },
+    "editor": {
+      "title": "Editor",
+      "lead": "Como o editor de texto bruto mostra e edita o texto, em todos os espaços de trabalho.",
+      "lineNumbers": {
+        "label": "Números de linha",
+        "description": "Numera cada linha."
+      },
+      "wordWrap": {
+        "label": "Quebra de linha",
+        "description": "Quebra as linhas longas na borda da janela em vez de rolar para o lado. {shortcut} ativa e desativa."
+      },
+      "minimap": {
+        "label": "Minimapa",
+        "description": "Mostra um contorno do arquivo inteiro ao lado dele."
+      },
+      "vim": {
+        "label": "Modo Vim",
+        "description": "Edita com as teclas e os modos do Vim."
+      },
+      "menu": {
+        "label": "Configurações do editor",
+        "allSettings": "Todas as configurações…"
+      }
+    },
+    "files": {
+      "title": "Arquivos",
+      "lead": "Quais arquivos o Vista abre, em todos os espaços de trabalho.",
+      "maxOpenSize": {
+        "label": "Maior arquivo a abrir (MB)",
+        "description": "Arquivos maiores não são abertos, para que o editor continue ágil.",
+        "invalid": "Digite um número inteiro de {min, number} a {max, number}. O limite continua em {current, number} MB."
+      }
+    },
+    "shortcuts": {
+      "title": "Atalhos de teclado",
+      "lead": "As teclas dos comandos do Vista, as mesmas em todos os espaços de trabalho."
+    },
+    "about": {
+      "title": "Sobre",
+      "lead": "O Vista edita uma pasta de arquivos Markdown, CSV e de texto, como texto bruto ou renderizado.",
+      "running": "{platform, select, native {Executando no aplicativo para desktop.} other {Executando no navegador.}}",
+      "releasedAndRunning": "Lançado em {date}. {platform, select, native {Executando no aplicativo para desktop.} other {Executando no navegador.}}",
+      "checkForUpdates": "Verificar atualizações",
+      "whatsNew": "Novidades",
+      "whatsNewDescription": "As mudanças do Vista {version}.",
+      "checkAtStartup": {
+        "label": "Verificar ao iniciar",
+        "description": "Pergunta a vista.coden.dev se há uma versão mais nova sempre que o Vista inicia. Verificar atualizações funciona de qualquer forma."
+      }
+    },
+    "nav": {
+      "heading": "Espaços de trabalho",
+      "search": "Pesquisar espaços de trabalho",
+      "searchPlaceholder": "Pesquisar espaços de trabalho",
+      "closeSearch": "Fechar pesquisa",
+      "newWorkspace": "Novo espaço de trabalho",
+      "newWorkspaceLabel": "Novo espaço de trabalho…",
+      "noMatches": "Nenhum espaço de trabalho encontrado",
+      "seeAll": "Ver todos"
+    },
+    "workspace": {
+      "lead": "Estas valem apenas para este espaço de trabalho. As configurações do próprio Vista valem para todos.",
+      "needsAccess": {
+        "label": "\"{name}\" precisa de acesso",
+        "description": "Os detalhes ficam guardados nesta pasta, então o Vista os lê de lá.",
+        "allow": "Permitir acesso"
+      },
+      "unavailable": "\"{name}\" não foi encontrada, então os detalhes guardados nela não podem ser alterados.",
+      "unreadable": "\"{name}\" guarda detalhes de espaço de trabalho que esta versão do Vista não consegue ler, então eles não podem ser alterados aqui.",
+      "name": {
+        "label": "Nome",
+        "description": "Exibido no seletor de espaços de trabalho e na lista de recentes.",
+        "invalid": "{message} O nome continua “{name}”."
+      },
+      "icon": "Ícone",
+      "colour": "Cor",
+      "customColour": "Cor personalizada",
+      "icons": {
+        "folder": "Pasta",
+        "book": "Livro",
+        "notebook": "Caderno",
+        "briefcase": "Maleta",
+        "code": "Código",
+        "house": "Casa",
+        "star": "Estrela",
+        "heart": "Coração",
+        "flask": "Frasco",
+        "graduationCap": "Capelo",
+        "pen": "Caneta",
+        "globe": "Globo"
+      },
+      "colours": {
+        "neutral": "Neutro",
+        "indigo": "Índigo",
+        "emerald": "Esmeralda",
+        "amber": "Âmbar",
+        "rose": "Rosa"
+      },
+      "folders": "Pastas",
+      "addFolder": "Adicionar pasta ao espaço de trabalho",
+      "folderStatus": {
+        "needsAccess": "Precisa de acesso",
+        "notFound": "Não encontrada"
+      },
+      "status": {
+        "open": "Aberto",
+        "notFound": "Não encontrado"
+      },
+      "removeFolder": "Remover \"{name}\" do espaço de trabalho",
+      "removeFolderTitle": "Remover do espaço de trabalho",
+      "storage": {
+        "heading": "Onde os detalhes ficam guardados",
+        "device": {
+          "label": "Neste dispositivo",
+          "description": "Nada é gravado nas suas pastas."
+        },
+        "folder": {
+          "label": "Em {name}/.vista",
+          "description": "O nome, o ícone, a cor e a lista de pastas acompanham a pasta, por sincronização ou git. Suas abas abertas ficam neste dispositivo."
+        }
+      },
+      "delete": {
+        "label": "Excluir espaço de trabalho",
+        "description": "O Vista esquece este espaço de trabalho e as abas dele. Suas pastas e arquivos não são alterados.",
+        "button": "Excluir espaço de trabalho…"
+      }
+    }
+  },
+  "app": {
+    "files": {
+      "changedMany": "{count, number} arquivos abertos foram alterados no disco. Ao salvá-los, o Vista vai perguntar antes de substituir as outras versões.",
+      "changedOnDisk": {
+        "message": "Outro programa alterou ou excluiu este arquivo depois que o Vista o leu. Substituir pela sua versão?",
+        "title": "\"{name}\" foi alterado no disco"
+      },
+      "changedOne": "\"{name}\" foi alterado no disco. Ao salvar, o Vista vai perguntar antes de substituir a outra versão.",
+      "delete": {
+        "fileMessage": "Este arquivo será excluído permanentemente.",
+        "folderMessage": "Esta pasta e tudo o que há nela serão excluídos permanentemente.",
+        "title": "Excluir \"{name}\"?"
+      },
+      "deletedMany": "{count, number} arquivos abertos foram excluídos.",
+      "deletedOne": "\"{name}\" foi excluído.",
+      "notText": "O Vista não consegue abrir \"{name}\" porque não é um arquivo de texto.",
+      "notUtf8": "\"{name}\" não é texto UTF-8, então foi aberto somente para leitura para manter seus caracteres intactos.",
+      "tooLarge": "\"{name}\" tem {size} MB, acima do limite de {limit, number} MB. Você pode aumentar o limite nas Configurações."
+    },
+    "panels": {
+      "toggleExplorer": "Alternar explorador",
+      "toggleStatusBar": "Alternar barra de status"
+    },
+    "pasteHint": "Pressione Ctrl + V para colar.",
+    "session": {
+      "goneFile": "\"{name}\", da sua última sessão, não existe mais.",
+      "goneFiles": "{count, number} arquivos da sua última sessão não existem mais."
+    },
+    "startHints": {
+      "allCommands": "Todos os comandos",
+      "goToFile": "Ir para arquivo"
+    },
+    "unsaved": {
+      "lostMany": "As alterações não salvas em {count, number} arquivos abertos serão perdidas.",
+      "lostOne": "As alterações não salvas em \"{name}\" serão perdidas."
+    },
+    "update": {
+      "alreadyDownloading": "O Vista já está baixando uma atualização. Ele reinicia quando ela for instalada.",
+      "downloading": "Baixando o Vista {version}. O Vista reinicia quando a atualização for instalada.",
+      "offer": {
+        "install": "Instalar e reiniciar",
+        "later": "Depois",
+        "message": "Instalar agora? O Vista reinicia para concluir e, antes, pergunta sobre alterações não salvas.",
+        "messageWithNotes": "{notes} Instalar agora? O Vista reinicia para concluir e, antes, pergunta sobre alterações não salvas.",
+        "title": "O Vista {version} está disponível"
+      },
+      "upToDate": "O Vista está atualizado."
+    },
+    "workspace": {
+      "alreadyPart": "\"{name}\" já faz parte deste espaço de trabalho.",
+      "delete": {
+        "message": "O Vista esquece este espaço de trabalho e suas abas. Suas pastas e arquivos não são alterados.",
+        "title": "Excluir \"{name}\"?"
+      },
+      "fallbackSaving": "Este navegador não consegue gravar arquivos diretamente, então salvar vai baixar uma cópia.",
+      "folderAccessUnsupported": "O acesso a pastas locais não é compatível com este navegador ou ambiente.",
+      "locate": {
+        "wrongName": "Escolha a pasta chamada \"{name}\"."
+      },
+      "removeFolder": {
+        "homeRefusal": "Os detalhes do espaço de trabalho estão guardados nesta pasta. Guarde-os neste dispositivo primeiro.",
+        "message": "Suas pastas e arquivos não são alterados.",
+        "title": "Remover \"{name}\" do espaço de trabalho?"
+      },
+      "storage": {
+        "fileGone": "\"{path}\" não existe mais, então os detalhes do espaço de trabalho agora ficam neste dispositivo.",
+        "replace": {
+          "confirm": "Substituir",
+          "keep": "Manter neste dispositivo",
+          "message": "Substituí-los altera esse espaço de trabalho em todo dispositivo que abrir esta pasta. Neste dispositivo, \"{other}\" mantém seus detalhes aqui.",
+          "title": "\"{name}\" já guarda os detalhes de \"{other}\""
+        },
+        "sharedLocation": "Duas pastas chamadas \"{name}\" seriam registradas como \"{location}\", então os detalhes ficam neste dispositivo.",
+        "sharedLocationRefusal": "\"{name}\" seria registrada como \"{location}\", como outra pasta deste espaço de trabalho, então não pode ser adicionada enquanto os detalhes estiverem guardados em \"{home}\".",
+        "toDevice": {
+          "confirm": "Excluir arquivo",
+          "message": "O Vista exclui \"{path}\", então abrir a pasta em outro lugar não abre mais este espaço de trabalho.",
+          "title": "Guardar os detalhes neste dispositivo?"
+        },
+        "unreadable": "\"{name}\" guarda detalhes de espaço de trabalho que esta versão do Vista não consegue ler, então eles ficam neste dispositivo."
+      },
+      "unknownFolder": "Pasta desconhecida",
+      "unreadableFile": "\"{name}\" tem detalhes de espaço de trabalho que esta versão do Vista não consegue ler, então foi aberta como uma pasta comum.",
+      "unrememberedFolder": "Este navegador só consegue abrir \"{name}\" até o Vista fechar, então ela não pode entrar em um espaço de trabalho que o Vista lembra."
+    }
+  },
+  "commands": {
+    "edit": {
+      "copy": "Copiar",
+      "cut": "Recortar",
+      "paste": "Colar",
+      "redo": "Refazer",
+      "undo": "Desfazer"
+    },
+    "file": {
+      "addFolder": "Adicionar pasta ao espaço de trabalho…",
+      "copyPath": "Copiar caminho",
+      "copyRelativePath": "Copiar caminho relativo",
+      "newFile": "Novo arquivo",
+      "newFolder": "Nova pasta",
+      "openFolder": "Abrir pasta…",
+      "reveal": "Mostrar no Explorador de Arquivos",
+      "save": "Salvar",
+      "saveAll": "Salvar tudo",
+      "settings": "Configurações…"
+    },
+    "find": {
+      "find": "Localizar",
+      "replace": "Substituir"
+    },
+    "goto": {
+      "file": "Ir para arquivo",
+      "line": "Ir para linha"
+    },
+    "help": {
+      "about": "Sobre o Vista",
+      "shortcuts": "Atalhos de teclado"
+    },
+    "palette": {
+      "commands": "Mostrar todos os comandos"
+    },
+    "paletteTitle": "{category}: {label}",
+    "selection": {
+      "all": "Selecionar tudo",
+      "allOccurrences": "Selecionar todas as ocorrências",
+      "cursorAbove": "Adicionar cursor acima",
+      "cursorBelow": "Adicionar cursor abaixo",
+      "line": "Selecionar linha",
+      "nextOccurrence": "Adicionar próxima ocorrência"
+    },
+    "tabs": {
+      "close": "Fechar aba",
+      "closeAll": "Fechar todas as abas",
+      "moveLeft": "Mover aba para a esquerda",
+      "moveRight": "Mover aba para a direita",
+      "next": "Próxima aba",
+      "previous": "Aba anterior"
+    },
+    "view": {
+      "explorer": "Explorador",
+      "lineNumbers": "Números de linha",
+      "minimap": "Minimapa",
+      "rawText": "Texto bruto",
+      "statusBar": "Barra de status",
+      "vim": "Modo Vim",
+      "wordWrap": "Quebra de linha"
+    },
+    "workspace": {
+      "close": "Fechar espaço de trabalho",
+      "new": "Novo espaço de trabalho…",
+      "settings": "Configurações do espaço de trabalho…"
+    }
+  },
+  "common": {
+    "delete": "Excluir",
+    "overwrite": "Substituir",
+    "remove": "Remover",
+    "close": "Fechar",
+    "copyPath": "Copiar caminho",
+    "copyRelativePath": "Copiar caminho relativo",
+    "explorer": "Explorador",
+    "newFile": "Novo arquivo",
+    "newFolder": "Nova pasta",
+    "open": "Abrir",
+    "rename": "Renomear",
+    "revealInFileExplorer": "Mostrar no Explorador de Arquivos",
+    "settings": "Configurações",
+    "cancel": "Cancelar",
+    "save": "Salvar",
+    "saveAll": "Salvar tudo",
+    "system": "Sistema"
+  },
+  "activityRail": {
+    "label": "Barra de atividades",
+    "search": "Pesquisar",
+    "graph": "Grafo",
+    "comingSoon": "Em breve"
+  },
+  "download": {
+    "for": {
+      "windows": "Baixar para Windows",
+      "linux": "Baixar para Linux",
+      "linuxX86_64": "Baixar para Linux (x86_64)"
+    },
+    "vistaFor": {
+      "windows": "Baixar o Vista para Windows",
+      "linux": "Baixar o Vista para Linux",
+      "linuxX86_64": "Baixar o Vista para Linux (x86_64)"
+    }
+  },
+  "pathValidation": {
+    "empty": "O nome não pode ficar vazio.",
+    "surroundingSpace": "O nome não pode começar nem terminar com espaço.",
+    "reserved": "Este nome é reservado.",
+    "trailingPeriod": "O nome não pode terminar com ponto.",
+    "reservedCharacters": "O nome não pode conter nenhum destes: {characters}",
+    "exists": "\"{name}\" já existe aqui."
+  },
+  "rename": {
+    "entryName": "Nome do item"
+  },
+  "sidebar": {
+    "label": "Explorador de arquivos",
+    "addFolder": "Adicionar pasta ao espaço de trabalho",
+    "collapseAll": "Recolher tudo",
+    "fileActions": "Ações do arquivo",
+    "removeFolder": "Remover pasta do espaço de trabalho",
+    "loading": "Carregando…",
+    "unreadableFolder": "O Vista não consegue ler esta pasta, então os arquivos dela não são listados",
+    "needsPermission": "O Vista precisa da sua permissão para abrir esta pasta de novo.",
+    "unavailable": "Esta pasta não foi encontrada. Ela pode ter sido movida ou excluída.",
+    "allowAccess": "Permitir acesso",
+    "locate": "Localizar…"
+  },
+  "startScreen": {
+    "openingFolder": "Abrindo pasta…",
+    "start": "Início",
+    "openFolder": "Abrir pasta…",
+    "recentWorkspaces": "Espaços de trabalho recentes",
+    "today": "Hoje",
+    "yesterday": "Ontem",
+    "allowAccess": "Clique para permitir o acesso",
+    "removeFromRecent": "Remover dos recentes",
+    "removeNamedFromRecent": "Remover \"{name}\" dos recentes"
+  },
+  "statusBar": {
+    "label": "Barra de status",
+    "goToLine": "{position}. Ir para linha",
+    "copied": "Copiado",
+    "readOnly": {
+      "text": "Somente leitura",
+      "title": "Este arquivo não é texto UTF-8, então o Vista não vai salvá-lo."
+    },
+    "rawOnly": {
+      "text": "Só texto bruto",
+      "title": "Este arquivo tem mais de {count, number} células, demais para a tabela mostrar com rapidez, então ele abre na visualização de texto bruto."
+    },
+    "changedOnDisk": {
+      "text": "Alterado no disco",
+      "title": "Outro programa alterou este arquivo. Ao salvar, o Vista pergunta antes de substituí-lo."
+    },
+    "deletedOnDisk": {
+      "text": "Excluído do disco",
+      "title": "Outro programa excluiu este arquivo. Ao salvar, o Vista pergunta antes de criá-lo de novo."
+    },
+    "position": "Ln {line, number}, Col {column, number}",
+    "positionWithSelection": {
+      "one": "Ln {line, number}, Col {column, number} ({count, number} selecionado)",
+      "other": "Ln {line, number}, Col {column, number} ({count, number} selecionados)"
+    },
+    "lines": {
+      "one": "{count, number} linha",
+      "other": "{count, number} linhas"
+    },
+    "words": {
+      "one": "{count, plural, =0 {# palavras} other {# palavra}}",
+      "other": "{count, number} palavras"
+    },
+    "bytes": "{size} B",
+    "kilobytes": "{size} KB",
+    "megabytes": "{size} MB",
+    "plainText": "Texto simples"
+  },
+  "tabs": {
+    "label": "Arquivos abertos",
+    "actions": "Ações da aba",
+    "closeOthers": "Fechar as outras",
+    "closeToTheRight": "Fechar as da direita",
+    "closeSaved": "Fechar as salvas",
+    "closeAll": "Fechar todas",
+    "unsaved": "(não salvo)",
+    "unsavedLabel": "{label} (não salvo)",
+    "closeNamed": "Fechar {label}"
+  },
+  "titleBar": {
+    "openExplorer": "Abrir explorador",
+    "closeExplorer": "Fechar explorador",
+    "goToFile": "Ir para arquivo"
+  },
+  "windowFrame": {
+    "minimize": "Minimizar",
+    "maximize": "Maximizar",
+    "restore": "Restaurar"
+  },
+  "workspace": {
+    "untitled": "Espaço de trabalho sem nome",
+    "nameRequired": "Digite um nome.",
+    "nameTooLong": "Use no máximo {count, number} caracteres."
+  },
+  "editor": {
+    "actions": "Ações do editor",
+    "documentActions": "Ações do documento",
+    "find": "Localizar",
+    "viewMode": "Modo de exibição do documento",
+    "richText": "Texto formatado",
+    "table": "Tabela",
+    "raw": "Bruto",
+    "rawContent": "Conteúdo em texto bruto de {name}"
+  },
+  "markdown": {
+    "editor": "Editor de Markdown",
+    "markDone": "Marcar tarefa como concluída",
+    "markNotDone": "Marcar tarefa como não concluída",
+    "image": "imagem",
+    "imageNotShown": "Imagem não exibida: {name}"
+  },
+  "csv": {
+    "row": "Linha",
+    "column": "Coluna {column, number}",
+    "columnName": "Nome da coluna {column, number}",
+    "addColumn": "Adicionar coluna",
+    "addRow": "Adicionar linha",
+    "moveRow": "Mover linha {row, number}",
+    "moveRowHint": "Arraste para mover a linha, ou pressione Shift + Up ou Shift + Down",
+    "cell": "{column}, linha {row, number}"
+  },
+  "findBar": {
+    "region": "Localizar no arquivo",
+    "find": "Localizar",
+    "replace": "Substituir",
+    "matchCase": "Diferenciar maiúsculas e minúsculas",
+    "matchWholeWord": "Palavra inteira",
+    "useRegex": "Usar expressão regular",
+    "previousMatch": "Resultado anterior (Shift+Enter)",
+    "nextMatch": "Próximo resultado (Enter)",
+    "showReplace": "Mostrar substituir",
+    "hideReplace": "Ocultar substituir",
+    "close": "Fechar (Escape)",
+    "replaceOne": "Substituir (Enter)",
+    "replaceAll": "Substituir tudo",
+    "all": "Tudo",
+    "invalidRegex": "Regex inválida",
+    "noResults": "Nenhum resultado",
+    "found": {
+      "one": "{count, number} encontrado",
+      "other": "{count, number} encontrados"
+    },
+    "position": "{current, number} de {total, number}"
+  },
+  "goTo": {
+    "goToFile": "Ir para arquivo",
+    "commands": "Comandos",
+    "files": "Arquivos",
+    "runCommand": "Executar um comando",
+    "fieldLabel": "Ir para arquivo, ou :linha:coluna",
+    "placeholder": "Digite o nome de um arquivo, ou :linha",
+    "noCommands": "Nenhum comando encontrado.",
+    "noFolder": "Abra uma pasta para encontrar os arquivos dela. Digite > para ver os comandos.",
+    "noFiles": "Nenhum arquivo encontrado.",
+    "navigate": "Navegar",
+    "run": "Executar",
+    "goToLine": "Ir para linha",
+    "lineNoFile": "Abra um arquivo para ir a uma linha dele.",
+    "lineHint": "Digite o número de uma linha e, se quiser, :coluna, e pressione Enter.",
+    "lineTarget": "Ir para a linha {line, number}.",
+    "lineColumnTarget": "Ir para a linha {line, number}, coluna {column, number}."
+  },
+  "workspaceSwitcher": {
+    "openFolder": "Abrir pasta…",
+    "closeWorkspace": "Fechar espaço de trabalho",
+    "noWorkspace": "Nenhum espaço de trabalho",
+    "search": "Pesquisar espaços de trabalho",
+    "workspaces": "Espaços de trabalho",
+    "noMatches": "Nenhum espaço de trabalho encontrado",
+    "moreMatches": {
+      "one": "Mais {count, number} resultado. Continue digitando para refinar a busca.",
+      "other": "Mais {count, number} resultados. Continue digitando para refinar a busca."
+    },
+    "moreShort": {
+      "one": "Mais {count, number} — continue digitando",
+      "other": "Mais {count, number} — continue digitando"
+    },
+    "settingsFor": "Configurações de \"{name}\"",
+    "removeFromRecent": "Remover \"{name}\" dos recentes"
+  },
+  "feedback": {
+    "dismissMessage": "Dispensar mensagem",
+    "notifications": "Notificações",
+    "unsaved": {
+      "titleOne": "Salvar as alterações em {name}?",
+      "titleMany": {
+        "one": "Salvar as alterações em {count, number} arquivo?",
+        "other": "Salvar as alterações em {count, number} arquivos?"
+      },
+      "message": "Suas alterações serão perdidas se você não salvá-las.",
+      "dontSave": "Não salvar"
+    },
+    "update": {
+      "updateTo": "Atualizar para {version}",
+      "available": "O Vista {version} está disponível. Escolha para instalá-lo.",
+      "availableWithNotes": "O Vista {version} está disponível. {notes} Escolha para instalá-lo.",
+      "dismiss": "Dispensar o Vista {version}"
+    }
+  },
+  "shortcuts": {
+    "categories": {
+      "workspace": "Espaço de trabalho",
+      "file": "Arquivo",
+      "tabs": "Abas",
+      "edit": "Editar",
+      "selection": "Seleção",
+      "view": "Exibir",
+      "go": "Ir",
+      "settings": "Configurações"
+    }
+  },
+  "appearance": {
+    "themes": {
+      "daylight": "Luz do dia",
+      "neutral": "Neutro",
+      "midnight": "Meia-noite",
+      "ocean": "Oceano",
+      "forest": "Floresta",
+      "ember": "Brasa",
+      "cappuccino": "Cappuccino"
+    }
+  },
+  "whatsNew": {
+    "title": "Novidades do Vista {version}",
+    "released": "Lançado em {date}"
+  },
+  "changelog": {
+    "sections": {
+      "added": "Adicionado",
+      "changed": "Alterado",
+      "deprecated": "Obsoleto",
+      "removed": "Removido",
+      "fixed": "Corrigido",
+      "security": "Segurança"
     }
   }
 }

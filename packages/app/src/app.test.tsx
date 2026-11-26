@@ -1007,10 +1007,16 @@ describe("App", () => {
       // The navigation belongs to Settings, not to the section that was changed, so only a re-render from the
       // root shows it in the new language.
       expect(
-        await within(within(dialog).getByRole("navigation", { name: "Settings sections" })).findByRole("button", {
-          name: "Idioma",
-        }),
+        await within(within(dialog).getByRole("navigation", { name: "Secciones de la configuración" })).findByRole(
+          "button",
+          { name: "Idioma" },
+        ),
       ).toHaveAttribute("aria-current", "page");
+
+      // The commands are built once and kept, so they show the new language only if a language change rebuilds them.
+      await user.click(within(dialog).getByRole("button", { name: "Atajos de teclado" }));
+      expect(within(dialog).getByRole("heading", { name: "Archivo" })).toBeInTheDocument();
+      expect(within(dialog).getByRole("cell", { name: "Guardar" })).toBeInTheDocument();
     });
 
     it("shows the same section after a reload, and stays closed after a reload once closed", async () => {

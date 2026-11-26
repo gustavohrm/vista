@@ -1,9 +1,33 @@
 import { Fragment, useEffect, useId, useRef, type MouseEvent, type SyntheticEvent } from "react";
 
-import { type ChangelogEntry, inlineParts, isIsoDate } from "../../domain/changelog";
+import { CHANGELOG_HEADINGS, type ChangelogEntry, inlineParts, isIsoDate } from "../../domain/changelog";
+import { i18n, t } from "../../i18n";
+
+/** Each Keep a Changelog heading in the interface language; the pages keep them in English. */
+const HEADING_NAMES: Record<(typeof CHANGELOG_HEADINGS)[number], () => string> = {
+  Added: () => t("changelog.sections.added"),
+  Changed: () => t("changelog.sections.changed"),
+  Deprecated: () => t("changelog.sections.deprecated"),
+  Removed: () => t("changelog.sections.removed"),
+  Fixed: () => t("changelog.sections.fixed"),
+  Security: () => t("changelog.sections.security"),
+};
 
 /**
- * A release date as the reader's locale writes it, such as "November 13, 2026". The date names a day, not a
+ * An entry's heading as the interface shows it: a Keep a Changelog heading in the interface language, and any
+ * other heading as written.
+ *
+ * @param heading - The heading as the page writes it, such as `Fixed`.
+ * @returns The heading to show.
+ */
+function headingName(heading: string): string {
+  return (CHANGELOG_HEADINGS as readonly string[]).includes(heading)
+    ? HEADING_NAMES[heading as (typeof CHANGELOG_HEADINGS)[number]]()
+    : heading;
+}
+
+/**
+ * A release date as the interface language writes it, such as "November 13, 2026". The date names a day, not a
  * moment, so it is read and written in UTC and never shifts by a day with the reader's time zone.
  *
  * @param date - The date as `YYYY-MM-DD`.
@@ -11,7 +35,10 @@ import { type ChangelogEntry, inlineParts, isIsoDate } from "../../domain/change
  */
 export function formatReleaseDate(date: string): string {
   return isIsoDate(date)
-    ? new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, { dateStyle: "long", timeZone: "UTC" })
+    ? i18n.formatDate(new Date(`${date}T00:00:00Z`), {
+        dateStyle: "long",
+        timeZone: "UTC",
+      })
     : date;
 }
 
@@ -85,15 +112,21 @@ export function WhatsNewDialog({ entry, onClose }: WhatsNewDialogProps) {
         <div className="flex items-start gap-2">
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <h2 id={titleId} className="text-text-strong text-[15px] leading-snug font-semibold">
-              What&apos;s new in Vista {entry.version}
+              {t("whatsNew.title", { version: entry.version })}
             </h2>
-            {entry.date && <p className="text-text-faint text-xs">Released {formatReleaseDate(entry.date)}</p>}
+            {entry.date && (
+              <p className="text-text-faint text-xs">
+                {t("whatsNew.released", {
+                  date: formatReleaseDate(entry.date),
+                })}
+              </p>
+            )}
           </div>
           {/* No tooltip: the dialog focuses this button as it opens, which would show one at once. */}
           <button
             ref={closeButtonRef}
             type="button"
-            aria-label="Close"
+            aria-label={t("common.close")}
             onClick={onClose}
             className="icon-button text-text-faint -mt-1 -mr-1.5 size-7 flex-none text-base"
           >
@@ -105,7 +138,7 @@ export function WhatsNewDialog({ entry, onClose }: WhatsNewDialogProps) {
           {entry.sections.map((section, sectionIndex) => (
             // oxlint-disable-next-line react/no-array-index-key -- an entry's sections never reorder, and a heading may repeat on an older page
             <section key={sectionIndex} className="flex flex-col gap-1.5">
-              <h3 className="text-text-strong font-semibold">{section.heading}</h3>
+              <h3 className="text-text-strong font-semibold">{headingName(section.heading)}</h3>
               <ul className="text-text-muted flex list-outside list-disc flex-col gap-1 pl-5">
                 {section.items.map((item, itemIndex) => (
                   // oxlint-disable-next-line react/no-array-index-key -- the bullets never reorder, and two may read the same

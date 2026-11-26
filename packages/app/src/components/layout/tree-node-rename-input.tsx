@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import { validateEntryName } from "../../domain/path-validation";
+import { t } from "../../i18n";
 
 /** Horizontal distance between nested tree levels, in pixels. */
 export const TREE_INDENT_PX = 16;
@@ -88,7 +89,7 @@ export function TreeEntryNameInput({
             }
           }}
           onBlur={commit}
-          aria-label="Entry name"
+          aria-label={t("rename.entryName")}
           aria-invalid={error !== null}
           aria-describedby={error !== null ? errorId : undefined}
           className="ipt ghost edgeless inline-field h-6 min-h-0 min-w-0 flex-1 px-1 py-0 text-[13px]"

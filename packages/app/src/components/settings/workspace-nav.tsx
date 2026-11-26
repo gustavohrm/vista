@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 import { matchWorkspaceName } from "../../domain/workspaces";
+import { t } from "../../i18n";
 import { Tooltip } from "../feedback/tooltip";
 import type { ManagedWorkspace } from "./workspace-manager";
 import { WorkspaceNavItem } from "./workspace-nav-item";
@@ -92,23 +93,29 @@ export function WorkspaceNav({
           <input
             ref={inputRef}
             type="search"
-            aria-label="Search workspaces"
-            placeholder="Search workspaces"
+            aria-label={t("settings.nav.searchPlaceholder")}
+            placeholder={t("settings.nav.searchPlaceholder")}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={handleSearchKeyDown}
             className="vista-fade text-text-strong placeholder:text-text-faint border-line h-6 w-32 min-w-0 rounded-md border bg-transparent px-1.5 text-xs outline-none focus-visible:border-[var(--focus-ring)] md:w-auto md:flex-1 md:rounded-none md:border-x-0 md:border-t-0 md:border-b-transparent md:px-0 md:font-medium md:focus-visible:border-b-[var(--focus-ring)]"
           />
         ) : (
-          <span className="text-text-faint hidden flex-1 text-xs font-medium md:block">Workspaces</span>
+          <span className="text-text-faint hidden flex-1 text-xs font-medium md:block">
+            {t("settings.nav.heading")}
+          </span>
         )}
-        <Tooltip text={isSearching ? "Close Search" : "Search Workspaces"} position="bottom" className="flex flex-none">
+        <Tooltip
+          text={isSearching ? t("settings.nav.closeSearch") : t("settings.nav.search")}
+          position="bottom"
+          className="flex flex-none"
+        >
           {(bubbleId) => (
             <button
               ref={searchButtonRef}
               type="button"
               onClick={isSearching ? closeSearch : openSearch}
-              aria-label={isSearching ? "Close Search" : "Search Workspaces"}
+              aria-label={isSearching ? t("settings.nav.closeSearch") : t("settings.nav.search")}
               aria-describedby={bubbleId}
               className="icon-button size-7 text-base md:size-6 md:text-sm"
             >
@@ -116,12 +123,12 @@ export function WorkspaceNav({
             </button>
           )}
         </Tooltip>
-        <Tooltip text="New Workspace" position="bottom" className="flex flex-none">
+        <Tooltip text={t("settings.nav.newWorkspace")} position="bottom" className="flex flex-none">
           {(bubbleId) => (
             <button
               type="button"
               onClick={onNewWorkspace}
-              aria-label="New Workspace…"
+              aria-label={t("settings.nav.newWorkspaceLabel")}
               aria-describedby={bubbleId}
               className="icon-button size-7 text-base md:size-6 md:text-sm"
             >
@@ -142,7 +149,7 @@ export function WorkspaceNav({
       </div>
       {hasQuery && listed.length === 0 && (
         <p className="text-text-muted flex h-7 flex-none items-center px-2.5 text-[13px] whitespace-nowrap">
-          No matching workspaces
+          {t("settings.nav.noMatches")}
         </p>
       )}
       {hasMore && (
@@ -155,7 +162,7 @@ export function WorkspaceNav({
           data-see-all
           className="text-text-muted hover:text-text hover:bg-hover flex h-7 flex-none cursor-pointer items-center rounded-md px-2.5 text-[13px] whitespace-nowrap transition-colors duration-100 outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] md:w-full"
         >
-          See all
+          {t("settings.nav.seeAll")}
         </button>
       )}
     </>

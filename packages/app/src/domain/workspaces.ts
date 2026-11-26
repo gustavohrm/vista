@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { ViewMode } from "../ports";
 
 /** Icons a workspace can show. Each needs a literal `ic-*` class where it renders. */
@@ -57,7 +58,6 @@ export function parseWorkspaceColor(value: unknown): WorkspaceColor {
 }
 
 export const MAX_WORKSPACE_NAME_LENGTH = 80;
-const FALLBACK_WORKSPACE_NAME = "Untitled workspace";
 
 /** Where a workspace's details live: Vista's own storage, or `.vista/workspace.json` in its home folder. */
 export type WorkspaceStorage = "device" | "folder";
@@ -95,7 +95,11 @@ export interface WorkspaceList {
 }
 
 export const WORKSPACES_STORAGE_KEY = "vista.workspaces";
-export const EMPTY_WORKSPACE_LIST: WorkspaceList = { version: 1, lastWorkspaceId: null, workspaces: [] };
+export const EMPTY_WORKSPACE_LIST: WorkspaceList = {
+  version: 1,
+  lastWorkspaceId: null,
+  workspaces: [],
+};
 
 export interface WorkspaceListRead {
   list: WorkspaceList;
@@ -137,7 +141,7 @@ function parseWorkspaceRecord(value: unknown): WorkspaceRecord | null {
   }
   const fields: WorkspaceRecordFields = {
     id: value.id,
-    name: parseName(value.name) ?? FALLBACK_WORKSPACE_NAME,
+    name: parseName(value.name) ?? t("workspace.untitled"),
     icon: parseIcon(value.icon),
     color: parseWorkspaceColor(value.color),
     folderIds: [...value.folderIds],
@@ -150,7 +154,11 @@ function parseWorkspaceRecord(value: unknown): WorkspaceRecord | null {
   if (value.storage !== "folder") {
     return { ...fields, storage: "device" };
   }
-  return { ...fields, storage: "folder", locations: parseLocations(value.locations, fields.folderIds) };
+  return {
+    ...fields,
+    storage: "folder",
+    locations: parseLocations(value.locations, fields.folderIds),
+  };
 }
 
 // Keeps the locations that name one of the workspace's folders; the home location is always its first.
@@ -233,7 +241,10 @@ export function matchWorkspaceName(name: string, query: string): NameMatch | nul
  */
 export function rankWorkspacesByName<T extends { name: string }>(workspaces: readonly T[], query: string): T[] {
   return workspaces
-    .map((workspace) => ({ workspace, match: matchWorkspaceName(workspace.name, query) }))
+    .map((workspace) => ({
+      workspace,
+      match: matchWorkspaceName(workspace.name, query),
+    }))
     .filter((entry): entry is { workspace: T; match: NameMatch } => entry.match !== null)
     .sort((a, b) => NAME_MATCH_ORDER.indexOf(a.match) - NAME_MATCH_ORDER.indexOf(b.match))
     .map((entry) => entry.workspace);
@@ -244,10 +255,13 @@ export type NameCheck = { ok: true; name: string } | { ok: false; message: strin
 export function validateWorkspaceName(name: string): NameCheck {
   const trimmed = name.trim();
   if (trimmed === "") {
-    return { ok: false, message: "Enter a name." };
+    return { ok: false, message: t("workspace.nameRequired") };
   }
   if (trimmed.length > MAX_WORKSPACE_NAME_LENGTH) {
-    return { ok: false, message: `Use at most ${MAX_WORKSPACE_NAME_LENGTH} characters.` };
+    return {
+      ok: false,
+      message: t("workspace.nameTooLong", { count: MAX_WORKSPACE_NAME_LENGTH }),
+    };
   }
   return { ok: true, name: trimmed };
 }
@@ -292,7 +306,12 @@ export function parseSession(stored: string | null): Session {
   // The stored index counts damaged tabs too, so it is followed to its tab rather than reused as is.
   const storedActive = Number.isInteger(value.activeIndex) ? parsed[value.activeIndex as number] : undefined;
   const activeIndex = tabs.length === 0 ? -1 : storedActive ? tabs.indexOf(storedActive) : 0;
-  return { version: 1, tabs, activeIndex, expanded: parseExpanded(value.expanded) };
+  return {
+    version: 1,
+    tabs,
+    activeIndex,
+    expanded: parseExpanded(value.expanded),
+  };
 }
 
 function parseSessionTab(value: unknown): SessionTab | null {
@@ -304,7 +323,11 @@ function parseSessionTab(value: unknown): SessionTab | null {
   ) {
     return null;
   }
-  return { folderId: value.folderId, path: value.path, viewMode: value.viewMode };
+  return {
+    folderId: value.folderId,
+    path: value.path,
+    viewMode: value.viewMode,
+  };
 }
 
 function parseExpanded(value: unknown): Record<string, string[]> {
@@ -351,7 +374,7 @@ export function parseWorkspaceFile(text: string, homeFolderName: string): Worksp
   return {
     status: "ok",
     details: {
-      name: parseName(value.name) ?? parseName(homeFolderName) ?? FALLBACK_WORKSPACE_NAME,
+      name: parseName(value.name) ?? parseName(homeFolderName) ?? t("workspace.untitled"),
       icon: parseIcon(value.icon),
       color: parseWorkspaceColor(value.color),
       folders,

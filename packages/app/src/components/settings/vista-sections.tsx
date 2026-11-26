@@ -1,6 +1,6 @@
 import { useId, useState, type ReactNode } from "react";
 
-import { COMMAND_CATEGORIES, formatShortcut, type Command } from "../../commands";
+import { categoryLabel, COMMAND_CATEGORIES, formatShortcut, type Command } from "../../commands";
 import {
   THEMES,
   type ContrastLevel,
@@ -17,6 +17,7 @@ import {
   type EditorSettings,
   type Settings,
 } from "../../domain/settings";
+import { t } from "../../i18n";
 import type { SettingsChanges } from "../../state/settings";
 import { useAppearanceLevels } from "../../theme/appearance";
 import type { ThemeState } from "../../theme/theme-manager";
@@ -25,25 +26,56 @@ import { GroupHeading, SectionHeading, SettingsGroup, SettingsRow, Switch } from
 import { formatReleaseDate, WhatsNewDialog } from "./whats-new-dialog";
 
 // Each icon up a pixel: centred on the text box, a glyph sits below the middle of the capitals beside it.
-const SCHEME_OPTIONS: readonly { value: SchemePreference; label: string; icon: ReactNode }[] = [
-  { value: "system", label: "System", icon: <i className="ic-monitor -translate-y-px text-sm" aria-hidden="true" /> },
-  { value: "light", label: "Light", icon: <i className="ic-sun -translate-y-px text-sm" aria-hidden="true" /> },
-  { value: "dark", label: "Dark", icon: <i className="ic-moon -translate-y-px text-sm" aria-hidden="true" /> },
+// Labels are functions, so they are read in the interface language at each render.
+const SCHEME_OPTIONS: readonly {
+  value: SchemePreference;
+  label: () => string;
+  icon: ReactNode;
+}[] = [
+  {
+    value: "system",
+    label: () => t("common.system"),
+    icon: <i className="ic-monitor -translate-y-px text-sm" aria-hidden="true" />,
+  },
+  {
+    value: "light",
+    label: () => t("settings.appearance.scheme.light"),
+    icon: <i className="ic-sun -translate-y-px text-sm" aria-hidden="true" />,
+  },
+  {
+    value: "dark",
+    label: () => t("settings.appearance.scheme.dark"),
+    icon: <i className="ic-moon -translate-y-px text-sm" aria-hidden="true" />,
+  },
 ];
 
 type ContrastCard = Exclude<ContrastPreference, "system">;
 type MotionCard = Exclude<MotionPreference, "system">;
 
-const CONTRAST_CARDS: readonly { value: ContrastCard; label: string }[] = [
-  { value: "standard", label: "Standard" },
-  { value: "more", label: "More" },
+const CONTRAST_CARDS: readonly { value: ContrastCard; label: () => string }[] = [
+  {
+    value: "standard",
+    label: () => t("settings.appearance.contrast.standard"),
+  },
+  { value: "more", label: () => t("settings.appearance.contrast.more") },
 ];
 
-const MOTION_CARDS: readonly { value: MotionCard; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "reduced", label: "Reduced" },
-  { value: "none", label: "None" },
+const MOTION_CARDS: readonly { value: MotionCard; label: () => string }[] = [
+  { value: "all", label: () => t("settings.appearance.motion.all") },
+  { value: "reduced", label: () => t("settings.appearance.motion.reduced") },
+  { value: "none", label: () => t("settings.appearance.motion.none") },
 ];
+
+/** Each theme's name in the interface language. */
+const THEME_NAMES: Record<ThemeId, () => string> = {
+  daylight: () => t("appearance.themes.daylight"),
+  neutral: () => t("appearance.themes.neutral"),
+  midnight: () => t("appearance.themes.midnight"),
+  ocean: () => t("appearance.themes.ocean"),
+  forest: () => t("appearance.themes.forest"),
+  ember: () => t("appearance.themes.ember"),
+  cappuccino: () => t("appearance.themes.cappuccino"),
+};
 
 /** The segments of a choice of a few short options, in one hairline box like the view switch. */
 const SEGMENT_CLASS =
@@ -220,7 +252,7 @@ function PreviewChoice<T extends string>({
                   aria-hidden="true"
                   className="border-line text-text-muted rounded border px-1 text-[10.5px] leading-4"
                 >
-                  System
+                  {t("common.system")}
                 </span>
               )}
             </span>
@@ -263,7 +295,7 @@ function MatchSystemToggle({
         >
           {/* Up a pixel: centred on the text box, the monitor's stand pulls it below the capitals' middle. */}
           <i className="ic-monitor -translate-y-px text-sm" aria-hidden="true" />
-          Match system
+          {t("settings.appearance.matchSystem")}
         </button>
       )}
     </Tooltip>
@@ -304,19 +336,22 @@ export function AppearanceSection({ theme, settings, onChange }: AppearanceSecti
   };
   return (
     <>
-      <SectionHeading title="Appearance" lead="How Vista looks, in every workspace." />
+      <SectionHeading title={t("settings.appearance.title")} lead={t("settings.appearance.lead")} />
       <GroupHeading id={id("color")} isFirst>
-        Colour
+        {t("settings.appearance.colour")}
       </GroupHeading>
       <SettingsGroup labelledBy={id("color")}>
         <SettingsRow
-          label="Scheme"
+          label={t("settings.appearance.scheme.label")}
           labelId={id("scheme")}
-          description="Light or dark. System follows your operating system and changes with it."
+          description={t("settings.appearance.scheme.description")}
           descriptionId={id("scheme-description")}
         >
           <SegmentedChoice
-            options={SCHEME_OPTIONS}
+            options={SCHEME_OPTIONS.map((option) => ({
+              ...option,
+              label: option.label(),
+            }))}
             value={theme.scheme}
             onChange={theme.setScheme}
             labelId={id("scheme")}
@@ -324,9 +359,9 @@ export function AppearanceSection({ theme, settings, onChange }: AppearanceSecti
           />
         </SettingsRow>
         <SettingsRow
-          label="Theme"
+          label={t("settings.appearance.theme.label")}
           labelId={id("theme")}
-          description="The interface's colours. Each theme has a light and a dark version."
+          description={t("settings.appearance.theme.description")}
           descriptionId={id("theme-description")}
         >
           <div
@@ -346,7 +381,7 @@ export function AppearanceSection({ theme, settings, onChange }: AppearanceSecti
                   className="sr-only"
                 />
                 <ThemePreview theme={option.id} contrast={levels.contrast} />
-                <span className="px-0.5 font-medium">{option.label}</span>
+                <span className="px-0.5 font-medium">{THEME_NAMES[option.id]()}</span>
               </label>
             ))}
           </div>
@@ -357,19 +392,20 @@ export function AppearanceSection({ theme, settings, onChange }: AppearanceSecti
         id={id("contrast")}
         action={
           <MatchSystemToggle
-            hint="Follow your operating system's contrast setting"
+            hint={t("settings.appearance.contrast.hint")}
             isOn={contrast === "system"}
             onToggle={(isOn) => chooseContrast(isOn ? "system" : shownContrast)}
           />
         }
       >
-        Contrast
+        {t("settings.appearance.contrast.title")}
       </GroupHeading>
       <SettingsGroup>
         <div className="p-3">
           <PreviewChoice
             cards={CONTRAST_CARDS.map((card) => ({
-              ...card,
+              value: card.value,
+              label: card.label(),
               preview: <ThemePreview theme={theme.theme} contrast={card.value} />,
             }))}
             value={shownContrast}
@@ -384,18 +420,22 @@ export function AppearanceSection({ theme, settings, onChange }: AppearanceSecti
         id={id("motion")}
         action={
           <MatchSystemToggle
-            hint="Follow your operating system's reduced-motion setting"
+            hint={t("settings.appearance.motion.hint")}
             isOn={motion === "system"}
             onToggle={(isOn) => chooseMotion(isOn ? "system" : shownMotion)}
           />
         }
       >
-        Motion
+        {t("settings.appearance.motion.title")}
       </GroupHeading>
       <SettingsGroup>
         <div className="p-3">
           <PreviewChoice
-            cards={MOTION_CARDS.map((card) => ({ ...card, preview: <MotionPreview level={card.value} /> }))}
+            cards={MOTION_CARDS.map((card) => ({
+              value: card.value,
+              label: card.label(),
+              preview: <MotionPreview level={card.value} />,
+            }))}
             value={shownMotion}
             systemValue={systemMotion}
             onChoose={chooseMotion}
@@ -408,17 +448,42 @@ export function AppearanceSection({ theme, settings, onChange }: AppearanceSecti
   );
 }
 
-/** The editor's switches, in the order Settings and the editor's gear menu list them, with the same labels. */
-export const EDITOR_OPTIONS: readonly { name: keyof EditorSettings; label: string; description: string }[] = [
-  { name: "lineNumbers", label: "Line numbers", description: "Numbers each line." },
-  {
-    name: "wordWrap",
-    label: "Word wrap",
-    description: `Breaks long lines at the window's edge instead of scrolling sideways. ${formatShortcut("Alt+Z")} switches it.`,
-  },
-  { name: "minimap", label: "Minimap", description: "Shows an outline of the whole file beside it." },
-  { name: "vim", label: "Vim mode", description: "Edits with Vim's keys and modes." },
-];
+/**
+ * The editor's switches, in the order Settings and the editor's gear menu list them, with the same labels.
+ * A function, so the text is read in the interface language each time.
+ *
+ * @returns Each switch's setting, label, and description.
+ */
+export function editorOptions(): readonly {
+  name: keyof EditorSettings;
+  label: string;
+  description: string;
+}[] {
+  return [
+    {
+      name: "lineNumbers",
+      label: t("settings.editor.lineNumbers.label"),
+      description: t("settings.editor.lineNumbers.description"),
+    },
+    {
+      name: "wordWrap",
+      label: t("settings.editor.wordWrap.label"),
+      description: t("settings.editor.wordWrap.description", {
+        shortcut: formatShortcut("Alt+Z"),
+      }),
+    },
+    {
+      name: "minimap",
+      label: t("settings.editor.minimap.label"),
+      description: t("settings.editor.minimap.description"),
+    },
+    {
+      name: "vim",
+      label: t("settings.editor.vim.label"),
+      description: t("settings.editor.vim.description"),
+    },
+  ];
+}
 
 interface SettingsSectionProps {
   settings: Settings;
@@ -435,9 +500,9 @@ export function EditorSection({ settings, onChange }: SettingsSectionProps) {
   const idPrefix = useId();
   return (
     <>
-      <SectionHeading title="Editor" lead="How the raw editor shows and edits text, in every workspace." />
+      <SectionHeading title={t("settings.editor.title")} lead={t("settings.editor.lead")} />
       <SettingsGroup>
-        {EDITOR_OPTIONS.map(({ name, label, description }) => (
+        {editorOptions().map(({ name, label, description }) => (
           <SettingsRow
             key={name}
             label={label}
@@ -472,19 +537,22 @@ export function FilesSection({ settings, onChange }: SettingsSectionProps) {
 
   return (
     <>
-      <SectionHeading title="Files" lead="Which files Vista opens, in every workspace." />
+      <SectionHeading title={t("settings.files.title")} lead={t("settings.files.lead")} />
       <SettingsGroup>
         <SettingsRow
-          label="Largest file to open (MB)"
+          label={t("settings.files.maxOpenSize.label")}
           htmlFor={sizeId}
           descriptionId={sizeHintId}
           description={
             isSizeValid ? (
-              "Larger files are not opened, so the editor stays responsive."
+              t("settings.files.maxOpenSize.description")
             ) : (
               <span role="alert" className="text-destructive">
-                Enter a whole number from {MIN_OPEN_SIZE_MB} to {MAX_OPEN_SIZE_MB_LIMIT}. The limit stays at{" "}
-                {settings.files.maxOpenSizeMb} MB.
+                {t("settings.files.maxOpenSize.invalid", {
+                  min: MIN_OPEN_SIZE_MB,
+                  max: MAX_OPEN_SIZE_MB_LIMIT,
+                  current: settings.files.maxOpenSizeMb,
+                })}
               </span>
             )
           }
@@ -524,20 +592,29 @@ export function ShortcutsSection({ commands }: { commands: readonly Command[] })
   const idPrefix = useId();
   const withKeys = commands.flatMap((command) => {
     const shortcut = command.shortcut ?? command.shortcutHint;
-    return shortcut ? [{ id: command.id, label: command.label, category: command.category, shortcut }] : [];
+    return shortcut
+      ? [
+          {
+            id: command.id,
+            label: command.label,
+            category: command.category,
+            shortcut,
+          },
+        ]
+      : [];
   });
   const categories = COMMAND_CATEGORIES.map((category) => ({
-    label: category,
+    id: category,
     rows: withKeys.filter((row) => row.category === category),
   })).filter((category) => category.rows.length > 0);
 
   return (
     <>
-      <SectionHeading title="Keyboard Shortcuts" lead="The keys for Vista's commands, the same in every workspace." />
+      <SectionHeading title={t("settings.shortcuts.title")} lead={t("settings.shortcuts.lead")} />
       {categories.map((category, index) => (
-        <div key={category.label}>
+        <div key={category.id}>
           <GroupHeading id={`${idPrefix}-${index}`} isFirst={index === 0}>
-            {category.label}
+            {categoryLabel(category.id)}
           </GroupHeading>
           <div className="border-line rounded-[10px] border">
             <table
@@ -597,14 +674,18 @@ export function AboutSection({ platform, version, entry, onCheckForUpdates, sett
 
   return (
     <>
-      <SectionHeading
-        title="About"
-        lead="Vista edits a folder of Markdown, CSV, and text files, as raw text or rendered."
-      />
+      <SectionHeading title={t("settings.about.title")} lead={t("settings.about.lead")} />
       <SettingsGroup>
         <SettingsRow
           label={`Vista ${version}`}
-          description={`${entry?.date ? `Released ${formatReleaseDate(entry.date)}. ` : ""}Running in the ${platform === "native" ? "desktop app" : "browser"}.`}
+          description={
+            entry?.date
+              ? t("settings.about.releasedAndRunning", {
+                  date: formatReleaseDate(entry.date),
+                  platform,
+                })
+              : t("settings.about.running", { platform })
+          }
         >
           {onCheckForUpdates && (
             <button
@@ -614,22 +695,25 @@ export function AboutSection({ platform, version, entry, onCheckForUpdates, sett
               aria-busy={isChecking || undefined}
               className="btn sm"
             >
-              Check for Updates
+              {t("settings.about.checkForUpdates")}
             </button>
           )}
         </SettingsRow>
         {entry && (
-          <SettingsRow label="What's New" description={entry.description || `The changes in Vista ${version}.`}>
+          <SettingsRow
+            label={t("settings.about.whatsNew")}
+            description={entry.description || t("settings.about.whatsNewDescription", { version })}
+          >
             <button type="button" onClick={() => setIsWhatsNewShown(true)} className="btn sm">
-              What&apos;s New
+              {t("settings.about.whatsNew")}
             </button>
           </SettingsRow>
         )}
         {onCheckForUpdates && (
           <SettingsRow
-            label="Check at startup"
+            label={t("settings.about.checkAtStartup.label")}
             htmlFor={checkAtStartupId}
-            description="Asks vista.coden.dev for a newer version each time Vista starts. Check for Updates works either way."
+            description={t("settings.about.checkAtStartup.description")}
             descriptionId={`${checkAtStartupId}-description`}
           >
             <Switch
