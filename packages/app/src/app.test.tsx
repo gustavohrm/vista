@@ -994,6 +994,25 @@ describe("App", () => {
       expect(within(dialog).getByRole("switch", { name: "Word wrap" })).toBeInTheDocument();
     });
 
+    it("changes the text outside the Language section at once when a language is chosen", async () => {
+      const user = userEvent.setup();
+      render(<App adapter={{ platform: "web", workspace: createMockWorkspaceCapability() }} />);
+      await screen.findByRole("button", { name: "Open Folder…" });
+
+      await user.keyboard("{Control>},{/Control}");
+      const dialog = await settingsDialog();
+      await user.click(within(dialog).getByRole("button", { name: "Language" }));
+      await user.selectOptions(within(dialog).getByRole("combobox", { name: "Language" }), "Español");
+
+      // The navigation belongs to Settings, not to the section that was changed, so only a re-render from the
+      // root shows it in the new language.
+      expect(
+        await within(within(dialog).getByRole("navigation", { name: "Settings sections" })).findByRole("button", {
+          name: "Idioma",
+        }),
+      ).toHaveAttribute("aria-current", "page");
+    });
+
     it("shows the same section after a reload, and stays closed after a reload once closed", async () => {
       const user = userEvent.setup();
       const adapter = { platform: "web" as const, workspace: createMockWorkspaceCapability() };

@@ -42,8 +42,8 @@ describe("LanguageSection", () => {
 
     await user.selectOptions(screen.getByRole("combobox", { name: "Language" }), "English");
 
-    await waitFor(() => expect(screen.getByRole("combobox", { name: "Language" })).toHaveValue("en"));
-    expect(localStorage.getItem(LOCALE_STORAGE_KEY)).toBe(JSON.stringify({ locale: "en" }));
+    await waitFor(() => expect(localStorage.getItem(LOCALE_STORAGE_KEY)).toBe(JSON.stringify({ locale: "en" })));
+    expect(screen.getByRole("combobox", { name: "Language" })).toHaveValue("en");
   });
 
   it("goes back to System and the system's language when System is chosen", async () => {
