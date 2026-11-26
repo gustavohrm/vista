@@ -260,11 +260,11 @@ The ratios each theme's tokens reach, as painted in the browser by `apps/web/tes
 
 | Forest                           | Light   | Dark    | Light, More | Dark, More |
 | -------------------------------- | ------- | ------- | ----------- | ---------- |
-| Text                             | 16.85:1 | 13.83:1 | 16.85:1     | 13.83:1    |
+| Text                             | 17.07:1 | 13.83:1 | 17.07:1     | 13.83:1    |
 | Muted text                       | 6.31:1  | 6.98:1  | 10.44:1     | 8.25:1     |
 | Secondary text                   | 8.23:1  | 7.91:1  | 8.23:1      | 7.91:1     |
 | Faint text                       | 4.59:1  | 4.00:1  | 8.44:1      | 7.05:1     |
-| Text on a hover or selected fill | 14.28:1 | 12.48:1 | 4.88:1      | 4.79:1     |
+| Text on a hover or selected fill | 14.95:1 | 12.48:1 | 5.11:1      | 4.79:1     |
 | Focus ring                       | 5.60:1  | 8.07:1  | 5.60:1      | 8.07:1     |
 | Control border                   | 4.64:1  | 3.67:1  | 6.19:1      | 5.52:1     |
 | Lines                            | 1.14:1  | 1.20:1  | 4.16:1      | 4.35:1     |
@@ -290,11 +290,11 @@ The ratios each theme's tokens reach, as painted in the browser by `apps/web/tes
 
 | Cappuccino                       | Light   | Dark    | Light, More | Dark, More |
 | -------------------------------- | ------- | ------- | ----------- | ---------- |
-| Text                             | 16.48:1 | 14.06:1 | 16.48:1     | 14.06:1    |
+| Text                             | 16.83:1 | 14.06:1 | 16.83:1     | 14.06:1    |
 | Muted text                       | 6.22:1  | 6.68:1  | 10.29:1     | 8.38:1     |
 | Secondary text                   | 8.79:1  | 7.94:1  | 8.79:1      | 7.94:1     |
 | Faint text                       | 4.49:1  | 3.84:1  | 8.42:1      | 7.18:1     |
-| Text on a hover or selected fill | 14.00:1 | 12.85:1 | 4.76:1      | 4.84:1     |
+| Text on a hover or selected fill | 14.82:1 | 12.85:1 | 5.04:1      | 4.84:1     |
 | Focus ring                       | 6.39:1  | 8.71:1  | 6.39:1      | 8.71:1     |
 | Control border                   | 4.68:1  | 4.13:1  | 6.12:1      | 5.50:1     |
 | Lines                            | 1.15:1  | 1.17:1  | 4.16:1      | 4.34:1     |

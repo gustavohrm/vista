@@ -271,7 +271,7 @@
   --color-control-border: light-dark(#77735f, #6c7760);
   --color-text: light-dark(#0a0c06, #ecefe4);
   --color-text-secondary: light-dark(#45473a, #b3b8a4);
-  --color-text-strong: light-dark(#0c0e08, #f4f6ee);
+  --color-text-strong: light-dark(#050602, #f4f6ee);
   --color-text-hover: light-dark(#3d4033, #d3d8c6);
   --color-text-contrast: light-dark(#f8f6ee, #0e120c);
   --color-primary: light-dark(#2f6b2a, #86c06c);
@@ -353,7 +353,7 @@
   --color-control-border: light-dark(#7d6e60, #87786b);
   --color-text: light-dark(#0f0b07, #f3ece4);
   --color-text-secondary: light-dark(#4a3f34, #bfb2a4);
-  --color-text-strong: light-dark(#130e09, #faf5ef);
+  --color-text-strong: light-dark(#080503, #faf5ef);
   --color-text-hover: light-dark(#43382e, #ddd2c5);
   --color-text-contrast: light-dark(#f7f3ed, #14100d);
   --color-primary: light-dark(#6f4e37, #d4b08c);
