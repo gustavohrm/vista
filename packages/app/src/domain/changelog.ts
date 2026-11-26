@@ -44,6 +44,8 @@ export interface InlinePart {
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const PLACEHOLDER = /^TODO\b/i;
+// In Spanish and Portuguese, "Todo" (all) starts ordinary sentences, so a translation's marker must be in capitals.
+const TRANSLATION_PLACEHOLDER = /^TODO\b/;
 // A file name the index may link: a version, as the release tag names it, and `.md`.
 const PAGE_NAME = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?\.md$/;
 // A list item in the index, whether or not it is a link the index can read.
