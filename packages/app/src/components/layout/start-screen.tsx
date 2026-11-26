@@ -2,7 +2,8 @@ import { motion } from "motion/react";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { formatShortcut } from "../../commands";
-import type { DesktopDownload } from "../../domain/desktop-download";
+import { desktopDownloadLabel, type DesktopDownload } from "../../domain/desktop-download";
+import { i18n, t } from "../../i18n";
 import { useReducedMotion } from "../../theme/appearance";
 import { LOGO_WRITE_MS, LogoWrite } from "../brand/logo-write";
 import { VistaLoader, VistaLogo } from "../brand/vista-logo";
@@ -87,7 +88,7 @@ export function StartScreen({
   if (!hasWorkspace && isLoading) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center p-6">
-        <VistaLoader label="Opening folder…" className="h-10 w-12" />
+        <VistaLoader label={t("startScreen.openingFolder")} className="h-10 w-12" />
       </div>
     );
   }
@@ -113,18 +114,18 @@ export function StartScreen({
     <div className="flex min-h-0 flex-1 justify-center overflow-y-auto p-6">
       <Intro entrance={entrance}>
         <section aria-labelledby="start-list" className="flex flex-col gap-1.5">
-          <Heading id="start-list">Start</Heading>
+          <Heading id="start-list">{t("startScreen.start")}</Heading>
           <ul className="-mx-2 flex flex-col gap-px">
             <li>
               <button type="button" onClick={onOpenFolder} className={ROW_CLASS}>
                 <i className="ic-folder-open text-text-muted flex-none text-base" aria-hidden="true" />
-                <span className="text-text-strong flex-1">Open Folder…</span>
+                <span className="text-text-strong flex-1">{t("startScreen.openFolder")}</span>
               </button>
             </li>
             <li>
               <button type="button" onClick={onOpenSettings} className={ROW_CLASS}>
                 <i className="ic-settings text-text-muted flex-none text-base" aria-hidden="true" />
-                <span className="text-text-strong flex-1">Settings</span>
+                <span className="text-text-strong flex-1">{t("common.settings")}</span>
                 <kbd aria-hidden="true" className="shortcut-key flex-none">
                   {formatShortcut(settingsShortcut)}
                 </kbd>
@@ -137,12 +138,12 @@ export function StartScreen({
                   // Like the rail's, so the click downloads rather than navigating away from the app.
                   download
                   // The label names the link and the version describes it, rather than both making up its name.
-                  aria-label={desktopDownload.label}
+                  aria-label={desktopDownloadLabel(desktopDownload)}
                   aria-describedby={desktopDownload.version ? downloadVersionId : undefined}
                   className={ROW_CLASS}
                 >
                   <i className="ic-monitor-down text-text-muted flex-none text-base" aria-hidden="true" />
-                  <span className="text-text-strong flex-1">{desktopDownload.label}</span>
+                  <span className="text-text-strong flex-1">{desktopDownloadLabel(desktopDownload)}</span>
                   {desktopDownload.version && (
                     <span id={downloadVersionId} className="text-text-faint flex-none text-xs">
                       v{desktopDownload.version}
@@ -155,7 +156,7 @@ export function StartScreen({
         </section>
         {recents.length > 0 && (
           <section aria-labelledby="recent-workspaces" className="flex flex-col gap-1.5">
-            <Heading id="recent-workspaces">Recent workspaces</Heading>
+            <Heading id="recent-workspaces">{t("startScreen.recentWorkspaces")}</Heading>
             <ul className="-mx-2 flex flex-col gap-px">
               {recents.map((workspace) => (
                 <RecentEntry
@@ -285,21 +286,21 @@ function Intro({ entrance, children }: { entrance: "single-stroke" | "opening"; 
 }
 
 /**
- * When a workspace was last opened, as a short date: "Today", "Yesterday", the month and day this
- * year, or the full date before that.
+ * When a workspace was last opened, as a short date in the interface language: "Today", "Yesterday",
+ * the month and day this year, or the full date before that.
  */
 export function formatLastOpened(timestamp: number, now = Date.now()): string {
   const day = new Date(timestamp);
   const today = new Date(now);
   const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
   if (timestamp >= startOfToday) {
-    return "Today";
+    return t("startScreen.today");
   }
   // The local start of yesterday, not 24 hours back, since a day a clock change shifts is 23 or 25 hours.
   if (timestamp >= new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1).getTime()) {
-    return "Yesterday";
+    return t("startScreen.yesterday");
   }
-  return day.toLocaleDateString(undefined, {
+  return i18n.formatDate(day, {
     month: "short",
     day: "numeric",
     year: day.getFullYear() === today.getFullYear() ? undefined : "numeric",
@@ -317,7 +318,7 @@ function RecentEntry({ workspace, onOpen, onRemove }: RecentEntryProps) {
   const dateId = useId();
   const needsPermission = workspace.folders?.some((folder) => folder.status === "needs-permission") ?? false;
   // The folders are not listed: the name usually is the folder's, and Settings lists them.
-  const description = needsPermission ? "Click to allow access" : undefined;
+  const description = needsPermission ? t("startScreen.allowAccess") : undefined;
   const lastOpened =
     workspace.lastOpenedAt !== undefined && workspace.lastOpenedAt > 0
       ? formatLastOpened(workspace.lastOpenedAt)
@@ -351,8 +352,10 @@ function RecentEntry({ workspace, onOpen, onRemove }: RecentEntryProps) {
       <button
         type="button"
         onClick={onRemove}
-        aria-label={`Remove "${workspace.name}" from Recent`}
-        title="Remove from Recent"
+        aria-label={t("startScreen.removeNamedFromRecent", {
+          name: workspace.name,
+        })}
+        title={t("startScreen.removeFromRecent")}
         className="icon-button text-text-faint absolute right-1.5 size-6"
       >
         <i className="ic-x" aria-hidden="true" />

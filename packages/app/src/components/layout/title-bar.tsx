@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { formatShortcut } from "../../commands";
+import { t } from "../../i18n";
 import { Tooltip } from "../feedback/tooltip";
 
 interface TitleBarProps {
@@ -65,7 +66,7 @@ export function TitleBar({
   panels = [],
   notice,
 }: TitleBarProps) {
-  const explorerLabel = isSidebarOpen ? "Close explorer" : "Open explorer";
+  const explorerLabel = isSidebarOpen ? t("titleBar.closeExplorer") : t("titleBar.openExplorer");
 
   return (
     // From `md` up, with a workspace, the left padding puts the switcher's button over the rail's
@@ -101,11 +102,11 @@ export function TitleBar({
           // A click does not take focus from the editor, so the picker returns focus there and an
           // Edit command chosen in it with `>` acts on the editor.
           onMouseDown={(event) => event.preventDefault()}
-          aria-label="Go to file"
+          aria-label={t("titleBar.goToFile")}
           className="text-text-muted hover:border-line-strong hover:text-text md:border-line md:bg-frame flex h-[30px] flex-none items-center justify-start gap-2 rounded-md px-2 text-[13px] transition-colors duration-100 md:w-80 md:border md:pr-1 lg:w-[460px]"
         >
           <i className="ic-file-search text-text-faint text-sm" aria-hidden="true" />
-          <span className="hidden flex-1 text-left md:inline">Go to file</span>
+          <span className="hidden flex-1 text-left md:inline">{t("titleBar.goToFile")}</span>
           <kbd aria-hidden="true" className="shortcut-key hidden md:inline-flex">
             {formatShortcut(goToFileShortcut)}
           </kbd>

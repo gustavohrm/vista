@@ -11,6 +11,7 @@ import {
 import { createPortal, flushSync } from "react-dom";
 
 import { rankWorkspacesByName, type WorkspaceColor, type WorkspaceIcon } from "../../domain/workspaces";
+import { t } from "../../i18n";
 import { WorkspaceGlyph } from "./workspace-glyph";
 
 /** Whether Vista can read a folder now, needs the user's permission first, or can't find it. */
@@ -114,7 +115,7 @@ export function WorkspaceSwitcher({
     {
       kind: "action",
       id: "open-folder",
-      label: "Open Folder…",
+      label: t("workspaceSwitcher.openFolder"),
       icon: <i className="ic-folder-open" aria-hidden="true" />,
       run: onOpenFolder,
     },
@@ -123,7 +124,7 @@ export function WorkspaceSwitcher({
           {
             kind: "action",
             id: "close-workspace",
-            label: "Close Workspace",
+            label: t("workspaceSwitcher.closeWorkspace"),
             icon: <i className="ic-folder-x" aria-hidden="true" />,
             run: onClose,
           } as const,
@@ -284,7 +285,9 @@ export function WorkspaceSwitcher({
               className="size-5 flex-none rounded-[5px] border border-dashed border-current opacity-60"
             />
           )}
-          <span className="max-w-48 min-w-0 truncate">{current ? current.name : "No workspace"}</span>
+          <span className="max-w-48 min-w-0 truncate">
+            {current ? current.name : t("workspaceSwitcher.noWorkspace")}
+          </span>
           <i className="ic-chevrons-up-down text-text-faint flex-none text-xs" aria-hidden="true" />
         </button>
         {isOpen && (
@@ -303,14 +306,14 @@ export function WorkspaceSwitcher({
               ref={inputRef}
               type="text"
               role="combobox"
-              aria-label="Search workspaces"
+              aria-label={t("workspaceSwitcher.search")}
               aria-expanded="true"
               aria-controls={listId}
               aria-autocomplete="list"
               aria-activedescendant={options[active] ? optionId(active) : undefined}
               aria-keyshortcuts="Shift+Delete Control+,"
               aria-describedby={hiddenCount > 0 ? `${listId}-more` : undefined}
-              placeholder="Search workspaces"
+              placeholder={t("workspaceSwitcher.search")}
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value);
@@ -322,7 +325,7 @@ export function WorkspaceSwitcher({
             {/* The field's description, outside the list, which holds only its options for a screen reader. */}
             {hiddenCount > 0 && (
               <span id={`${listId}-more`} className="visually-hidden">
-                {hiddenCount} more matches. Keep typing to narrow them down.
+                {t("workspaceSwitcher.moreMatches", { count: hiddenCount })}
               </span>
             )}
           </div>
@@ -335,7 +338,7 @@ export function WorkspaceSwitcher({
             id={listId}
             // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a combobox's popup listbox; a native select can't hold rich options or follow the field's arrow keys
             role="listbox"
-            aria-label="Workspaces"
+            aria-label={t("workspaceSwitcher.workspaces")}
             // Choosing with the pointer keeps the typing in the field.
             onPointerDown={(event) => event.preventDefault()}
             style={{
@@ -351,13 +354,13 @@ export function WorkspaceSwitcher({
             }}
             className="vista-menu vista-pop card soft floating fixed z-50 flex max-h-[calc(100vh-56px)] min-w-48 flex-col overflow-y-auto p-1 text-[13px] [--ui-radius-surface:8px]"
           >
-            {isEmptySearch && <p className="text-text-muted px-2 py-1.5">No matching workspaces</p>}
+            {isEmptySearch && <p className="text-text-muted px-2 py-1.5">{t("workspaceSwitcher.noMatches")}</p>}
             {options.map((option, index) => (
               <Fragment key={`${option.kind}:${option.id}`}>
                 {hiddenCount > 0 && index === workspaceOptions.length && (
                   // Seen here; a screen reader hears it as the field's description.
                   <p aria-hidden="true" className="text-text-faint px-2 py-1 text-xs">
-                    {hiddenCount} more — keep typing
+                    {t("workspaceSwitcher.moreShort", { count: hiddenCount })}
                   </p>
                 )}
                 <SwitcherOption
@@ -436,7 +439,7 @@ function SwitcherOption({
         <span className="min-w-0 flex-1 truncate text-left">{isWorkspace ? option.workspace.name : option.label}</span>
         {isWorkspace && (
           <RowButton
-            title={`Settings for "${option.workspace.name}"`}
+            title={t("workspaceSwitcher.settingsFor", { name: option.workspace.name })}
             onClick={onOpenSettings}
             className={`ml-4 ${revealClass}`}
           >
@@ -446,7 +449,7 @@ function SwitcherOption({
         {isWorkspace && option.isCurrent && <i className="ic-check flex-none text-sm" aria-hidden="true" />}
         {canRemove && (
           <RowButton
-            title={`Remove "${option.workspace.name}" from Recent`}
+            title={t("workspaceSwitcher.removeFromRecent", { name: option.workspace.name })}
             onClick={onRemove}
             className={`-ml-1 ${revealClass}`}
           >

@@ -6,7 +6,7 @@ scope: The interface languages, how one is chosen, stored, and applied, which te
 
 # Languages
 
-This document makes Vista's interface available in more than one language. It is approved and partly implemented: the language starts before the first render, is chosen in Settings → Language, and is stored as described below, and the dictionaries and their tests are in place. Most interface text is still an English literal in `packages/app`, which is legacy until it moves into the dictionaries, and the dates and numbers, the editor's phrases, and the translated changelog are not implemented yet.
+This document makes Vista's interface available in more than one language. It is approved and partly implemented: the language starts before the first render, is chosen in Settings → Language, and is stored as described below; the interface text is in the dictionaries with its tests; and the dates and numbers follow the language. Messages that report a failed operation, such as `Failed to open the selected folder.`, are still English literals in `packages/app`, because the [Errors direction](errors.md#direction) rewrites them; they move into the dictionaries with it. The editor's phrases and the translated changelog are not implemented yet.
 
 ## The languages
 

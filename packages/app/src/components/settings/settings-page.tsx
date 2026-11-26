@@ -11,19 +11,42 @@ import { WorkspaceNav } from "./workspace-nav";
 export type SettingsSection = "workspaces" | "appearance" | "language" | "editor" | "files" | "shortcuts" | "about";
 
 // A label is a function, so it is read in the interface language at each render.
-const VISTA_SECTIONS: readonly { id: Exclude<SettingsSection, "workspaces">; label: () => string; icon: ReactNode }[] =
-  [
-    { id: "appearance", label: () => "Appearance", icon: <i className="ic-sun" aria-hidden="true" /> },
-    {
-      id: "language",
-      label: () => t("settings.sections.language"),
-      icon: <i className="ic-languages" aria-hidden="true" />,
-    },
-    { id: "editor", label: () => "Editor", icon: <i className="ic-type" aria-hidden="true" /> },
-    { id: "files", label: () => "Files", icon: <i className="ic-folder" aria-hidden="true" /> },
-    { id: "shortcuts", label: () => "Keyboard Shortcuts", icon: <i className="ic-keyboard" aria-hidden="true" /> },
-    { id: "about", label: () => "About", icon: <i className="ic-info" aria-hidden="true" /> },
-  ];
+const VISTA_SECTIONS: readonly {
+  id: Exclude<SettingsSection, "workspaces">;
+  label: () => string;
+  icon: ReactNode;
+}[] = [
+  {
+    id: "appearance",
+    label: () => t("settings.sections.appearance"),
+    icon: <i className="ic-sun" aria-hidden="true" />,
+  },
+  {
+    id: "language",
+    label: () => t("settings.sections.language"),
+    icon: <i className="ic-languages" aria-hidden="true" />,
+  },
+  {
+    id: "editor",
+    label: () => t("settings.sections.editor"),
+    icon: <i className="ic-type" aria-hidden="true" />,
+  },
+  {
+    id: "files",
+    label: () => t("settings.sections.files"),
+    icon: <i className="ic-folder" aria-hidden="true" />,
+  },
+  {
+    id: "shortcuts",
+    label: () => t("settings.sections.shortcuts"),
+    icon: <i className="ic-keyboard" aria-hidden="true" />,
+  },
+  {
+    id: "about",
+    label: () => t("settings.sections.about"),
+    icon: <i className="ic-info" aria-hidden="true" />,
+  },
+];
 
 const EASE_ENTER = [0.2, 0, 0, 1] as const;
 
@@ -118,7 +141,7 @@ export function SettingsPage({
 
   return (
     <motion.section
-      aria-label="Settings"
+      aria-label={t("settings.title")}
       initial={isReducedMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: isReducedMotion ? 0.1 : 0.2, ease: EASE_ENTER }}
@@ -137,20 +160,20 @@ export function SettingsPage({
                 }}
                 className="text-text-muted hover:text-text-strong -mx-1 cursor-pointer rounded px-1 font-semibold transition-colors duration-100 outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)]"
               >
-                Settings
+                {t("settings.title")}
               </button>
               <i className="ic-chevron-right text-text-faint text-xs" aria-hidden="true" />
-              Workspaces
+              {t("settings.workspacesBreadcrumb")}
             </>
           ) : (
-            "Settings"
+            t("settings.title")
           )}
         </h1>
-        <Tooltip text="Close" shortcut="Escape" position="bottom">
+        <Tooltip text={t("common.close")} shortcut="Escape" position="bottom">
           {(tooltipId) => (
             <button
               type="button"
-              aria-label="Close Settings"
+              aria-label={t("settings.close")}
               aria-describedby={tooltipId}
               onClick={onClose}
               className="icon-button size-7 text-base"
@@ -163,7 +186,7 @@ export function SettingsPage({
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <nav
           ref={navRef}
-          aria-label="Settings sections"
+          aria-label={t("settings.sectionsLabel")}
           className="border-line flex flex-none [scrollbar-width:none] gap-0.5 overflow-x-auto border-b px-2 py-2 md:block md:w-[232px] md:overflow-y-auto md:border-r md:border-b-0 md:px-3 md:py-5"
         >
           <WorkspaceNav

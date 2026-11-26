@@ -8,16 +8,16 @@ export type SchemePreference = "system" | "light" | "dark";
 
 /**
  * The themes, in the order Settings shows them. Each has a light and a dark variant, which is what
- * lets `"system"` work with any of them.
+ * lets `"system"` work with any of them. Their names are in the dictionaries, under `appearance.themes`.
  */
 export const THEMES = [
-  { id: "daylight", label: "Daylight" },
-  { id: "neutral", label: "Neutral" },
-  { id: "midnight", label: "Midnight" },
-  { id: "ocean", label: "Ocean" },
-  { id: "forest", label: "Forest" },
-  { id: "ember", label: "Ember" },
-  { id: "cappuccino", label: "Cappuccino" },
+  { id: "daylight" },
+  { id: "neutral" },
+  { id: "midnight" },
+  { id: "ocean" },
+  { id: "forest" },
+  { id: "ember" },
+  { id: "cappuccino" },
 ] as const;
 
 /** A theme's id, as it appears in its variants' names and in its `theme-<id>` class. */
@@ -44,7 +44,10 @@ export interface AppearanceSettings {
   motion: MotionPreference;
 }
 
-export const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettings = { contrast: "system", motion: "system" };
+export const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettings = {
+  contrast: "system",
+  motion: "system",
+};
 
 const CONTRAST_PREFERENCES: readonly ContrastPreference[] = ["system", "standard", "more"];
 const MOTION_PREFERENCES: readonly MotionPreference[] = ["system", "all", "reduced", "none"];

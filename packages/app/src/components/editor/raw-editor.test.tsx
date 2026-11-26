@@ -1,9 +1,10 @@
 import { EditorView } from "@codemirror/view";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createRef, type ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 
+import { i18n } from "../../i18n";
 import type { FindTarget } from "./find-target";
 import { DEFAULT_RAW_EDITOR_OPTIONS, RawEditor } from "./raw-editor";
 import type { RawEditorStateCache } from "./raw-editor";
@@ -203,6 +204,21 @@ describe("RawEditor", () => {
 
     rerenderWith({ options: DEFAULT_RAW_EDITOR_OPTIONS });
     expect(onVimModeChange).toHaveBeenLastCalledWith(null);
+  });
+
+  it("renames the editor in a new language without leaving vim's insert mode", async () => {
+    const user = userEvent.setup();
+    const { props } = renderEditor({ options: { ...DEFAULT_RAW_EDITOR_OPTIONS, vim: true } });
+    await user.click(getEditor());
+    await user.keyboard("i");
+
+    await act(() => i18n.setLocale("es"));
+    const editor = screen.getByRole("textbox", { name: "Contenido en texto sin formato de a.txt" });
+    await user.click(editor);
+    await user.keyboard("x");
+
+    // Still in insert mode, "x" types itself; back in normal mode, it would delete a character.
+    expect(props.onChange).toHaveBeenLastCalledWith(expect.stringContaining("x"));
   });
 
   it("moves to a requested position, clamped to the document", () => {

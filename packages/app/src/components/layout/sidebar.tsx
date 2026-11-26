@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type Dispatch, type ReactNode, type SetSta
 
 import { joinWorkspacePath } from "../../domain/path-validation";
 import { isDesktopViewport } from "../../domain/viewport";
+import { t } from "../../i18n";
 import type { WorkspaceNode } from "../../ports";
 import { documentKey } from "../../state/documents";
 import { useReducedMotion } from "../../theme/appearance";
@@ -179,7 +180,11 @@ export function Sidebar({
   useEffect(() => {
     const folderId = firstFolderIdRef.current;
     if (newEntryRequest && folderId !== undefined) {
-      setPendingNewEntry({ folderId, parentPath: "", kind: newEntryRequest.kind });
+      setPendingNewEntry({
+        folderId,
+        parentPath: "",
+        kind: newEntryRequest.kind,
+      });
       setCollapsedFolderIds((prev) => without(prev, folderId));
     }
   }, [newEntryRequest]);
@@ -255,7 +260,10 @@ export function Sidebar({
     if (!pendingNewEntry) {
       return;
     }
-    const parent = { folderId: pendingNewEntry.folderId, path: pendingNewEntry.parentPath };
+    const parent = {
+      folderId: pendingNewEntry.folderId,
+      path: pendingNewEntry.parentPath,
+    };
     if (pendingNewEntry.kind === "file") {
       onCreateFile(parent, name);
     } else {
@@ -273,7 +281,7 @@ export function Sidebar({
     <>
       {isOpen && <div aria-hidden="true" onClick={onClose} className="fixed inset-0 z-30 bg-black/40 md:hidden" />}
       <nav
-        aria-label="File Explorer"
+        aria-label={t("sidebar.label")}
         // Closed, the panel is only slid away or zero wide, so its controls would still take focus.
         inert={!isOpen}
         onTransitionEnd={(event) => {
@@ -291,12 +299,12 @@ export function Sidebar({
           {activities}
           {/* The title sits as far from the rail's glyphs as the last button's glyph sits from the frame. */}
           <div className="flex h-9 flex-none items-center justify-between gap-2 pr-3.5 pl-[7px]">
-            <span className="text-text-muted min-w-0 truncate text-xs font-semibold">Explorer</span>
+            <span className="text-text-muted min-w-0 truncate text-xs font-semibold">{t("common.explorer")}</span>
             <div className="flex flex-none items-center">
-              <ExplorerActionButton label="Add Folder to Workspace" onClick={onAddFolder}>
+              <ExplorerActionButton label={t("sidebar.addFolder")} onClick={onAddFolder}>
                 <i className="ic-folder-input" aria-hidden="true" />
               </ExplorerActionButton>
-              <ExplorerActionButton label="Collapse All" onClick={handleCollapseAll}>
+              <ExplorerActionButton label={t("sidebar.collapseAll")} onClick={handleCollapseAll}>
                 <i className="ic-chevrons-down-up" aria-hidden="true" />
               </ExplorerActionButton>
             </div>
@@ -339,7 +347,14 @@ export function Sidebar({
                       isExpanded: (path) => expandedKeys.has(documentKey(folder.id, path)),
                       onToggleCollapse: (path) => handleToggleCollapse(documentKey(folder.id, path)),
                       onSelectFile: (path) => handleSelectFile({ folderId: folder.id, path }),
-                      onContextMenu: (path, kind, x, y) => setContextMenu({ folderId: folder.id, path, kind, x, y }),
+                      onContextMenu: (path, kind, x, y) =>
+                        setContextMenu({
+                          folderId: folder.id,
+                          path,
+                          kind,
+                          x,
+                          y,
+                        }),
                       onNewEntry: (path, kind) => handleNewEntry({ folderId: folder.id, path }, kind),
                       renamingPath: renaming?.folderId === folder.id ? renaming.path : null,
                       onCommitRename: (path, name) => handleCommitRename({ folderId: folder.id, path }, name),
@@ -358,7 +373,7 @@ export function Sidebar({
 
       {contextMenu && (
         <Menu
-          label="File actions"
+          label={t("sidebar.fileActions")}
           items={buildTreeMenu(contextMenu, {
             onOpen: handleSelectFile,
             onNewFile: (entry) => handleNewEntry(entry, "file"),
@@ -412,15 +427,21 @@ function buildTreeMenu({ folderId, path, kind }: ContextMenuTarget, actions: Tre
   const { onCopyPath, onReveal, onRemoveFolder } = actions;
   const groups: MenuEntry[][] = [
     kind === "file"
-      ? [{ label: "Open", icon: <i className="ic-file" aria-hidden="true" />, onSelect: () => actions.onOpen(entry) }]
+      ? [
+          {
+            label: t("common.open"),
+            icon: <i className="ic-file" aria-hidden="true" />,
+            onSelect: () => actions.onOpen(entry),
+          },
+        ]
       : [
           {
-            label: "New File",
+            label: t("common.newFile"),
             icon: <i className="ic-file-plus" aria-hidden="true" />,
             onSelect: () => actions.onNewFile(entry),
           },
           {
-            label: "New Folder",
+            label: t("common.newFolder"),
             icon: <i className="ic-folder-plus" aria-hidden="true" />,
             onSelect: () => actions.onNewFolder(entry),
           },
@@ -429,12 +450,12 @@ function buildTreeMenu({ folderId, path, kind }: ContextMenuTarget, actions: Tre
       ? []
       : [
           {
-            label: "Rename",
+            label: t("common.rename"),
             icon: <i className="ic-pencil" aria-hidden="true" />,
             onSelect: () => actions.onRename(entry),
           },
           {
-            label: "Delete",
+            label: t("common.delete"),
             icon: <i className="ic-trash-2" aria-hidden="true" />,
             destructive: true,
             onSelect: () => actions.onDelete(entry),
@@ -444,7 +465,7 @@ function buildTreeMenu({ folderId, path, kind }: ContextMenuTarget, actions: Tre
       ...(onCopyPath
         ? [
             {
-              label: "Copy Path",
+              label: t("common.copyPath"),
               icon: <i className="ic-clipboard" aria-hidden="true" />,
               onSelect: () => onCopyPath(entry),
             },
@@ -454,7 +475,7 @@ function buildTreeMenu({ folderId, path, kind }: ContextMenuTarget, actions: Tre
         ? []
         : [
             {
-              label: "Copy Relative Path",
+              label: t("common.copyRelativePath"),
               icon: <i className="ic-copy" aria-hidden="true" />,
               onSelect: () => actions.onCopyRelativePath(entry),
             },
@@ -462,7 +483,7 @@ function buildTreeMenu({ folderId, path, kind }: ContextMenuTarget, actions: Tre
       ...(onReveal
         ? [
             {
-              label: "Reveal in File Explorer",
+              label: t("common.revealInFileExplorer"),
               icon: <i className="ic-folder-open" aria-hidden="true" />,
               onSelect: () => onReveal(entry),
             },
@@ -472,7 +493,7 @@ function buildTreeMenu({ folderId, path, kind }: ContextMenuTarget, actions: Tre
     isRoot && onRemoveFolder
       ? [
           {
-            label: "Remove Folder from Workspace",
+            label: t("sidebar.removeFolder"),
             icon: <i className="ic-folder-minus" aria-hidden="true" />,
             onSelect: () => onRemoveFolder(folderId),
           },
@@ -528,7 +549,7 @@ function LoadingIndicator() {
   return (
     <div className="text-text-secondary flex items-center justify-center p-4">
       <i className="ic-loader-circle ic-anim-spin" aria-hidden="true" />
-      <span className="visually-hidden">Loading…</span>
+      <span className="visually-hidden">{t("sidebar.loading")}</span>
     </div>
   );
 }
@@ -560,8 +581,6 @@ function EntryIcon({ kind, extension, isCollapsed = false }: EntryIconProps) {
   );
 }
 
-const UNREADABLE_FOLDER_HINT = "Vista can't read this folder, so its files aren't listed";
-
 /** How long a folder takes to open, in seconds. Closing takes two thirds of it. */
 const FOLDER_OPEN_SECONDS = 0.2;
 const FOLDER_CLOSE_SECONDS = 0.14;
@@ -583,14 +602,20 @@ function FolderChildren({ children }: { children: ReactNode }) {
       animate={{
         height: "auto",
         opacity: 1,
-        transition: { duration: isReduced ? 0 : FOLDER_OPEN_SECONDS, ease: EASE_MOVE },
+        transition: {
+          duration: isReduced ? 0 : FOLDER_OPEN_SECONDS,
+          ease: EASE_MOVE,
+        },
         transitionEnd: { overflow: "visible" },
       }}
       exit={{
         height: 0,
         opacity: 0,
         overflow: "hidden",
-        transition: { duration: isReduced ? 0 : FOLDER_CLOSE_SECONDS, ease: EASE_MOVE },
+        transition: {
+          duration: isReduced ? 0 : FOLDER_CLOSE_SECONDS,
+          ease: EASE_MOVE,
+        },
       }}
       className="relative flex flex-col gap-px"
     >
@@ -743,24 +768,22 @@ function UnreachableFolder({ status, onAllowAccess, onLocate, onRemove }: Unreac
   return (
     <div className="flex flex-col items-start gap-1.5 py-1 pr-2" style={{ paddingLeft: TREE_ROW_INSET_PX }}>
       <p className="text-text-secondary text-xs">
-        {status === "needs-permission"
-          ? "Vista needs your permission to open this folder again."
-          : "This folder can't be found. It may have been moved or deleted."}
+        {status === "needs-permission" ? t("sidebar.needsPermission") : t("sidebar.unavailable")}
       </p>
       {status === "needs-permission" ? (
         <button type="button" onClick={onAllowAccess} className="btn sm">
-          Allow access
+          {t("sidebar.allowAccess")}
         </button>
       ) : (
         <div className="flex flex-wrap gap-1.5">
           {onLocate && (
             <button type="button" onClick={onLocate} className="btn sm">
-              Locate…
+              {t("sidebar.locate")}
             </button>
           )}
           {onRemove && (
             <button type="button" onClick={onRemove} className="btn sm">
-              Remove Folder from Workspace
+              {t("sidebar.removeFolder")}
             </button>
           )}
         </div>
@@ -782,10 +805,10 @@ interface FolderRowActionsProps {
 function FolderRowActions({ onNewEntry }: FolderRowActionsProps) {
   return (
     <div className={ROW_ACTIONS_CLASS}>
-      <ExplorerActionButton label="New File" onClick={() => onNewEntry("file")}>
+      <ExplorerActionButton label={t("common.newFile")} onClick={() => onNewEntry("file")}>
         <i className="ic-file-plus" aria-hidden="true" />
       </ExplorerActionButton>
-      <ExplorerActionButton label="New Folder" onClick={() => onNewEntry("directory")}>
+      <ExplorerActionButton label={t("common.newFolder")} onClick={() => onNewEntry("directory")}>
         <i className="ic-folder-plus" aria-hidden="true" />
       </ExplorerActionButton>
     </div>
@@ -855,7 +878,7 @@ function TreeNode({ node, siblings, level, tree }: TreeNodeProps) {
             }}
             style={{ paddingLeft: rowPaddingLeft }}
             // The title is also the button's accessible description, so the hint is announced once.
-            title={node.isUnreadable ? UNREADABLE_FOLDER_HINT : undefined}
+            title={node.isUnreadable ? t("sidebar.unreadableFolder") : undefined}
             className={`${TREE_ROW_CLASS} ${TREE_ROW_IDLE_CLASS}`}
           >
             <EntryIcon kind="directory" isCollapsed={isCollapsed} />
@@ -915,7 +938,7 @@ function TreeNode({ node, siblings, level, tree }: TreeNodeProps) {
       {tree.isDirty(node.path) && (
         <>
           <span aria-hidden="true" className="bg-text-muted size-1.5 flex-none rounded-full" />
-          <span className="visually-hidden"> (unsaved)</span>
+          <span className="visually-hidden"> {t("tabs.unsaved")}</span>
         </>
       )}
     </button>

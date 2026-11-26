@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { EditorSettings } from "../../domain/settings";
 import { getViewer } from "../../domain/viewers";
+import { t } from "../../i18n";
 import type { OpenDocument } from "../../state/documents";
 import { Menu, type MenuEntry } from "../menu/menu";
 import { CsvTableEditor } from "./csv-table-editor";
@@ -152,7 +153,7 @@ export function EditorPane({
       </div>
       {contextMenu && (
         <Menu
-          label="Editor actions"
+          label={t("editor.actions")}
           items={contextMenuItems}
           x={contextMenu.x}
           y={contextMenu.y}

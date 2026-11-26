@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef, type MouseEvent, type SyntheticEvent } from "react";
 
+import { t } from "../../i18n";
+
 /** The user's decision when leaving a document that has unsaved changes. */
 export type UnsavedChangesChoice = "save" | "discard" | "cancel";
 
@@ -32,7 +34,9 @@ export function UnsavedChangesDialog({ fileNames, onChoose }: UnsavedChangesDial
   const titleId = useId();
   const descriptionId = useId();
   const isSingle = fileNames.length === 1;
-  const title = isSingle ? `Save changes to ${fileNames[0]}?` : `Save changes to ${fileNames.length} files?`;
+  const title = isSingle
+    ? t("feedback.unsaved.titleOne", { name: fileNames[0] ?? "" })
+    : t("feedback.unsaved.titleMany", { count: fileNames.length });
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -80,7 +84,7 @@ export function UnsavedChangesDialog({ fileNames, onChoose }: UnsavedChangesDial
             {title}
           </h2>
           <p id={descriptionId} className="text-text-muted text-[13px] leading-normal">
-            Your changes will be lost if you don&apos;t save them.
+            {t("feedback.unsaved.message")}
           </p>
           {!isSingle && (
             <ul className="text-text max-h-40 list-inside list-disc overflow-y-auto text-[13px]">
@@ -93,13 +97,13 @@ export function UnsavedChangesDialog({ fileNames, onChoose }: UnsavedChangesDial
         </div>
         <div className="flex justify-end gap-2">
           <button type="button" onClick={() => onChoose("cancel")} className="btn ghost sm">
-            Cancel
+            {t("common.cancel")}
           </button>
           <button type="button" onClick={() => onChoose("discard")} className="btn sm">
-            Don&apos;t Save
+            {t("feedback.unsaved.dontSave")}
           </button>
           <button ref={saveButtonRef} type="button" onClick={() => onChoose("save")} className="btn primary solid sm">
-            {isSingle ? "Save" : "Save All"}
+            {isSingle ? t("common.save") : t("common.saveAll")}
           </button>
         </div>
       </div>

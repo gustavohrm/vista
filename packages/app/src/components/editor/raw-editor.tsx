@@ -24,6 +24,7 @@ import { matchesShortcut } from "../../commands/shortcuts";
 import { lineSeparatorOf } from "../../domain/line-endings";
 import { DEFAULT_EDITOR_SETTINGS, type EditorSettings } from "../../domain/settings";
 import { findTextChange } from "../../domain/text-change";
+import { t, useLocale } from "../../i18n";
 import type { FindTarget } from "./find-target";
 import { createRawFindTarget, hiddenSearchPanel } from "./raw-find";
 
@@ -207,9 +208,11 @@ export function RawEditor(props: RawEditorProps) {
   }, [binding, content]);
 
   const { lineNumbers: showLineNumbers, minimap, vim: isVimEnabled, wordWrap } = options;
+  // The locale too, since the editor's accessible name is in the interface language.
+  const locale = useLocale();
   useEffect(() => {
     viewRef.current?.dispatch({ effects: reconfigure(binding) });
-  }, [binding, fileName, readOnly, showLineNumbers, minimap, isVimEnabled, wordWrap]);
+  }, [binding, fileName, readOnly, showLineNumbers, minimap, isVimEnabled, wordWrap, locale]);
 
   const { pendingJump } = props;
   useEffect(() => {
@@ -301,7 +304,7 @@ function reconfigure(binding: EditorBinding): StateEffect<unknown>[] {
     compartments.bindings.reconfigure(createBindings(binding)),
     compartments.vim.reconfigure(options.vim ? vim() : []),
     compartments.label.reconfigure(
-      EditorView.contentAttributes.of({ "aria-label": `Raw text content of ${props.fileName}` }),
+      EditorView.contentAttributes.of({ "aria-label": t("editor.rawContent", { name: props.fileName }) }),
     ),
     compartments.lineNumbers.reconfigure(options.lineNumbers ? [lineNumbers(), highlightActiveLineGutter()] : []),
     compartments.wordWrap.reconfigure(options.wordWrap ? EditorView.lineWrapping : []),

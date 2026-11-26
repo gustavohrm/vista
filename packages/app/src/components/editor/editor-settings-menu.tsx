@@ -1,9 +1,10 @@
 import { useState } from "react";
 
 import type { EditorSettings } from "../../domain/settings";
+import { t } from "../../i18n";
 import { Tooltip } from "../feedback/tooltip";
 import { Menu, MENU_SEPARATOR, type MenuEntry } from "../menu/menu";
-import { EDITOR_OPTIONS } from "../settings/vista-sections";
+import { editorOptions } from "../settings/vista-sections";
 
 /** Space between the button and its menu, in pixels. */
 const MENU_GAP_PX = 4;
@@ -38,24 +39,24 @@ export function EditorSettingsMenu({ settings, onChange, onOpenSettings }: Edito
   };
 
   const items: MenuEntry[] = [
-    ...EDITOR_OPTIONS.map(({ name, label }) => ({
+    ...editorOptions().map(({ name, label }) => ({
       label,
       checked: settings[name],
       onSelect: () => onChange({ [name]: !settings[name] }),
     })),
     MENU_SEPARATOR,
-    { label: "All settings…", onSelect: onOpenSettings },
+    { label: t("settings.editor.menu.allSettings"), onSelect: onOpenSettings },
   ];
 
   return (
     <>
-      <Tooltip text="Editor settings" position="bottom">
+      <Tooltip text={t("settings.editor.menu.label")} position="bottom">
         {(bubbleId) => (
           <button
             ref={setButton}
             type="button"
             onClick={toggle}
-            aria-label="Editor settings"
+            aria-label={t("settings.editor.menu.label")}
             aria-haspopup="menu"
             aria-expanded={anchor !== null}
             aria-describedby={bubbleId}
@@ -67,7 +68,7 @@ export function EditorSettingsMenu({ settings, onChange, onOpenSettings }: Edito
       </Tooltip>
       {anchor && (
         <Menu
-          label="Editor settings"
+          label={t("settings.editor.menu.label")}
           items={items}
           x={anchor.x}
           y={anchor.y}

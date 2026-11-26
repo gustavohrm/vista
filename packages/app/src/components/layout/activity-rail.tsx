@@ -1,7 +1,8 @@
 import { motion, useAnimate } from "motion/react";
 import { useId, type ReactNode } from "react";
 
-import type { DesktopDownload } from "../../domain/desktop-download";
+import { desktopDownloadLabel, type DesktopDownload } from "../../domain/desktop-download";
+import { t } from "../../i18n";
 import { useReducedMotion } from "../../theme/appearance";
 import { Tooltip } from "../feedback/tooltip";
 
@@ -36,10 +37,13 @@ export function ActivityRail({
 }: ActivityRailProps) {
   const indicatorId = useId();
   return (
-    <nav aria-label="Activity bar" className="hidden w-11 flex-none flex-col items-center gap-1 pt-1 pb-2 md:flex">
+    <nav
+      aria-label={t("activityRail.label")}
+      className="hidden w-11 flex-none flex-col items-center gap-1 pt-1 pb-2 md:flex"
+    >
       <RailButton
-        label="Explorer"
-        tooltip="Explorer"
+        label={t("common.explorer")}
+        tooltip={t("common.explorer")}
         position="right"
         onClick={onShowExplorer}
         isCurrent={isExplorerCurrent}
@@ -51,8 +55,8 @@ export function ActivityRail({
       <div className="flex-1" />
       {desktopDownload && <DownloadLink download={desktopDownload} position="right" />}
       <RailButton
-        label="Settings"
-        tooltip="Settings"
+        label={t("common.settings")}
+        tooltip={t("common.settings")}
         position="right"
         onClick={onToggleSettings}
         isPressed={isSettingsOpen}
@@ -87,8 +91,8 @@ export function DrawerActivities({
       <div className="flex-1" />
       {desktopDownload && <DownloadLink download={desktopDownload} position="bottom" />}
       <RailButton
-        label="Settings"
-        tooltip="Settings"
+        label={t("common.settings")}
+        tooltip={t("common.settings")}
         position="bottom"
         onClick={onToggleSettings}
         isPressed={isSettingsOpen}
@@ -103,10 +107,10 @@ export function DrawerActivities({
 function ComingSoonButtons({ position }: { position: "right" | "bottom" }) {
   return (
     <>
-      <RailButton label="Search" tooltip="Coming soon" position={position}>
+      <RailButton label={t("activityRail.search")} tooltip={t("activityRail.comingSoon")} position={position}>
         <i className="ic-search" aria-hidden="true" />
       </RailButton>
-      <RailButton label="Graph" tooltip="Coming soon" position={position}>
+      <RailButton label={t("activityRail.graph")} tooltip={t("activityRail.comingSoon")} position={position}>
         <i className="ic-waypoints" aria-hidden="true" />
       </RailButton>
     </>
@@ -118,7 +122,7 @@ function ComingSoonButtons({ position }: { position: "right" | "bottom" }) {
  * keeps the click from navigating away from the app when the host answers with a page instead of the installer.
  */
 function DownloadLink({ download, position }: { download: DesktopDownload; position: "right" | "bottom" }) {
-  const label = download.label.replace("Download", "Download Vista");
+  const label = desktopDownloadLabel(download, true);
   return (
     <Tooltip text={label} position={position} className="flex flex-none">
       {(bubbleId) => (
@@ -194,13 +198,21 @@ function RailButton({
  * small round drop and stretches a little along its path, then swells just past its size as it
  * lands and settles, so it reads as one fluid thing moving rather than a box sliding.
  */
-const INDICATOR_TRAVEL = { type: "spring", visualDuration: 0.5, bounce: 0.18 } as const;
+const INDICATOR_TRAVEL = {
+  type: "spring",
+  visualDuration: 0.5,
+  bounce: 0.18,
+} as const;
 const INDICATOR_DROP = {
   scaleX: [1, 0.42, 0.42, 1.08, 1],
   scaleY: [1, 0.5, 0.62, 1.04, 1],
   borderRadius: ["8px", "17px", "17px", "10px", "8px"],
 };
-const INDICATOR_DROP_TIMING = { duration: 0.6, times: [0, 0.22, 0.6, 0.82, 1], ease: "easeInOut" as const };
+const INDICATOR_DROP_TIMING = {
+  duration: 0.6,
+  times: [0, 0.22, 0.6, 0.82, 1],
+  ease: "easeInOut" as const,
+};
 
 /**
  * The background behind the marked rail button. The outer element moves between buttons; the inner

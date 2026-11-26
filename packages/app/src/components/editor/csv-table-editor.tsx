@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, type KeyboardEvent } from "react";
 
 import { parseCsv, serializeCsv } from "../../domain/csv";
+import { t } from "../../i18n";
 import { useReducedMotion } from "../../theme/appearance";
 import { useReorderDrag } from "../use-reorder-drag";
 
@@ -105,7 +106,7 @@ export function CsvTableEditor({ content, onChange }: CsvTableEditorProps) {
     }
   };
 
-  const columnName = (colIndex: number) => header[colIndex]?.trim() || `Column ${colIndex + 1}`;
+  const columnName = (colIndex: number) => header[colIndex]?.trim() || t("csv.column", { column: colIndex + 1 });
   const columns = Array.from({ length: columnCount }, (_, colIndex) => colIndex);
 
   return (
@@ -116,13 +117,13 @@ export function CsvTableEditor({ content, onChange }: CsvTableEditorProps) {
         <table className="data-table ruled edged">
           <thead>
             <tr>
-              <th data-find-skip aria-label="Row" className="w-12" />
+              <th data-find-skip aria-label={t("csv.row")} className="w-12" />
               {columns.map((colIndex) => (
                 <th key={colIndex} className="min-w-[120px]">
                   <input
                     type="text"
                     value={header[colIndex] ?? ""}
-                    aria-label={`Column ${colIndex + 1} name`}
+                    aria-label={t("csv.columnName", { column: colIndex + 1 })}
                     onChange={(event) => handleCellChange(0, colIndex, event.target.value)}
                     className="ipt ghost edgeless inline-field text-text-strong font-semibold"
                   />
@@ -132,8 +133,8 @@ export function CsvTableEditor({ content, onChange }: CsvTableEditorProps) {
                 <button
                   type="button"
                   onClick={handleAddColumn}
-                  aria-label="Add column"
-                  title="Add column"
+                  aria-label={t("csv.addColumn")}
+                  title={t("csv.addColumn")}
                   className="icon-button text-text-muted mx-auto size-6"
                 >
                   <i className="ic-plus" aria-hidden="true" />
@@ -162,8 +163,8 @@ export function CsvTableEditor({ content, onChange }: CsvTableEditorProps) {
                     <button
                       type="button"
                       data-row-handle
-                      aria-label={`Move row ${rowIndex}`}
-                      title="Drag to move the row, or press Shift + Up or Shift + Down"
+                      aria-label={t("csv.moveRow", { row: rowIndex })}
+                      title={t("csv.moveRowHint")}
                       onPointerDown={(event) => startDrag(String(rowIndex), event)}
                       onKeyDown={(event) => handleHandleKeyDown(rowIndex, event)}
                       className="text-text-faint hover:text-text-muted grid h-8 w-full cursor-grab place-items-center font-mono text-xs outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-inset active:cursor-grabbing"
@@ -182,7 +183,7 @@ export function CsvTableEditor({ content, onChange }: CsvTableEditorProps) {
                       <input
                         type="text"
                         value={row[colIndex] ?? ""}
-                        aria-label={`${columnName(colIndex)}, row ${rowIndex}`}
+                        aria-label={t("csv.cell", { column: columnName(colIndex), row: rowIndex })}
                         onChange={(event) => handleCellChange(rowIndex, colIndex, event.target.value)}
                         className="ipt ghost edgeless inline-field"
                       />
@@ -202,7 +203,7 @@ export function CsvTableEditor({ content, onChange }: CsvTableEditorProps) {
         className="text-text-muted hover:bg-hover hover:text-text mt-1 flex h-8 items-center gap-2 rounded-md px-3 text-[13px] transition-colors duration-100"
       >
         <i className="ic-plus" aria-hidden="true" />
-        Add row
+        {t("csv.addRow")}
       </button>
     </div>
   );

@@ -5,6 +5,7 @@ import { shortenPath, type DocumentLocation } from "../../domain/document-locati
 import { getFileKind } from "../../domain/file-types";
 import { lineSeparatorOf } from "../../domain/line-endings";
 import { canShowEnriched, getViewer } from "../../domain/viewers";
+import { i18n, t, useLocale } from "../../i18n";
 import type { FileDocument } from "../../ports";
 import type { OpenDocument } from "../../state/documents";
 import type { CursorInfo } from "../editor/raw-editor";
@@ -20,8 +21,8 @@ interface StatusBarProps {
   location?: DocumentLocation | null;
   /** Copies the active file's path: the full path on desktop, the path within its folder on the web. */
   onCopyPath?: () => Promise<boolean>;
-  /** Names the copy button after what it copies. */
-  copyPathLabel?: "Copy Path" | "Copy Relative Path";
+  /** Names the copy button after what it copies, in the interface language; Copy Path by default. */
+  copyPathLabel?: string;
   /** Shows the active file in the operating system's file manager, where the host has one. */
   onReveal?: () => void;
   /** Cursor of the raw editor, or null when the active document isn't shown raw. */
@@ -45,7 +46,7 @@ export function StatusBar({
   activeFile,
   location,
   onCopyPath,
-  copyPathLabel = "Copy Path",
+  copyPathLabel,
   onReveal,
   cursor,
   vimMode,
@@ -53,16 +54,16 @@ export function StatusBar({
 }: StatusBarProps) {
   return (
     <footer
-      aria-label="Status Bar"
+      aria-label={t("statusBar.label")}
       className="text-text-faint flex h-[30px] flex-none items-center justify-between gap-4 px-1 text-xs tabular-nums select-none"
     >
       {activeFile && location && (
         // The path comes first, so it keeps most of a narrow bar and the facts scroll instead.
         <div className="flex max-w-[65%] min-w-0 flex-none items-center gap-1 whitespace-nowrap">
           <PathText location={location} />
-          {onCopyPath && <CopyPathButton label={copyPathLabel} onCopy={onCopyPath} />}
+          {onCopyPath && <CopyPathButton label={copyPathLabel ?? t("common.copyPath")} onCopy={onCopyPath} />}
           {onReveal && (
-            <PathButton label="Reveal in File Explorer" onClick={onReveal}>
+            <PathButton label={t("common.revealInFileExplorer")} onClick={onReveal}>
               <i className="ic-folder-open" aria-hidden="true" />
             </PathButton>
           )}
@@ -77,7 +78,9 @@ export function StatusBar({
               <button
                 type="button"
                 onClick={onGoToLine}
-                aria-label={`${describeCursor(cursor)}. Go to line`}
+                aria-label={t("statusBar.goToLine", {
+                  position: describeCursor(cursor),
+                })}
                 className="hover:text-text cursor-pointer"
               >
                 {describeCursor(cursor)}
@@ -135,7 +138,11 @@ function PathText({ location }: { location: DocumentLocation }) {
     const name = probe.lastElementChild;
     probe.removeAttribute("aria-describedby");
     probe.setAttribute("aria-hidden", "true");
-    Object.assign(probe.style, { position: "absolute", visibility: "hidden", width: `${text.clientWidth}px` });
+    Object.assign(probe.style, {
+      position: "absolute",
+      visibility: "hidden",
+      width: `${text.clientWidth}px`,
+    });
     text.after(probe);
     let fits = maxHidden;
     for (let candidate = hidden + 1; candidate < maxHidden; candidate += 1) {
@@ -203,7 +210,7 @@ function CopyPathButton({ label, onCopy }: { label: string; onCopy: () => Promis
           <i className="ic-copy" aria-hidden="true" />
         )}
       </PathButton>
-      <output className="visually-hidden">{isCopied ? "Copied" : ""}</output>
+      <output className="visually-hidden">{isCopied ? t("statusBar.copied") : ""}</output>
     </>
   );
 }
@@ -238,24 +245,18 @@ function DocumentNotes({ file }: { file: OpenDocument }) {
   );
   return (
     <>
-      {file.isReadOnly && <DocumentNote text="Read-only" title="This file isn't UTF-8 text, so Vista won't save it." />}
+      {file.isReadOnly && <DocumentNote text={t("statusBar.readOnly.text")} title={t("statusBar.readOnly.title")} />}
       {!file.isReadOnly && isRawOnly && (
         <DocumentNote
-          text="Raw only"
-          title={`This file has more than ${MAX_TABLE_CELLS.toLocaleString("en-US")} cells, too many for the table to show quickly, so it opens in the raw view.`}
+          text={t("statusBar.rawOnly.text")}
+          title={t("statusBar.rawOnly.title", { count: MAX_TABLE_CELLS })}
         />
       )}
       {file.externalChange === "changed" && (
-        <DocumentNote
-          text="Changed on disk"
-          title="Another program changed this file. Saving asks before overwriting it."
-        />
+        <DocumentNote text={t("statusBar.changedOnDisk.text")} title={t("statusBar.changedOnDisk.title")} />
       )}
       {file.externalChange === "deleted" && (
-        <DocumentNote
-          text="Deleted on disk"
-          title="Another program deleted this file. Saving asks before creating it again."
-        />
+        <DocumentNote text={t("statusBar.deletedOnDisk.text")} title={t("statusBar.deletedOnDisk.title")} />
       )}
     </>
   );
@@ -271,14 +272,22 @@ function DocumentNote({ text, title }: { text: string; title: string }) {
 
 function DocumentFacts({ file }: { file: FileDocument }) {
   const { content, extension } = file;
-  const facts = useMemo(() => describeDocument(content, extension), [content, extension]);
+  // The facts are text, so they are built again in a new language.
+  const locale = useLocale();
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- the locale changes the text describeDocument writes
+  const facts = useMemo(() => describeDocument(content, extension), [content, extension, locale]);
   // oxlint-disable-next-line react/no-array-index-key -- the list has a fixed order, and two facts can read the same, such as LF and an .lf file's format
   return facts.map((fact, index) => <span key={`${index}:${fact}`}>{fact}</span>);
 }
 
 function describeCursor({ line, column, selectionLength }: CursorInfo): string {
-  const position = `Ln ${line}, Col ${column}`;
-  return selectionLength > 0 ? `${position} (${selectionLength} selected)` : position;
+  return selectionLength > 0
+    ? t("statusBar.positionWithSelection", {
+        line,
+        column,
+        count: selectionLength,
+      })
+    : t("statusBar.position", { line, column });
 }
 
 /**
@@ -291,26 +300,31 @@ function describeCursor({ line, column, selectionLength }: CursorInfo): string {
 function describeDocument(content: string, extension: string): string[] {
   const lineCount = content.split("\n").length;
   const facts = [
-    `${lineCount} ${lineCount === 1 ? "line" : "lines"}`,
+    t("statusBar.lines", { count: lineCount }),
     formatBytes(new TextEncoder().encode(content).length),
     lineSeparatorOf(content) === "\r\n" ? "CRLF" : "LF",
     describeFormat(extension),
   ];
   if (getFileKind(extension) === "markdown") {
     const wordCount = content.split(/\s+/).filter((word) => word.length > 0).length;
-    facts.push(`${wordCount} ${wordCount === 1 ? "word" : "words"}`);
+    facts.push(t("statusBar.words", { count: wordCount }));
   }
   return facts;
 }
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) {
-    return `${bytes} B`;
+    return t("statusBar.bytes", { size: i18n.formatNumber(bytes) });
   }
+  const oneDecimal = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
   if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
+    return t("statusBar.kilobytes", {
+      size: i18n.formatNumber(bytes / 1024, oneDecimal),
+    });
   }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return t("statusBar.megabytes", {
+    size: i18n.formatNumber(bytes / (1024 * 1024), oneDecimal),
+  });
 }
 
 /**
@@ -327,7 +341,7 @@ function describeFormat(extension: string): string {
     case "csv":
       return "CSV";
     case "text":
-      return "Plain Text";
+      return t("statusBar.plainText");
     case "unknown":
       return extension.toUpperCase();
   }

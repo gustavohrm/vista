@@ -1,14 +1,16 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FocusEvent } from "react";
 import { createPortal } from "react-dom";
 
+import { t } from "../../i18n";
 import { TOOLTIP_DELAY_MS } from "../feedback/tooltip";
 import { WorkspaceGlyph } from "../workspace/workspace-glyph";
 import type { ManagedWorkspace } from "./workspace-manager";
 
+// Functions, so the text is read in the interface language at each render.
 const FOLDER_STATUS_TEXT = {
   ready: null,
-  "needs-permission": "Needs access",
-  unavailable: "Not found",
+  "needs-permission": () => t("settings.workspace.folderStatus.needsAccess"),
+  unavailable: () => t("settings.workspace.folderStatus.notFound"),
 } as const;
 
 /** The gap between the item and its popover, and the least room the popover keeps from the window's edge, in pixels. */
@@ -39,7 +41,10 @@ export function WorkspaceNavItem({ workspace, isCurrent, onSelect }: WorkspaceNa
   const buttonRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef(0);
-  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  const [position, setPosition] = useState<{
+    left: number;
+    top: number;
+  } | null>(null);
   const folders = workspace.folders ?? [];
   const onlyFolder = folders.length === 1 ? folders[0] : undefined;
   // One folder named like the workspace says nothing the name doesn't, unless it can't be reached.
@@ -47,7 +52,12 @@ export function WorkspaceNavItem({ workspace, isCurrent, onSelect }: WorkspaceNa
     !isCurrent &&
     folders.length > 0 &&
     (folders.length > 1 || onlyFolder?.name !== workspace.name || onlyFolder.status !== "ready");
-  const statusText = workspace.status === "open" ? "Open" : workspace.status === "unavailable" ? "Not found" : null;
+  const statusText =
+    workspace.status === "open"
+      ? t("settings.workspace.status.open")
+      : workspace.status === "unavailable"
+        ? t("settings.workspace.status.notFound")
+        : null;
 
   useEffect(() => () => window.clearTimeout(timerRef.current), []);
   useEffect(() => {
@@ -178,7 +188,7 @@ export function WorkspaceNavItem({ workspace, isCurrent, onSelect }: WorkspaceNa
                   {FOLDER_STATUS_TEXT[folder.status] && (
                     <span className="text-text-muted flex-none">
                       <span className="visually-hidden">, </span>
-                      {FOLDER_STATUS_TEXT[folder.status]}
+                      {FOLDER_STATUS_TEXT[folder.status]?.()}
                     </span>
                   )}
                 </li>

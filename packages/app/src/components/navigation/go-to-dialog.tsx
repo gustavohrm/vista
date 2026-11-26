@@ -11,6 +11,7 @@ import {
 
 import { formatShortcut, type Command } from "../../commands";
 import { parseGoToQuery, rankFiles, type FileMatch } from "../../domain/goto";
+import { t } from "../../i18n";
 import { FileIcon } from "../layout/file-icon";
 
 /** Typed first in the picker to list commands instead of files. */
@@ -173,7 +174,7 @@ export function GoToDialog({
     // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- the click only dismisses on the backdrop; keyboard users close with Escape (`onCancel`)
     <dialog
       ref={dialogRef}
-      aria-label={isCommandMode ? "Commands" : "Go to file"}
+      aria-label={isCommandMode ? t("goTo.commands") : t("goTo.goToFile")}
       onCancel={(event) => {
         event.preventDefault();
         onClose();
@@ -192,12 +193,12 @@ export function GoToDialog({
             ref={inputRef}
             type="text"
             role="combobox"
-            aria-label={isCommandMode ? "Run a command" : "Go to file, or :line:column"}
+            aria-label={isCommandMode ? t("goTo.runCommand") : t("goTo.fieldLabel")}
             aria-expanded={resultCount > 0}
             aria-controls={listId}
             aria-autocomplete="list"
             aria-activedescendant={activeIndex < resultCount ? optionId(activeIndex) : undefined}
-            placeholder="Type a file name, or :line"
+            placeholder={t("goTo.placeholder")}
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
@@ -216,7 +217,7 @@ export function GoToDialog({
             id={listId}
             // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a combobox's popup listbox; a native select can't hold rich options or follow the field's arrow keys
             role="listbox"
-            aria-label={isCommandMode ? "Commands" : "Files"}
+            aria-label={isCommandMode ? t("goTo.commands") : t("goTo.files")}
             className="max-h-80 scroll-py-1.5 overflow-y-auto p-1.5"
           >
             {isCommandMode
@@ -264,11 +265,7 @@ export function GoToDialog({
                 ))}
             {resultCount === 0 && (
               <p className="text-text-muted px-2.5 py-2 text-[13px]">
-                {isCommandMode
-                  ? "No matching commands."
-                  : files.length === 0
-                    ? "Open a folder to find its files. Type > for commands."
-                    : "No matching files."}
+                {isCommandMode ? t("goTo.noCommands") : files.length === 0 ? t("goTo.noFolder") : t("goTo.noFiles")}
               </p>
             )}
           </div>
@@ -277,17 +274,17 @@ export function GoToDialog({
           <span className="flex items-center gap-1.5">
             <kbd className="shortcut-key">↑</kbd>
             <kbd className="shortcut-key">↓</kbd>
-            Navigate
+            {t("goTo.navigate")}
           </span>
           <span className="flex items-center gap-1.5">
             <kbd className="shortcut-key">Enter</kbd>
-            {isCommandMode ? "Run" : "Open"}
+            {isCommandMode ? t("goTo.run") : t("common.open")}
           </span>
           <span className="ml-auto hidden items-center gap-1.5 sm:flex">
             <kbd className="shortcut-key">{COMMAND_QUERY_PREFIX}</kbd>
-            Commands
+            {t("goTo.commands")}
             <kbd className="shortcut-key ml-2">:</kbd>
-            Go to line
+            {t("goTo.goToLine")}
           </span>
         </div>
       </div>
@@ -297,12 +294,12 @@ export function GoToDialog({
 
 function describeLineTarget(hasCurrentFile: boolean, line: number | undefined, column: number | undefined): string {
   if (!hasCurrentFile) {
-    return "Open a file to go to a line in it.";
+    return t("goTo.lineNoFile");
   }
   if (line === undefined) {
-    return "Type a line number, and optionally :column, then press Enter.";
+    return t("goTo.lineHint");
   }
-  return column === undefined ? `Go to line ${line}.` : `Go to line ${line}, column ${column}.`;
+  return column === undefined ? t("goTo.lineTarget", { line }) : t("goTo.lineColumnTarget", { line, column });
 }
 
 interface CommandMatch {

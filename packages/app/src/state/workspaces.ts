@@ -13,6 +13,7 @@ import {
   type WorkspaceList,
   type WorkspaceRecord,
 } from "../domain/workspaces";
+import { t } from "../i18n";
 import { LEGACY_FOLDER_ID, type RestoreFolderResult, type WorkspaceCapability, type WorkspaceFolder } from "../ports";
 
 /** The part of `localStorage` the store uses, so tests can hand it another one. */
@@ -27,8 +28,6 @@ export const browserStorage: KeyValueStorage = {
 
 // Where a stored list this Vista could not fully read is kept before it is first saved over.
 export const WORKSPACES_BACKUP_KEY = "vista.workspaces.damaged";
-
-const UNTITLED_NAME = "Untitled workspace";
 
 /** How many workspaces Recent lists: few enough to read at a glance; the manager lists them all. */
 export const MAX_RECENT_WORKSPACES = 5;
@@ -137,12 +136,19 @@ export function createWorkspaceStore(
   function opened(workspace: WorkspaceRecord): WorkspaceRecord {
     const updated = { ...shownInRecent(workspace), lastOpenedAt: now() };
     const others = list.workspaces.filter((w) => w.id !== workspace.id);
-    save({ version: 1, lastWorkspaceId: updated.id, workspaces: [...others, updated] });
+    save({
+      version: 1,
+      lastWorkspaceId: updated.id,
+      workspaces: [...others, updated],
+    });
     return updated;
   }
 
   function replace(workspace: WorkspaceRecord): WorkspaceRecord {
-    const next = { ...list, workspaces: list.workspaces.map((w) => (w.id === workspace.id ? workspace : w)) };
+    const next = {
+      ...list,
+      workspaces: list.workspaces.map((w) => (w.id === workspace.id ? workspace : w)),
+    };
     if (sessionOnlyIds.has(workspace.id)) {
       list = next;
     } else {
@@ -159,7 +165,7 @@ export function createWorkspaceStore(
     const name = validateWorkspaceName(folderName);
     return {
       id: newId(),
-      name: name.ok ? name.name : UNTITLED_NAME,
+      name: name.ok ? name.name : t("workspace.untitled"),
       icon: DEFAULT_WORKSPACE_ICON,
       color: DEFAULT_WORKSPACE_COLOR,
       folderIds: [folderId],
@@ -178,7 +184,10 @@ export function createWorkspaceStore(
 
     openFolder(folder) {
       if (folder.accessMode === "fallback") {
-        const workspace = { ...createFor(folder.id, folder.name), lastOpenedAt: now() };
+        const workspace = {
+          ...createFor(folder.id, folder.name),
+          lastOpenedAt: now(),
+        };
         sessionOnlyIds.add(workspace.id);
         list = { ...list, workspaces: [...list.workspaces, workspace] };
         return workspace;
@@ -215,7 +224,11 @@ export function createWorkspaceStore(
       if (workspace.storage === "device" || location === undefined) {
         return replace({ ...workspace, folderIds });
       }
-      return replace({ ...workspace, folderIds, locations: { ...workspace.locations, [location]: folderId } });
+      return replace({
+        ...workspace,
+        folderIds,
+        locations: { ...workspace.locations, [location]: folderId },
+      });
     },
 
     storeInFolder(workspaceId, locations) {
@@ -224,7 +237,11 @@ export function createWorkspaceStore(
         return null;
       }
       const home = { [HOME_FOLDER_LOCATION]: workspace.folderIds[0]! };
-      return replace({ ...workspace, storage: "folder", locations: { ...locations, ...home } });
+      return replace({
+        ...workspace,
+        storage: "folder",
+        locations: { ...locations, ...home },
+      });
     },
 
     workspaceForFile(home) {
@@ -241,7 +258,11 @@ export function createWorkspaceStore(
       // The folder's own device workspace becomes the folder-backed one, so Recent and the session stay one.
       const plain = findWorkspaceForFolder(list, home.id);
       if (plain) {
-        return replace({ ...plain, storage: "folder", locations: { [HOME_FOLDER_LOCATION]: home.id } });
+        return replace({
+          ...plain,
+          storage: "folder",
+          locations: { [HOME_FOLDER_LOCATION]: home.id },
+        });
       }
       const created: WorkspaceRecord = {
         ...createFor(home.id, home.name),
@@ -258,7 +279,9 @@ export function createWorkspaceStore(
       if (!workspace || homeId === undefined) {
         return null;
       }
-      const locations: Record<string, string> = { [HOME_FOLDER_LOCATION]: homeId };
+      const locations: Record<string, string> = {
+        [HOME_FOLDER_LOCATION]: homeId,
+      };
       const folderIds = [homeId];
       const known: Readonly<Record<string, string>> = workspace.storage === "folder" ? workspace.locations : {};
       for (const location of details.folders) {
@@ -276,7 +299,15 @@ export function createWorkspaceStore(
         }
       }
       const { name, icon, color } = details;
-      const updated = replace({ ...workspace, name, icon, color, folderIds, storage: "folder", locations });
+      const updated = replace({
+        ...workspace,
+        name,
+        icon,
+        color,
+        folderIds,
+        storage: "folder",
+        locations,
+      });
       const listed = new Set(details.folders);
       const dropped =
         workspace.storage === "folder"
@@ -284,7 +315,10 @@ export function createWorkspaceStore(
               listed.has(location) || folderIds.includes(id) ? [] : [id],
             )
           : [];
-      return { workspace: updated, unusedFolderIds: dropped.filter((id) => !isUsed(id)) };
+      return {
+        workspace: updated,
+        unusedFolderIds: dropped.filter((id) => !isUsed(id)),
+      };
     },
 
     storeOnDevice(workspaceId) {
@@ -331,7 +365,9 @@ export function createWorkspaceStore(
       if (hasStoredList) {
         return null;
       }
-      const result = await capability.restoreFolder(LEGACY_FOLDER_ID, { interactive: false });
+      const result = await capability.restoreFolder(LEGACY_FOLDER_ID, {
+        interactive: false,
+      });
       if (result.status === "none") {
         return null;
       }
@@ -402,7 +438,9 @@ export function createWorkspaceStore(
           console.error("Failed to forget the session:", err);
         }
       }
-      return { unusedFolderIds: workspace.folderIds.filter((id) => !isUsed(id)) };
+      return {
+        unusedFolderIds: workspace.folderIds.filter((id) => !isUsed(id)),
+      };
     },
 
     loadSession: (workspaceId) =>

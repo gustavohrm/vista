@@ -3,6 +3,7 @@ import { useId, useMemo, type ReactNode } from "react";
 
 import type { EditorSettings } from "../../domain/settings";
 import { canShowEnriched, getViewer } from "../../domain/viewers";
+import { t } from "../../i18n";
 import type { ViewMode } from "../../ports";
 import type { OpenDocument } from "../../state/documents";
 import { useReducedMotion } from "../../theme/appearance";
@@ -53,16 +54,16 @@ export function DocumentActions({
 
   return (
     // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a row of buttons; a native fieldset would bring browser styling to reset
-    <div role="group" aria-label="Document actions" className="flex flex-none items-center gap-1">
+    <div role="group" aria-label={t("editor.documentActions")} className="flex flex-none items-center gap-1">
       {canToggleView && viewer.enriched !== undefined && (
         <ViewModeToggle viewMode={doc.viewMode} enriched={viewer.enriched} onViewModeChange={onViewModeChange} />
       )}
-      <Tooltip text="Find" shortcut="Mod+F" position="bottom">
+      <Tooltip text={t("editor.find")} shortcut="Mod+F" position="bottom">
         {(bubbleId) => (
           <button
             type="button"
             onClick={onFind}
-            aria-label="Find"
+            aria-label={t("editor.find")}
             aria-describedby={bubbleId}
             className={`icon-button size-7 text-base ${isFindOpen ? "bg-selected text-text-strong" : ""}`}
           >
@@ -166,17 +167,17 @@ function ViewModeToggle({ viewMode, enriched, onViewModeChange }: ViewModeToggle
   };
   return (
     // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a plain row of two toggles; a native fieldset would bring browser styling to reset
-    <div role="group" aria-label="Document view mode" className={VIEW_GROUP_CLASS}>
+    <div role="group" aria-label={t("editor.viewMode")} className={VIEW_GROUP_CLASS}>
       {segment(
         "enriched",
-        enriched === "markdown" ? "Rich text" : "Table",
+        enriched === "markdown" ? t("editor.richText") : t("editor.table"),
         enriched === "markdown" ? (
           <i className="ic-eye text-sm" aria-hidden="true" />
         ) : (
           <i className="ic-table text-sm" aria-hidden="true" />
         ),
       )}
-      {segment("raw", "Raw", <i className="ic-code text-sm" aria-hidden="true" />)}
+      {segment("raw", t("editor.raw"), <i className="ic-code text-sm" aria-hidden="true" />)}
     </div>
   );
 }

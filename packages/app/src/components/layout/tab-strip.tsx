@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { shortenPath, type DocumentLocation } from "../../domain/document-location";
+import { t } from "../../i18n";
 import type { OpenDocument } from "../../state/documents";
 import { useReducedMotion } from "../../theme/appearance";
 import { Menu, MENU_SEPARATOR, type MenuEntry } from "../menu/menu";
@@ -56,7 +57,11 @@ export function TabStrip({
   actions,
   locate,
 }: TabStripProps) {
-  const [menu, setMenu] = useState<{ key: string; x: number; y: number } | null>(null);
+  const [menu, setMenu] = useState<{
+    key: string;
+    x: number;
+    y: number;
+  } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   // Set when a tab is closed from its focused Close button or from its menu. Closing removes the
   // focused element, so focus follows the newly active tab once the close completes; a cancelled
@@ -134,7 +139,7 @@ export function TabStrip({
       <div
         ref={listRef}
         role="tablist"
-        aria-label="Open files"
+        aria-label={t("tabs.label")}
         className="relative flex h-full min-w-0 flex-1 [scrollbar-width:none] items-center gap-0.5 overflow-x-auto overflow-y-hidden pl-1.5"
       >
         <AnimatePresence initial={false}>
@@ -164,7 +169,7 @@ export function TabStrip({
         </AnimatePresence>
         {menu && (
           <Menu
-            label="Tab actions"
+            label={t("tabs.actions")}
             items={buildTabMenu(documents, menu.key, {
               onClose: (key) => void closeTabs(key, () => onClose(key)),
               onCloseMany: (keys) => void closeTabs(keys.includes(menu.key) ? menu.key : null, () => onCloseMany(keys)),
@@ -209,30 +214,49 @@ function buildTabMenu(
   const toTheRight = keysOf(documents.slice(index + 1));
   const saved = keysOf(documents.filter((doc) => !doc.isDirty));
   return [
-    { label: "Close", icon: <i className="ic-x" aria-hidden="true" />, onSelect: () => actions.onClose(key) },
-    { label: "Close Others", disabled: others.length === 0, onSelect: () => actions.onCloseMany(others) },
-    { label: "Close to the Right", disabled: toTheRight.length === 0, onSelect: () => actions.onCloseMany(toTheRight) },
-    { label: "Close Saved", disabled: saved.length === 0, onSelect: () => actions.onCloseMany(saved) },
-    { label: "Close All", onSelect: () => actions.onCloseMany(keysOf(documents)) },
+    {
+      label: t("common.close"),
+      icon: <i className="ic-x" aria-hidden="true" />,
+      onSelect: () => actions.onClose(key),
+    },
+    {
+      label: t("tabs.closeOthers"),
+      disabled: others.length === 0,
+      onSelect: () => actions.onCloseMany(others),
+    },
+    {
+      label: t("tabs.closeToTheRight"),
+      disabled: toTheRight.length === 0,
+      onSelect: () => actions.onCloseMany(toTheRight),
+    },
+    {
+      label: t("tabs.closeSaved"),
+      disabled: saved.length === 0,
+      onSelect: () => actions.onCloseMany(saved),
+    },
+    {
+      label: t("tabs.closeAll"),
+      onSelect: () => actions.onCloseMany(keysOf(documents)),
+    },
     MENU_SEPARATOR,
     ...(onCopyPath
       ? [
           {
-            label: "Copy Path",
+            label: t("common.copyPath"),
             icon: <i className="ic-clipboard" aria-hidden="true" />,
             onSelect: () => onCopyPath(target),
           },
         ]
       : []),
     {
-      label: "Copy Relative Path",
+      label: t("common.copyRelativePath"),
       icon: <i className="ic-copy" aria-hidden="true" />,
       onSelect: () => actions.onCopyRelativePath(target.path),
     },
     ...(onReveal
       ? [
           {
-            label: "Reveal in File Explorer",
+            label: t("common.revealInFileExplorer"),
             icon: <i className="ic-folder-open" aria-hidden="true" />,
             onSelect: () => onReveal(target),
           },
@@ -347,14 +371,20 @@ function Tab({
       animate={{
         width: "auto",
         opacity: 1,
-        transition: { duration: isReduced ? 0 : TAB_GROW_SECONDS, ease: EASE_MOVE },
+        transition: {
+          duration: isReduced ? 0 : TAB_GROW_SECONDS,
+          ease: EASE_MOVE,
+        },
         transitionEnd: { overflow: "visible" },
       }}
       exit={{
         width: 0,
         opacity: 0,
         overflow: "hidden",
-        transition: { duration: isReduced ? 0 : TAB_SHRINK_SECONDS, ease: EASE_MOVE },
+        transition: {
+          duration: isReduced ? 0 : TAB_SHRINK_SECONDS,
+          ease: EASE_MOVE,
+        },
       }}
       inert={!isPresent}
       className="flex flex-none"
@@ -382,7 +412,7 @@ function Tab({
           aria-selected={isActive}
           tabIndex={isActive ? 0 : -1}
           // Named in full, so a screen reader hears the folder that tells two same-named tabs apart.
-          aria-label={doc.isDirty ? `${label} (unsaved)` : label}
+          aria-label={doc.isDirty ? t("tabs.unsavedLabel", { label }) : label}
           data-tab-key={isPresent ? doc.key : undefined}
           title={title}
           onClick={onActivate}
@@ -393,11 +423,11 @@ function Tab({
           <FileIcon extension={doc.extension} className="text-text-faint flex flex-none text-sm" />
           <span className="min-w-0 truncate">{doc.name}</span>
           {folderHint && <span className="text-text-faint min-w-0 truncate">{folderHint}</span>}
-          {doc.isDirty && <span className="visually-hidden">(unsaved)</span>}
+          {doc.isDirty && <span className="visually-hidden">{t("tabs.unsaved")}</span>}
         </button>
         <button
           type="button"
-          aria-label={`Close ${label}`}
+          aria-label={t("tabs.closeNamed", { label })}
           tabIndex={isActive ? 0 : -1}
           onClick={onClose}
           className="icon-button mr-1 size-5 rounded-[4px] text-[13px]"

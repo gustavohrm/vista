@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import type { FindQuery } from "../../domain/find";
+import { t } from "../../i18n";
 import { Tooltip } from "../feedback/tooltip";
 import { NO_FIND_RESULT, type FindResult, type FindTarget } from "./find-target";
 
@@ -105,7 +106,7 @@ export function FindBar({ getTarget, targetKey, content, canReplace, mode, focus
   return (
     // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- Escape anywhere in the bar closes it; the controls inside are the interactive elements
     <search
-      aria-label="Find in file"
+      aria-label={t("findBar.region")}
       onKeyDown={handleKeyDown}
       className="card soft floating absolute top-2 right-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-col gap-1 p-1 [--ui-radius-surface:8px]"
     >
@@ -114,9 +115,9 @@ export function FindBar({ getTarget, targetKey, content, canReplace, mode, focus
           <input
             ref={findInputRef}
             type="text"
-            aria-label="Find"
+            aria-label={t("findBar.find")}
             aria-invalid={result.invalid || undefined}
-            placeholder="Find"
+            placeholder={t("findBar.find")}
             value={query.text}
             onChange={(event) => setQuery((previous) => ({ ...previous, text: event.target.value }))}
             onKeyDown={handleFindKeyDown}
@@ -126,21 +127,21 @@ export function FindBar({ getTarget, targetKey, content, canReplace, mode, focus
             {describeResult(query, result)}
           </output>
           <BarButton
-            label="Match case"
+            label={t("findBar.matchCase")}
             icon={<i className="ic-case-sensitive" aria-hidden="true" />}
             pressed={query.caseSensitive}
             onClick={() => toggle("caseSensitive")}
             isInField
           />
           <BarButton
-            label="Match whole word"
+            label={t("findBar.matchWholeWord")}
             icon={<i className="ic-whole-word" aria-hidden="true" />}
             pressed={query.wholeWord}
             onClick={() => toggle("wholeWord")}
             isInField
           />
           <BarButton
-            label="Use regular expression"
+            label={t("findBar.useRegex")}
             icon={<i className="ic-regex" aria-hidden="true" />}
             pressed={query.regexp}
             onClick={() => toggle("regexp")}
@@ -148,34 +149,34 @@ export function FindBar({ getTarget, targetKey, content, canReplace, mode, focus
           />
         </div>
         <BarButton
-          label="Previous match (Shift+Enter)"
+          label={t("findBar.previousMatch")}
           icon={<i className="ic-arrow-up" aria-hidden="true" />}
           disabled={!hasMatches}
           onClick={() => run((target) => target.findPrevious())}
         />
         <BarButton
-          label="Next match (Enter)"
+          label={t("findBar.nextMatch")}
           icon={<i className="ic-arrow-down" aria-hidden="true" />}
           disabled={!hasMatches}
           onClick={() => run((target) => target.findNext())}
         />
         {canReplace && (
           <BarButton
-            label={isReplaceShown ? "Hide replace" : "Show replace"}
+            label={isReplaceShown ? t("findBar.hideReplace") : t("findBar.showReplace")}
             icon={<i className="ic-replace" aria-hidden="true" />}
             onClick={() => setIsReplaceShown((shown) => !shown)}
             expanded={isReplaceShown}
           />
         )}
-        <BarButton label="Close (Escape)" icon={<i className="ic-x" aria-hidden="true" />} onClick={close} />
+        <BarButton label={t("findBar.close")} icon={<i className="ic-x" aria-hidden="true" />} onClick={close} />
       </div>
       {showsReplace && (
         <div className="flex items-center gap-0.5">
           <div className={FIELD_CLASS}>
             <input
               type="text"
-              aria-label="Replace"
-              placeholder="Replace"
+              aria-label={t("findBar.replace")}
+              placeholder={t("findBar.replace")}
               value={replacement}
               onChange={(event) => setReplacement(event.target.value)}
               onKeyDown={handleReplaceKeyDown}
@@ -184,21 +185,21 @@ export function FindBar({ getTarget, targetKey, content, canReplace, mode, focus
           </div>
           <button
             type="button"
-            aria-label="Replace (Enter)"
+            aria-label={t("findBar.replaceOne")}
             disabled={!hasMatches}
             onClick={() => run((target) => target.replace(replacement))}
             className="btn ghost sm ml-0.5 font-normal [--ui-radius:4px]"
           >
-            Replace
+            {t("findBar.replace")}
           </button>
           <button
             type="button"
-            aria-label="Replace all"
+            aria-label={t("findBar.replaceAll")}
             disabled={!hasMatches}
             onClick={() => run((target) => target.replaceAll(replacement))}
             className="btn ghost sm font-normal [--ui-radius:4px]"
           >
-            All
+            {t("findBar.all")}
           </button>
         </div>
       )}
@@ -212,15 +213,17 @@ const FIELD_CLASS =
 
 function describeResult(query: FindQuery, result: FindResult): string {
   if (result.invalid) {
-    return "Invalid regex";
+    return t("findBar.invalidRegex");
   }
   if (query.text === "") {
     return "";
   }
   if (result.total === 0) {
-    return "No results";
+    return t("findBar.noResults");
   }
-  return result.current === null ? `${result.total} found` : `${result.current} of ${result.total}`;
+  return result.current === null
+    ? t("findBar.found", { count: result.total })
+    : t("findBar.position", { current: result.current, total: result.total });
 }
 
 interface BarButtonProps {
