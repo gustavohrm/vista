@@ -31,7 +31,7 @@ Commands that have no key today are included. They are most of the commands, and
 
 A command has a list of keys, empty or with one or more, and any of them runs it. Someone used to another editor can keep its key beside Vista's, such as `Ctrl + L` and `Ctrl + G` both for Go to Line, without giving up the one the rest of Vista's documentation names. Each default list has the one key the command has today, or none.
 
-The list is ordered, and its first key is the command's **main key**: the one shown wherever a single key fits, which is the palette, menus, tooltips, the title bar, and the start screen's and the empty frame's hints. Settings shows every key. A key added goes to the end, so the main key changes only when the user removes it, and the next key becomes the main one. Reordering keys by dragging was left out: removing and adding again does the same, and the order matters only for what a tooltip shows.
+The list is ordered, and its first key is the one shown wherever a single key fits, which is the palette, menus, tooltips, the title bar, and the start screen's and the empty frame's hints. Settings shows every key. A key added goes to the end, so the key shown changes only when the user removes the first one, and the next key is shown instead. Reordering keys by dragging was left out: removing and adding again does the same, and the order matters only for what a tooltip shows.
 
 Rejected: one key per command. It cannot keep a familiar key alongside the default, and that case is the one the owner set for 0.0.4. Rejected: showing every key in tooltips and menus, which would widen them for the rare command with three keys.
 
@@ -66,7 +66,7 @@ A key is recorded from the physical key for letters and digits (`event.code`, as
 
 ## Storage
 
-The choices are stored with the other settings in `vista.settings`, as a `shortcuts` field that holds only the commands whose list differs from the default, each with its whole list: `"shortcuts": { "goto.line": ["Mod+G", "Mod+L"], "tabs.close": [] }`, where a key is the command's id and `[]` means no key. A command not listed has its default, so a later version that changes a default reaches every user who did not change that command. Storing the whole list, rather than keys added and removed, keeps the order that picks the main key, and a list equal to the default is removed from the field rather than stored.
+The choices are stored with the other settings in `vista.settings`, as a `shortcuts` field that holds only the commands whose list differs from the default, each with its whole list: `"shortcuts": { "goto.line": ["Mod+G", "Mod+L"], "tabs.close": [] }`, where a key is the command's id and `[]` means no key. A command not listed has its default, so a later version that changes a default reaches every user who did not change that command. Storing the whole list, rather than keys added and removed, keeps the order that picks the key shown, and a list equal to the default is removed from the field rather than stored.
 
 The field falls back entry by entry, as [Editor settings](workspaces.md#editor-settings) describes for the others: an entry whose command does not exist or whose value is not an array is ignored, and within a list a key that is not a string, is refused, or appears earlier in the list is dropped, and the rest stay. An ignored entry is not removed from storage until the user next changes a shortcut, so a command a later build brings back still has its keys. A key in the lists of two commands stays with the first in the command list's order and is dropped from the other. The settings version stays `1`: the field is new and optional, and a missing one reads as no changes.
 
@@ -76,12 +76,12 @@ Keeping the shortcuts in a store of their own, `vista.shortcuts`, was rejected: 
 
 ## Applying the keys
 
-A command's `shortcut` becomes `shortcuts`, a list. `AppShell` resolves each command's list from its default and the stored choices before building the command list, so the window listener, which runs the command any of whose keys matches, `reservedShortcuts`, which holds every key of every command, the palette, menus, and tooltips read the one resolved list as they read the fixed one today. The start screen's and the empty frame's hints, and the title bar's Go to File, read the main keys of their commands instead of the constants they use now, and a hint whose command has no key is not shown. A change applies at once, without a reload.
+A command's `shortcut` becomes `shortcuts`, a list. `AppShell` resolves each command's list from its default and the stored choices before building the command list, so the window listener, which runs the command any of whose keys matches, `reservedShortcuts`, which holds every key of every command, the palette, menus, and tooltips read the one resolved list as they read the fixed one today. The start screen's and the empty frame's hints, and the title bar's Go to File, read the first key of their commands instead of the constants they use now, and a hint whose command has no key is not shown. A change applies at once, without a reload.
 
 ## Tests
 
 - **Resolution.** Defaults, a changed list, an empty list, an unknown id, a value that is not an array, a refused or repeated key in a list, and one key in two commands' lists resolve as [Storage](#storage) describes, and a list equal to the default is not stored.
 - **Refusal.** Each rule in [Keys that are refused](#keys-that-are-refused), for each platform, with a Spanish-layout `Ctrl+Alt+2` among the cases.
 - **Recording.** Adding a key saves it and makes it run the command alongside the others, Escape cancels, a key in use asks before replacing and leaves the other command its other keys, a key the command has is refused, and recording `Ctrl + S` does not save.
-- **Main key.** Removing the main key makes the next one main; the palette, a tooltip, a menu, and the start screen's hints show the main key.
+- **Key shown.** The palette, a tooltip, a menu, and the start screen's hints show a command's first key, and removing it shows the next one.
 - **The editor yields.** Every key of a command runs it in the raw editor, with vim on and off.
