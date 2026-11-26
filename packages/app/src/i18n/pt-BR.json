@@ -1,0 +1,14 @@
+{
+  "settings": {
+    "sections": {
+      "language": "Idioma"
+    },
+    "language": {
+      "title": "Idioma",
+      "lead": "Em qual idioma o Vista é exibido, em todos os espaços de trabalho.",
+      "label": "Idioma",
+      "description": "A opção Sistema segue os idiomas do seu sistema operacional e muda junto com eles.",
+      "system": "Sistema ({language})"
+    }
+  }
+}

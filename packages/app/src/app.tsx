@@ -33,6 +33,7 @@ import {
   type GoToRequest,
   type PaletteCommand,
 } from "./components/navigation/go-to-dialog";
+import { LanguageSection } from "./components/settings/language-section";
 import { SettingsPage, type SettingsSection } from "./components/settings/settings-page";
 import {
   AboutSection,
@@ -65,6 +66,7 @@ import {
   type WorkspaceRecord,
   type WorkspaceStorage,
 } from "./domain/workspaces";
+import { startLanguage, useIsLanguageReady, useLocale } from "./i18n";
 import {
   LEGACY_FOLDER_ID,
   WorkspaceError,
@@ -163,6 +165,23 @@ const RAW_EDITOR_MENU = [...EDITOR_MENU, "find.replace", "goto.line"];
  * @returns Shared application UI configured for the supplied platform.
  */
 export function App({ adapter }: AppProps) {
+  const isLanguageReady = useIsLanguageReady();
+  // Read at the root, so a language change re-renders the whole interface and no text stays in the old one.
+  useLocale();
+  useEffect(() => {
+    void (async () => {
+      try {
+        await startLanguage();
+      } catch (error) {
+        // Every dictionary is bundled, so only a build defect can fail this.
+        console.error("Vista could not start the interface language.", error);
+      }
+    })();
+  }, []);
+  if (!isLanguageReady) {
+    // Nothing until the language is in place, so the interface never shows English first and then switches.
+    return null;
+  }
   return (
     <ToastProvider>
       <AppShell adapter={adapter} />
@@ -3081,6 +3100,8 @@ function AppShell({ adapter }: AppProps) {
                       onDelete={() => void handleDeleteWorkspace(managedId)}
                     />
                   )
+                ) : shownSettingsSection === "language" ? (
+                  <LanguageSection />
                 ) : shownSettingsSection === "editor" ? (
                   <EditorSection settings={settings} onChange={updateSettings} />
                 ) : shownSettingsSection === "files" ? (

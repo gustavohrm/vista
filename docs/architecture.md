@@ -1,6 +1,6 @@
 ---
 status: IMPLEMENTED
-last_updated: 2026-11-24
+last_updated: 2026-11-26
 scope: Boundaries between shared app code, platform hosts, and workspace packages.
 ---
 
@@ -51,6 +51,10 @@ Controls and surfaces use the `@codenhub/styles` component classes wherever one 
 `@codenhub/theme` (`packages/app/src/theme/theme-manager.ts`, pinned to `0.4.1`) sets the scheme and theme, stored under `vista-theme`, as [Appearance](specs/appearance.md#scheme-and-theme) describes: each theme is a light and a dark variant, such as `ocean-light` and `ocean-dark`, and `<html>` carries the theme's class, such as `theme-ocean`. `packages/app/src/theme/appearance.ts` writes the contrast and motion levels as `data-contrast` and `data-motion` on `<html>`, and its `useReducedMotion` replaces the motion library's hook, which reads only the operating system. Each host calls `initAppearance()` before it renders; the content security policy allows no inline script, so this runs at the start of the app's module script rather than in the page's `<head>`, and a slow load may briefly show the Daylight fallback before the saved appearance applies.
 
 Colours are `light-dark()` tokens. The palette and the component tokens come from `@codenhub/styles`; `style.css` adds Vista's own tokens (the chrome and frame grounds, lines, the floating surface, selection, find matches, and the action colours) and sets the package's colour tokens Vista draws with, such as the text colours, the primary colour, and the focus ring. `@theme` names Vista's themed tokens with a placeholder value, so Tailwind generates their utilities, and one block per theme, `.theme-<id>`, gives every token its value; `packages/app/src/theme/themes.test.ts` checks each block sets them all. A theme class on any element shows that theme inside it, which is how Settings previews each theme. `:root[data-contrast="more"]` raises the text, lines, and fills over any theme, and the `contrast-more` class does the same inside one element, for the previews. The motion rules read `data-motion`; a motion preview in Settings plays from the `essential-motion` layer, past the package's reset, since it plays only when asked to. The [brand guidelines](guidelines/brand.md#colours) record each theme's measured contrast, which `apps/web/tests/e2e/appearance.spec.ts` checks.
+
+### Interface languages
+
+`@codenhub/i18n`, pinned to `0.5.0` in the pnpm catalog, translates the interface, as [Languages](specs/languages.md) describes. `packages/app/src/i18n/` holds the manager and the dictionaries, English in `en.ts` and the translations in JSON, all bundled with the app. `App` starts the browser binding, which saves a chosen language under `vista-locale` and keeps `<html lang>` and `dir` in step, and renders nothing until it has started, so the hosts need no call of their own; it reads the language at the root, so a change re-renders the whole interface.
 
 ### Toasts and confirmations
 

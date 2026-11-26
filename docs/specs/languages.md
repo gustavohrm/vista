@@ -6,7 +6,7 @@ scope: The interface languages, how one is chosen, stored, and applied, which te
 
 # Languages
 
-This document makes Vista's interface available in more than one language. It is approved and not yet implemented: today every piece of interface text is an English literal in `packages/app`, which is legacy until this document is implemented.
+This document makes Vista's interface available in more than one language. It is approved and partly implemented: the language starts before the first render, is chosen in Settings → Language, and is stored as described below, and the dictionaries and their tests are in place. Most interface text is still an English literal in `packages/app`, which is legacy until it moves into the dictionaries, and the dates and numbers, the editor's phrases, and the translated changelog are not implemented yet.
 
 ## The languages
 
@@ -149,6 +149,6 @@ Checked by hand, as [Tests](tests.md) records for what no automated test reaches
 
 ## Dependency
 
-This adds `@codenhub/i18n` to the workspace catalog at `^0.5.0`, used by `packages/app` only. It has no dependencies of its own and no import-time side effects; its browser binding changes `<html lang>` and `dir` and follows `languagechange`, as [Applying the language](#applying-the-language) and [Storage](#storage) describe. It is maintained alongside Vista and is before 1.0, so a minor upgrade may change its API; a defect found in it is fixed in its own repository, as [the code guidelines](../guidelines/code.md) describe.
+This adds `@codenhub/i18n` to the workspace catalog, pinned to `0.5.0`, as the other `@codenhub/*` packages are, used by `packages/app` only. It has no dependencies of its own and no import-time side effects; its browser binding changes `<html lang>` and `dir` and follows `languagechange`, as [Applying the language](#applying-the-language) and [Storage](#storage) describe. It is maintained alongside Vista and is before 1.0, so a minor upgrade may change its API; a defect found in it is fixed in its own repository, as [the code guidelines](../guidelines/code.md) describe.
 
 0.5.0 is the first version with everything this document needs. It added `binding.switchToSystemLocale()`, `binding.isUsingSystemLocale`, `binding.subscribe()`, and following `languagechange` while no choice is saved, which _System_ needs, in answer to [codenhub/codenhub#588](https://github.com/codenhub/codenhub/issues/588), which Vista filed. Markup inside a translated sentence, such as a link, is not supported: the `rich()` method that did it was removed before 0.5.0, and [codenhub/codenhub#648](https://github.com/codenhub/codenhub/issues/648) tracks it. Vista does not need it, since its dictionaries hold only text and markup stays in components, as [Writing translations](#writing-translations) says; a sentence that ever needs a link inside it is the case that issue waits for.
