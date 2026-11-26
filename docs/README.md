@@ -48,4 +48,4 @@ Every document in `docs/` is listed here. Adding, moving, or deleting one update
 | [Appearance](specs/appearance.md)        | The theme, scheme, contrast, and motion preferences, how each is chosen, stored, and applied, and what each theme provides.                                     |
 | [Languages](specs/languages.md)          | The interface languages, how one is chosen, stored, and applied, what is and is not translated, including changelog entries, and how translations are reviewed. |
 | [Changelog](specs/changelog.md)          | The changelog pages, the check that holds a release to them, and where the app and GitHub show them.                                                            |
-| [Keyboard shortcuts](specs/shortcuts.md) | A draft for customizable shortcuts: which commands take a key, how one is recorded and refused, and how choices are stored.                                     |
+| [Keyboard shortcuts](specs/shortcuts.md) | Customizable shortcuts: which commands take keys, several per command, how a key is added, refused, and removed, and how choices are stored.                    |
