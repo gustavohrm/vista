@@ -473,7 +473,14 @@
     "richText": "Texto enriquecido",
     "table": "Tabla",
     "raw": "Sin formato",
-    "rawContent": "Contenido en texto sin formato de {name}"
+    "rawContent": "Contenido en texto sin formato de {name}",
+    "phrases": {
+      "currentMatch": "coincidencia actual",
+      "onLine": "en la línea",
+      "replacedMatchOnLine": "coincidencia reemplazada en la línea {line}",
+      "replacedMatches": "coincidencias reemplazadas: {count}",
+      "selectionDeleted": "Selección eliminada"
+    }
   },
   "markdown": {
     "editor": "Editor de Markdown",
