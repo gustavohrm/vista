@@ -1,12 +1,12 @@
 ---
 status: APPROVED
-last_updated: 2026-11-23
+last_updated: 2026-11-26
 scope: The interface languages, how one is chosen, stored, and applied, which text is translated and which is not, how changelog entries are translated, how dates and numbers follow the language, and how translations are written, reviewed, and tested.
 ---
 
 # Languages
 
-This document makes Vista's interface available in more than one language. It is approved and partly implemented: the language starts before the first render, is chosen in Settings → Language, and is stored as described below; the interface text is in the dictionaries with its tests; and the dates and numbers follow the language. Messages that report a failed operation, such as `Failed to open the selected folder.`, are still English literals in `packages/app`, because the [Errors direction](errors.md#direction) rewrites them; they move into the dictionaries with it. The editor's phrases and the translated changelog are not implemented yet.
+This document makes Vista's interface available in more than one language. It is approved and partly implemented: the language starts before the first render, is chosen in Settings → Language, and is stored as described below; the interface text, including the editor's phrases, is in the dictionaries with its tests; and the dates and numbers follow the language. Messages that report a failed operation, such as `Failed to open the selected folder.`, are still English literals in `packages/app`, because the [Errors direction](errors.md#direction) rewrites them; they move into the dictionaries with it. The translated changelog is not implemented yet.
 
 ## The languages
 
@@ -69,7 +69,7 @@ Every piece of text Vista writes for the user:
 - Command names in the command palette and in Keyboard Shortcuts, and their categories. The palette matches what it shows, so commands are searched in the current language.
 - The update notice and its offers, such as `Update to {version}` and `Install it now?`, and the summary of what the update changes, as [The changelog](#the-changelog) describes.
 - What's New and the release summary in About, as [The changelog](#the-changelog) describes.
-- Text inside the editor libraries that Vista shows: CodeMirror's phrases, such as those of the search and vim extensions, through CodeMirror's `EditorState.phrases` facet. The facet is part of the editor's state, so a re-render does not change it: on a language change, the open editor is reconfigured with the new phrases, keeping each tab's saved state. Which phrases Vista actually shows is listed when this is implemented.
+- Text inside the editor libraries that Vista shows: CodeMirror's phrases, through CodeMirror's `EditorState.phrases` facet. Vista shows only those the raw editor announces to screen readers: `current match` and `on line` when find moves to a match, `replaced match on line $` and `replaced $ matches` when find replaces, and `Selection deleted`. The search panel's and the go-to prompt's phrases are not shown, since the find bar and the go-to dialog replace them. Each phrase is read in the interface language when CodeMirror announces it, so a language change applies at once without rebuilding the editor, and each tab keeps its state, including vim's mode. The vim extension's own messages, such as `Not an editor command` and `Pattern not found`, do not go through the facet and stay in English.
 - Messages Vista writes for failures, such as `Failed to open the selected folder.`
 
 The English strings that [Workspaces](workspaces.md) and other specs quote are the `en` dictionary's text. A spec keeps quoting English; the translations follow it.
