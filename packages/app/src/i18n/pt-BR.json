@@ -641,5 +641,40 @@
       "fixed": "Corrigido",
       "security": "Segurança"
     }
+  },
+  "failures": {
+    "operations": {
+      "save": "Não foi possível salvar {name}.",
+      "open": "Não foi possível abrir {name}.",
+      "readFolder": "Não foi possível ler a pasta \"{name}\".",
+      "pickFolder": "Não foi possível abrir a pasta selecionada.",
+      "restoreWorkspace": "Não foi possível reabrir o último espaço de trabalho.",
+      "openWorkspace": "Não foi possível abrir o espaço de trabalho.",
+      "createWorkspace": "Não foi possível criar o espaço de trabalho.",
+      "readWorkspace": "Não foi possível ler o espaço de trabalho.",
+      "storeDetails": "Não foi possível guardar os detalhes em \"{path}\".",
+      "deleteDetails": "Não foi possível excluir \"{path}\".",
+      "addFolder": "Não foi possível adicionar a pasta.",
+      "openFolder": "Não foi possível abrir a pasta.",
+      "refresh": "Não foi possível atualizar a lista de arquivos.",
+      "create": "Não foi possível criar \"{name}\".",
+      "rename": "Não foi possível renomear \"{name}\".",
+      "delete": "Não foi possível excluir \"{name}\".",
+      "reveal": "Não foi possível mostrar {name} no gerenciador de arquivos.",
+      "copy": "Não foi possível copiar para a área de transferência."
+    },
+    "reasons": {
+      "permissionDenied": "O Vista não tem permissão para usar esta pasta. Abra a pasta novamente e permita o acesso quando for solicitado.",
+      "notFound": "Não há mais nada nesse local, por uma mudança de lugar ou de nome, ou por uma exclusão. Atualize a lista de arquivos ou abra a pasta novamente.",
+      "alreadyExists": "Já existe algo com esse nome. Escolha outro nome.",
+      "unsupported": "Este navegador ou dispositivo não oferece suporte a isso, então tentar novamente não vai adiantar.",
+      "conflict": "O conteúdo mudou no disco depois que o Vista o leu. Abra novamente para ver as alterações.",
+      "unknown": "Algo inesperado deu errado. Tente novamente e, se continuar acontecendo, reinicie o Vista."
+    },
+    "installUpdate": "Não foi possível instalar o Vista {version}. O download ou o instalador falhou. Você pode tentar novamente em Sobre, nas Configurações.",
+    "checkUpdates": "Não foi possível verificar se há atualizações. O Vista não conseguiu acessar o servidor de atualizações. Verifique sua conexão e tente novamente.",
+    "fileGone": "\"{name}\" não existe mais. Talvez tenha sido movido ou excluído.",
+    "reopenFolder": "Não foi possível reabrir \"{name}\". Talvez a pasta tenha sido movida ou excluída.",
+    "reopenWorkspace": "Não foi possível reabrir \"{workspace}\". Talvez as pastas dele tenham sido movidas ou excluídas."
   }
 }

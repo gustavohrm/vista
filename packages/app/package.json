@@ -20,6 +20,7 @@
     "@codemirror/search": "catalog:",
     "@codemirror/state": "catalog:",
     "@codemirror/view": "catalog:",
+    "@codenhub/error": "catalog:",
     "@codenhub/i18n": "catalog:",
     "@codenhub/icons": "catalog:",
     "@codenhub/styles": "catalog:",

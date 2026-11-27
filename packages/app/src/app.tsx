@@ -55,6 +55,7 @@ import { BYTES_PER_MB } from "./domain/settings";
 import { decodeText, encodeText } from "./domain/text-codec";
 import { getViewer } from "./domain/viewers";
 import { isDesktopViewport, onDesktopViewportChange } from "./domain/viewport";
+import { workspaceErrorKind } from "./domain/workspace-errors";
 import {
   HOME_FOLDER_LOCATION,
   parseWorkspaceFile,
@@ -78,6 +79,7 @@ import {
   type RestoreFolderResult,
   type ViewMode,
   type WorkspaceFolder,
+  type WorkspaceErrorKind,
   type WorkspaceNode,
 } from "./ports";
 import {
@@ -427,8 +429,7 @@ function AppShell({ adapter }: AppProps) {
         return true;
       } catch (err) {
         console.error("Failed to save file:", err);
-        const message = err instanceof Error ? err.message : `Failed to save ${doc.name}.`;
-        toast.show({ kind: "error", text: message });
+        toast.show({ kind: "error", text: failureText(t("failures.operations.save", { name: doc.name }), err) });
         return false;
       }
     },
@@ -583,7 +584,7 @@ function AppShell({ adapter }: AppProps) {
         console.error("Failed to install the update:", err);
         toast.show({
           kind: "error",
-          text: `Couldn't install Vista ${update.version}. You can try again from About in Settings.`,
+          text: t("failures.installUpdate", { version: update.version }),
         });
       }
     },
@@ -623,7 +624,7 @@ function AppShell({ adapter }: AppProps) {
         }
         console.warn("Could not check for updates:", err);
         if (isRequested) {
-          toast.show({ kind: "error", text: "Couldn't check for updates. Check your connection and try again." });
+          toast.show({ kind: "error", text: t("failures.checkUpdates") });
         }
         return;
       }
@@ -723,7 +724,7 @@ function AppShell({ adapter }: AppProps) {
             return { tab, isGone: (await adapter.workspace.stat(folder, tab.path)) === null };
           } catch (err) {
             // Kept: reading it when it is shown reports the problem.
-            console.error("Failed to check a file from the last session:", err);
+            console.warn("Failed to check a file from the last session:", err);
             return { tab, isGone: false };
           }
         }),
@@ -801,8 +802,10 @@ function AppShell({ adapter }: AppProps) {
             return { id, name: result.folder.name, folder: result.folder, status: "ready", tree };
           } catch (err) {
             console.error("Failed to read a folder:", err);
-            const message = err instanceof Error ? err.message : `Failed to read "${result.folder.name}".`;
-            toast.show({ kind: "error", text: message });
+            toast.show({
+              kind: "error",
+              text: failureText(t("failures.operations.readFolder", { name: result.folder.name }), err),
+            });
             return { id, name: result.folder.name, folder: null, status: "unavailable", tree: [] };
           }
         case "needs-permission":
@@ -937,7 +940,8 @@ function AppShell({ adapter }: AppProps) {
                 try {
                   await adapter.workspace.forgetFolder(folderId);
                 } catch (err) {
-                  console.error("Failed to forget a folder the workspace file dropped:", err);
+                  // Nothing uses the folder any more; the host keeping a record of it is harmless.
+                  console.warn("Failed to forget a folder the workspace file dropped:", err);
                 }
               }),
             );
@@ -1118,8 +1122,7 @@ function AppShell({ adapter }: AppProps) {
       }
     } catch (err) {
       console.error("Failed to open folder:", err);
-      const message = err instanceof Error ? err.message : "Failed to open the selected folder.";
-      toast.show({ kind: "error", text: message });
+      toast.show({ kind: "error", text: failureText(t("failures.operations.pickFolder"), err) });
     } finally {
       setIsLoading(false);
     }
@@ -1141,7 +1144,7 @@ function AppShell({ adapter }: AppProps) {
       const last = workspaceStore.lastWorkspace();
       if (!last) {
         if (migrated?.status === "unavailable") {
-          toast.show({ kind: "info", text: `Couldn't reopen "${migrated.name}". It may have been moved or deleted.` });
+          toast.show({ kind: "info", text: t("failures.reopenFolder", { name: migrated.name }) });
         }
         return;
       }
@@ -1151,8 +1154,7 @@ function AppShell({ adapter }: AppProps) {
       });
     } catch (err) {
       console.error("Failed to restore the last workspace:", err);
-      const message = err instanceof Error ? err.message : "Failed to restore the last workspace.";
-      toast.show({ kind: "error", text: message });
+      toast.show({ kind: "error", text: failureText(t("failures.operations.restoreWorkspace"), err) });
     } finally {
       setIsLoading(false);
     }
@@ -1190,8 +1192,7 @@ function AppShell({ adapter }: AppProps) {
         }
       } catch (err) {
         console.error("Failed to open the workspace:", err);
-        const message = err instanceof Error ? err.message : "Failed to open the workspace.";
-        toast.show({ kind: "error", text: message });
+        toast.show({ kind: "error", text: failureText(t("failures.operations.openWorkspace"), err) });
       }
       return false;
     },
@@ -1257,8 +1258,7 @@ function AppShell({ adapter }: AppProps) {
       showManaged(record.id);
     } catch (err) {
       console.error("Failed to create a workspace:", err);
-      const message = err instanceof Error ? err.message : "Failed to create the workspace.";
-      toast.show({ kind: "error", text: message });
+      toast.show({ kind: "error", text: failureText(t("failures.operations.createWorkspace"), err) });
     }
   }, [adapter.workspace, pickFolder, showManaged, toast, workspaceStore]);
 
@@ -1315,7 +1315,7 @@ function AppShell({ adapter }: AppProps) {
             await adapter.workspace.forgetFolder(folderId);
           } catch (err) {
             // The workspace is gone either way; the host keeping a record of the folder is harmless.
-            console.error("Failed to forget a folder:", err);
+            console.warn("Failed to forget a folder:", err);
           }
         }),
       );
@@ -1397,8 +1397,7 @@ function AppShell({ adapter }: AppProps) {
         }
         managedLoadRef.current = null;
         console.error("Failed to read the workspace:", err);
-        const message = err instanceof Error ? err.message : "Failed to read the workspace.";
-        toast.show({ kind: "error", text: message });
+        toast.show({ kind: "error", text: failureText(t("failures.operations.readWorkspace"), err) });
         setManaged(null);
         setManagedId(null);
       }
@@ -1465,7 +1464,7 @@ function AppShell({ adapter }: AppProps) {
           );
         } catch (err) {
           // The entry still opens; it only goes without its folder names.
-          console.error("Failed to look up a workspace's folders:", err);
+          console.warn("Failed to look up a workspace's folders:", err);
         }
       };
       void probe();
@@ -1659,8 +1658,13 @@ function AppShell({ adapter }: AppProps) {
         });
       } catch (err) {
         console.error("Failed to delete the workspace file:", err);
-        const reason = err instanceof Error ? ` ${err.message}` : "";
-        toast.show({ kind: "error", text: `Couldn't delete "${home.name}/${WORKSPACE_FILE_PATH}".${reason}` });
+        toast.show({
+          kind: "error",
+          text: failureText(
+            t("failures.operations.deleteDetails", { path: `${home.name}/${WORKSPACE_FILE_PATH}` }),
+            err,
+          ),
+        });
         return;
       }
       writtenFileRef.current.delete(current.id);
@@ -1729,8 +1733,7 @@ function AppShell({ adapter }: AppProps) {
         }
       } catch (err) {
         console.error("Failed to add a folder:", err);
-        const message = err instanceof Error ? err.message : "Failed to add the folder.";
-        toast.show({ kind: "error", text: message });
+        toast.show({ kind: "error", text: failureText(t("failures.operations.addFolder"), err) });
       }
     },
     [adapter.workspace, locateFolder, pickFolder, targetWorkspace, toast, updateWorkspace, workspaceStore],
@@ -1852,8 +1855,7 @@ function AppShell({ adapter }: AppProps) {
         );
       } catch (err) {
         console.error("Failed to locate a folder:", err);
-        const message = err instanceof Error ? err.message : "Failed to open the folder.";
-        toast.show({ kind: "error", text: message });
+        toast.show({ kind: "error", text: failureText(t("failures.operations.openFolder"), err) });
       }
     },
     [adapter.workspace, pickFolder, toast, workspaceStore],
@@ -1890,8 +1892,7 @@ function AppShell({ adapter }: AppProps) {
         );
       } catch (err) {
         console.error("Failed to allow access to a folder:", err);
-        const message = err instanceof Error ? err.message : "Failed to open the folder.";
-        toast.show({ kind: "error", text: message });
+        toast.show({ kind: "error", text: failureText(t("failures.operations.openFolder"), err) });
       }
     },
     [openStoredWorkspace, restoreFolder, toOpenFolder, toast, workspaceStore],
@@ -1916,8 +1917,7 @@ function AppShell({ adapter }: AppProps) {
         }
       } catch (err) {
         console.error("Failed to allow access to a folder:", err);
-        const message = err instanceof Error ? err.message : "Failed to open the folder.";
-        toast.show({ kind: "error", text: message });
+        toast.show({ kind: "error", text: failureText(t("failures.operations.openFolder"), err) });
       }
     },
     [handleAllowAccess, loadManaged, restoreFolder, toast, workspaceStore],
@@ -1932,8 +1932,7 @@ function AppShell({ adapter }: AppProps) {
         }
       } catch (err) {
         console.error("Failed to refresh the file list:", err);
-        const message = err instanceof Error ? err.message : "Failed to refresh the file list.";
-        toast.show({ kind: "error", text: message });
+        toast.show({ kind: "error", text: failureText(t("failures.operations.refresh"), err) });
       }
     },
     [adapter.workspace, isStillOpen, setFolderTree, toast],
@@ -1960,7 +1959,7 @@ function AppShell({ adapter }: AppProps) {
         }
         switch (result.kind) {
           case "missing":
-            toast.show({ kind: "error", text: `"${name}" no longer exists. It may have been moved or deleted.` });
+            toast.show({ kind: "error", text: t("failures.fileGone", { name }) });
             void refreshTree(folder);
             return false;
           case "too-large":
@@ -1989,8 +1988,7 @@ function AppShell({ adapter }: AppProps) {
         return true;
       } catch (err) {
         console.error("Failed to read file:", err);
-        const message = err instanceof Error ? err.message : `Failed to open ${path}.`;
-        toast.show({ kind: "error", text: message });
+        toast.show({ kind: "error", text: failureText(t("failures.operations.open", { name: path }), err) });
         return false;
       }
     },
@@ -2091,7 +2089,7 @@ function AppShell({ adapter }: AppProps) {
             }
           } catch (err) {
             // Quiet: the user did not ask for this refresh, and the tree on screen is still usable.
-            console.error("Failed to refresh the file list:", err);
+            console.warn("Failed to refresh the file list:", err);
           }
         }),
       );
@@ -2132,7 +2130,8 @@ function AppShell({ adapter }: AppProps) {
               marked.push(current);
             }
           } catch (err) {
-            console.error("Failed to check a file on disk:", err);
+            // Quiet for the same reason: the tab still shows what was read, and the next focus checks again.
+            console.warn("Failed to check a file on disk:", err);
           }
         }),
       );
@@ -2200,8 +2199,7 @@ function AppShell({ adapter }: AppProps) {
         await refreshTree(folder);
       } catch (err) {
         console.error("Failed to create file:", err);
-        const message = err instanceof Error ? err.message : `Failed to create "${name}".`;
-        toast.show({ kind: "error", text: message });
+        toast.show({ kind: "error", text: failureText(t("failures.operations.create", { name }), err) });
       }
     },
     [adapter.workspace, readyFolder, refreshTree, toast],
@@ -2218,8 +2216,7 @@ function AppShell({ adapter }: AppProps) {
         await refreshTree(folder);
       } catch (err) {
         console.error("Failed to create folder:", err);
-        const message = err instanceof Error ? err.message : `Failed to create "${name}".`;
-        toast.show({ kind: "error", text: message });
+        toast.show({ kind: "error", text: failureText(t("failures.operations.create", { name }), err) });
       }
     },
     [adapter.workspace, readyFolder, refreshTree, toast],
@@ -2237,8 +2234,7 @@ function AppShell({ adapter }: AppProps) {
         await refreshTree(folder);
       } catch (err) {
         console.error("Failed to rename entry:", err);
-        const message = err instanceof Error ? err.message : `Failed to rename "${fromPath}".`;
-        toast.show({ kind: "error", text: message });
+        toast.show({ kind: "error", text: failureText(t("failures.operations.rename", { name: fromPath }), err) });
       }
     },
     [adapter.workspace, readyFolder, refreshTree, toast],
@@ -2277,8 +2273,7 @@ function AppShell({ adapter }: AppProps) {
         await refreshTree(folder);
       } catch (err) {
         console.error("Failed to delete entry:", err);
-        const message = err instanceof Error ? err.message : `Failed to delete "${path}".`;
-        toast.show({ kind: "error", text: message });
+        toast.show({ kind: "error", text: failureText(t("failures.operations.delete", { name: path }), err) });
       }
     },
     [adapter.workspace, readyFolder, refreshTree, toast],
@@ -2372,7 +2367,7 @@ function AppShell({ adapter }: AppProps) {
         return true;
       } catch (err) {
         console.error("Failed to copy to the clipboard:", err);
-        toast.show({ kind: "error", text: "Couldn't copy to the clipboard." });
+        toast.show({ kind: "error", text: failureText(t("failures.operations.copy"), err) });
         return false;
       }
     },
@@ -2407,8 +2402,8 @@ function AppShell({ adapter }: AppProps) {
         await reveal(folder, entry.path);
       } catch (err) {
         console.error("Failed to reveal the entry:", err);
-        const name = entry.path === "" ? "the folder" : `"${entry.path.split("/").at(-1)}"`;
-        toast.show({ kind: "error", text: `Couldn't show ${name} in the file manager.` });
+        const name = `"${entry.path === "" ? folder.name : entry.path.split("/").at(-1)}"`;
+        toast.show({ kind: "error", text: failureText(t("failures.operations.reveal", { name }), err) });
       }
     };
   }, [adapter.workspace, readyFolder, toast]);
@@ -3318,9 +3313,9 @@ function describeUnsavedDocuments(documents: readonly OpenDocument[], folders: r
 
 function describeUnreachableWorkspace(record: WorkspaceRecord, goneNames: readonly string[]): string {
   const [only] = goneNames;
-  return goneNames.length === 1 && record.folderIds.length === 1
-    ? `Couldn't reopen "${only}". It may have been moved or deleted.`
-    : `Couldn't reopen "${record.name}". Its folders may have been moved or deleted.`;
+  return only !== undefined && goneNames.length === 1 && record.folderIds.length === 1
+    ? t("failures.reopenFolder", { name: only })
+    : t("failures.reopenWorkspace", { workspace: record.name });
 }
 
 /**
@@ -3558,8 +3553,28 @@ function canStoreInFolder(workspace: OpenWorkspace | null): boolean {
 }
 
 function describeFileWriteFailure(homeName: string, err: unknown): string {
-  const reason = err instanceof Error ? ` ${err.message}` : "";
-  return `Couldn't store the details in "${homeName}/${WORKSPACE_FILE_DIRECTORY}".${reason}`;
+  return failureText(t("failures.operations.storeDetails", { path: `${homeName}/${WORKSPACE_FILE_DIRECTORY}` }), err);
+}
+
+const FAILURE_REASONS = {
+  "permission-denied": "failures.reasons.permissionDenied",
+  "not-found": "failures.reasons.notFound",
+  "already-exists": "failures.reasons.alreadyExists",
+  unsupported: "failures.reasons.unsupported",
+  conflict: "failures.reasons.conflict",
+  unknown: "failures.reasons.unknown",
+} as const satisfies Record<WorkspaceErrorKind, string>;
+
+/**
+ * A failure message, as `docs/specs/errors.md` describes it: what failed, then why and what to do next for
+ * the failure's kind. The platform's own text is never part of it.
+ *
+ * @param what - The sentence saying what failed, such as `Couldn't save notes.md.`.
+ * @param err - The caught value; anything but a `WorkspaceError` reads as an unknown failure.
+ * @returns The whole message.
+ */
+function failureText(what: string, err: unknown): string {
+  return `${what} ${t(FAILURE_REASONS[workspaceErrorKind(err)])}`;
 }
 
 /** A folder of a workspace in the order its file lists them: restored, or a location not found here. */

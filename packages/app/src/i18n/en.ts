@@ -661,6 +661,44 @@ const en = {
       security: "Security",
     },
   },
+  failures: {
+    operations: {
+      save: "Couldn't save {name}.",
+      open: "Couldn't open {name}.",
+      readFolder: 'Couldn\'t read the folder "{name}".',
+      pickFolder: "Couldn't open the selected folder.",
+      restoreWorkspace: "Couldn't reopen the last workspace.",
+      openWorkspace: "Couldn't open the workspace.",
+      createWorkspace: "Couldn't create the workspace.",
+      readWorkspace: "Couldn't read the workspace.",
+      storeDetails: 'Couldn\'t store the details in "{path}".',
+      deleteDetails: 'Couldn\'t delete "{path}".',
+      addFolder: "Couldn't add the folder.",
+      openFolder: "Couldn't open the folder.",
+      refresh: "Couldn't refresh the file list.",
+      create: 'Couldn\'t create "{name}".',
+      rename: 'Couldn\'t rename "{name}".',
+      delete: 'Couldn\'t delete "{name}".',
+      reveal: "Couldn't show {name} in the file manager.",
+      copy: "Couldn't copy to the clipboard.",
+    },
+    reasons: {
+      permissionDenied: "Vista isn't allowed to use this folder. Open the folder again and allow access when asked.",
+      notFound:
+        "Nothing is at that location anymore, because it was moved, renamed, or deleted. Refresh the file list, or open the folder again.",
+      alreadyExists: "Something with that name is already there. Choose another name.",
+      unsupported: "This browser or device doesn't support it, so trying again won't help.",
+      conflict: "Its content changed on disk after Vista read it. Open it again to see the changes.",
+      unknown: "Something unexpected went wrong. Try again, and if it keeps happening, restart Vista.",
+    },
+    installUpdate:
+      "Couldn't install Vista {version}. The download or the installer failed. You can try again from About in Settings.",
+    checkUpdates:
+      "Couldn't check for updates. Vista couldn't reach the update server. Check your connection and try again.",
+    fileGone: '"{name}" no longer exists. It may have been moved or deleted.',
+    reopenFolder: 'Couldn\'t reopen "{name}". It may have been moved or deleted.',
+    reopenWorkspace: 'Couldn\'t reopen "{workspace}". Its folders may have been moved or deleted.',
+  },
 } as const;
 
 export default en;

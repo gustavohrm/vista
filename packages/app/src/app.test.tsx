@@ -12,6 +12,7 @@ import { inlineParts } from "./domain/changelog";
 import { i18n } from "./i18n";
 import {
   LEGACY_FOLDER_ID,
+  WorkspaceError,
   type AppAdapter,
   type FileStat,
   type WorkspaceCapability,
@@ -569,7 +570,9 @@ describe("App", () => {
   it("shows an error toast when opening a folder fails for a reason other than user cancellation", async () => {
     const user = userEvent.setup();
     const mockWorkspace = createMockWorkspaceCapability({
-      pickFolder: vi.fn().mockRejectedValue(new Error("Permission to read this folder was not granted.")),
+      pickFolder: vi
+        .fn()
+        .mockRejectedValue(new WorkspaceError("permission-denied", "Permission to read this folder was not granted.")),
     });
     const adapter: AppAdapter = { platform: "web", workspace: mockWorkspace };
 
@@ -577,7 +580,11 @@ describe("App", () => {
 
     await user.click(await screen.findByRole("button", { name: "Open Folder…" }));
 
-    expect(await findToast("Permission to read this folder was not granted.")).toBeInTheDocument();
+    expect(
+      await findToast(
+        "Couldn't open the selected folder. Vista isn't allowed to use this folder. Open the folder again and allow access when asked.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("shows no error toast when the user cancels the folder picker", async () => {
@@ -634,7 +641,12 @@ describe("App", () => {
     await appendToRawEditor(user, editor, "!");
     await user.keyboard("{Control>}s{/Control}");
 
-    expect(await findToast("Write access was denied.")).toBeInTheDocument();
+    expect(
+      await findToast(
+        "Couldn't save readme.md. Something unexpected went wrong. Try again, and if it keeps happening, restart Vista.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Write access was denied/)).not.toBeInTheDocument();
   });
 
   it("toggles the mobile explorer drawer open and closed", async () => {
@@ -729,7 +741,7 @@ describe("App", () => {
   it("shows an error toast and keeps the tree unchanged when create fails", async () => {
     const user = userEvent.setup();
     const mockWorkspace = createMockWorkspaceCapability({
-      createFile: vi.fn().mockRejectedValue(new Error('"todo.md" already exists.')),
+      createFile: vi.fn().mockRejectedValue(new WorkspaceError("already-exists", '"todo.md" already exists.')),
     });
     const adapter: AppAdapter = { platform: "web", workspace: mockWorkspace };
     const { container } = render(<App adapter={adapter} />);
@@ -741,7 +753,9 @@ describe("App", () => {
     await user.click(screen.getByRole("menuitem", { name: "New File" }));
     await user.type(screen.getByRole("textbox", { name: "Entry name" }), "todo.md{Enter}");
 
-    expect(await findToast('"todo.md" already exists.')).toBeInTheDocument();
+    expect(
+      await findToast(`Couldn't create "todo.md". Something with that name is already there. Choose another name.`),
+    ).toBeInTheDocument();
   });
 
   it("renames the active file and updates the open editor's path without a reload", async () => {
@@ -1593,7 +1607,7 @@ describe("App", () => {
       const user = userEvent.setup();
       const { capability } = createFoldersCapability(storedFolders());
       vi.mocked(capability.writeFile).mockRejectedValueOnce(
-        new Error("Permission to write to this folder was not granted."),
+        new WorkspaceError("permission-denied", "Permission to write to this folder was not granted."),
       );
       render(<App adapter={{ platform: "web", workspace: capability }} />);
       await findFileRows("plan.txt");
@@ -1603,7 +1617,7 @@ describe("App", () => {
 
       expect(
         await screen.findByText(
-          'Couldn\'t store the details in "notes/.vista". Permission to write to this folder was not granted.',
+          `Couldn't store the details in "notes/.vista". Vista isn't allowed to use this folder. Open the folder again and allow access when asked.`,
         ),
       ).toBeInTheDocument();
       expect(within(dialog).getByRole("radio", { name: "On this device" })).toBeChecked();
@@ -4417,7 +4431,11 @@ describe("App", () => {
       const dialog = await screen.findByRole("dialog", { name: "Save changes to readme.md?" });
       await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
-      expect(await findToast("Write access was denied.")).toBeInTheDocument();
+      expect(
+        await findToast(
+          "Couldn't save readme.md. Something unexpected went wrong. Try again, and if it keeps happening, restart Vista.",
+        ),
+      ).toBeInTheDocument();
       expect(rawEditorText(screen.getByRole("textbox", { name: /Raw text content of readme\.md/i }))).toBe(
         EDITED_README_CONTENT,
       );
@@ -4652,7 +4670,11 @@ describe("App", () => {
       });
       render(<App adapter={{ platform: "web", workspace: mockWorkspace }} />);
 
-      expect(await findToast("Storage is unavailable.")).toBeInTheDocument();
+      expect(
+        await findToast(
+          "Couldn't reopen the last workspace. Something unexpected went wrong. Try again, and if it keeps happening, restart Vista.",
+        ),
+      ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Open Folder…" })).toBeInTheDocument();
     });
 
@@ -5053,7 +5075,11 @@ describe("App", () => {
       await user.click(screen.getByText("data.csv"));
 
       await user.click(within(statusBar()).getByRole("button", { name: "Copy Relative Path" }));
-      expect(await screen.findByText("Couldn't copy to the clipboard.")).toBeInTheDocument();
+      expect(
+        await screen.findByText(
+          "Couldn't copy to the clipboard. Something unexpected went wrong. Try again, and if it keeps happening, restart Vista.",
+        ),
+      ).toBeInTheDocument();
       expect(within(statusBar()).getByRole("status")).toHaveTextContent("");
     });
 
@@ -5084,7 +5110,30 @@ describe("App", () => {
 
       await user.click(within(statusBar()).getByRole("button", { name: "Reveal in File Explorer" }));
 
-      expect(await findToast(`Couldn't show "data.csv" in the file manager.`)).toBeInTheDocument();
+      expect(
+        await findToast(
+          `Couldn't show "data.csv" in the file manager. Something unexpected went wrong. Try again, and if it keeps happening, restart Vista.`,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("names the folder when the file manager can't show a root row", async () => {
+      const user = userEvent.setup();
+      const reveal = vi.fn(async () => {
+        throw new Error("No file manager.");
+      });
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability({ reveal }) }} />);
+      await openFolderFromWelcome(user);
+
+      fireEvent.contextMenu(within(explorerPanel()).getByRole("button", { name: "My Notes" }));
+      await user.click(screen.getByRole("menuitem", { name: "Reveal in File Explorer" }));
+
+      expect(
+        await findToast(
+          `Couldn't show "My Notes" in the file manager. Something unexpected went wrong. Try again, and if it keeps happening, restart Vista.`,
+        ),
+      ).toBeInTheDocument();
     });
 
     it("copies a tree entry's relative path, and offers its full path only on desktop", async () => {
@@ -5819,7 +5868,9 @@ describe("App", () => {
       await user.click(within(dialog).getByRole("button", { name: "Install and Restart" }));
 
       expect(
-        await findToast("Couldn't install Vista 0.3.0. You can try again from About in Settings."),
+        await findToast(
+          "Couldn't install Vista 0.3.0. The download or the installer failed. You can try again from About in Settings.",
+        ),
       ).toBeInTheDocument();
       error.mockRestore();
     });

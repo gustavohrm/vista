@@ -1,6 +1,7 @@
 import {
   LEGACY_FOLDER_ID,
   WorkspaceError,
+  classifyWorkspaceFailures,
   type FileContents,
   type FileStat,
   type FolderRelation,
@@ -9,6 +10,8 @@ import {
   type WorkspaceFolder,
   type WorkspaceNode,
 } from "@vista/app";
+
+import { WEB_FAILURES } from "./platform-failures";
 
 // Vista's own folder, version-control internals, installed dependencies, and OS metadata: never
 // notes, and large enough to slow every scan. A folder such as `build` or `.vscode` is shown, since
@@ -405,7 +408,7 @@ async function ensurePermission(handle: FileSystemDirectoryHandle, mode: FsaPerm
   const requested = await capable.requestPermission({ mode });
   if (requested !== "granted") {
     const verb = mode === "readwrite" ? "write to" : "read";
-    throw new Error(`Permission to ${verb} this folder was not granted. Re-open the folder to try again.`);
+    throw new WorkspaceError("permission-denied", `Permission to ${verb} this folder was not granted.`);
   }
 }
 
@@ -587,7 +590,7 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
   function sessionOf(folder: WorkspaceFolder): Session {
     const session = sessions.get(folder.id);
     if (!session) {
-      throw new Error(`"${folder.name}" is no longer open. Open the folder again.`);
+      throw new WorkspaceError("not-found", `"${folder.name}" is no longer open.`);
     }
     return session;
   }
@@ -714,343 +717,346 @@ export function createWebWorkspaceAdapter(): WorkspaceCapability {
     return { bytes: new Uint8Array(await file.arrayBuffer()), stat: statOfFile(file) };
   }
 
-  return {
-    isSupported: typeof window !== "undefined",
+  return classifyWorkspaceFailures(
+    {
+      isSupported: typeof window !== "undefined",
 
-    async pickFolder(): Promise<WorkspaceFolder | null> {
-      // Attempt 1: File System Access API (Chrome, Edge, Opera)
-      interface FsaWindow {
-        showDirectoryPicker?: (options?: { mode?: "read" | "readwrite" }) => Promise<FileSystemDirectoryHandle>;
-        isSecureContext?: boolean;
-      }
-      const fsaWindow = typeof window !== "undefined" ? (window as unknown as FsaWindow) : null;
-      const canUseFsa = Boolean(
-        fsaWindow && typeof fsaWindow.showDirectoryPicker === "function" && fsaWindow.isSecureContext,
-      );
+      async pickFolder(): Promise<WorkspaceFolder | null> {
+        // Attempt 1: File System Access API (Chrome, Edge, Opera)
+        interface FsaWindow {
+          showDirectoryPicker?: (options?: { mode?: "read" | "readwrite" }) => Promise<FileSystemDirectoryHandle>;
+          isSecureContext?: boolean;
+        }
+        const fsaWindow = typeof window !== "undefined" ? (window as unknown as FsaWindow) : null;
+        const canUseFsa = Boolean(
+          fsaWindow && typeof fsaWindow.showDirectoryPicker === "function" && fsaWindow.isSecureContext,
+        );
 
-      if (canUseFsa && fsaWindow?.showDirectoryPicker) {
-        try {
-          // Request read-only access up front. Write access is requested lazily on
-          // first save (see `ensurePermission` in `writeFile`) so opening a folder is
-          // a single native picker interaction rather than two separate prompts —
-          // a missed or dismissed second prompt previously surfaced as a silent no-op.
-          const dirHandle = await fsaWindow.showDirectoryPicker({
-            mode: "read",
-          });
+        if (canUseFsa && fsaWindow?.showDirectoryPicker) {
+          try {
+            // Request read-only access up front. Write access is requested lazily on
+            // first save (see `ensurePermission` in `writeFile`) so opening a folder is
+            // a single native picker interaction rather than two separate prompts —
+            // a missed or dismissed second prompt previously surfaced as a silent no-op.
+            const dirHandle = await fsaWindow.showDirectoryPicker({
+              mode: "read",
+            });
 
-          const id = (await findRememberedId(dirHandle)) ?? crypto.randomUUID();
-          await saveFolderHandle(id, dirHandle);
-          return adoptDirectoryHandle(id, dirHandle);
-        } catch (err) {
-          if (err instanceof DOMException && err.name === "AbortError") {
-            return null; // User cancelled the picker
+            const id = (await findRememberedId(dirHandle)) ?? crypto.randomUUID();
+            await saveFolderHandle(id, dirHandle);
+            return adoptDirectoryHandle(id, dirHandle);
+          } catch (err) {
+            if (err instanceof DOMException && err.name === "AbortError") {
+              return null; // User cancelled the picker
+            }
+            console.warn("showDirectoryPicker failed or restricted, falling back to directory input:", err);
           }
-          console.warn("showDirectoryPicker failed or restricted, falling back to directory input:", err);
         }
-      }
 
-      // Attempt 2: Directory Input Fallback (Firefox, Safari, non-secure origins, or iframe)
-      const inputResult = await pickDirectoryViaInput();
-      if (!inputResult) {
-        return null;
-      }
-      // Never remembered: this folder cannot be reopened without a picker.
-      const id = newSessionId();
-      sessions.set(id, {
-        kind: "fallback",
-        tree: inputResult.nodes,
-        files: new Map(inputResult.fileMap),
-        saved: new Map(),
-      });
-      return { id, name: inputResult.rootName, rootPath: "/", accessMode: "fallback" };
-    },
-
-    async restoreFolder(id: string, { interactive }: { interactive: boolean }): Promise<RestoreFolderResult> {
-      const handle = await readFolderHandle(id);
-      if (!handle) {
-        return { status: "none" };
-      }
-
-      const capable = handle as unknown as PermissionCapableHandle;
-      const currentPermission = await capable.queryPermission({ mode: "read" });
-      if (currentPermission !== "granted") {
-        if (!interactive) {
-          return { status: "needs-permission", name: handle.name };
+        // Attempt 2: Directory Input Fallback (Firefox, Safari, non-secure origins, or iframe)
+        const inputResult = await pickDirectoryViaInput();
+        if (!inputResult) {
+          return null;
         }
-        // Chromium only accepts requestPermission during transient user activation, which the
-        // caller guarantees when interactive is true. A dismissed prompt keeps the folder remembered.
-        const requestedPermission = await capable.requestPermission({ mode: "read" });
-        if (requestedPermission !== "granted") {
-          return { status: "needs-permission", name: handle.name };
+        // Never remembered: this folder cannot be reopened without a picker.
+        const id = newSessionId();
+        sessions.set(id, {
+          kind: "fallback",
+          tree: inputResult.nodes,
+          files: new Map(inputResult.fileMap),
+          saved: new Map(),
+        });
+        return { id, name: inputResult.rootName, rootPath: "/", accessMode: "fallback" };
+      },
+
+      async restoreFolder(id: string, { interactive }: { interactive: boolean }): Promise<RestoreFolderResult> {
+        const handle = await readFolderHandle(id);
+        if (!handle) {
+          return { status: "none" };
         }
-      }
 
-      try {
-        // Reading the first entry proves the folder still exists and is readable.
-        await handle.values().next();
-      } catch (err) {
-        console.warn(`Could not reopen the folder "${handle.name}":`, err);
-        return { status: "unavailable", name: handle.name };
-      }
+        const capable = handle as unknown as PermissionCapableHandle;
+        const currentPermission = await capable.queryPermission({ mode: "read" });
+        if (currentPermission !== "granted") {
+          if (!interactive) {
+            return { status: "needs-permission", name: handle.name };
+          }
+          // Chromium only accepts requestPermission during transient user activation, which the
+          // caller guarantees when interactive is true. A dismissed prompt keeps the folder remembered.
+          const requestedPermission = await capable.requestPermission({ mode: "read" });
+          if (requestedPermission !== "granted") {
+            return { status: "needs-permission", name: handle.name };
+          }
+        }
 
-      return { status: "restored", folder: adoptDirectoryHandle(id, handle) };
-    },
+        try {
+          // Reading the first entry proves the folder still exists and is readable.
+          await handle.values().next();
+        } catch (err) {
+          console.warn(`Could not reopen the folder "${handle.name}":`, err);
+          return { status: "unavailable", name: handle.name };
+        }
 
-    async forgetFolder(id: string): Promise<void> {
-      // The app forgets only folders no workspace uses, so their handles and fallback bytes can go too.
-      sessions.delete(id);
-      await runFolderTransaction("readwrite", (store) => requestResult(store.delete(id)));
-    },
+        return { status: "restored", folder: adoptDirectoryHandle(id, handle) };
+      },
 
-    async relate(a: WorkspaceFolder, b: WorkspaceFolder): Promise<FolderRelation> {
-      const left = sessionOf(a);
-      const right = sessionOf(b);
-      // A folder picked through a directory input has no handle to compare, only its own id.
-      if (left.kind === "fallback" || right.kind === "fallback") {
-        return a.id === b.id ? "same" : "separate";
-      }
-      if (await left.root.isSameEntry(right.root)) {
-        return "same";
-      }
-      if ((await left.root.resolve(right.root)) !== null) {
-        return "contains";
-      }
-      return (await right.root.resolve(left.root)) !== null ? "inside" : "separate";
-    },
+      async forgetFolder(id: string): Promise<void> {
+        // The app forgets only folders no workspace uses, so their handles and fallback bytes can go too.
+        sessions.delete(id);
+        await runFolderTransaction("readwrite", (store) => requestResult(store.delete(id)));
+      },
 
-    // A handle only knows the entries inside it, so a folder anywhere else has no location.
-    async relativeLocation(from: WorkspaceFolder, to: WorkspaceFolder): Promise<string | null> {
-      const source = sessionOf(from);
-      const target = sessionOf(to);
-      if (source.kind === "fallback" || target.kind === "fallback") {
-        return null;
-      }
-      const segments = await source.root.resolve(target.root);
-      if (segments === null) {
-        return null;
-      }
-      return segments.length === 0 ? "." : segments.join("/");
-    },
+      async relate(a: WorkspaceFolder, b: WorkspaceFolder): Promise<FolderRelation> {
+        const left = sessionOf(a);
+        const right = sessionOf(b);
+        // A folder picked through a directory input has no handle to compare, only its own id.
+        if (left.kind === "fallback" || right.kind === "fallback") {
+          return a.id === b.id ? "same" : "separate";
+        }
+        if (await left.root.isSameEntry(right.root)) {
+          return "same";
+        }
+        if ((await left.root.resolve(right.root)) !== null) {
+          return "contains";
+        }
+        return (await right.root.resolve(left.root)) !== null ? "inside" : "separate";
+      },
 
-    async readTree(folder: WorkspaceFolder): Promise<WorkspaceNode[]> {
-      const session = sessionOf(folder);
-      if (session.kind === "direct") {
-        await ensurePermission(session.root, "read");
-        session.fileHandles.clear();
-        return scanDirectoryHandle(session.root, "", session.fileHandles);
-      }
-      // A copy, so callers get a new reference after in-place mutations such as `remove()` splicing
-      // this array; returning the same array would let React skip the re-render.
-      return structuredClone(session.tree);
-    },
+      // A handle only knows the entries inside it, so a folder anywhere else has no location.
+      async relativeLocation(from: WorkspaceFolder, to: WorkspaceFolder): Promise<string | null> {
+        const source = sessionOf(from);
+        const target = sessionOf(to);
+        if (source.kind === "fallback" || target.kind === "fallback") {
+          return null;
+        }
+        const segments = await source.root.resolve(target.root);
+        if (segments === null) {
+          return null;
+        }
+        return segments.length === 0 ? "." : segments.join("/");
+      },
 
-    async stat(folder: WorkspaceFolder, path: string): Promise<FileStat | null> {
-      const session = sessionOf(folder);
-      if (session.kind === "direct") {
-        await ensurePermission(session.root, "read");
-        const file = await currentFile(session, path);
+      async readTree(folder: WorkspaceFolder): Promise<WorkspaceNode[]> {
+        const session = sessionOf(folder);
+        if (session.kind === "direct") {
+          await ensurePermission(session.root, "read");
+          session.fileHandles.clear();
+          return scanDirectoryHandle(session.root, "", session.fileHandles);
+        }
+        // A copy, so callers get a new reference after in-place mutations such as `remove()` splicing
+        // this array; returning the same array would let React skip the re-render.
+        return structuredClone(session.tree);
+      },
+
+      async stat(folder: WorkspaceFolder, path: string): Promise<FileStat | null> {
+        const session = sessionOf(folder);
+        if (session.kind === "direct") {
+          await ensurePermission(session.root, "read");
+          const file = await currentFile(session, path);
+          return file ? statOfFile(file) : null;
+        }
+        const saved = session.saved.get(path);
+        if (saved) {
+          return { ...saved.stat };
+        }
+        const file = session.files.get(path);
         return file ? statOfFile(file) : null;
-      }
-      const saved = session.saved.get(path);
-      if (saved) {
-        return { ...saved.stat };
-      }
-      const file = session.files.get(path);
-      return file ? statOfFile(file) : null;
-    },
+      },
 
-    async readFile(folder: WorkspaceFolder, path: string): Promise<FileContents> {
-      const session = sessionOf(folder);
-      if (session.kind === "direct") {
-        await ensurePermission(session.root, "read");
-        const file = await currentFile(session, path);
-        if (!file) {
-          throw new Error(`"${path}" was not found.`);
+      async readFile(folder: WorkspaceFolder, path: string): Promise<FileContents> {
+        const session = sessionOf(folder);
+        if (session.kind === "direct") {
+          await ensurePermission(session.root, "read");
+          const file = await currentFile(session, path);
+          if (!file) {
+            throw new WorkspaceError("not-found", `"${path}" was not found.`);
+          }
+          return { bytes: new Uint8Array(await file.arrayBuffer()), stat: statOfFile(file) };
         }
-        return { bytes: new Uint8Array(await file.arrayBuffer()), stat: statOfFile(file) };
-      }
-      const contents = await readFallbackFile(session, path);
-      if (!contents) {
-        throw new Error(`"${path}" was not found.`);
-      }
-      return contents;
-    },
+        const contents = await readFallbackFile(session, path);
+        if (!contents) {
+          throw new WorkspaceError("not-found", `"${path}" was not found.`);
+        }
+        return contents;
+      },
 
-    async writeFile(
-      folder: WorkspaceFolder,
-      path: string,
-      bytes: Uint8Array<ArrayBuffer>,
-      options?: { expected?: FileStat },
-    ): Promise<FileStat> {
-      const session = sessionOf(folder);
-      if (session.kind === "direct") {
-        await ensurePermission(session.root, "readwrite");
-        const expected = options?.expected;
-        if (expected) {
-          const current = await currentFile(session, path);
-          if (!current || current.size !== expected.size || current.lastModified !== expected.modifiedAt) {
-            throw new WorkspaceError("conflict", `"${path}" changed on disk after it was read.`);
+      async writeFile(
+        folder: WorkspaceFolder,
+        path: string,
+        bytes: Uint8Array<ArrayBuffer>,
+        options?: { expected?: FileStat },
+      ): Promise<FileStat> {
+        const session = sessionOf(folder);
+        if (session.kind === "direct") {
+          await ensurePermission(session.root, "readwrite");
+          const expected = options?.expected;
+          if (expected) {
+            const current = await currentFile(session, path);
+            if (!current || current.size !== expected.size || current.lastModified !== expected.modifiedAt) {
+              throw new WorkspaceError("conflict", `"${path}" changed on disk after it was read.`);
+            }
+          }
+          const handle = await resolveFileHandle(session, path, { create: true });
+          // The browser writes to a swap file and replaces the original on close, so a failed write
+          // leaves the file as it was.
+          const writable = await handle.createWritable();
+          try {
+            await writable.write(bytes);
+            await writable.close();
+          } catch (err) {
+            await writable.abort().catch(() => {});
+            throw err;
+          }
+          return statOfFile(await handle.getFile());
+        }
+
+        // Nothing else can change this in-memory snapshot, so there is no version to compare.
+        const stat: FileStat = { size: bytes.length, modifiedAt: Date.now() };
+        session.saved.set(path, { bytes: new Uint8Array(bytes), stat });
+        downloadFallbackFile(path, bytes);
+        return { ...stat };
+      },
+
+      async createFile(folder: WorkspaceFolder, path: string): Promise<void> {
+        const session = sessionOf(folder);
+        const { parentPath, name } = splitPath(path);
+
+        if (session.kind === "direct") {
+          await ensurePermission(session.root, "readwrite");
+          const { parent } = await resolveParentDirectoryHandle(session, path);
+          if (await entryExistsInDirectory(parent, name)) {
+            throw new WorkspaceError("already-exists", `"${name}" already exists.`);
+          }
+          const handle = await parent.getFileHandle(name, { create: true });
+          session.fileHandles.set(path, handle);
+          return;
+        }
+
+        if (nodeExistsAtPath(session.tree, path)) {
+          throw new WorkspaceError("already-exists", `"${name}" already exists.`);
+        }
+        const siblings = findChildrenArray(session.tree, parentPath);
+        if (!siblings) {
+          throw new WorkspaceError("not-found", `Folder "${parentPath}" was not found.`);
+        }
+        const extension = name.includes(".") ? name.split(".").pop()?.toLowerCase() : "";
+        siblings.push({ id: path, name, path, kind: "file", extension });
+        sortNodes(siblings);
+        session.saved.set(path, { bytes: new Uint8Array(), stat: { size: 0, modifiedAt: Date.now() } });
+      },
+
+      async createDirectory(folder: WorkspaceFolder, path: string): Promise<void> {
+        const session = sessionOf(folder);
+        const { parentPath, name } = splitPath(path);
+
+        if (session.kind === "direct") {
+          await ensurePermission(session.root, "readwrite");
+          const { parent } = await resolveParentDirectoryHandle(session, path);
+          if (await entryExistsInDirectory(parent, name)) {
+            throw new WorkspaceError("already-exists", `"${name}" already exists.`);
+          }
+          await parent.getDirectoryHandle(name, { create: true });
+          return;
+        }
+
+        if (nodeExistsAtPath(session.tree, path)) {
+          throw new WorkspaceError("already-exists", `"${name}" already exists.`);
+        }
+        const siblings = findChildrenArray(session.tree, parentPath);
+        if (!siblings) {
+          throw new WorkspaceError("not-found", `Folder "${parentPath}" was not found.`);
+        }
+        siblings.push({ id: path, name, path, kind: "directory", children: [] });
+        sortNodes(siblings);
+      },
+
+      async move(folder: WorkspaceFolder, fromPath: string, toPath: string): Promise<void> {
+        const session = sessionOf(folder);
+        if (session.kind === "direct") {
+          await ensurePermission(session.root, "readwrite");
+          const { parent: sourceParent, name: sourceName } = await resolveParentDirectoryHandle(session, fromPath);
+          const { parent: destParent, name: destName } = await resolveParentDirectoryHandle(session, toPath);
+          if (await entryExistsInDirectory(destParent, destName)) {
+            throw new WorkspaceError("already-exists", `An entry already exists at "${toPath}".`);
+          }
+
+          let sourceFileHandle: FileSystemFileHandle | null = null;
+          try {
+            sourceFileHandle = await sourceParent.getFileHandle(sourceName);
+          } catch {
+            // Not a file; sourceName is expected to be a directory instead.
+          }
+
+          if (sourceFileHandle) {
+            await copyFileEntry(sourceFileHandle, destParent, destName);
+          } else {
+            const sourceDirHandle = await sourceParent.getDirectoryHandle(sourceName);
+            await copyDirectoryEntryRecursive(sourceDirHandle, destParent, destName);
+          }
+
+          // Only remove the source once the copy has fully succeeded, so a failure above
+          // never destroys data (see the contract's non-atomicity note for the web host).
+          await sourceParent.removeEntry(sourceName, { recursive: true });
+          forgetCachedHandlesUnder(session, fromPath);
+          return;
+        }
+
+        if (nodeExistsAtPath(session.tree, toPath)) {
+          throw new WorkspaceError("already-exists", `An entry already exists at "${toPath}".`);
+        }
+        const removed = removeNodeAtPath(session.tree, fromPath);
+        if (!removed) {
+          throw new WorkspaceError("not-found", `"${fromPath}" was not found.`);
+        }
+        const oldPaths = collectSubtreePaths(removed);
+        relocateSubtree(removed, toPath);
+        const newPaths = collectSubtreePaths(removed);
+
+        const destSiblings = findChildrenArray(session.tree, splitPath(toPath).parentPath);
+        if (!destSiblings) {
+          throw new WorkspaceError("not-found", `Folder "${splitPath(toPath).parentPath}" was not found.`);
+        }
+        destSiblings.push(removed);
+        sortNodes(destSiblings);
+
+        for (const [index, oldPath] of oldPaths.entries()) {
+          const newPath = newPaths[index];
+          if (newPath === undefined) {
+            continue;
+          }
+          const file = session.files.get(oldPath);
+          if (file) {
+            session.files.delete(oldPath);
+            session.files.set(newPath, file);
+          }
+          const saved = session.saved.get(oldPath);
+          if (saved !== undefined) {
+            session.saved.delete(oldPath);
+            session.saved.set(newPath, saved);
           }
         }
-        const handle = await resolveFileHandle(session, path, { create: true });
-        // The browser writes to a swap file and replaces the original on close, so a failed write
-        // leaves the file as it was.
-        const writable = await handle.createWritable();
-        try {
-          await writable.write(bytes);
-          await writable.close();
-        } catch (err) {
-          await writable.abort().catch(() => {});
-          throw err;
-        }
-        return statOfFile(await handle.getFile());
-      }
+      },
 
-      // Nothing else can change this in-memory snapshot, so there is no version to compare.
-      const stat: FileStat = { size: bytes.length, modifiedAt: Date.now() };
-      session.saved.set(path, { bytes: new Uint8Array(bytes), stat });
-      downloadFallbackFile(path, bytes);
-      return { ...stat };
+      async remove(folder: WorkspaceFolder, path: string): Promise<void> {
+        const session = sessionOf(folder);
+        if (session.kind === "direct") {
+          await ensurePermission(session.root, "readwrite");
+          const { parent, name } = await resolveParentDirectoryHandle(session, path);
+          await parent.removeEntry(name, { recursive: true });
+          forgetCachedHandlesUnder(session, path);
+          return;
+        }
+
+        const removed = removeNodeAtPath(session.tree, path);
+        if (!removed) {
+          throw new WorkspaceError("not-found", `"${path}" was not found.`);
+        }
+        for (const subPath of collectSubtreePaths(removed)) {
+          session.files.delete(subPath);
+          session.saved.delete(subPath);
+        }
+      },
     },
-
-    async createFile(folder: WorkspaceFolder, path: string): Promise<void> {
-      const session = sessionOf(folder);
-      const { parentPath, name } = splitPath(path);
-
-      if (session.kind === "direct") {
-        await ensurePermission(session.root, "readwrite");
-        const { parent } = await resolveParentDirectoryHandle(session, path);
-        if (await entryExistsInDirectory(parent, name)) {
-          throw new Error(`"${name}" already exists.`);
-        }
-        const handle = await parent.getFileHandle(name, { create: true });
-        session.fileHandles.set(path, handle);
-        return;
-      }
-
-      if (nodeExistsAtPath(session.tree, path)) {
-        throw new Error(`"${name}" already exists.`);
-      }
-      const siblings = findChildrenArray(session.tree, parentPath);
-      if (!siblings) {
-        throw new Error(`Folder "${parentPath}" was not found.`);
-      }
-      const extension = name.includes(".") ? name.split(".").pop()?.toLowerCase() : "";
-      siblings.push({ id: path, name, path, kind: "file", extension });
-      sortNodes(siblings);
-      session.saved.set(path, { bytes: new Uint8Array(), stat: { size: 0, modifiedAt: Date.now() } });
-    },
-
-    async createDirectory(folder: WorkspaceFolder, path: string): Promise<void> {
-      const session = sessionOf(folder);
-      const { parentPath, name } = splitPath(path);
-
-      if (session.kind === "direct") {
-        await ensurePermission(session.root, "readwrite");
-        const { parent } = await resolveParentDirectoryHandle(session, path);
-        if (await entryExistsInDirectory(parent, name)) {
-          throw new Error(`"${name}" already exists.`);
-        }
-        await parent.getDirectoryHandle(name, { create: true });
-        return;
-      }
-
-      if (nodeExistsAtPath(session.tree, path)) {
-        throw new Error(`"${name}" already exists.`);
-      }
-      const siblings = findChildrenArray(session.tree, parentPath);
-      if (!siblings) {
-        throw new Error(`Folder "${parentPath}" was not found.`);
-      }
-      siblings.push({ id: path, name, path, kind: "directory", children: [] });
-      sortNodes(siblings);
-    },
-
-    async move(folder: WorkspaceFolder, fromPath: string, toPath: string): Promise<void> {
-      const session = sessionOf(folder);
-      if (session.kind === "direct") {
-        await ensurePermission(session.root, "readwrite");
-        const { parent: sourceParent, name: sourceName } = await resolveParentDirectoryHandle(session, fromPath);
-        const { parent: destParent, name: destName } = await resolveParentDirectoryHandle(session, toPath);
-        if (await entryExistsInDirectory(destParent, destName)) {
-          throw new Error(`An entry already exists at "${toPath}".`);
-        }
-
-        let sourceFileHandle: FileSystemFileHandle | null = null;
-        try {
-          sourceFileHandle = await sourceParent.getFileHandle(sourceName);
-        } catch {
-          // Not a file; sourceName is expected to be a directory instead.
-        }
-
-        if (sourceFileHandle) {
-          await copyFileEntry(sourceFileHandle, destParent, destName);
-        } else {
-          const sourceDirHandle = await sourceParent.getDirectoryHandle(sourceName);
-          await copyDirectoryEntryRecursive(sourceDirHandle, destParent, destName);
-        }
-
-        // Only remove the source once the copy has fully succeeded, so a failure above
-        // never destroys data (see the contract's non-atomicity note for the web host).
-        await sourceParent.removeEntry(sourceName, { recursive: true });
-        forgetCachedHandlesUnder(session, fromPath);
-        return;
-      }
-
-      if (nodeExistsAtPath(session.tree, toPath)) {
-        throw new Error(`An entry already exists at "${toPath}".`);
-      }
-      const removed = removeNodeAtPath(session.tree, fromPath);
-      if (!removed) {
-        throw new Error(`"${fromPath}" was not found.`);
-      }
-      const oldPaths = collectSubtreePaths(removed);
-      relocateSubtree(removed, toPath);
-      const newPaths = collectSubtreePaths(removed);
-
-      const destSiblings = findChildrenArray(session.tree, splitPath(toPath).parentPath);
-      if (!destSiblings) {
-        throw new Error(`Folder "${splitPath(toPath).parentPath}" was not found.`);
-      }
-      destSiblings.push(removed);
-      sortNodes(destSiblings);
-
-      for (const [index, oldPath] of oldPaths.entries()) {
-        const newPath = newPaths[index];
-        if (newPath === undefined) {
-          continue;
-        }
-        const file = session.files.get(oldPath);
-        if (file) {
-          session.files.delete(oldPath);
-          session.files.set(newPath, file);
-        }
-        const saved = session.saved.get(oldPath);
-        if (saved !== undefined) {
-          session.saved.delete(oldPath);
-          session.saved.set(newPath, saved);
-        }
-      }
-    },
-
-    async remove(folder: WorkspaceFolder, path: string): Promise<void> {
-      const session = sessionOf(folder);
-      if (session.kind === "direct") {
-        await ensurePermission(session.root, "readwrite");
-        const { parent, name } = await resolveParentDirectoryHandle(session, path);
-        await parent.removeEntry(name, { recursive: true });
-        forgetCachedHandlesUnder(session, path);
-        return;
-      }
-
-      const removed = removeNodeAtPath(session.tree, path);
-      if (!removed) {
-        throw new Error(`"${path}" was not found.`);
-      }
-      for (const subPath of collectSubtreePaths(removed)) {
-        session.files.delete(subPath);
-        session.saved.delete(subPath);
-      }
-    },
-  };
+    WEB_FAILURES,
+  );
 }
