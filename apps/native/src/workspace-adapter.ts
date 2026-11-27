@@ -13,6 +13,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
   LEGACY_FOLDER_ID,
   WorkspaceError,
+  classifyWorkspaceFailures,
   type FileContents,
   type FileStat,
   type RestoreFolderResult,
@@ -29,6 +30,7 @@ import {
   relativeFolderPath,
   resolveRelativePath,
 } from "./folder-paths";
+import { NATIVE_FAILURES } from "./platform-failures";
 
 const FOLDERS_STORAGE_KEY = "vista.folders";
 // Where the Vista before workspaces kept its one remembered folder.
@@ -142,7 +144,7 @@ async function isSymlink(fullPath: string): Promise<boolean> {
 async function statWritten(fullPath: string, path: string): Promise<FileStat> {
   const written = await statFile(fullPath);
   if (!written) {
-    throw new Error(`"${path}" was not found after saving.`);
+    throw new WorkspaceError("not-found", `"${path}" was not found after saving.`);
   }
   return { size: written.size, modifiedAt: written.modifiedAt };
 }
@@ -221,160 +223,163 @@ export function createNativeWorkspaceAdapter(): WorkspaceCapability {
     }
   }
 
-  return {
-    isSupported,
+  return classifyWorkspaceFailures(
+    {
+      isSupported,
 
-    async pickFolder(): Promise<WorkspaceFolder | null> {
-      // `open()` itself resolves to null on user cancellation rather than rejecting, so any
-      // rejection here is a genuine failure and must propagate rather than being swallowed
-      // into the same null result cancellation produces.
-      // `recursive` grants the whole tree to the fs scope; without it only the folder's direct children
-      // are allowed, and reading `.vista/workspace.json` or any subfolder is refused.
-      const selected = await open({
-        directory: true,
-        recursive: true,
-        multiple: false,
-        title: "Select Folder for Vista Workspace",
-      });
-      if (!selected || typeof selected !== "string") {
-        return null;
-      }
-      return rememberFolder(selected);
+      async pickFolder(): Promise<WorkspaceFolder | null> {
+        // `open()` itself resolves to null on user cancellation rather than rejecting, so any
+        // rejection here is a genuine failure and must propagate rather than being swallowed
+        // into the same null result cancellation produces.
+        // `recursive` grants the whole tree to the fs scope; without it only the folder's direct children
+        // are allowed, and reading `.vista/workspace.json` or any subfolder is refused.
+        const selected = await open({
+          directory: true,
+          recursive: true,
+          multiple: false,
+          title: "Select Folder for Vista Workspace",
+        });
+        if (!selected || typeof selected !== "string") {
+          return null;
+        }
+        return rememberFolder(selected);
+      },
+
+      async restoreFolder(id: string): Promise<RestoreFolderResult> {
+        const savedPath = readFolderPaths()[id];
+        if (!savedPath) {
+          return { status: "none" };
+        }
+        // Probing the folder is what detects a missing folder or one the persisted fs scope no longer allows.
+        if (!(await isReadable(savedPath))) {
+          return { status: "unavailable", name: folderNameFromPath(savedPath) };
+        }
+        return { status: "restored", folder: folderAt(id, savedPath) };
+      },
+
+      async forgetFolder(id: string): Promise<void> {
+        const paths = readFolderPaths();
+        if (id in paths) {
+          delete paths[id];
+          saveFolderPaths(paths);
+        }
+      },
+
+      relate: async (a, b) => relateFolderPaths(a.rootPath, b.rootPath),
+
+      async resolveRelative(from: WorkspaceFolder, relativePath: string): Promise<WorkspaceFolder | null> {
+        const target = resolveRelativePath(from.rootPath, relativePath);
+        // Only a folder already in the granted scope can be read; anything else is not found.
+        if (target === null || !(await isReadable(target))) {
+          return null;
+        }
+        return rememberFolder(target);
+      },
+
+      relativeLocation: async (from, to) => relativeFolderPath(from.rootPath, to.rootPath),
+
+      async reveal(folder: WorkspaceFolder, path: string): Promise<void> {
+        const fullPath = path === "" ? normalizeFolderPath(folder.rootPath) : joinFolderPath(folder.rootPath, path);
+        await revealItemInDir(toPlatformPath(fullPath));
+      },
+
+      // A root that cannot be read fails the whole call, so a vanished folder never shows as empty.
+      readTree: (folder) => scanDirectory(folder.rootPath, ""),
+
+      async stat(folder: WorkspaceFolder, path: string): Promise<FileStat | null> {
+        const current = await statFile(joinFolderPath(folder.rootPath, path));
+        return current ? { size: current.size, modifiedAt: current.modifiedAt } : null;
+      },
+
+      async readFile(folder: WorkspaceFolder, path: string): Promise<FileContents> {
+        const fullPath = joinFolderPath(folder.rootPath, path);
+        // Stated before reading: a change in between then reads as newer than this version and is
+        // noticed on the next check, rather than hidden behind a version that matches it.
+        const current = await statFile(fullPath);
+        if (!current) {
+          throw new WorkspaceError("not-found", `"${path}" was not found.`);
+        }
+        const bytes = await readFileBytes(fullPath);
+        return { bytes, stat: { size: current.size, modifiedAt: current.modifiedAt } };
+      },
+
+      async writeFile(
+        folder: WorkspaceFolder,
+        path: string,
+        bytes: Uint8Array<ArrayBuffer>,
+        options?: { expected?: FileStat },
+      ): Promise<FileStat> {
+        const fullPath = joinFolderPath(folder.rootPath, path);
+        const current = await statFile(fullPath);
+        const expected = options?.expected;
+        if (expected && (!current || current.size !== expected.size || current.modifiedAt !== expected.modifiedAt)) {
+          throw new WorkspaceError("conflict", `"${path}" changed on disk after it was read.`);
+        }
+
+        // A rename would replace a symbolic link with a regular file, and the file it points to would stop
+        // changing. So a link is written through, in place, without the temporary file's protection.
+        if (current && (await isSymlink(fullPath))) {
+          await writeFileBytes(fullPath, bytes);
+          return statWritten(fullPath, path);
+        }
+
+        // Written beside the file and renamed over it, so a crash or a full disk mid-write leaves the
+        // original intact rather than truncated. The rename replaces the file in one step on Windows,
+        // Linux, and macOS.
+        const { directory, name } = splitNativePath(fullPath);
+        // No leading dot: on Unix, Tauri's filesystem scope does not match dotfiles inside the granted folder.
+        const tempPath = `${directory}/${name}.vista-save-${crypto.randomUUID().slice(0, 8)}`;
+        // Unix permission bits only; Windows reports none.
+        const mode = current?.mode === null || current?.mode === undefined ? undefined : current.mode & 0o7777;
+        try {
+          // Inside the try, so a write that fails partway, such as on a full disk, leaves no temporary file.
+          await writeFileBytes(tempPath, bytes, { createNew: true, ...(mode === undefined ? {} : { mode }) });
+          // Stated before the rename, which keeps size and modification time, so a program that changes the
+          // file right after cannot have its version recorded as the one Vista saved.
+          const written = await statWritten(tempPath, path);
+          await rename(tempPath, fullPath);
+          return written;
+        } catch (err) {
+          await removeEntry(tempPath).catch((cleanupErr: unknown) =>
+            console.warn(`Could not remove the temporary file "${tempPath}":`, cleanupErr),
+          );
+          throw err;
+        }
+      },
+
+      async createFile(folder: WorkspaceFolder, path: string): Promise<void> {
+        const fullPath = joinFolderPath(folder.rootPath, path);
+        if (await exists(fullPath)) {
+          throw new WorkspaceError("already-exists", `"${path.split("/").pop()}" already exists.`);
+        }
+        // `createNew` fails atomically if the file was created by something else between
+        // the `exists` check above and this call, rather than silently overwriting it.
+        await writeFileBytes(fullPath, new Uint8Array(), { createNew: true });
+      },
+
+      async createDirectory(folder: WorkspaceFolder, path: string): Promise<void> {
+        const fullPath = joinFolderPath(folder.rootPath, path);
+        if (await exists(fullPath)) {
+          throw new WorkspaceError("already-exists", `"${path.split("/").pop()}" already exists.`);
+        }
+        await mkdir(fullPath);
+      },
+
+      async move(folder: WorkspaceFolder, fromPath: string, toPath: string): Promise<void> {
+        const fullFromPath = joinFolderPath(folder.rootPath, fromPath);
+        const fullToPath = joinFolderPath(folder.rootPath, toPath);
+        // `rename` silently replaces an existing destination rather than failing, so the
+        // collision check has to happen explicitly here to honor the contract.
+        if (await exists(fullToPath)) {
+          throw new WorkspaceError("already-exists", `An entry already exists at "${toPath}".`);
+        }
+        await rename(fullFromPath, fullToPath);
+      },
+
+      async remove(folder: WorkspaceFolder, path: string): Promise<void> {
+        await removeEntry(joinFolderPath(folder.rootPath, path), { recursive: true });
+      },
     },
-
-    async restoreFolder(id: string): Promise<RestoreFolderResult> {
-      const savedPath = readFolderPaths()[id];
-      if (!savedPath) {
-        return { status: "none" };
-      }
-      // Probing the folder is what detects a missing folder or one the persisted fs scope no longer allows.
-      if (!(await isReadable(savedPath))) {
-        return { status: "unavailable", name: folderNameFromPath(savedPath) };
-      }
-      return { status: "restored", folder: folderAt(id, savedPath) };
-    },
-
-    async forgetFolder(id: string): Promise<void> {
-      const paths = readFolderPaths();
-      if (id in paths) {
-        delete paths[id];
-        saveFolderPaths(paths);
-      }
-    },
-
-    relate: async (a, b) => relateFolderPaths(a.rootPath, b.rootPath),
-
-    async resolveRelative(from: WorkspaceFolder, relativePath: string): Promise<WorkspaceFolder | null> {
-      const target = resolveRelativePath(from.rootPath, relativePath);
-      // Only a folder already in the granted scope can be read; anything else is not found.
-      if (target === null || !(await isReadable(target))) {
-        return null;
-      }
-      return rememberFolder(target);
-    },
-
-    relativeLocation: async (from, to) => relativeFolderPath(from.rootPath, to.rootPath),
-
-    async reveal(folder: WorkspaceFolder, path: string): Promise<void> {
-      const fullPath = path === "" ? normalizeFolderPath(folder.rootPath) : joinFolderPath(folder.rootPath, path);
-      await revealItemInDir(toPlatformPath(fullPath));
-    },
-
-    // A root that cannot be read fails the whole call, so a vanished folder never shows as empty.
-    readTree: (folder) => scanDirectory(folder.rootPath, ""),
-
-    async stat(folder: WorkspaceFolder, path: string): Promise<FileStat | null> {
-      const current = await statFile(joinFolderPath(folder.rootPath, path));
-      return current ? { size: current.size, modifiedAt: current.modifiedAt } : null;
-    },
-
-    async readFile(folder: WorkspaceFolder, path: string): Promise<FileContents> {
-      const fullPath = joinFolderPath(folder.rootPath, path);
-      // Stated before reading: a change in between then reads as newer than this version and is
-      // noticed on the next check, rather than hidden behind a version that matches it.
-      const current = await statFile(fullPath);
-      if (!current) {
-        throw new Error(`"${path}" was not found.`);
-      }
-      const bytes = await readFileBytes(fullPath);
-      return { bytes, stat: { size: current.size, modifiedAt: current.modifiedAt } };
-    },
-
-    async writeFile(
-      folder: WorkspaceFolder,
-      path: string,
-      bytes: Uint8Array<ArrayBuffer>,
-      options?: { expected?: FileStat },
-    ): Promise<FileStat> {
-      const fullPath = joinFolderPath(folder.rootPath, path);
-      const current = await statFile(fullPath);
-      const expected = options?.expected;
-      if (expected && (!current || current.size !== expected.size || current.modifiedAt !== expected.modifiedAt)) {
-        throw new WorkspaceError("conflict", `"${path}" changed on disk after it was read.`);
-      }
-
-      // A rename would replace a symbolic link with a regular file, and the file it points to would stop
-      // changing. So a link is written through, in place, without the temporary file's protection.
-      if (current && (await isSymlink(fullPath))) {
-        await writeFileBytes(fullPath, bytes);
-        return statWritten(fullPath, path);
-      }
-
-      // Written beside the file and renamed over it, so a crash or a full disk mid-write leaves the
-      // original intact rather than truncated. The rename replaces the file in one step on Windows,
-      // Linux, and macOS.
-      const { directory, name } = splitNativePath(fullPath);
-      // No leading dot: on Unix, Tauri's filesystem scope does not match dotfiles inside the granted folder.
-      const tempPath = `${directory}/${name}.vista-save-${crypto.randomUUID().slice(0, 8)}`;
-      // Unix permission bits only; Windows reports none.
-      const mode = current?.mode === null || current?.mode === undefined ? undefined : current.mode & 0o7777;
-      try {
-        // Inside the try, so a write that fails partway, such as on a full disk, leaves no temporary file.
-        await writeFileBytes(tempPath, bytes, { createNew: true, ...(mode === undefined ? {} : { mode }) });
-        // Stated before the rename, which keeps size and modification time, so a program that changes the
-        // file right after cannot have its version recorded as the one Vista saved.
-        const written = await statWritten(tempPath, path);
-        await rename(tempPath, fullPath);
-        return written;
-      } catch (err) {
-        await removeEntry(tempPath).catch((cleanupErr: unknown) =>
-          console.warn(`Could not remove the temporary file "${tempPath}":`, cleanupErr),
-        );
-        throw err;
-      }
-    },
-
-    async createFile(folder: WorkspaceFolder, path: string): Promise<void> {
-      const fullPath = joinFolderPath(folder.rootPath, path);
-      if (await exists(fullPath)) {
-        throw new Error(`"${path.split("/").pop()}" already exists.`);
-      }
-      // `createNew` fails atomically if the file was created by something else between
-      // the `exists` check above and this call, rather than silently overwriting it.
-      await writeFileBytes(fullPath, new Uint8Array(), { createNew: true });
-    },
-
-    async createDirectory(folder: WorkspaceFolder, path: string): Promise<void> {
-      const fullPath = joinFolderPath(folder.rootPath, path);
-      if (await exists(fullPath)) {
-        throw new Error(`"${path.split("/").pop()}" already exists.`);
-      }
-      await mkdir(fullPath);
-    },
-
-    async move(folder: WorkspaceFolder, fromPath: string, toPath: string): Promise<void> {
-      const fullFromPath = joinFolderPath(folder.rootPath, fromPath);
-      const fullToPath = joinFolderPath(folder.rootPath, toPath);
-      // `rename` silently replaces an existing destination rather than failing, so the
-      // collision check has to happen explicitly here to honor the contract.
-      if (await exists(fullToPath)) {
-        throw new Error(`An entry already exists at "${toPath}".`);
-      }
-      await rename(fullFromPath, fullToPath);
-    },
-
-    async remove(folder: WorkspaceFolder, path: string): Promise<void> {
-      await removeEntry(joinFolderPath(folder.rootPath, path), { recursive: true });
-    },
-  };
+    NATIVE_FAILURES,
+  );
 }

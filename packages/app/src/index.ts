@@ -19,6 +19,7 @@ export type {
   WorkspaceErrorKind,
   WorkspaceNode,
 } from "./ports";
-export { LEGACY_FOLDER_ID, WorkspaceError } from "./ports";
+export { LEGACY_FOLDER_ID, WORKSPACE_ERROR_KINDS, WorkspaceError } from "./ports";
+export { classifyWorkspaceFailures, type PlatformFailures } from "./domain/workspace-errors";
 export { initAppearance } from "./theme/appearance";
 export { getThemeInstance, useTheme } from "./theme/theme-manager";

@@ -87,18 +87,33 @@ export interface FileContents {
   stat: FileStat;
 }
 
-/** Why a workspace operation failed, for failures the application handles rather than reports. */
-export type WorkspaceErrorKind = "conflict";
+/** The kinds of workspace failure, which the interface words and branches on. */
+export const WORKSPACE_ERROR_KINDS = [
+  "permission-denied",
+  "not-found",
+  "already-exists",
+  "unsupported",
+  "conflict",
+  "unknown",
+] as const;
 
 /**
- * A failure the application branches on. `"conflict"`: the file on disk is not the version the
- * caller expected, because something else changed, created, or deleted it.
+ * Why a workspace operation failed. `"conflict"`: the file on disk is not the version the caller
+ * expected, because something else changed, created, or deleted it. `"not-found"` also covers a
+ * folder that is no longer open in this session. `"unknown"`: nothing recognized the failure.
+ */
+export type WorkspaceErrorKind = (typeof WORKSPACE_ERROR_KINDS)[number];
+
+/**
+ * A failed workspace operation, as every adapter reports it. The interface shows its own message for
+ * the `kind`; the `message` describes the failure for the console and is never shown, and `cause`
+ * holds the platform's error when there was one. `docs/specs/errors.md` describes the kinds.
  */
 export class WorkspaceError extends Error {
   readonly kind: WorkspaceErrorKind;
 
-  constructor(kind: WorkspaceErrorKind, message: string) {
-    super(message);
+  constructor(kind: WorkspaceErrorKind, message: string, options?: { cause?: unknown }) {
+    super(message, options);
     this.name = "WorkspaceError";
     this.kind = kind;
   }
