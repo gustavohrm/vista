@@ -724,7 +724,7 @@ function AppShell({ adapter }: AppProps) {
             return { tab, isGone: (await adapter.workspace.stat(folder, tab.path)) === null };
           } catch (err) {
             // Kept: reading it when it is shown reports the problem.
-            console.error("Failed to check a file from the last session:", err);
+            console.warn("Failed to check a file from the last session:", err);
             return { tab, isGone: false };
           }
         }),
@@ -940,7 +940,8 @@ function AppShell({ adapter }: AppProps) {
                 try {
                   await adapter.workspace.forgetFolder(folderId);
                 } catch (err) {
-                  console.error("Failed to forget a folder the workspace file dropped:", err);
+                  // Nothing uses the folder any more; the host keeping a record of it is harmless.
+                  console.warn("Failed to forget a folder the workspace file dropped:", err);
                 }
               }),
             );
@@ -1314,7 +1315,7 @@ function AppShell({ adapter }: AppProps) {
             await adapter.workspace.forgetFolder(folderId);
           } catch (err) {
             // The workspace is gone either way; the host keeping a record of the folder is harmless.
-            console.error("Failed to forget a folder:", err);
+            console.warn("Failed to forget a folder:", err);
           }
         }),
       );
@@ -1463,7 +1464,7 @@ function AppShell({ adapter }: AppProps) {
           );
         } catch (err) {
           // The entry still opens; it only goes without its folder names.
-          console.error("Failed to look up a workspace's folders:", err);
+          console.warn("Failed to look up a workspace's folders:", err);
         }
       };
       void probe();
@@ -2088,7 +2089,7 @@ function AppShell({ adapter }: AppProps) {
             }
           } catch (err) {
             // Quiet: the user did not ask for this refresh, and the tree on screen is still usable.
-            console.error("Failed to refresh the file list:", err);
+            console.warn("Failed to refresh the file list:", err);
           }
         }),
       );
@@ -2129,7 +2130,8 @@ function AppShell({ adapter }: AppProps) {
               marked.push(current);
             }
           } catch (err) {
-            console.error("Failed to check a file on disk:", err);
+            // Quiet for the same reason: the tab still shows what was read, and the next focus checks again.
+            console.warn("Failed to check a file on disk:", err);
           }
         }),
       );

@@ -320,7 +320,8 @@ export function MarkdownEditor({ content, onChange, onReady, loadImage }: Markdo
         try {
           await editor.destroy();
         } catch (error) {
-          console.error("Failed to destroy Markdown editor", error);
+          // The editor is leaving the screen, so nothing shown depends on it any more.
+          console.warn("Failed to destroy Markdown editor", error);
         }
       };
       void destroyEditor();
