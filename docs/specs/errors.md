@@ -1,12 +1,12 @@
 ---
-status: DRAFT
-last_updated: 2026-11-16
+status: APPROVED
+last_updated: 2026-11-26
 scope: How workspace failures are classified, presented to the user, and logged across the shared app and the web and native hosts.
 ---
 
 # Errors
 
-This document describes how failures move from the platform to the interface today, then proposes a direction. Sections marked **Current behavior** are facts from the code. Sections marked **Direction** are proposals for the owner to approve or change; they are not implemented.
+This document describes how failures move from the platform to the interface, and how they are classified, worded, and logged. It is approved and not yet implemented: [Current behavior](#current-behavior) records what the code does today, and [Decisions](#decisions) what it changes to. Code that still follows the current behavior is legacy until it is brought in line.
 
 ## Current behavior
 
@@ -56,21 +56,41 @@ Most of these carry a comment saying why; not all do.
 
 Failures are logged with `console.error` or `console.warn` and a fixed prefix. The logged values include folder paths and names (`relativePath`, `savedPath`, `handle.name`). File content is not logged. No logger abstraction exists.
 
-## Direction
+## Decisions
 
-Proposals only. Each needs owner approval before it becomes a rule.
+### Failure kinds
 
-1. **Classify at the adapter boundary.** Adapters map platform errors to a small set of failure kinds. Proposed kinds: `permission-denied`, `not-found`, `already-exists`, `unsupported`, and `unknown`. Cancellation is not a kind; it stays a `null` or equivalent value. The mapping lives in the adapter, because only the adapter knows what `NotAllowedError` or a Tauri plugin error means.
-2. **The interface never shows raw platform text.** The `unknown` kind shows a fixed message for the operation. The raw error goes to the console. This replaces the `err.message` fallback in `app.tsx`.
-3. **The app package owns user-facing text.** Wording is keyed by kind and operation in `packages/app`. Adapters supply the kind and, where useful, a name such as the file name. Vista-authored messages in the adapters move out.
-4. **Three parts per message.** Each message says what happened, why, and what to do next, in that order. For example: "Couldn't save notes.md. The folder doesn't allow changes. Re-open the folder and allow access when asked." A message that cannot name a next step should say so explicitly rather than omit it.
-5. **Best-effort swallowing needs a comment.** Every deliberate swallow states why losing the failure is safe, and logs with `console.warn`. Sites without a comment are brought into line.
-6. **Never log note content.** Logs may name an operation and a kind. Whether paths and file names may be logged is an open question for the owner; the current code logs them.
-7. **One error type across the interface.** An error class carrying `kind` replaces message matching, so a future branch on failure kind does not parse text.
-8. **Rust, when it has commands.** If Tauri commands are added, they return the same kinds through a Rust enum exported to TypeScript. Until then, no Rust error type is proposed.
+A failed workspace operation has one kind: `permission-denied`, `not-found`, `already-exists`, `unsupported`, `conflict`, or `unknown`. `conflict` is the save conflict [Changes on disk](workspaces.md#changes-on-disk) describes. A folder that is no longer open in this session is `not-found`, since what the user does next is the same: open it again. Cancellation is not a kind; it stays a `null` or equivalent value, and shows nothing.
 
-## Open questions
+The interface branches on the kind and never on message text, so wording a message differently or translating it cannot change behavior. Rejected: matching on message text, which breaks the first time a platform or a translation words the same failure differently.
 
-- Whether file and folder names may appear in logs.
-- Whether the three-part message rule applies to info toasts as well as errors.
-- Whether `unknown` should offer a retry action.
+### Classifying at the adapter boundary
+
+The adapter decides the kind, because only it knows what a `NotAllowedError` or a Tauri plugin error means. Every failure that leaves an adapter is a `WorkspaceError` (`packages/app/src/ports.ts`) carrying its kind, with the platform's error as its `cause`:
+
+- A failure the adapter detects itself, such as a name already taken, is thrown as a `WorkspaceError` of that kind, with no wording of its own beyond a developer-facing description.
+- A platform error is classified through `@codenhub/error`. `packages/app` registers each kind as a code, and each adapter adds the platform failures it recognizes as aliases of those codes: error names on the web, such as `NotAllowedError` for `permission-denied`, and the operating-system error in a Tauri plugin message on the desktop. An alias names a kind without wording it, so both adapters report the same failure the same way. A platform error no alias matches is `unknown`.
+
+Rejected: classifying in the shared app, which would need it to know each platform's errors and break the rule that `packages/app` stays host-free.
+
+### What the user sees
+
+The interface never shows a platform's text. The app shows its own message, from the dictionaries, keyed by the operation that failed and the failure's kind, and the raw error goes to the console. A platform's text cannot be translated and can name internals the user cannot act on.
+
+Each failure message says what happened, why, and what to do next, in that order: "Couldn't save notes.md. Vista isn't allowed to change this folder. Open the folder again and allow access when asked." A message that cannot name a next step says so rather than leave it out. The operation part names the file or folder where there is one; the kind part words the reason and the next step, so a kind reads the same whichever operation hit it.
+
+The rule applies to failures, not to info toasts such as a folder that couldn't be reopened: those report an outcome the user does not have to act on, and holding them to three sentences only makes them longer.
+
+An `unknown` failure offers no retry action. Retrying is safe for some operations and not others, as a save that half-ran shows, and repeating the action by hand is as quick; the message says to try again.
+
+### Swallowed failures
+
+A deliberate swallow carries a comment saying why losing the failure is safe, and logs with `console.warn`. A site without such a comment is brought into line.
+
+### What a log may hold
+
+Logs stay on the local console, as [Security](../guidelines/security.md) requires. A log may name the operation, the kind, and the file and folder names and paths involved, because a log that cannot say which file failed cannot be acted on, and a name is far less sensitive than what the file holds. A log never includes note content. Rejected: keeping names out of logs, which leaves a failure in a workspace of many files undiagnosable for a gain the local console does not need.
+
+### Rust, when it has commands
+
+If Tauri commands are added, they return the same kinds through a Rust enum exported to TypeScript. Until then, the Rust host has no error type.

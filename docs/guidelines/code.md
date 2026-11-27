@@ -55,7 +55,7 @@ Exceptions: framework callbacks, test helpers, tiny local functions, and APIs wh
 
 ## Concurrency and errors
 
-How failures are classified and shown to people is specified in [Errors](../specs/errors.md) (DRAFT).
+How failures are classified and shown to people is specified in [Errors](../specs/errors.md).
 
 - Run independent asynchronous work concurrently. Waiting for each in turn needs a reason, given where the code does it.
 - Do not swallow errors silently.

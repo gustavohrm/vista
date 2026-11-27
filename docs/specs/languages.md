@@ -6,7 +6,7 @@ scope: The interface languages, how one is chosen, stored, and applied, which te
 
 # Languages
 
-This document makes Vista's interface available in more than one language. It is approved and partly implemented: the language starts before the first render, is chosen in Settings → Language, and is stored as described below; the interface text, including the editor's phrases, is in the dictionaries with its tests; the dates and numbers follow the language; and each changelog entry is translated, as [The changelog](#the-changelog) describes. Messages that report a failed operation, such as `Failed to open the selected folder.`, are still English literals in `packages/app`, because the [Errors direction](errors.md#direction) rewrites them; they move into the dictionaries with it.
+This document makes Vista's interface available in more than one language. It is approved and partly implemented: the language starts before the first render, is chosen in Settings → Language, and is stored as described below; the interface text, including the editor's phrases, is in the dictionaries with its tests; the dates and numbers follow the language; and each changelog entry is translated, as [The changelog](#the-changelog) describes. Messages that report a failed operation, such as `Failed to open the selected folder.`, are still English literals in `packages/app`, because [Errors → Decisions](errors.md#decisions) rewrites them; they move into the dictionaries with it.
 
 ## The languages
 
@@ -87,7 +87,7 @@ The English strings that [Workspaces](workspaces.md) and other specs quote are t
 
 Today some failures show the platform's own message, from the Tauri filesystem plugin or a browser `DOMException`, through the `err.message` fallback in `app.tsx`, as [Errors → How failures reach the user](errors.md#how-failures-reach-the-user) describes. That text is in whatever language the platform uses, which may differ from Vista's, and Vista cannot translate it.
 
-The interface is therefore only fully translated once the [Errors direction](errors.md#direction) is in place: adapters report a failure kind, and the shared app shows its own message for it. This document relies on that direction and does not restate it. Until it lands, the languages can ship with every other text translated, and such a failure still shows the platform's text.
+The interface is therefore only fully translated once [Errors → Decisions](errors.md#decisions) is in place: adapters report a failure kind, and the shared app shows its own message for it. This document relies on that decision and does not restate it. Until it lands, the languages can ship with every other text translated, and such a failure still shows the platform's text.
 
 ## The changelog
 
