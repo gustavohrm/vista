@@ -2402,7 +2402,7 @@ function AppShell({ adapter }: AppProps) {
         await reveal(folder, entry.path);
       } catch (err) {
         console.error("Failed to reveal the entry:", err);
-        const name = entry.path === "" ? "the folder" : `"${entry.path.split("/").at(-1)}"`;
+        const name = `"${entry.path === "" ? folder.name : entry.path.split("/").at(-1)}"`;
         toast.show({ kind: "error", text: failureText(t("failures.operations.reveal", { name }), err) });
       }
     };

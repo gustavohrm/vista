@@ -5117,6 +5117,25 @@ describe("App", () => {
       ).toBeInTheDocument();
     });
 
+    it("names the folder when the file manager can't show a root row", async () => {
+      const user = userEvent.setup();
+      const reveal = vi.fn(async () => {
+        throw new Error("No file manager.");
+      });
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      render(<App adapter={{ platform: "native", workspace: createMockWorkspaceCapability({ reveal }) }} />);
+      await openFolderFromWelcome(user);
+
+      fireEvent.contextMenu(within(explorerPanel()).getByRole("button", { name: "My Notes" }));
+      await user.click(screen.getByRole("menuitem", { name: "Reveal in File Explorer" }));
+
+      expect(
+        await findToast(
+          `Couldn't show "My Notes" in the file manager. Something unexpected went wrong. Try again, and if it keeps happening, restart Vista.`,
+        ),
+      ).toBeInTheDocument();
+    });
+
     it("copies a tree entry's relative path, and offers its full path only on desktop", async () => {
       const user = userEvent.setup();
       const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
