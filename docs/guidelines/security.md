@@ -21,8 +21,8 @@ Vista issues and stores no secrets: it has no accounts, sessions, or server-side
 ## Never in logs, errors, or messages
 
 - Note and document content stays out of logs, error messages, and test snapshots. An error message names what failed, never the content involved.
-- Logs go only to the local console. Today they include folder paths and file names, as [Errors](../specs/errors.md#logging) records; a change that sends a log or an error anywhere off the device is a decision, recorded first, and keeps paths and names out of what it sends.
-- [Errors](../specs/errors.md#direction) proposes that the interface show a fixed message for an unexpected failure and leave the raw error to the console. Until it is approved, toasts show the error's own message.
+- Logs go only to the local console. They may include folder paths and file names but never note content, as [Errors → What a log may hold](../specs/errors.md#what-a-log-may-hold) decides; a change that sends a log or an error anywhere off the device is a decision, recorded first, and keeps paths and names out of what it sends.
+- The interface shows Vista's own message for a failure and leaves the raw error to the console, as [Errors → What the user sees](../specs/errors.md#what-the-user-sees) decides. Until that is implemented, toasts show the error's own message.
 - Where a leak would matter, a test proves it: it feeds known note content through the flow and asserts it never appears in what was logged, shown, or snapshotted.
 
 ## Untrusted input
