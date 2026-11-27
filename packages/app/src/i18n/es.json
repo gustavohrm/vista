@@ -641,5 +641,40 @@
       "fixed": "Corregido",
       "security": "Seguridad"
     }
+  },
+  "failures": {
+    "operations": {
+      "save": "No se pudo guardar {name}.",
+      "open": "No se pudo abrir {name}.",
+      "readFolder": "No se pudo leer la carpeta \"{name}\".",
+      "pickFolder": "No se pudo abrir la carpeta seleccionada.",
+      "restoreWorkspace": "No se pudo volver a abrir el último espacio de trabajo.",
+      "openWorkspace": "No se pudo abrir el espacio de trabajo.",
+      "createWorkspace": "No se pudo crear el espacio de trabajo.",
+      "readWorkspace": "No se pudo leer el espacio de trabajo.",
+      "storeDetails": "No se pudieron guardar los detalles en \"{path}\".",
+      "deleteDetails": "No se pudo eliminar \"{path}\".",
+      "addFolder": "No se pudo añadir la carpeta.",
+      "openFolder": "No se pudo abrir la carpeta.",
+      "refresh": "No se pudo actualizar la lista de archivos.",
+      "create": "No se pudo crear \"{name}\".",
+      "rename": "No se pudo cambiar el nombre de \"{name}\".",
+      "delete": "No se pudo eliminar \"{name}\".",
+      "reveal": "No se pudo mostrar {name} en el explorador de archivos.",
+      "copy": "No se pudo copiar al portapapeles."
+    },
+    "reasons": {
+      "permissionDenied": "Vista no tiene permiso para usar esta carpeta. Vuelve a abrir la carpeta y permite el acceso cuando se te pida.",
+      "notFound": "Ya no hay nada en esa ubicación, por un cambio de lugar o de nombre, o por una eliminación. Actualiza la lista de archivos o vuelve a abrir la carpeta.",
+      "alreadyExists": "Ya hay algo con ese nombre. Elige otro nombre.",
+      "unsupported": "Este navegador o dispositivo no lo admite, así que volver a intentarlo no servirá.",
+      "conflict": "El contenido cambió en el disco después de que Vista lo leyera. Vuelve a abrirlo para ver los cambios.",
+      "unknown": "Algo inesperado salió mal. Vuelve a intentarlo y, si sigue ocurriendo, reinicia Vista."
+    },
+    "installUpdate": "No se pudo instalar Vista {version}. Falló la descarga o el instalador. Puedes volver a intentarlo desde Acerca de, en Configuración.",
+    "checkUpdates": "No se pudo buscar actualizaciones. Vista no pudo conectar con el servidor de actualizaciones. Revisa tu conexión y vuelve a intentarlo.",
+    "fileGone": "\"{name}\" ya no existe. Puede que se haya movido o eliminado.",
+    "reopenFolder": "No se pudo volver a abrir \"{name}\". Puede que la carpeta se haya movido o eliminado.",
+    "reopenWorkspace": "No se pudo volver a abrir \"{workspace}\". Puede que sus carpetas se hayan movido o eliminado."
   }
 }
